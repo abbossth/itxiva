@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ITXiva — O'quv Platformasi (LMS)
 
-## Getting Started
+Muhammad al-Xorazmiy vorislari dasturi (Xiva, Xorazm) doirasidagi 5 ta guruh (2×8-sinf, 2×9-sinf, 1×11-sinf) uchun mo'ljallangan ixtisoslashtirilgan o'quv platformasi.
 
-First, run the development server:
+Domen: **itxiva.uz**
+
+---
+
+## 1. Texnologik stek
+
+- **Frontend & Backend**: Next.js 16 (App Router), TypeScript (strict mode), Tailwind CSS v4, shadcn/ui, `motion/react`.
+- **Ma'lumotlar bazasi**: MongoDB Atlas (Mongoose ORM).
+- **Fayllar ombori**: Cloudflare R2 (Private bucket, AWS SDK v3 S3 presigned URL).
+- **Autentifikatsiya**: `bcryptjs` (parollarni xeshlash) + `jose` (JWT cookie: `httpOnly`, `secure`, `sameSite=lax`, 14 kunlik sessiya).
+- **Validatsiya**: Zod.
+- **Dizayn**: Mobile-first (360px+ moslashuvchan), Xiva firuza (`#14B8A6`) → chuqur ko'k (`#2563EB`) gradient, iliq oltin/amber (`#F59E0B`) urg'u, yorug' va qorong'i rejim.
+
+---
+
+## 2. Loyihani mahalliydan ishga tushirish
+
+### 1-qadam. Muhit o'zgaruvchilarini sozlash
+`.env.example` faylidan nusxa olib `.env.local` yarating va kerakli qiymatlarni kiriting:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` tarkibi:
+```env
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/itxiva?retryWrites=true&w=majority
+JWT_SECRET=bu_yerga_kamida_32_belgili_maxfiy_satr_yozing_123456789
+R2_ACCESS_KEY_ID=sizning_r2_access_key
+R2_SECRET_ACCESS_KEY=sizning_r2_secret_key
+R2_ACCOUNT_ID=5f9109839719d5cf37ba7f8c35a7f19c
+R2_BUCKET_NAME=itxivas3
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2-qadam. Paketlarni o'rnatish va dev serverni ishga tushirish
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Brauzerda: `http://localhost:3000` ochiladi.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 3. Test ma'lumotlarini bazaga yuklash (Seed)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Test guruhlari (8-A, 8-B, 9-A, 9-B, 11-A), mentor akkaunti va sinov o'quvchilarini yaratish uchun quyidagi buyruqni bering:
 
-## Deploy on Vercel
+```bash
+npx tsx scripts/seed.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> **Eslatma:** Tasodifiy parollar konsolda faqat bir marta jadval ko'rinishida chiqariladi.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 4. Cloudflare R2 CORS sozlamasi
+
+Brauzerdan fayllarni to'g'ridan-to'g'ri `PUT` orqali R2 bucketiga yuklash uchun Cloudflare Dashboard'da quyidagi CORS qoidasini qo'llang:
+
+**Cloudflare Dashboard → R2 Object Storage → `itxivas3` bucket → Settings → CORS Policy:**
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://itxiva.uz",
+      "https://www.itxiva.uz",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": [
+      "GET",
+      "PUT",
+      "HEAD"
+    ],
+    "AllowedHeaders": [
+      "Content-Type",
+      "Authorization"
+    ],
+    "ExposeHeaders": [
+      "ETag"
+    ],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+---
+
+## 5. Vercel'ga joylash (Production Deploy)
+
+1. Loyihani GitHub reposingizga push qiling.
+2. [Vercel Dashboard](https://vercel.com) da loyihani import qiling.
+3. **Environment Variables** bo'limiga `.env.local` dagi barcha qiymatlarni kiriting (`MONGODB_URI`, `JWT_SECRET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`, `R2_BUCKET_NAME`, `NEXT_PUBLIC_APP_URL`).
+4. **Deploy** tugmasini bosing.
+
+---
+
+## 6. Shaxsiy ma'lumotlar xavfsizligi va qonunchilik eslatmasi
+
+> [!IMPORTANT]
+> O'zbekiston Respublikasining "Shaxsga doir ma'lumotlar to'g'risida"gi Qonuni (O'RQ-547) 27-1-moddasi talablariga muvofiq, O'zbekiston fuqarolarining shaxsga doir ma'lumotlari jismonan O'zbekiston hududida joylashgan ma'lumotlar bazalarida saqlanishi belgilangan.
+> Loyihada faqat zarur minimal ma'lumotlar (ism, guruh, login) saqlanadi; telefon raqam yoki boshqa ortiqcha shaxsiy ma'lumotlar so'ralmaydi va saqlanmaydi. Ishlab chiqarish (production) serverlari va bazasini tanlashda milliy qonunchilik talablariga rioya etilishiga e'tibor qaratilishi zarur.

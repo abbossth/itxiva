@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #F8FAFC;
+    --foreground: #0F172A;
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    --card-alt: #F1F5F9;
+    --popover: #FFFFFF;
+    --popover-foreground: #0F172A;
+    --primary: #14B8A6;
+    --primary-gradient-from: #14B8A6;
+    --primary-gradient-to: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #0F172A;
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    --accent: #F59E0B;
+    --accent-foreground: #FFFFFF;
+    --destructive: #F43F5E;
+    --destructive-foreground: #FFFFFF;
+    --success: #10B981;
+    --success-foreground: #FFFFFF;
+    --border: #E2E8F0;
+    --input: #E2E8F0;
+    --ring: #14B8A6;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: #0B1220;
+    --foreground: #F8FAFC;
+    --card: #131E32;
+    --card-foreground: #F8FAFC;
+    --card-alt: #1E293B;
+    --popover: #131E32;
+    --popover-foreground: #F8FAFC;
+    --primary: #14B8A6;
+    --primary-gradient-from: #14B8A6;
+    --primary-gradient-to: #3B82F6;
+    --primary-foreground: #FFFFFF;
+    --secondary: #1E293B;
+    --secondary-foreground: #F8FAFC;
+    --muted: #1E293B;
+    --muted-foreground: #94A3B8;
+    --accent: #F59E0B;
+    --accent-foreground: #FFFFFF;
+    --destructive: #F43F5E;
+    --destructive-foreground: #FFFFFF;
+    --success: #10B981;
+    --success-foreground: #FFFFFF;
+    --border: #1E293B;
+    --input: #1E293B;
+    --ring: #14B8A6;
   }
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom Gradients */
+.bg-itxiva-gradient {
+  background: linear-gradient(135deg, var(--primary-gradient-from) 0%, var(--primary-gradient-to) 100%);
+}
+
+.text-itxiva-gradient {
+  background: linear-gradient(135deg, var(--primary-gradient-from) 0%, var(--primary-gradient-to) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-accent-gold {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+}
+
+/* Shimmer animation for skeletons */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-effect::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(255, 255, 255, 0.2) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+  content: '';
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

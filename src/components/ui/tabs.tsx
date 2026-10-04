@@ -1,0 +1,109 @@
+"use client";
+
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+interface TabsContextType {
+  activeTab: string;
+  setActiveTab: (id: string) => void;
+}
+
+const TabsContext = React.createContext<TabsContextType | null>(null);
+
+export function Tabs({
+  defaultValue,
+  value,
+  onValueChange,
+  children,
+  className,
+}: {
+  defaultValue?: string;
+  value?: string;
+  onValueChange?: (val: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const [internalTab, setInternalTab] = React.useState(defaultValue || "");
+  const activeTab = value !== undefined ? value : internalTab;
+
+  const setActiveTab = React.useCallback(
+    (newVal: string) => {
+      if (value === undefined) setInternalTab(newVal);
+      onValueChange?.(newVal);
+    },
+    [value, onValueChange]
+  );
+
+  return (
+    <TabsContext.Provider value={{ activeTab, setActiveTab }}>
+      <div className={cn("w-full", className)}>{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+export function TabsList({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function TabsTrigger({
+  value,
+  children,
+  className,
+}: {
+  value: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const ctx = React.useContext(TabsContext);
+  if (!ctx) throw new Error("TabsTrigger must be used inside Tabs");
+
+  const isActive = ctx.activeTab === value;
+
+  return (
+    <button
+      type="button"
+      onClick={() => ctx.setActiveTab(value)}
+      className={cn(
+        "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all select-none cursor-pointer min-h-[38px]",
+        isActive
+          ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 font-semibold shadow-xs"
+          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function TabsContent({
+  value,
+  children,
+  className,
+}: {
+  value: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const ctx = React.useContext(TabsContext);
+  if (!ctx) throw new Error("TabsContent must be used inside Tabs");
+
+  if (ctx.activeTab !== value) return null;
+
+  return <div className={cn("mt-4 focus:outline-hidden", className)}>{children}</div>;
+}
