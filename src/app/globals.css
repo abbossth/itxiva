@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* dark: utilitalari tizim sozlamasiga emas, <html class="dark"> ga bog'lanadi (ThemeToggle shu klassni almashtiradi) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --background: #F8FAFC;
