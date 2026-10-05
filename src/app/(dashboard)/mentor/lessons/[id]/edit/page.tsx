@@ -7,6 +7,10 @@ import { getLessonById } from "@/actions/lesson.actions";
 import { getQuizForMentor } from "@/actions/quiz.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 
+export const metadata = {
+  title: "Darsni tahrirlash — ITXiva",
+};
+
 interface EditLessonPageProps {
   params: Promise<{ id: string }>;
 }

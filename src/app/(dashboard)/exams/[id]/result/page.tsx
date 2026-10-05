@@ -7,6 +7,10 @@ import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { ArrowLeft, Clock } from "lucide-react";
 
+export const metadata = {
+  title: "Imtihon natijasi — ITXiva",
+};
+
 interface ExamResultPageProps {
   params: Promise<{ id: string }>;
 }

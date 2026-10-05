@@ -82,6 +82,19 @@ export async function loginAction(
     redirect("/change-password");
   }
 
+  const rawNext = formData.get("next") as string | null;
+  const safeNext =
+    rawNext &&
+    rawNext.startsWith("/") &&
+    !rawNext.startsWith("//") &&
+    !rawNext.startsWith("/api")
+      ? rawNext
+      : null;
+
+  if (safeNext) {
+    redirect(safeNext);
+  }
+
   if (user.role === "mentor") {
     redirect("/mentor/groups");
   } else {

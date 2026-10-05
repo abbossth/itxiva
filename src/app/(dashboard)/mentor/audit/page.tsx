@@ -5,6 +5,10 @@ import { ShieldCheck, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeUz } from "@/lib/utils";
 
+export const metadata = {
+  title: "Audit loglar — ITXiva",
+};
+
 export default async function MentorAuditPage() {
   await requireMentorPage();
   await connectToDatabase();

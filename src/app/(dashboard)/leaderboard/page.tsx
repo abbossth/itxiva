@@ -7,6 +7,10 @@ import { Trophy } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+export const metadata = {
+  title: "Reyting — ITXiva",
+};
+
 interface LeaderboardPageProps {
   searchParams: Promise<{
     type?: "all" | "group" | "grade";

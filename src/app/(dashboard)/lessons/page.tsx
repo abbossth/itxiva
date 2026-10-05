@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getGroupById } from "@/actions/group.actions";
@@ -7,12 +8,20 @@ import { BookOpen } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+export const metadata = {
+  title: "Darslarim — ITXiva",
+};
+
 interface LessonsPageProps {
   searchParams: Promise<{ quarter?: string }>;
 }
 
 export default async function LessonsPage({ searchParams }: LessonsPageProps) {
   const session = await requireAuth();
+  if (session.role === "mentor") {
+    redirect("/mentor/lessons");
+  }
+
   const resolvedSearchParams = await searchParams;
   const quarter = resolvedSearchParams.quarter ? parseInt(resolvedSearchParams.quarter, 10) : 1;
 

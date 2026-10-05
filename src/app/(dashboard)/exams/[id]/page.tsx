@@ -8,6 +8,10 @@ import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
 
+export const metadata = {
+  title: "Imtihon — ITXiva",
+};
+
 interface ExamDetailPageProps {
   params: Promise<{ id: string }>;
 }

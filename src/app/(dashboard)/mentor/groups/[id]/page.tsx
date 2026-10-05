@@ -4,6 +4,10 @@ import { getGroupById, getGroups } from "@/actions/group.actions";
 import { getStudentsByGroup } from "@/actions/student.actions";
 import { GroupStudentsView } from "@/components/mentor/group-students-view";
 
+export const metadata = {
+  title: "Guruh o'quvchilari — ITXiva",
+};
+
 interface GroupDetailPageProps {
   params: Promise<{ id: string }>;
 }

@@ -7,6 +7,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
+export const metadata = {
+  title: "Darslar boshqaruvi — ITXiva",
+};
+
 interface MentorLessonsPageProps {
   searchParams: Promise<{
     groupId?: string;

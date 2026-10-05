@@ -11,6 +11,10 @@ interface NewLessonPageProps {
   }>;
 }
 
+export const metadata = {
+  title: "Yangi dars — ITXiva",
+};
+
 export default async function NewLessonPage({ searchParams }: NewLessonPageProps) {
   await requireMentorPage();
   const resolvedSearchParams = await searchParams;
