@@ -21,6 +21,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0B1220]">
+      {/* Lokal ishlab chiqishda: bu yerdagi o'zgarishlar (masalan, parol tiklash) itxiva.uz ga ta'sir qilmaydi */}
+      {process.env.NODE_ENV !== "production" && (
+        <div className="bg-amber-400 text-amber-950 text-xs font-bold text-center px-3 py-1.5">
+          LOKAL TEST BAZASI — bu yerdagi o&apos;zgarishlar itxiva.uz saytiga ta&apos;sir qilmaydi
+        </div>
+      )}
+
       {/* Sticky Top Header */}
       <Header user={session} />
 
