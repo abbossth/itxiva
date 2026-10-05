@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { KeyRound, ShieldAlert } from "lucide-react";
+import { useActionState, useState } from "react";
+import { Eye, EyeOff, KeyRound, ShieldAlert } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ const initialState: ActionResult = {
 
 export default function ChangePasswordPage() {
   const [state, formAction, isPending] = useActionState(changePasswordAction, initialState);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-[#0B1220] p-4 sm:p-6">
@@ -57,12 +59,20 @@ export default function ChangePasswordPage() {
                 <Input
                   id="newPassword"
                   name="newPassword"
-                  type="password"
+                  type={showNewPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
                   autoComplete="new-password"
-                  className="pl-10"
+                  className="pl-10 pr-11"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  aria-label={showNewPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {state?.errors?.newPassword && (
                 <p className="text-[11px] text-rose-500 mt-1">
@@ -85,12 +95,20 @@ export default function ChangePasswordPage() {
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   placeholder="••••••••"
                   required
                   autoComplete="new-password"
-                  className="pl-10"
+                  className="pl-10 pr-11"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {state?.errors?.confirmPassword && (
                 <p className="text-[11px] text-rose-500 mt-1">
