@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, BookOpen, Trophy, ShieldCheck } from "lucide-react";
+import { Users, BookOpen, Trophy, ShieldCheck, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DesktopNavProps {
@@ -15,12 +15,14 @@ export function DesktopNav({ role }: DesktopNavProps) {
   const mentorLinks = [
     { href: "/mentor/groups", label: "Guruhlar", icon: Users },
     { href: "/mentor/lessons", label: "Darslar boshqaruvi", icon: BookOpen },
+    { href: "/mentor/exams", label: "Imtihonlar", icon: GraduationCap },
     { href: "/leaderboard", label: "Reyting", icon: Trophy },
     { href: "/mentor/audit", label: "Audit loglar", icon: ShieldCheck },
   ];
 
   const studentLinks = [
     { href: "/lessons", label: "Darslarim", icon: BookOpen },
+    { href: "/exams", label: "Imtihonlarim", icon: GraduationCap },
     { href: "/leaderboard", label: "Reyting", icon: Trophy },
   ];
 

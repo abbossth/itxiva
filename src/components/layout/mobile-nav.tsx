@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, BookOpen, Trophy, ShieldCheck } from "lucide-react";
+import { Users, BookOpen, Trophy, ShieldCheck, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MobileNavProps {
@@ -15,12 +15,14 @@ export function MobileNav({ role }: MobileNavProps) {
   const mentorLinks = [
     { href: "/mentor/groups", label: "Guruhlar", icon: Users },
     { href: "/mentor/lessons", label: "Darslar", icon: BookOpen },
+    { href: "/mentor/exams", label: "Imtihon", icon: GraduationCap },
     { href: "/leaderboard", label: "Reyting", icon: Trophy },
     { href: "/mentor/audit", label: "Audit", icon: ShieldCheck },
   ];
 
   const studentLinks = [
     { href: "/lessons", label: "Darslar", icon: BookOpen },
+    { href: "/exams", label: "Imtihon", icon: GraduationCap },
     { href: "/leaderboard", label: "Reyting", icon: Trophy },
   ];
 

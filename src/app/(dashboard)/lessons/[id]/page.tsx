@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, BookOpen } from "lucide-react";
 import { getLessonById } from "@/actions/lesson.actions";
+import { getQuizForLesson } from "@/actions/quiz.actions";
 import { YouTubeFacade } from "@/components/lessons/youtube-facade";
 import { FilePreview } from "@/components/lessons/file-preview";
+import { QuizView } from "@/components/quiz/quiz-view";
 import { formatDateUz } from "@/lib/utils";
 
 interface LessonDetailPageProps {
@@ -23,6 +25,9 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
   if (!lesson) {
     notFound();
   }
+
+  const quizRes = await getQuizForLesson(resolvedParams.id);
+  const quizData = quizRes.data;
 
   const youtubeMaterial = lesson.materials?.find((m) => m.type === "youtube");
 
@@ -97,6 +102,18 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
             <FilePreview
               lessonId={lesson._id.toString()}
               materials={lesson.materials}
+            />
+          </div>
+        )}
+
+        {/* Lesson Quiz */}
+        {quizData?.quiz && (
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+            <QuizView
+              lessonId={lesson._id.toString()}
+              quiz={quizData.quiz}
+              initialSubmission={quizData.submission}
+              role="student"
             />
           </div>
         )}

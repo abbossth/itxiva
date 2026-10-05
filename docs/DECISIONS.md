@@ -19,3 +19,16 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 ### [2026-10-05] 4-qaror: 1-bosqich Reyting hisoblash
 - **Holat**: 3-bosqichdagi Coin ledger ulanmaguncha, reyting `User.totalCoins` maydoni bo'yicha hisoblanadi.
 - **Qaror**: 1-bosqichda Umumiy, Guruh va Sinf filtrlari to'liq ishlaydi. O'quvchilarga boshqalarning ismi "Ali V." ko'rinishida yuboriladi (privacy protection).
+
+### [2026-10-05] 5-qaror: Dars orasidagi kichik testlar (Quizzes) arxitekturasi
+- **Holat**: Darslarni mustahkamlash uchun dars sahifasida kichik testlar (`/lessons/[id]`).
+- **Qaror**: Test savollari 4 turga bo'lindi: `single_choice`, `multiple_choice`, `short_answer` (avtomatik tekshirish va `normalizeText` orqali bo'shliqlar/harf registri tenglashtiriladi), `open_ended` (mentor baholashi uchun). Mentor dars muharririda (`QuizEditorModal`) testni darsga bog'laydi. O'quvchi topshirgach darhol o'tish bali va to'g'ri javoblarni ko'radi.
+
+### [2026-10-05] 6-qaror: Choraklik imtihonlar (Exams), qat'iy server-side taymer va R2 fayl yuklash
+- **Holat**: Choraklik nazorat va loyiha imtihonlari (`/exams` va `/mentor/exams`).
+- **Qaror**: 
+  1. **Qat'iy server-side taymer**: O'quvchi imtihonni boshlaganda serverda `startedAt` fiksatsiyalanadi. Har bir qoralama saqlash (`saveExamDraftAction`) va yakuniy topshirishda (`submitExamAction`) `startedAt + durationMinutes + 1 daqiqa bufer` qat'iy tekshiriladi; mijoz soatini orqaga surish imtihon vaqtini cho'za olmaydi.
+  2. **Auto-save**: Imtihon vaqtida har 30 soniyada qoralama javoblar avtomatik serverga saqlanadi.
+  3. **Loyiha fayllari va GitHub**: Amaliy topshiriqlar uchun GitHub repozitoriy havolasi yoki Cloudflare R2 presigned PUT URL orqali to'g'ridan-to'g'ri fayl (zip/rar/pdf/py/js/ipynb, max 50MB) yuklanadi. Mentor baholash oynasida presigned GET URL orqali faylni yuklab oladi.
+  4. **Natijalarni e'lon qilish nazorati**: Mentor tekshirib `isResultsPublished`ni yoqmaguncha, test javoblari va natijalar o'quvchilarga sir tutiladi.
+

@@ -9,12 +9,14 @@ import {
   Loader2,
   AlertCircle,
   FileText,
+  HelpCircle,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData, IMaterial } from "@/lib/db/models/lesson.model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
+import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
 
 interface LessonEditorFormProps {
   groups: IGroupData[];
@@ -95,6 +97,7 @@ export function LessonEditorForm({
   );
   const [isPublished, setIsPublished] = useState(initialLesson?.isPublished ?? false);
   const [materials, setMaterials] = useState<IMaterial[]>(initialLesson?.materials || []);
+  const [showQuizModal, setShowQuizModal] = useState(false);
 
   // Material builder states
   const [materialType, setMaterialType] = useState<"file" | "youtube" | "link">("youtube");
@@ -485,19 +488,43 @@ export function LessonEditorForm({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center justify-end gap-3 pt-2">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => router.back()}
-          disabled={isSaving}
-        >
-          Bekor qilish
-        </Button>
-        <Button type="submit" variant="primary" size="lg" isLoading={isSaving}>
-          {initialLesson ? "O'zgarishlarni saqlash" : "Darsni yaratish"}
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        {initialLesson ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowQuizModal(true)}
+            className="flex items-center gap-2 border-teal-500/30 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>Kichik testni sozlash (Quiz)</span>
+          </Button>
+        ) : (
+          <div />
+        )}
+
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => router.back()}
+            disabled={isSaving}
+          >
+            Bekor qilish
+          </Button>
+          <Button type="submit" variant="primary" size="lg" isLoading={isSaving}>
+            {initialLesson ? "O'zgarishlarni saqlash" : "Darsni yaratish"}
+          </Button>
+        </div>
       </div>
+
+      {initialLesson && (
+        <QuizEditorModal
+          isOpen={showQuizModal}
+          onClose={() => setShowQuizModal(false)}
+          lessonId={initialLesson._id.toString()}
+        />
+      )}
     </form>
   );
 }

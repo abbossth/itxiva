@@ -185,6 +185,112 @@ async function runSeed() {
     ]);
   }
 
+  // 5. Create Sample Quiz for Lesson 1
+  const quizzesCollection = db.collection("quizzes");
+  const firstLesson = await lessonsCollection.findOne({ order: 1 });
+  if (firstLesson) {
+    const existingQuiz = await quizzesCollection.findOne({ lessonId: firstLesson._id });
+    if (!existingQuiz) {
+      await quizzesCollection.insertOne({
+        lessonId: firstLesson._id,
+        title: "1-dars bo'yicha tezkor test",
+        description: "Python asoslari bo'yicha bilimlarni mustahkamlash",
+        isPublished: true,
+        passingScore: 60,
+        questions: [
+          {
+            _id: new mongoose.Types.ObjectId(),
+            type: "single_choice",
+            prompt: "Pythonda konsolga ma'lumot chiqarish uchun qaysi funksiya ishlatiladi?",
+            options: ["echo()", "print()", "console.log()", "System.out.println()"],
+            correctAnswers: ["print()"],
+            points: 1,
+            explanation: "Pythonda standart konsolga chiqarish funksiyasi print() hisoblanadi.",
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            type: "multiple_choice",
+            prompt: "Quyidagilardan qaysilari Pythonda to'g'ri ma'lumot turlari hisoblanadi?",
+            options: ["int", "str", "boolean_type", "float", "number"],
+            correctAnswers: ["int", "str", "float"],
+            points: 2,
+            explanation: "Pythonda int, str, float va bool asosiy ma'lumot turlaridir.",
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            type: "short_answer",
+            prompt: "Butun sonlar ma'lumot turining nomi nima?",
+            options: [],
+            correctAnswers: ["int", "integer"],
+            points: 1,
+            explanation: "Butun sonlar int (integer) deb ataladi.",
+          },
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log("Namunaviy kichik test (Quiz) yaratildi!");
+    }
+  }
+
+  // 6. Create Sample Exam for groups
+  const examsCollection = db.collection("exams");
+  const existingExam = await examsCollection.findOne({ title: "1-chorak oraliq nazorat imtihoni" });
+  if (!existingExam && groupDocs.length > 0) {
+    await examsCollection.insertOne({
+      groupIds: groupDocs.map((g) => g._id),
+      quarter: 1,
+      title: "1-chorak oraliq nazorat imtihoni",
+      description: "Python asoslari, o'zgaruvchilar va shart operatorlari bo'yicha amaliy va nazariy nazorat ishi.",
+      startTime: new Date(Date.now() - 24 * 60 * 60 * 1000), // kecha boshlangan
+      endTime: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 kundan keyin tugaydi
+      durationMinutes: 45,
+      maxAttempts: 1,
+      passingScore: 60,
+      isPublished: true,
+      isResultsPublished: false,
+      questions: [
+        {
+          _id: new mongoose.Types.ObjectId(),
+          type: "single_choice",
+          prompt: "Qaysi belgi yordamida Pythonda bir qatorli izoh (comment) qoldiriladi?",
+          options: ["//", "/*", "#", "--"],
+          correctAnswers: ["#"],
+          points: 5,
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          type: "multiple_choice",
+          prompt: "Shart operatorida ishlatilishi mumkin bo'lgan kalit so'zlarni tanlang:",
+          options: ["if", "elif", "else", "then", "switch"],
+          correctAnswers: ["if", "elif", "else"],
+          points: 5,
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          type: "open_ended",
+          prompt: "O'zgaruvchi (variable) nima va unga nom berishda nimalarga e'tibor berish kerak? O'z so'zlaringiz bilan tushuntiring.",
+          options: [],
+          correctAnswers: [],
+          points: 10,
+        },
+        {
+          _id: new mongoose.Types.ObjectId(),
+          type: "project_upload",
+          prompt: "Kalkulyator dasturini yozing (qo'shish, ayirish, ko'paytirish, bo'lish) va dastur kodi faylini (.py yoki .zip) yuklang:",
+          options: [],
+          correctAnswers: [],
+          points: 20,
+          allowedFileTypes: [".zip", ".py", ".pdf", ".png"],
+          maxFileSizeMb: 50,
+        },
+      ],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    console.log("Namunaviy imtihon (Exam) yaratildi!");
+  }
+
   console.log("\n=======================================================");
   console.log("   ITXIVA MA'LUMOTLAR BAZASI MUVAFFAQIYATLI SEED QILINDI");
   console.log("=======================================================\n");
