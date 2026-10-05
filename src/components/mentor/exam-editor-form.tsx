@@ -136,6 +136,27 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
       setError("Kamida bitta savol qo'shing");
       return;
     }
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      setError("Boshlanish va tugash vaqtini to'g'ri kiriting");
+      return;
+    }
+    if (endDate <= startDate) {
+      setError("Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak");
+      return;
+    }
+    const totalMinutes = Math.floor((endDate.getTime() - startDate.getTime()) / (60 * 1000));
+    if (durationMinutes > totalMinutes) {
+      setError(
+        `Imtihon davomiyligi (${durationMinutes} daqiqa) imtihon ochiq bo'lgan vaqt oralig'idan (${totalMinutes} daqiqa) oshmasligi kerak`
+      );
+      return;
+    }
+    if (passingScore < 0 || passingScore > 100) {
+      setError("O'tish bali 0 dan 100 gacha bo'lishi kerak");
+      return;
+    }
     for (let i = 0; i < questions.length; i++) {
       if (!questions[i].prompt.trim()) {
         setError(`${i + 1}-savol matnini kiriting`);

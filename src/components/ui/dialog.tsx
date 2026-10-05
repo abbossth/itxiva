@@ -175,6 +175,20 @@ export function DialogTitle({
   );
 }
 
+export function DialogDescription({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className={cn("text-xs text-slate-500 dark:text-slate-400", className)}>
+      {children}
+    </p>
+  );
+}
+
 export function DialogFooter({
   className,
   children,

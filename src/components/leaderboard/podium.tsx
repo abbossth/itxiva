@@ -1,18 +1,21 @@
 "use client";
 
-import { Trophy, Medal, Award, Coins } from "lucide-react";
+import { Trophy, Medal, Award } from "lucide-react";
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
+import { CoinBadge } from "@/components/ui/coin-badge";
 
 interface PodiumProps {
   top3: LeaderboardEntry[];
 }
 
 export function Podium({ top3 }: PodiumProps) {
-  if (!top3 || top3.length === 0) return null;
+  // Only display entries that have positive coins
+  const validTop = (top3 || []).filter((e) => e.totalCoins > 0);
+  if (validTop.length === 0) return null;
 
-  const first = top3[0];
-  const second = top3.length > 1 ? top3[1] : null;
-  const third = top3.length > 2 ? top3[2] : null;
+  const first = validTop[0];
+  const second = validTop.length > 1 ? validTop[1] : null;
+  const third = validTop.length > 2 ? validTop[2] : null;
 
   return (
     <div className="flex items-end justify-center gap-2 sm:gap-4 pt-6 pb-2 max-w-md mx-auto">
@@ -26,13 +29,12 @@ export function Podium({ top3 }: PodiumProps) {
             <span className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 text-center truncate max-w-[90px]">
               {second.displayName}
             </span>
-            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-amber-500">
-              <Coins className="w-3 h-3" />
-              {second.totalCoins}
+            <div className="mt-0.5">
+              <CoinBadge amount={second.totalCoins} size="sm" animate={false} />
             </div>
           </div>
           <div className="w-full h-24 sm:h-28 rounded-t-2xl bg-gradient-to-t from-slate-300 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center font-black text-2xl text-slate-600 dark:text-slate-300 shadow-inner">
-            2
+            {second.rank}
           </div>
         </div>
       )}
@@ -50,13 +52,12 @@ export function Podium({ top3 }: PodiumProps) {
             <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 mt-1 text-center truncate max-w-[100px]">
               {first.displayName}
             </span>
-            <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
-              <Coins className="w-3.5 h-3.5 fill-amber-500" />
-              {first.totalCoins}
+            <div className="mt-0.5">
+              <CoinBadge amount={first.totalCoins} size="sm" animate={false} />
             </div>
           </div>
           <div className="w-full h-32 sm:h-36 rounded-t-2xl bg-gradient-to-t from-amber-500 to-amber-400 text-white flex items-center justify-center font-black text-3xl shadow-lg shadow-amber-500/20">
-            1
+            {first.rank}
           </div>
         </div>
       )}
@@ -71,13 +72,12 @@ export function Podium({ top3 }: PodiumProps) {
             <span className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 mt-1 text-center truncate max-w-[90px]">
               {third.displayName}
             </span>
-            <div className="flex items-center gap-1 text-[10px] sm:text-xs font-semibold text-amber-500">
-              <Coins className="w-3 h-3" />
-              {third.totalCoins}
+            <div className="mt-0.5">
+              <CoinBadge amount={third.totalCoins} size="sm" animate={false} />
             </div>
           </div>
           <div className="w-full h-18 sm:h-20 rounded-t-2xl bg-gradient-to-t from-amber-700/40 to-amber-600/30 dark:from-amber-900/50 dark:to-amber-800/40 flex items-center justify-center font-black text-xl text-amber-800 dark:text-amber-300 shadow-inner">
-            3
+            {third.rank}
           </div>
         </div>
       )}

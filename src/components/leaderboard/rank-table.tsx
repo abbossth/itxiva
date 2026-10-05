@@ -1,8 +1,8 @@
 "use client";
 
-import { Coins } from "lucide-react";
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { Badge } from "@/components/ui/badge";
+import { CoinBadge } from "@/components/ui/coin-badge";
 import { cn } from "@/lib/utils";
 
 interface RankTableProps {
@@ -42,9 +42,8 @@ export function RankTable({ entries, currentUserEntry }: RankTableProps) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 font-bold text-amber-500">
-            <Coins className="w-4 h-4 fill-amber-500" />
-            <span>{currentUserEntry.totalCoins}</span>
+          <div className="shrink-0">
+            <CoinBadge amount={currentUserEntry.totalCoins} size="sm" animate={false} />
           </div>
         </div>
       )}
@@ -101,9 +100,8 @@ export function RankTable({ entries, currentUserEntry }: RankTableProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 font-bold text-amber-500 shrink-0">
-                  <Coins className="w-4 h-4 fill-amber-500" />
-                  <span className="text-sm sm:text-base">{entry.totalCoins}</span>
+                <div className="shrink-0">
+                  <CoinBadge amount={entry.totalCoins} size="sm" animate={false} />
                 </div>
               </div>
             );

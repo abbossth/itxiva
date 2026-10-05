@@ -3,7 +3,7 @@ import { getLeaderboardAction } from "@/actions/leaderboard.actions";
 import { getGroups } from "@/actions/group.actions";
 import { Podium } from "@/components/leaderboard/podium";
 import { RankTable } from "@/components/leaderboard/rank-table";
-import { Trophy } from "lucide-react";
+import { Trophy, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +33,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   ]);
 
   const grades = [8, 9, 11];
+  const hasAnyCoins = leaderboardData.top3.some((e) => e.totalCoins > 0);
 
   return (
     <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
@@ -52,13 +53,13 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       {/* Filter Navigation */}
       <div className="space-y-3">
         {/* Primary Filter Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-full sm:w-fit overflow-x-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-full sm:w-fit overflow-x-auto scrollbar-none snap-x snap-mandatory">
           <Link
             href="/leaderboard?type=all"
             className={cn(
-              "flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] flex items-center justify-center whitespace-nowrap",
+              "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "all"
-                ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -72,9 +73,9 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                 : "/leaderboard?type=group"
             }
             className={cn(
-              "flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] flex items-center justify-center whitespace-nowrap",
+              "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "group"
-                ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -84,9 +85,9 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
           <Link
             href="/leaderboard?type=grade&grade=8"
             className={cn(
-              "flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] flex items-center justify-center whitespace-nowrap",
+              "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "grade"
-                ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -96,7 +97,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
         {/* Sub-tabs for Groups */}
         {type === "group" && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none snap-x snap-mandatory">
             {groups.map((g) => {
               const isSelected = groupId === g._id.toString();
               return (
@@ -104,10 +105,10 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                   key={g._id.toString()}
                   href={`/leaderboard?type=group&groupId=${g._id.toString()}`}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[36px] flex items-center justify-center",
+                    "px-4 py-2 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[40px] flex items-center justify-center snap-start",
                     isSelected
                       ? "bg-teal-600 text-white shadow-xs"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      : "bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                 >
                   {g.name} ({g.grade}-sinf)
@@ -119,7 +120,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
         {/* Sub-tabs for Grades */}
         {type === "grade" && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none snap-x snap-mandatory">
             {grades.map((gr) => {
               const isSelected = grade === gr;
               return (
@@ -127,10 +128,10 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                   key={gr}
                   href={`/leaderboard?type=grade&grade=${gr}`}
                   className={cn(
-                    "px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[36px] flex items-center justify-center",
+                    "px-4 py-2 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[40px] flex items-center justify-center snap-start",
                     isSelected
                       ? "bg-teal-600 text-white shadow-xs"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      : "bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                 >
                   {gr}-sinflar
@@ -141,10 +142,22 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
         )}
       </div>
 
-      {/* Top 3 Podium (shown if at least 1 student has entries) */}
-      {leaderboardData.top3.length > 0 && (
+      {/* Top 3 Podium or Empty Inspiration Banner (fixes K3) */}
+      {hasAnyCoins ? (
         <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-4 sm:p-6 shadow-xs">
           <Podium top3={leaderboardData.top3} />
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-dashed border-amber-300/80 dark:border-amber-700/60 bg-amber-50/30 dark:bg-amber-950/20 p-6 sm:p-8 text-center space-y-2.5 max-w-lg mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            Hali hech kim coin to&apos;plamagan — birinchi bo&apos;ling!
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Darslarda qatnashing, davomatdan o&apos;ting va testlarni yechib birinchi o&apos;ringa ko&apos;tariling.
+          </p>
         </div>
       )}
 
