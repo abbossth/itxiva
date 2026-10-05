@@ -69,3 +69,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
   1. **Toza taymer**: 1 soniyalik interval faqat sof raqamni kamaytiradi (`prev - 1`), hech qanday nojo'ya ta'sirsiz.
   2. **Effect orqali rotatsiya**: Taymer 0 ga yetganda alohida `useEffect` render to'liq yakunlangandan so'ng xavfsiz tarzda `rotateCode()`ni ishga tushiradi (`isRotatingRef` orqali takroriy chaqiruvlardan himoyalangan).
   3. **O'qish so'rovi tozaligi**: `getAttendanceSessionForProjector` funksiyasidan nojo'ya mutatsiya chaqiruvi olib tashlandi.
+
+### [2026-10-05] 14-qaror: Darslar boshqaruvi — Chorak tanlash selectga o'zgartirildi
+- **Holat**: `/mentor/lessons` sahifasida guruh tablari va chorak tablari (1, 2, 3, 4) yonma-yon turib, gorizontal bo'shliqni to'ldirib yuborayotgan va guruh nomlari qisqarib ketayotgan edi.
+- **Qaror**:
+  1. Chorak tanlash 4 ta tab o'rniga ixcham `<select>` ga o'zgartirildi (`1-chorak`, `2-chorak`, `3-chorak`, `4-chorak`).
+  2. Sukut bo'yicha (default) qiymati `1` (`1-chorak`) etib belgilandi.
+  3. Guruhlar ro'yxatiga ko'proq joy ajratilib, mobil va planshetlarda aylantirish osonlashdi.

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, BookOpen, Trash2, Edit3, Eye, EyeOff, Video, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, BookOpen, Trash2, Edit3, Eye, EyeOff, Video, FileText, ChevronDown } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData } from "@/lib/db/models/lesson.model";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function LessonsManager({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { toast } = useToast();
+  const router = useRouter();
 
   const currentGroupId = selectedGroupId;
   const currentQuarter = selectedQuarter;
@@ -99,9 +101,9 @@ export function LessonsManager({
       </div>
 
       {/* Selectors for Group and Quarter */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         {/* Group selector with scroll-snap */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory flex-1 min-w-0">
           {groups.map((g) => {
             const isSelected = currentGroupId === g._id.toString();
             return (
@@ -121,25 +123,32 @@ export function LessonsManager({
           })}
         </div>
 
-        {/* Quarter selector */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit shrink-0 self-start lg:self-auto border border-slate-200/60 dark:border-slate-700/60">
-          {[1, 2, 3, 4].map((q) => {
-            const isSelected = currentQuarter === q;
-            return (
-              <Link
-                key={q}
-                href={`/mentor/lessons?groupId=${currentGroupId}&quarter=${q}`}
-                className={cn(
-                  "px-3.5 py-2 rounded-xl text-xs font-bold transition-all min-h-[40px] flex items-center justify-center",
-                  isSelected
-                    ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                )}
-              >
-                {q}-chorak
-              </Link>
-            );
-          })}
+        {/* Quarter selector as a Select */}
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
+          <label
+            htmlFor="quarter-select"
+            className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0"
+          >
+            Chorak:
+          </label>
+          <div className="relative">
+            <select
+              id="quarter-select"
+              value={currentQuarter || 1}
+              onChange={(e) => {
+                const q = e.target.value;
+                router.push(`/mentor/lessons?groupId=${currentGroupId}&quarter=${q}`);
+              }}
+              aria-label="Chorakni tanlang"
+              className="appearance-none pl-3.5 pr-9 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 shadow-xs hover:border-teal-500/50 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer min-h-[44px]"
+            >
+              <option value={1}>1-chorak</option>
+              <option value={2}>2-chorak</option>
+              <option value={3}>3-chorak</option>
+              <option value={4}>4-chorak</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+          </div>
         </div>
       </div>
 
