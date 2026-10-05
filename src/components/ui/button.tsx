@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+export { IconButton, type IconButtonProps } from "./icon-button";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "destructive" | "gold";
@@ -8,7 +9,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const baseStyles =
-  "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98]";
+  "inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B1220]";
 
 const variants = {
   primary:
@@ -20,18 +21,18 @@ const variants = {
   ghost:
     "bg-transparent text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800",
   danger:
-    "bg-rose-500 text-white hover:bg-rose-600 shadow-md shadow-rose-500/20",
+    "bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-600/20",
   destructive:
-    "bg-rose-500 text-white hover:bg-rose-600 shadow-md shadow-rose-500/20",
+    "bg-rose-600 text-white hover:bg-rose-700 shadow-md shadow-rose-600/20",
   gold:
     "bg-amber-500 text-white hover:bg-amber-600 shadow-md shadow-amber-500/20 font-semibold",
 };
 
 const sizes = {
   sm: "h-9 px-3 text-xs gap-1.5",
-  md: "min-h-[44px] px-4 text-sm gap-2", // 44px touch target friendly
+  md: "min-h-[44px] px-4 text-sm gap-2", // 44px sensor bosish maydoni (WCAG AA)
   lg: "min-h-[48px] px-6 text-base gap-2.5",
-  icon: "min-h-[44px] min-w-[44px] p-2",
+  icon: "min-h-[44px] min-w-[44px] p-2.5",
 };
 
 export function buttonVariants({
@@ -72,6 +73,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <circle
               className="opacity-25"

@@ -49,13 +49,16 @@ export function TabsList({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
-        className
-      )}
-    >
-      {children}
+    <div className="relative w-full overflow-hidden">
+      <div
+        className={cn(
+          "flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
+          "overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth touch-pan-x",
+          className
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -77,11 +80,14 @@ export function TabsTrigger({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={isActive}
       onClick={() => ctx.setActiveTab(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-all select-none cursor-pointer min-h-[38px]",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-xs sm:text-sm font-medium transition-all select-none cursor-pointer min-h-[38px] snap-start shrink-0",
+        "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
         isActive
-          ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 font-semibold shadow-xs"
+          ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 font-semibold shadow-xs"
           : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
         className
       )}
@@ -105,5 +111,9 @@ export function TabsContent({
 
   if (ctx.activeTab !== value) return null;
 
-  return <div className={cn("mt-4 focus:outline-hidden", className)}>{children}</div>;
+  return (
+    <div role="tabpanel" tabIndex={0} className={cn("mt-4 focus:outline-hidden", className)}>
+      {children}
+    </div>
+  );
 }

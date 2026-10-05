@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
 const inter = Inter({
@@ -54,7 +55,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0B1220] dark:text-slate-100 selection:bg-teal-500/20 selection:text-teal-600 dark:selection:text-teal-400">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
