@@ -222,16 +222,9 @@ export async function markAttendanceAction(params: {
   const sessionUser = await requireStudent();
   await connectToDatabase();
 
-  if (!sessionUser.groupId) {
-    return {
-      success: false,
-      message: "Sizga guruh biriktirilmagan. Mentorga murojaat qiling.",
-    };
-  }
-
-  // Rate limit: 5 attempts per minute per student
+  // Rate limit: 10 attempts per minute per student
   const rateKey = `att_mark_${sessionUser.userId}`;
-  const rate = checkRateLimit(rateKey, 5, 60_000);
+  const rate = checkRateLimit(rateKey, 10, 60_000);
   if (!rate.allowed) {
     return {
       success: false,
@@ -239,23 +232,91 @@ export async function markAttendanceAction(params: {
     };
   }
 
-  // Find active session for student's group
-  const activeSession = await AttendanceSession.findOne({
-    groupId: sessionUser.groupId,
-    status: "active",
-  });
+  // Find user in database by ID or login
+  let dbUser = await User.findById(sessionUser.userId);
+  if (!dbUser && sessionUser.login) {
+    dbUser = await User.findOne({ login: sessionUser.login.toLowerCase() });
+  }
+
+  const effectiveUserId = dbUser?._id ? dbUser._id.toString() : sessionUser.userId;
+
+  const cleanCode = params.code?.trim().toUpperCase();
+  const cleanToken = params.token?.trim();
+
+  if (!cleanCode && !cleanToken) {
+    return {
+      success: false,
+      message: "Kod yoki QR belgi kiritilmadi.",
+    };
+  }
+
+  const now = new Date();
+  let activeSession = null;
+  let method: "qr" | "code" = "code";
+
+  // 1. Try finding active session by current code / token OR grace period tokens
+  if (cleanCode) {
+    method = "code";
+    activeSession = await AttendanceSession.findOne({
+      status: "active",
+      $or: [
+        { currentCode: cleanCode },
+        { "previousTokens.code": cleanCode, "previousTokens.expiredAt": { $gt: now } },
+      ],
+    });
+  } else if (cleanToken) {
+    method = "qr";
+    activeSession = await AttendanceSession.findOne({
+      status: "active",
+      $or: [
+        { currentToken: cleanToken },
+        { "previousTokens.token": cleanToken, "previousTokens.expiredAt": { $gt: now } },
+      ],
+    });
+  }
+
+  // 2. Fallback: check if student group's active session matches
+  if (!activeSession && dbUser?.groupId) {
+    const groupSession = await AttendanceSession.findOne({
+      groupId: dbUser.groupId,
+      status: "active",
+    });
+    if (groupSession) {
+      if (cleanCode) {
+        if (
+          groupSession.currentCode === cleanCode ||
+          (groupSession.previousTokens || []).some(
+            (p) => p.code === cleanCode && new Date(p.expiredAt) > now
+          )
+        ) {
+          activeSession = groupSession;
+          method = "code";
+        }
+      } else if (cleanToken) {
+        if (
+          groupSession.currentToken === cleanToken ||
+          (groupSession.previousTokens || []).some(
+            (p) => p.token === cleanToken && new Date(p.expiredAt) > now
+          )
+        ) {
+          activeSession = groupSession;
+          method = "qr";
+        }
+      }
+    }
+  }
 
   if (!activeSession) {
     return {
       success: false,
-      message: "Ayni damda guruhingiz uchun faol davomat ochilmagan.",
+      message: "Kiritilgan kod yoki QR belgi eskirgan. Proyektordagi yangi kodni kiriting.",
     };
   }
 
   // Check if student already checked in
   const existingRecord = await AttendanceRecord.findOne({
     sessionId: activeSession._id,
-    studentId: sessionUser.userId,
+    studentId: effectiveUserId,
   });
 
   if (existingRecord) {
@@ -265,38 +326,10 @@ export async function markAttendanceAction(params: {
     };
   }
 
-  const now = new Date();
-  let isValid = false;
-  let method: "qr" | "code" = "qr";
-
-  if (params.token) {
-    method = "qr";
-    if (params.token === activeSession.currentToken) {
-      isValid = true;
-    } else {
-      // Check 20-second grace period in previousTokens
-      isValid = (activeSession.previousTokens || []).some(
-        (p) => p.token === params.token && new Date(p.expiredAt) > now
-      );
-    }
-  } else if (params.code) {
-    method = "code";
-    const cleanCode = params.code.trim().toUpperCase();
-    if (cleanCode === activeSession.currentCode) {
-      isValid = true;
-    } else {
-      // Check 20-second grace period in previousTokens
-      isValid = (activeSession.previousTokens || []).some(
-        (p) => p.code === cleanCode && new Date(p.expiredAt) > now
-      );
-    }
-  }
-
-  if (!isValid) {
-    return {
-      success: false,
-      message: "Kiritilgan kod yoki QR belgi eskirgan. Proyektordagi yangi kodni kiriting.",
-    };
+  // If student didn't have a group set in DB, link them to this group
+  if (dbUser && !dbUser.groupId) {
+    dbUser.groupId = activeSession.groupId;
+    await dbUser.save();
   }
 
   const coinsAwarded = activeSession.defaultCoinsReward || 10;
@@ -304,8 +337,8 @@ export async function markAttendanceAction(params: {
   // Create attendance record
   await AttendanceRecord.create({
     sessionId: activeSession._id,
-    studentId: sessionUser.userId,
-    groupId: sessionUser.groupId,
+    studentId: effectiveUserId,
+    groupId: activeSession.groupId,
     status: "present",
     method,
     markedAt: now,
@@ -314,7 +347,7 @@ export async function markAttendanceAction(params: {
 
   // Award coins to user
   const updatedUser = await User.findByIdAndUpdate(
-    sessionUser.userId,
+    effectiveUserId,
     {
       $inc: { totalCoins: coinsAwarded, spendableBalance: coinsAwarded },
     },
@@ -323,7 +356,7 @@ export async function markAttendanceAction(params: {
 
   // Record into CoinLedger
   await CoinLedger.create({
-    studentId: sessionUser.userId,
+    studentId: effectiveUserId,
     amount: coinsAwarded,
     type: "attendance",
     referenceId: activeSession._id,
@@ -576,27 +609,51 @@ export async function getStudentAttendanceHistory() {
 }
 
 /**
- * Get active attendance session for student's group if any
+ * Get active attendance session for student's group or school-wide active session
  */
 export async function getActiveAttendanceSessionForStudent() {
   const user = await requireAuth();
-  if (user.role !== "student" || !user.groupId) return null;
+  if (user.role !== "student") return null;
 
   await connectToDatabase();
-  const activeSession = await AttendanceSession.findOne({
-    groupId: user.groupId,
-    status: "active",
-  }).lean();
+
+  let dbUser = await User.findById(user.userId).lean();
+  if (!dbUser && user.login) {
+    dbUser = await User.findOne({ login: user.login.toLowerCase() }).lean();
+  }
+
+  const effectiveUserId = dbUser?._id ? dbUser._id.toString() : user.userId;
+  const targetGroupId = dbUser?.groupId || user.groupId;
+
+  let activeSession = null;
+  if (targetGroupId) {
+    activeSession = await AttendanceSession.findOne({
+      groupId: targetGroupId,
+      status: "active",
+    }).lean();
+  }
+
+  // Fallback: if no group session, find any active session currently open
+  if (!activeSession) {
+    activeSession = await AttendanceSession.findOne({
+      status: "active",
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
 
   if (!activeSession) return null;
 
   const hasMarked = await AttendanceRecord.exists({
     sessionId: activeSession._id,
-    studentId: user.userId,
+    studentId: effectiveUserId,
   });
+
+  const group = await Group.findById(activeSession.groupId).select("name grade").lean();
 
   return {
     sessionId: activeSession._id.toString(),
+    groupName: group?.name || "Dars",
     rotateIntervalSeconds: activeSession.rotateIntervalSeconds,
     defaultCoinsReward: activeSession.defaultCoinsReward,
     hasMarked: Boolean(hasMarked),

@@ -54,3 +54,11 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 ### [2026-10-05] 11-qaror: Joriy o'quv yili (2026-2027) standartlashtirilishi
 - **Holat**: Platforma 2026-2027 o'quv yilida faoliyat ko'rsatmoqda, biroq guruh yaratish formasi, Mongoose modeli va Zod validatsiyasida sukut bo'yicha `2025-2026` qolgan edi.
 - **Qaror**: Barcha standart qiymatlar (`Group` modeli, `groupSchema`, `GroupsManager` overview va formasi, `scripts/seed.ts` guruhlari) `2026-2027` ga yangilandi.
+
+### [2026-10-05] 12-qaror: O'quvchi davomati — Doimiy 6 xonali kod kiritish va Kamera orqali QR skaner
+- **Holat**: `/attendance` sahifasida faol sessiya aniqlanmagan taqdirda kod kiritish maydoni butunlay yashirinib, o'quvchida hech narsa ko'rinmayotgan edi; shuningdek kamera orqali QR skanerlash imkoniyati yo'q edi.
+- **Qaror**:
+  1. **Doimiy interaktiv panel**: O'quvchi sahifasida 6 xonali kod (`OTPInput`) kiritish har doim ochiq bo'ladi.
+  2. **Kamera QR Skaneri (`html5-qrcode`)**: "QR Skaner" orqali kamera ochiladi, proyektor ekranidagi QR belgini real vaqtda o'qiydi (yoki rasm yuklash orqali ham ishlaydi).
+  3. **Universal token/kod tekshiruvi**: Serverda `markAttendanceAction` kiritilgan kod yoki skaner qilingan token orqali to'g'ridan-to'g'ri faol sessiyani topadi va talabaning guruhidan qat'i nazar davomatni adolatli qayd etadi.
+  4. **Profilga tezkor havola**: O'quvchi profilida (`/profile`) dars davomatiga to'g'ridan-to'g'ri o'tuvchi tezkor karta qo'shildi.

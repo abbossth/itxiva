@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { User, Lock, Eye, EyeOff, Shield, Award, Sparkles, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { User, Lock, Eye, EyeOff, Shield, Award, Sparkles, CheckCircle2, QrCode, Camera } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
@@ -133,6 +134,32 @@ export function ProfileView({ user }: ProfileViewProps) {
               <div className="text-[10px] text-slate-400">Al-Xorazmiy vorisi</div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Attendance Quick Action Card (for student) */}
+      {user.role === "student" && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-[#131E32] dark:to-blue-950/30 border border-teal-500/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
+              <QrCode className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+                Bugungi dars davomati
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Proyektordagi 6 xonali kod yoki QR belgi orqali davomatdan o&apos;ting (+10 coin)
+              </p>
+            </div>
+          </div>
+
+          <Link href="/attendance" className="shrink-0">
+            <Button variant="primary" className="gap-2 min-h-[44px] w-full sm:w-auto font-semibold shadow-xs">
+              <Camera className="w-4 h-4" />
+              <span>Davomatdan o&apos;tish</span>
+            </Button>
+          </Link>
         </div>
       )}
 
