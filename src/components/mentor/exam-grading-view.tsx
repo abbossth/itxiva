@@ -16,6 +16,7 @@ import {
   FileText,
   User,
 } from "lucide-react";
+import { formatDateTimeUz } from "@/lib/utils";
 
 interface ExamGradingViewProps {
   submission: IExamSubmissionData;
@@ -139,7 +140,7 @@ export function ExamGradingView({
             <p className="text-xs text-slate-500">
               {groupName} &bull; {submission.attemptNumber}-urinish &bull; Topshirilgan:{" "}
               {submission.submittedAt
-                ? new Date(submission.submittedAt).toLocaleString("uz-UZ")
+                ? formatDateTimeUz(submission.submittedAt)
                 : "Topshirilmagan"}
             </p>
           </div>

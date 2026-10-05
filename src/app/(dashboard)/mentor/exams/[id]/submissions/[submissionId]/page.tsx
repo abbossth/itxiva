@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getExamSubmissionDetailsForMentor } from "@/actions/exam.actions";
 import { ExamGradingView } from "@/components/mentor/exam-grading-view";
 
@@ -12,7 +12,7 @@ export const metadata = {
 };
 
 export default async function GradingPage({ params }: GradingPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedParams = await params;
 
   const res = await getExamSubmissionDetailsForMentor(resolvedParams.submissionId);

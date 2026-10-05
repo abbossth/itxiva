@@ -2,13 +2,14 @@
 
 import { connectDB } from "@/lib/db/connect";
 import { Quiz, IQuizQuestion, IQuizData } from "@/lib/db/models/quiz.model";
-import { QuizSubmission, IQuizSubmissionData } from "@/lib/db/models/quiz-submission.model";
+import { QuizSubmission, IQuizAnswer, IQuizSubmissionData } from "@/lib/db/models/quiz-submission.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireAuth, requireMentor, requireStudent, requireGroupAccess } from "@/lib/auth/guards";
 import { quizUpsertSchema, quizSubmitSchema, quizGradeSchema } from "@/lib/validations/quiz.schema";
 import { autoGradeQuiz } from "@/lib/grading";
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -36,6 +37,9 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
 
     if (user.role === "student") {
       await requireGroupAccess(lesson.groupId.toString());
+      if (!lesson.isPublished) {
+        return { success: false, error: "Dars hali nashr etilmagan" };
+      }
     }
 
     const quizDoc = await Quiz.findOne({ lessonId, isPublished: true }).lean();
@@ -93,6 +97,7 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
       },
     };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Xatolik yuz berdi";
     return { success: false, error: message };
   }
@@ -103,7 +108,9 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
  */
 export async function submitQuizAction(
   data: unknown
-): Promise<ActionState<{ totalScore: number; maxScore: number; status: string }>> {
+): Promise<
+  ActionState<{ totalScore: number; maxScore: number; status: string; answers: IQuizAnswer[] }>
+> {
   try {
     const user = await requireStudent();
     const parsed = quizSubmitSchema.safeParse(data);
@@ -123,6 +130,18 @@ export async function submitQuizAction(
     }
 
     await requireGroupAccess(lesson.groupId.toString());
+    if (!lesson.isPublished) {
+      return { success: false, error: "Dars hali nashr etilmagan" };
+    }
+
+    // Test faqat bir marta topshiriladi (natijada to'g'ri javoblar ko'rsatilgani uchun)
+    const alreadySubmitted = await QuizSubmission.exists({
+      quizId: quiz._id,
+      studentId: user.userId,
+    });
+    if (alreadySubmitted) {
+      return { success: false, error: "Siz bu testni allaqachon topshirgansiz" };
+    }
 
     // Auto-grade
     const { answers, totalScore, maxScore, hasOpenEnded } = autoGradeQuiz({
@@ -132,23 +151,16 @@ export async function submitQuizAction(
 
     const status = hasOpenEnded ? "submitted" : "graded";
 
-    await QuizSubmission.findOneAndUpdate(
-      {
-        quizId: quiz._id,
-        studentId: user.userId,
-      },
-      {
-        quizId: quiz._id,
-        lessonId: lesson._id,
-        studentId: user.userId,
-        answers,
-        totalScore,
-        maxScore,
-        status,
-        submittedAt: new Date(),
-      },
-      { upsert: true, new: true }
-    );
+    await QuizSubmission.create({
+      quizId: quiz._id,
+      lessonId: lesson._id,
+      studentId: user.userId,
+      answers,
+      totalScore,
+      maxScore,
+      status,
+      submittedAt: new Date(),
+    });
 
     revalidatePath(`/lessons/${lesson._id}`);
     revalidatePath(`/mentor/lessons/${lesson._id}`);
@@ -158,9 +170,10 @@ export async function submitQuizAction(
       message: hasOpenEnded
         ? "Javoblaringiz qabul qilindi. Ochiq savollar mentor tomonidan tekshiriladi."
         : `Test yakunlandi! Natijangiz: ${totalScore} / ${maxScore} ball`,
-      data: { totalScore, maxScore, status },
+      data: { totalScore, maxScore, status, answers },
     };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Testni topshirishda xatolik";
     return { success: false, error: message };
   }
@@ -194,6 +207,7 @@ export async function getQuizForMentor(lessonId: string): Promise<ActionState<IQ
       },
     };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Xatolik yuz berdi";
     return { success: false, error: message };
   }
@@ -227,7 +241,7 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
         isPublished: parsed.data.isPublished,
         passingScore: parsed.data.passingScore,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after", runValidators: true }
     );
 
     await AuditLog.create({
@@ -241,6 +255,7 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
 
     return { success: true, message: "Kichik test muvaffaqiyatli saqlandi" };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Testni saqlashda xatolik";
     return { success: false, error: message };
   }
@@ -273,14 +288,14 @@ export async function getQuizSubmissionsForLesson(lessonId: string): Promise<
     }
 
     const submissions = await QuizSubmission.find({ quizId: quiz._id })
-      .populate("studentId", "fullName username")
+      .populate("studentId", "fullName login")
       .sort({ submittedAt: -1 })
       .lean();
 
     const data = (
       submissions as unknown as Array<{
         _id: { toString: () => string };
-        studentId?: { fullName?: string; username?: string };
+        studentId?: { fullName?: string; login?: string };
         totalScore: number;
         maxScore: number;
         status: string;
@@ -290,7 +305,7 @@ export async function getQuizSubmissionsForLesson(lessonId: string): Promise<
     ).map((sub) => ({
       _id: sub._id.toString(),
       studentName: sub.studentId?.fullName || "Noma'lum",
-      studentLogin: sub.studentId?.username || "-",
+      studentLogin: sub.studentId?.login || "-",
       totalScore: sub.totalScore,
       maxScore: sub.maxScore,
       status: sub.status,
@@ -300,6 +315,7 @@ export async function getQuizSubmissionsForLesson(lessonId: string): Promise<
 
     return { success: true, data };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Topshiriqlarni yuklashda xatolik";
     return { success: false, error: message };
   }
@@ -352,6 +368,7 @@ export async function gradeQuizSubmissionAction(data: unknown): Promise<ActionSt
     revalidatePath(`/lessons/${submission.lessonId}`);
     return { success: true, message: "Baho muvaffaqiyatli saqlandi" };
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Baholashda xatolik";
     return { success: false, error: message };
   }

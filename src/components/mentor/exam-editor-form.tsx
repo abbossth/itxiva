@@ -16,6 +16,7 @@ import {
   Calendar,
   Users,
 } from "lucide-react";
+import { toDateTimeLocalValue } from "@/lib/utils";
 
 interface ExamEditorFormProps {
   groups: IGroupData[];
@@ -33,15 +34,11 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
   );
 
   const [startTime, setStartTime] = useState(() =>
-    initialExam?.startTime
-      ? new Date(initialExam.startTime).toISOString().slice(0, 16)
-      : new Date().toISOString().slice(0, 16)
+    toDateTimeLocalValue(initialExam?.startTime || new Date())
   );
 
   const [endTime, setEndTime] = useState(() =>
-    initialExam?.endTime
-      ? new Date(initialExam.endTime).toISOString().slice(0, 16)
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+    toDateTimeLocalValue(initialExam?.endTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
   );
   const [durationMinutes, setDurationMinutes] = useState(initialExam?.durationMinutes || 60);
   const [maxAttempts, setMaxAttempts] = useState(initialExam?.maxAttempts || 1);
@@ -485,7 +482,11 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
                           onChange={(e) => {
                             const newOpts = [...(q.options || [])];
                             newOpts[optIdx] = e.target.value;
-                            updateQuestion(qIdx, { options: newOpts });
+                            // To'g'ri javob matn bo'yicha saqlanadi — variant nomi o'zgarsa, u ham yangilanadi
+                            const newCorrect = (q.correctAnswers || []).map((ans) =>
+                              ans === opt ? e.target.value : ans
+                            );
+                            updateQuestion(qIdx, { options: newOpts, correctAnswers: newCorrect });
                           }}
                           className="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                         />

@@ -1,12 +1,12 @@
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { connectToDatabase } from "@/lib/db/connect";
 import { AuditLog, IAuditLog } from "@/lib/db/models/audit-log.model";
 import { ShieldCheck, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatDateUz } from "@/lib/utils";
+import { formatDateTimeUz } from "@/lib/utils";
 
 export default async function MentorAuditPage() {
-  await requireMentor();
+  await requireMentorPage();
   await connectToDatabase();
 
   const rawLogs = await AuditLog.find()
@@ -65,7 +65,7 @@ export default async function MentorAuditPage() {
                   <td className="p-3.5 sm:p-4 text-xs text-slate-500 whitespace-nowrap">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      {formatDateUz(log.createdAt)} {new Date(log.createdAt).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                      {formatDateTimeUz(log.createdAt)}
                     </span>
                   </td>
                   <td className="p-3.5 sm:p-4 whitespace-nowrap">

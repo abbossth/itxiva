@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User, IUser } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { requireMentor, requireAuth } from "@/lib/auth/guards";
+import { requireMentor } from "@/lib/auth/guards";
 import { hashPassword, generateRandomPassword } from "@/lib/auth/password";
 import { slugifyLogin } from "@/lib/utils";
 
@@ -16,11 +16,11 @@ export interface ImportedStudentResult {
 }
 
 /**
- * Get students for a group. Mentor gets full names, students only if authorized.
+ * Get students for a group (mentor only: returns full names and logins)
  */
 export async function getStudentsByGroup(groupId: string) {
+  await requireMentor();
   await connectToDatabase();
-  await requireAuth();
 
   const students = await User.find({ groupId, role: "student" })
     .select("-passwordHash")
@@ -201,6 +201,11 @@ export async function moveStudentAction({
   const user = await User.findById(userId);
   if (!user || user.role !== "student") {
     return { success: false, message: "O'quvchi topilmadi" };
+  }
+
+  const newGroup = await Group.findById(newGroupId);
+  if (!newGroup) {
+    return { success: false, message: "Guruh topilmadi" };
   }
 
   const oldGroupId = user.groupId;

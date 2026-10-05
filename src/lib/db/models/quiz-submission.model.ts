@@ -36,7 +36,7 @@ const QuizAnswerSchema = new Schema<IQuizAnswer>(
     },
     value: {
       type: Schema.Types.Mixed,
-      required: true,
+      default: "",
     },
     isCorrect: {
       type: Boolean,
@@ -102,7 +102,7 @@ const QuizSubmissionSchema = new Schema<IQuizSubmission>(
 );
 
 // Har bir o'quvchi uchun bitta quiz topshirig'i (yoki oxirgi topshiriq)
-QuizSubmissionSchema.index({ quizId: 1, studentId: 1 });
+QuizSubmissionSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
 
 export const QuizSubmission: Model<IQuizSubmission> =
   mongoose.models.QuizSubmission ||

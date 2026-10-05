@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import {
   getExamByIdForMentor,
   getExamSubmissionsForMentor,
@@ -16,6 +16,7 @@ import {
   Edit,
   ExternalLink,
 } from "lucide-react";
+import { formatDateTimeUz } from "@/lib/utils";
 
 interface ExamSubmissionsPageProps {
   params: Promise<{ id: string }>;
@@ -26,7 +27,7 @@ export const metadata = {
 };
 
 export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedParams = await params;
 
   const [examRes, submissionsRes] = await Promise.all([
@@ -139,7 +140,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
                       </td>
                       <td className="px-4 py-3.5 text-xs text-slate-500">
                         {sub.submittedAt
-                          ? new Date(sub.submittedAt).toLocaleString("uz-UZ")
+                          ? formatDateTimeUz(sub.submittedAt)
                           : "Topshirilmagan"}
                       </td>
                       <td className="px-4 py-3.5">

@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Group, IGroup } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { requireMentor, requireAuth } from "@/lib/auth/guards";
+import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
 import { groupSchema, GroupInput } from "@/lib/validations/group.schema";
 
 export async function getGroups() {
@@ -24,7 +24,7 @@ export async function getGroups() {
 
 export async function getGroupById(id: string) {
   await connectToDatabase();
-  await requireAuth();
+  await requireGroupAccess(id);
 
   const group = await Group.findById(id).lean();
   if (!group) return null;

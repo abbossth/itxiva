@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { ExamEditorForm } from "@/components/mentor/exam-editor-form";
 import { ArrowLeft, GraduationCap } from "lucide-react";
@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 export default async function NewExamPage() {
-  await requireMentor();
+  await requireMentorPage();
   const groups = await getGroups();
 
   return (

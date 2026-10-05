@@ -8,6 +8,24 @@ export const quizQuestionSchema = z.object({
   correctAnswers: z.array(z.string()).default([]),
   points: z.coerce.number().min(1, "Ball kamida 1 bo'lishi kerak").default(1),
   explanation: z.string().optional(),
+}).superRefine((q, ctx) => {
+  if (q.type === "single_choice" || q.type === "multiple_choice") {
+    if (q.options.length < 2) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida kamida 2 ta variant bo'lishi kerak` });
+    }
+    if (new Set(q.options).size !== q.options.length) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida variantlar takrorlanmasligi kerak` });
+    }
+    if (q.correctAnswers.length === 0 || q.correctAnswers.some((a) => !q.options.includes(a))) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida to'g'ri javobni belgilang` });
+    }
+    if (q.type === "single_choice" && q.correctAnswers.length > 1) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida faqat bitta to'g'ri javob bo'lishi kerak` });
+    }
+  }
+  if (q.type === "short_answer" && q.correctAnswers.filter((a) => a.trim()).length === 0) {
+    ctx.addIssue({ code: "custom", message: `"${q.prompt}" savoli uchun to'g'ri javobni kiriting` });
+  }
 });
 
 export const quizUpsertSchema = z.object({

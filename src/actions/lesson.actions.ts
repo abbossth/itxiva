@@ -111,6 +111,10 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
     return { success: false, message: "Dars topilmadi" };
   }
 
+  if (input.groupId && input.groupId !== lesson.groupId.toString()) {
+    lesson.groupId = input.groupId as unknown as typeof lesson.groupId;
+  }
+  if (input.order) lesson.order = input.order;
   if (input.title) lesson.title = input.title;
   if (input.topic !== undefined) lesson.topic = input.topic;
   if (input.description !== undefined) lesson.description = input.description;

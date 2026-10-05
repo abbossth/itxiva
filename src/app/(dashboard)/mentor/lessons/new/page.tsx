@@ -1,4 +1,4 @@
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 import Link from "next/link";
@@ -12,7 +12,7 @@ interface NewLessonPageProps {
 }
 
 export default async function NewLessonPage({ searchParams }: NewLessonPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedSearchParams = await searchParams;
 
   const groups = await getGroups();

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getExamByIdForMentor } from "@/actions/exam.actions";
 import { ExamEditorForm } from "@/components/mentor/exam-editor-form";
@@ -15,7 +15,7 @@ export const metadata = {
 };
 
 export default async function EditExamPage({ params }: EditExamPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedParams = await params;
 
   const [groups, examRes] = await Promise.all([

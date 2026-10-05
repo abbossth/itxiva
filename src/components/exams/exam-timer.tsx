@@ -1,37 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Clock, AlertTriangle } from "lucide-react";
 
 interface ExamTimerProps {
-  startedAt: string;
+  /** Urinish tugaydigan vaqt (ISO) — serverda hisoblanadi */
+  deadline: string;
+  /** Sahifa render qilingan paytdagi server vaqti (ISO) — qurilma soati noto'g'ri bo'lsa ham to'g'ri sanash uchun */
+  serverTime: string;
   durationMinutes: number;
   onTimeExpired: () => void;
 }
 
-export function ExamTimer({ startedAt, durationMinutes, onTimeExpired }: ExamTimerProps) {
-  const [timeLeftMs, setTimeLeftMs] = useState<number>(() => {
-    const startTime = new Date(startedAt).getTime();
-    const endTime = startTime + durationMinutes * 60 * 1000;
-    return Math.max(0, endTime - Date.now());
-  });
+export function ExamTimer({ deadline, serverTime, durationMinutes, onTimeExpired }: ExamTimerProps) {
+  const [timeLeftMs, setTimeLeftMs] = useState<number>(() =>
+    Math.max(0, new Date(deadline).getTime() - new Date(serverTime).getTime())
+  );
+
+  const onTimeExpiredRef = useRef(onTimeExpired);
+  useEffect(() => {
+    onTimeExpiredRef.current = onTimeExpired;
+  }, [onTimeExpired]);
 
   useEffect(() => {
-    const startTime = new Date(startedAt).getTime();
-    const endTime = startTime + durationMinutes * 60 * 1000;
+    const deadlineMs = new Date(deadline).getTime();
+    // Server va qurilma soati orasidagi farq
+    const clockOffsetMs = new Date(serverTime).getTime() - Date.now();
+    let hasExpired = false;
 
     const interval = setInterval(() => {
-      const remaining = Math.max(0, endTime - Date.now());
+      const remaining = Math.max(0, deadlineMs - (Date.now() + clockOffsetMs));
       setTimeLeftMs(remaining);
 
-      if (remaining <= 0) {
+      if (remaining <= 0 && !hasExpired) {
+        hasExpired = true;
         clearInterval(interval);
-        onTimeExpired();
+        onTimeExpiredRef.current();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startedAt, durationMinutes, onTimeExpired]);
+  }, [deadline, serverTime]);
 
   const totalDurationMs = durationMinutes * 60 * 1000;
   const progressPercent = Math.max(0, Math.min(100, (timeLeftMs / totalDurationMs) * 100));

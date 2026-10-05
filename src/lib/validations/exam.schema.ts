@@ -15,6 +15,21 @@ export const examQuestionSchema = z.object({
   points: z.coerce.number().min(1, "Ball kamida 1 bo'lishi kerak").default(5),
   allowedFileTypes: z.array(z.string()).optional().default([".zip", ".pdf", ".png", ".jpg"]),
   maxFileSizeMb: z.coerce.number().min(1).max(100).default(50),
+}).superRefine((q, ctx) => {
+  if (q.type === "single_choice" || q.type === "multiple_choice") {
+    if (q.options.length < 2) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida kamida 2 ta variant bo'lishi kerak` });
+    }
+    if (new Set(q.options).size !== q.options.length) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida variantlar takrorlanmasligi kerak` });
+    }
+    if (q.correctAnswers.length === 0 || q.correctAnswers.some((a) => !q.options.includes(a))) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida to'g'ri javobni belgilang` });
+    }
+    if (q.type === "single_choice" && q.correctAnswers.length > 1) {
+      ctx.addIssue({ code: "custom", message: `"${q.prompt}" savolida faqat bitta to'g'ri javob bo'lishi kerak` });
+    }
+  }
 });
 
 export const examUpsertSchema = z

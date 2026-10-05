@@ -34,7 +34,7 @@ export function slugifyLogin(fullName: string): string {
 
   let str = fullName.toLowerCase().trim();
   // replace uzbek specific apostrophes
-  str = str.replace(/o['`ʻ‘]r?/g, "o").replace(/g['`ʻ‘]/g, "g");
+  str = str.replace(/o['`ʻ‘’]/g, "o").replace(/g['`ʻ‘’]/g, "g");
   for (const [key, val] of Object.entries(map)) {
     str = str.split(key).join(val);
   }
@@ -45,14 +45,56 @@ export function slugifyLogin(fullName: string): string {
     .slice(0, 24);
 }
 
+// Platforma Xiva (O'zbekiston) uchun: server (UTC) va brauzerda bir xil natija chiqishi uchun vaqt zonasi qat'iy belgilanadi
+const APP_TIME_ZONE = "Asia/Tashkent";
+
+const UZ_MONTHS_SHORT = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
+
+// "uz-UZ" lokali Node.js va brauzerlarda turlicha chiqadi (hydration xatosiga olib keladi),
+// shuning uchun sana qismlari ajratib olinib, matn qo'lda yig'iladi
+const datePartsFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function getDateParts(date: Date | string | number) {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts: Record<string, string> = {};
+  for (const part of datePartsFormatter.formatToParts(d)) {
+    parts[part.type] = part.value;
+  }
+  return parts;
+}
+
 /**
- * Format date in Uzbek locale
+ * Format date in Uzbek: "4-okt, 2026"
  */
 export function formatDateUz(date: Date | string | number): string {
+  const p = getDateParts(date);
+  if (!p) return "";
+  return `${Number(p.day)}-${UZ_MONTHS_SHORT[Number(p.month) - 1]}, ${p.year}`;
+}
+
+/**
+ * Format date and time in Uzbek: "4-okt, 2026 14:30"
+ */
+export function formatDateTimeUz(date: Date | string | number): string {
+  const p = getDateParts(date);
+  if (!p) return "";
+  return `${formatDateUz(date)} ${p.hour}:${p.minute}`;
+}
+
+/**
+ * Value for <input type="datetime-local"> in the user's local time zone
+ */
+export function toDateTimeLocalValue(date: Date | string | number): string {
   const d = new Date(date);
-  return d.toLocaleDateString("uz-UZ", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

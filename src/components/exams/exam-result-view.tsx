@@ -22,6 +22,7 @@ interface ExamResultViewProps {
 
 export function ExamResultView({ exam, submission }: ExamResultViewProps) {
   const percentage = Math.round((submission.totalScore / (submission.maxScore || 1)) * 100);
+  const isPending = submission.status !== "graded";
   const isPassed = submission.isPassed;
 
   return (
@@ -40,7 +41,9 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
       {/* Score Banner */}
       <Card
         className={`p-6 sm:p-8 rounded-3xl border shadow-sm text-center space-y-4 ${
-          isPassed
+          isPending
+            ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/20"
+            : isPassed
             ? "border-teal-500/40 bg-teal-500/5 dark:bg-teal-950/20"
             : "border-rose-500/40 bg-rose-500/5 dark:bg-rose-950/20"
         }`}
@@ -48,17 +51,25 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
         <div className="inline-flex p-4 rounded-3xl bg-white dark:bg-slate-800 shadow-xs">
           <Award
             className={`w-12 h-12 ${
-              isPassed ? "text-teal-600 dark:text-teal-400" : "text-rose-500"
+              isPending
+                ? "text-amber-500"
+                : isPassed
+                ? "text-teal-600 dark:text-teal-400"
+                : "text-rose-500"
             }`}
           />
         </div>
 
         <div className="space-y-1">
           <Badge
-            variant={isPassed ? "teal" : "rose"}
+            variant={isPending ? "amber" : isPassed ? "teal" : "rose"}
             className="text-xs px-3 py-1 font-semibold"
           >
-            {isPassed ? "Imtihondan o'tdingiz!" : "O'tish baliga yetmadi"}
+            {isPending
+              ? "Mentor tekshirmoqda — ball hali yakuniy emas"
+              : isPassed
+              ? "Imtihondan o'tdingiz!"
+              : "O'tish baliga yetmadi"}
           </Badge>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100">
             {exam.title}

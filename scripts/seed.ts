@@ -88,14 +88,17 @@ async function runSeed() {
   }
 
   // 3. Create Sample Students per group
-  const sampleStudentsByGrade: Record<number, string[]> = {
-    8: ["Alisher Valiyev", "Madina Karimova", "Javohir Oripov"],
-    9: ["Sardorbek Rahimov", "Nigora Yusupova", "Bobur Mirzayev"],
-    11: ["Jasurbek Qosimov", "Shahlo Ahmedova", "Azizbek Normatov"],
+  // Har bir guruh uchun alohida ismlar (login takrorlanmasligi uchun)
+  const sampleStudentsByGroup: Record<string, string[]> = {
+    "8-A": ["Alisher Valiyev", "Madina Karimova", "Javohir Oripov"],
+    "8-B": ["Diyorbek Sobirov", "Sevara Tursunova", "Otabek Ismoilov"],
+    "9-A": ["Sardorbek Rahimov", "Nigora Yusupova", "Bobur Mirzayev"],
+    "9-B": ["Mironshoh Latipov", "Gulnoza Hamidova", "Islom Nazarov"],
+    "11-A": ["Jasurbek Qosimov", "Shahlo Ahmedova", "Azizbek Normatov"],
   };
 
   for (const group of groupDocs) {
-    const names = sampleStudentsByGrade[group.grade] || ["Olim Olimov", "Zilola Toirova"];
+    const names = sampleStudentsByGroup[group.name] || [];
 
     let count = 0;
     for (const fullName of names) {
@@ -132,7 +135,10 @@ async function runSeed() {
       }
     }
 
-    await groupsCollection.updateOne({ _id: group._id }, { $inc: { studentCount: count } });
+    if (count > 0) {
+      const studentCount = await usersCollection.countDocuments({ groupId: group._id, role: "student" });
+      await groupsCollection.updateOne({ _id: group._id }, { $set: { studentCount } });
+    }
   }
 
   // 4. Create Sample Lessons for 8-A group

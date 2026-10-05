@@ -31,6 +31,17 @@ export async function requireMentor(): Promise<SessionPayload> {
 }
 
 /**
+ * Sahifalar uchun: mentor bo'lmagan foydalanuvchini xato sahifasi o'rniga o'z bosh sahifasiga yo'naltiradi
+ */
+export async function requireMentorPage(): Promise<SessionPayload> {
+  const user = await requireAuth();
+  if (user.role !== "mentor") {
+    redirect("/lessons");
+  }
+  return user;
+}
+
+/**
  * Require student role
  */
 export async function requireStudent(): Promise<SessionPayload> {

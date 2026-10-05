@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData, IMaterial } from "@/lib/db/models/lesson.model";
+import { IQuizData } from "@/lib/db/models/quiz.model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
@@ -21,6 +22,7 @@ import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
 interface LessonEditorFormProps {
   groups: IGroupData[];
   initialLesson?: ILessonData | null;
+  initialQuiz?: IQuizData | null;
   defaultGroupId?: string;
   defaultQuarter?: number;
 }
@@ -79,6 +81,7 @@ async function compressImageToWebP(file: File): Promise<Blob> {
 export function LessonEditorForm({
   groups,
   initialLesson,
+  initialQuiz,
   defaultGroupId,
   defaultQuarter = 1,
 }: LessonEditorFormProps) {
@@ -135,7 +138,8 @@ export function LessonEditorForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filename: file.name.replace(/\.[^/.]+$/, "") + (contentType === "image/webp" ? ".webp" : ""),
+          filename:
+            contentType === "image/webp" ? file.name.replace(/\.[^/.]+$/, "") + ".webp" : file.name,
           contentType,
           fileSize: fileToUpload.size,
         }),
@@ -523,6 +527,7 @@ export function LessonEditorForm({
           isOpen={showQuizModal}
           onClose={() => setShowQuizModal(false)}
           lessonId={initialLesson._id.toString()}
+          initialQuiz={initialQuiz}
         />
       )}
     </form>

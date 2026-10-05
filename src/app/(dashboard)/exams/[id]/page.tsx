@@ -37,7 +37,7 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
     );
   }
 
-  const { exam, submission, isLocked, lockReason } = res.data;
+  const { exam, submission, isLocked, lockReason, canRetake, serverTime } = res.data;
 
   // Agar imtihon vaqti kelmagan bo'lsa yoki yopilgan bo'lsa
   if (isLocked) {
@@ -65,7 +65,11 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
   }
 
   // Agar o'quvchi topshirib bo'lgan bo'lsa
-  if (submission && (submission.status === "submitted" || submission.status === "graded")) {
+  if (
+    submission &&
+    (submission.status === "submitted" || submission.status === "graded") &&
+    !canRetake
+  ) {
     if (exam.isResultsPublished) {
       redirect(`/exams/${resolvedParams.id}/result`);
     }
@@ -96,11 +100,21 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
 
   // Agar urinish allaqachon boshlangan bo'lsa (in_progress)
   if (submission && submission.status === "in_progress") {
+    // Muddat: boshlangan vaqt + davomiylik, lekin imtihon oynasi yopilishidan kech emas
+    const deadline = new Date(
+      Math.min(
+        new Date(submission.startedAt).getTime() + exam.durationMinutes * 60 * 1000,
+        new Date(exam.endTime).getTime()
+      )
+    ).toISOString();
+
     return (
       <ExamTaker
+        key={submission._id.toString()}
         exam={exam}
         initialSubmission={submission}
-        startedAt={new Date(submission.startedAt).toISOString()}
+        deadline={deadline}
+        serverTime={serverTime}
         durationMinutes={exam.durationMinutes}
       />
     );

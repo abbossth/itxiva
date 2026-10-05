@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { IQuizData } from "@/lib/db/models/quiz.model";
 import { IQuizSubmissionData, QuizSubmissionStatus } from "@/lib/db/models/quiz-submission.model";
 import { submitQuizAction } from "@/actions/quiz.actions";
@@ -17,6 +18,7 @@ interface QuizViewProps {
 }
 
 export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
+  const router = useRouter();
   const [submission, setSubmission] = useState<IQuizSubmissionData | null>(initialSubmission);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>(() => {
     if (initialSubmission?.answers) {
@@ -78,16 +80,14 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
           quizId: quiz._id,
           lessonId: quiz.lessonId,
           studentId: "me",
-          answers: formattedAnswers.map((a) => ({
-            questionId: a.questionId,
-            value: a.value,
-            pointsAwarded: 0,
-          })),
+          answers: res.data.answers,
           totalScore: res.data.totalScore,
           maxScore: res.data.maxScore,
           status: res.data.status as QuizSubmissionStatus,
           submittedAt: new Date().toISOString(),
         });
+        // To'g'ri javoblar va tushuntirishlarni serverdan qayta yuklash
+        router.refresh();
       }
     } catch {
       setError("Server bilan aloqada xatolik");

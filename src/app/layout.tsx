@@ -11,7 +11,6 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ITXiva — O'quv Platformasi",
   description: "Muhammad al-Xorazmiy vorislari dasturi — Xiva o'quv platformasi",
-  manifest: "/manifest.json",
   icons: {
     icon: "/icons/minaret.svg",
     apple: "/icons/minaret.svg",

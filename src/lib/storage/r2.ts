@@ -43,11 +43,13 @@ export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 export async function getUploadPresignedUrl({
   key,
   contentType,
+  skipTypeCheck = false,
 }: {
   key: string;
   contentType: string;
+  skipTypeCheck?: boolean;
 }): Promise<{ uploadUrl: string; key: string }> {
-  if (!ALLOWED_FILE_TYPES.includes(contentType)) {
+  if (!skipTypeCheck && !ALLOWED_FILE_TYPES.includes(contentType)) {
     throw new Error(`Ruxsat berilmagan fayl turi: ${contentType}`);
   }
 

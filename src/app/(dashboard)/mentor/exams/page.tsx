@@ -1,4 +1,4 @@
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getExamsForMentor } from "@/actions/exam.actions";
 import { ExamsManager } from "@/components/mentor/exams-manager";
 import { GraduationCap } from "lucide-react";
@@ -9,7 +9,7 @@ export const metadata = {
 };
 
 export default async function MentorExamsPage() {
-  await requireMentor();
+  await requireMentorPage();
   const res = await getExamsForMentor();
   const exams = res.data || [];
 

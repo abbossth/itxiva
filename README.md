@@ -46,6 +46,17 @@ npm run dev
 
 Brauzerda: `http://localhost:3000` ochiladi.
 
+### MongoDB Atlas'siz lokal ishlash (ixtiyoriy)
+
+Kompyuterda MongoDB o'rnatilmagan bo'lsa, loyiha bilan birga keladigan lokal bazadan foydalanish mumkin
+(ma'lumotlar `.mongo-data/` papkasida saqlanadi):
+
+```bash
+npm run db      # alohida terminalda: mongodb://127.0.0.1:27017/itxiva
+```
+
+`.env.local` faylida `MONGODB_URI=mongodb://127.0.0.1:27017/itxiva` deb yozing.
+
 ---
 
 ## 3. Test ma'lumotlarini bazaga yuklash (Seed)
@@ -53,7 +64,7 @@ Brauzerda: `http://localhost:3000` ochiladi.
 Test guruhlari (8-A, 8-B, 9-A, 9-B, 11-A), mentor akkaunti va sinov o'quvchilarini yaratish uchun quyidagi buyruqni bering:
 
 ```bash
-npx tsx scripts/seed.ts
+npm run seed
 ```
 
 > **Eslatma:** Tasodifiy parollar konsolda faqat bir marta jadval ko'rinishida chiqariladi.

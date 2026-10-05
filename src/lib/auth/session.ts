@@ -6,7 +6,14 @@ const COOKIE_NAME = "itxiva_session";
 const SESSION_DURATION_SECONDS = 14 * 24 * 60 * 60; // 14 days
 
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || "itxiva-development-secret-key-at-least-32-characters-long!";
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    // Productionda ma'lum bo'lgan zaxira kalit bilan ishlash sessiyalarni soxtalashtirishga yo'l ochadi
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET muhit o'zgaruvchisi aniqlanmagan");
+    }
+    return new TextEncoder().encode("itxiva-development-secret-key-at-least-32-characters-long!");
+  }
   return new TextEncoder().encode(secret);
 }
 

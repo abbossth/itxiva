@@ -1,4 +1,4 @@
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { LessonsManager } from "@/components/mentor/lessons-manager";
@@ -15,7 +15,7 @@ interface MentorLessonsPageProps {
 }
 
 export default async function MentorLessonsPage({ searchParams }: MentorLessonsPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedSearchParams = await searchParams;
 
   const groups = await getGroups();
@@ -47,6 +47,7 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
 
   return (
     <LessonsManager
+      key={`${selectedGroupId}-${selectedQuarter}`}
       groups={groups}
       initialLessons={lessons}
       selectedGroupId={selectedGroupId}

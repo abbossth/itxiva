@@ -23,14 +23,16 @@ import {
 interface ExamTakerProps {
   exam: IExamData;
   initialSubmission: IExamSubmissionData;
-  startedAt: string;
+  deadline: string;
+  serverTime: string;
   durationMinutes: number;
 }
 
 export function ExamTaker({
   exam,
   initialSubmission,
-  startedAt,
+  deadline,
+  serverTime,
   durationMinutes,
 }: ExamTakerProps) {
   const router = useRouter();
@@ -113,24 +115,31 @@ export function ExamTaker({
     setUploadProgress((prev) => ({ ...prev, [questionId]: "Yuklanmoqda..." }));
 
     try {
-      // 1. Get presigned PUT URL
-      const key = `exams/${exam._id}/submissions/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      // 1. Get presigned PUT URL (the server validates the file and generates the storage key)
+      const contentType = file.type || "application/octet-stream";
       const presignedRes = await fetch("/api/upload/presigned-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, contentType: file.type || "application/octet-stream" }),
+        body: JSON.stringify({
+          filename: file.name,
+          contentType,
+          fileSize: file.size,
+          examId: exam._id,
+          questionId,
+        }),
       });
 
       if (!presignedRes.ok) {
-        throw new Error("Presigned URL olishda xatolik");
+        const data = await presignedRes.json().catch(() => null);
+        throw new Error(data?.error || "Fayl yuklashga ruxsat olinmadi");
       }
 
-      const { uploadUrl } = await presignedRes.json();
+      const { uploadUrl, key } = await presignedRes.json();
 
       // 2. Upload directly to Cloudflare R2
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": contentType },
         body: file,
       });
 
@@ -139,6 +148,7 @@ export function ExamTaker({
       }
 
       updateAnswer(questionId, {
+        type: "project_upload",
         fileKey: key,
         fileName: file.name,
         fileSize: file.size,
@@ -159,13 +169,16 @@ export function ExamTaker({
     }
   };
 
-  // Handle final submission
+  // Handle final submission (manual or automatic when time expires)
+  const isSubmittingRef = useRef(false);
   const handleSubmitExam = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const answersList = Object.values(answers);
+      const answersList = Object.values(answersRef.current);
       const res = await submitExamAction({
         examId: exam._id,
         answers: answersList,
@@ -174,6 +187,7 @@ export function ExamTaker({
       if (!res.success) {
         setError(res.error || "Imtihonni topshirishda xatolik yuz berdi");
         setIsSubmitting(false);
+        isSubmittingRef.current = false;
       } else {
         router.push("/exams");
         router.refresh();
@@ -181,6 +195,7 @@ export function ExamTaker({
     } catch {
       setError("Server bilan aloqada xatolik yuz berdi");
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -223,7 +238,8 @@ export function ExamTaker({
 
         <div className="flex items-center gap-3">
           <ExamTimer
-            startedAt={startedAt}
+            deadline={deadline}
+            serverTime={serverTime}
             durationMinutes={durationMinutes}
             onTimeExpired={handleSubmitExam}
           />
@@ -395,7 +411,8 @@ export function ExamTaker({
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                        Loyiha faylini yuklang (ZIP, PDF yoki rasm)
+                        Loyiha faylini yuklang
+                        {q.allowedFileTypes?.length ? ` (${q.allowedFileTypes.join(", ")})` : ""}
                       </p>
                       <p className="text-xs text-slate-500">
                         Maksimal hajm: {q.maxFileSizeMb || 50} MB.
@@ -406,9 +423,11 @@ export function ExamTaker({
                       type="file"
                       id={`file-${qId}`}
                       className="hidden"
+                      accept={q.allowedFileTypes?.join(",")}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleFileUpload(qId, file);
+                        e.target.value = "";
                       }}
                     />
                     <label

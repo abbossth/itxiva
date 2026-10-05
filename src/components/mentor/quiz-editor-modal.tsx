@@ -309,7 +309,11 @@ export function QuizEditorModal({
                             onChange={(e) => {
                               const newOpts = [...(q.options || [])];
                               newOpts[optIdx] = e.target.value;
-                              updateQuestion(qIdx, { options: newOpts });
+                              // To'g'ri javob matn bo'yicha saqlanadi — variant nomi o'zgarsa, u ham yangilanadi
+                              const newCorrect = (q.correctAnswers || []).map((ans) =>
+                                ans === opt ? e.target.value : ans
+                              );
+                              updateQuestion(qIdx, { options: newOpts, correctAnswers: newCorrect });
                             }}
                             className="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                           />

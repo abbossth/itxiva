@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { formatDateTimeUz } from "@/lib/utils";
 
 interface ExamsManagerProps {
   initialExams: Array<{
@@ -258,8 +259,8 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">
-                      {new Date(exam.startTime).toLocaleDateString("uz-UZ")} —{" "}
-                      {new Date(exam.endTime).toLocaleDateString("uz-UZ")}
+                      {formatDateTimeUz(exam.startTime)} —{" "}
+                      {formatDateTimeUz(exam.endTime)}
                     </span>
                   </div>
                 </div>

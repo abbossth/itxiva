@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getLessonById } from "@/actions/lesson.actions";
+import { getQuizForMentor } from "@/actions/quiz.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 
 interface EditLessonPageProps {
@@ -11,12 +12,13 @@ interface EditLessonPageProps {
 }
 
 export default async function EditLessonPage({ params }: EditLessonPageProps) {
-  await requireMentor();
+  await requireMentorPage();
   const resolvedParams = await params;
 
-  const [lesson, groups] = await Promise.all([
+  const [lesson, groups, quizRes] = await Promise.all([
     getLessonById(resolvedParams.id),
     getGroups(),
+    getQuizForMentor(resolvedParams.id),
   ]);
 
   if (!lesson) {
@@ -35,7 +37,7 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
         </Link>
       </div>
 
-      <LessonEditorForm groups={groups} initialLesson={lesson} />
+      <LessonEditorForm groups={groups} initialLesson={lesson} initialQuiz={quizRes.data ?? null} />
     </div>
   );
 }

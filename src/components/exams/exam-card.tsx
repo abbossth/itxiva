@@ -13,6 +13,7 @@ import {
   ArrowRight,
   FileText,
 } from "lucide-react";
+import { formatDateTimeUz } from "@/lib/utils";
 
 interface ExamCardProps {
   exam: IExamData;
@@ -23,6 +24,8 @@ interface ExamCardProps {
 export function ExamCard({ exam, submission, category }: ExamCardProps) {
   const isCompleted = submission && (submission.status === "submitted" || submission.status === "graded");
   const isInProgress = submission && submission.status === "in_progress";
+  // Ball faqat mentor natijalarni e'lon qilgach va baholash tugagach ko'rsatiladi
+  const showScore = submission?.status === "graded" && exam.isResultsPublished;
 
   return (
     <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs hover:border-teal-500/40 transition-all flex flex-col justify-between space-y-4">
@@ -48,10 +51,10 @@ export function ExamCard({ exam, submission, category }: ExamCardProps) {
 
           {isCompleted && (
             <Badge
-              variant={submission.status === "graded" ? (submission.isPassed ? "teal" : "rose") : "amber"}
+              variant={showScore ? (submission.isPassed ? "teal" : "rose") : "amber"}
               className="flex items-center gap-1"
             >
-              {submission.status === "graded" ? (
+              {showScore ? (
                 <>
                   <Award className="w-3.5 h-3.5" />
                   <span>
@@ -61,7 +64,7 @@ export function ExamCard({ exam, submission, category }: ExamCardProps) {
               ) : (
                 <>
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Tekshirilmoqda</span>
+                  <span>{exam.isResultsPublished ? "Tekshirilmoqda" : "Topshirildi"}</span>
                 </>
               )}
             </Badge>
@@ -91,8 +94,8 @@ export function ExamCard({ exam, submission, category }: ExamCardProps) {
           <div className="flex items-center gap-1.5 col-span-2">
             <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span>
-              Muddat: {new Date(exam.startTime).toLocaleDateString("uz-UZ")} —{" "}
-              {new Date(exam.endTime).toLocaleDateString("uz-UZ")}
+              Muddat: {formatDateTimeUz(exam.startTime)} —{" "}
+              {formatDateTimeUz(exam.endTime)}
             </span>
           </div>
         </div>
@@ -133,7 +136,7 @@ export function ExamCard({ exam, submission, category }: ExamCardProps) {
 
         {category === "upcoming" && (
           <div className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 py-2 bg-slate-50 dark:bg-slate-900/40 rounded-xl">
-            Boshlanish: {new Date(exam.startTime).toLocaleString("uz-UZ")}
+            Boshlanish: {formatDateTimeUz(exam.startTime)}
           </div>
         )}
       </div>
