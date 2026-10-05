@@ -19,7 +19,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { startAttendanceSessionAction } from "@/actions/attendance.actions";
-import { formatDateUz } from "@/lib/utils";
+import { formatDateUz, formatTimeUz } from "@/lib/utils";
 
 interface AttendanceSessionItem {
   _id: string;
@@ -145,10 +145,7 @@ export function AttendanceSessionsView({
                   <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300 mt-2">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-teal-600" />
-                      {new Date(s.startTime).toLocaleTimeString("uz-UZ", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })} da boshlandi
+                      {formatTimeUz(s.startTime)} da boshlandi
                     </span>
                     <span className="flex items-center gap-1 font-bold text-teal-700 dark:text-teal-300">
                       <Users className="w-3.5 h-3.5" />
@@ -235,7 +232,7 @@ export function AttendanceSessionsView({
           </DialogHeader>
 
           <form onSubmit={handleStartSession} className="space-y-4">
-            <Field id="session-group" label="O'quv guruhi" required>
+            <Field htmlFor="session-group" label="O'quv guruhi" required>
               <select
                 id="session-group"
                 value={selectedGroupId}
@@ -252,7 +249,7 @@ export function AttendanceSessionsView({
             </Field>
 
             <Field
-              id="coins-reward"
+              htmlFor="coins-reward"
               label="Har bir o'quvchiga beriladigan coin"
               required
               hint="Standart: 10 coin"

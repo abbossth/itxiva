@@ -28,6 +28,7 @@ import {
   getAttendanceSessionForProjector,
   ProjectorSessionData,
 } from "@/actions/attendance.actions";
+import { formatTimeUz } from "@/lib/utils";
 
 interface AttendeeRecord {
   _id: string;
@@ -426,10 +427,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                         {r.method === "qr" ? "QR" : "Kod"}
                       </Badge>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {new Date(r.markedAt).toLocaleTimeString("uz-UZ", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatTimeUz(r.markedAt)}
                       </span>
                     </div>
                   </div>

@@ -87,6 +87,7 @@ export async function loginAction(
     rawNext &&
     rawNext.startsWith("/") &&
     !rawNext.startsWith("//") &&
+    !rawNext.includes("\\") &&
     !rawNext.startsWith("/api")
       ? rawNext
       : null;

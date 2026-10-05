@@ -91,6 +91,15 @@ export function formatDateTimeUz(date: Date | string | number): string {
 }
 
 /**
+ * Format time only: "14:30"
+ */
+export function formatTimeUz(date: Date | string | number): string {
+  const p = getDateParts(date);
+  if (!p) return "";
+  return `${p.hour}:${p.minute}`;
+}
+
+/**
  * Value for <input type="datetime-local"> in the user's local time zone
  */
 export function toDateTimeLocalValue(date: Date | string | number): string {

@@ -329,7 +329,7 @@ export function GroupStudentsView({
           </DialogHeader>
 
           <div className="space-y-4">
-            <Field id="target-group" label="Yangi guruhni tanlang" required>
+            <Field htmlFor="target-group" label="Yangi guruhni tanlang" required>
               <select
                 id="target-group"
                 value={targetGroupId}

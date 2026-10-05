@@ -35,7 +35,7 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
         {nextUrl && <input type="hidden" name="next" value={nextUrl} />}
 
         <Field
-          id="login"
+          htmlFor="login"
           label="Login"
           required
           error={state?.errors?.login?.[0]}
@@ -59,7 +59,7 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
         </Field>
 
         <Field
-          id="password"
+          htmlFor="password"
           label="Parol"
           required
           error={state?.errors?.password?.[0]}

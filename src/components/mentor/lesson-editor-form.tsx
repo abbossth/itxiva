@@ -288,7 +288,7 @@ export function LessonEditorForm({
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field id="lesson-group" label="O'quv guruhi" required>
+          <Field htmlFor="lesson-group" label="O'quv guruhi" required>
             <select
               id="lesson-group"
               value={groupId}
@@ -304,7 +304,7 @@ export function LessonEditorForm({
             </select>
           </Field>
 
-          <Field id="lesson-quarter" label="Chorak" required>
+          <Field htmlFor="lesson-quarter" label="Chorak" required>
             <select
               id="lesson-quarter"
               value={quarter}
@@ -319,7 +319,7 @@ export function LessonEditorForm({
             </select>
           </Field>
 
-          <Field id="lesson-order" label="Tartib raqami (dars #)" required>
+          <Field htmlFor="lesson-order" label="Tartib raqami (dars #)" required>
             <Input
               id="lesson-order"
               type="number"
@@ -331,7 +331,7 @@ export function LessonEditorForm({
           </Field>
         </div>
 
-        <Field id="lesson-title" label="Dars mavzusi / Sarlavhasi" required hint="Darsning to'liq rasmiy nomi">
+        <Field htmlFor="lesson-title" label="Dars mavzusi / Sarlavhasi" required hint="Darsning to'liq rasmiy nomi">
           <Input
             id="lesson-title"
             value={title}
@@ -342,7 +342,7 @@ export function LessonEditorForm({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="lesson-topic" label="Mavzu qisqacha (podzagolovok)" hint="Asosiy teglari yoki kalit so'zlar">
+          <Field htmlFor="lesson-topic" label="Mavzu qisqacha (podzagolovok)" hint="Asosiy teglari yoki kalit so'zlar">
             <Input
               id="lesson-topic"
               value={topic}
@@ -351,7 +351,7 @@ export function LessonEditorForm({
             />
           </Field>
 
-          <Field id="lesson-date" label="Dars o'tiladigan sana">
+          <Field htmlFor="lesson-date" label="Dars o'tiladigan sana">
             <Input
               id="lesson-date"
               type="date"
@@ -361,7 +361,7 @@ export function LessonEditorForm({
           </Field>
         </div>
 
-        <Field id="lesson-description" label="Dars konspekti / Tavsifi" hint="Dars mazmuni, uy vazifasi va ko'rsatmalar">
+        <Field htmlFor="lesson-description" label="Dars konspekti / Tavsifi" hint="Dars mazmuni, uy vazifasi va ko'rsatmalar">
           <textarea
             id="lesson-description"
             value={description}
@@ -453,7 +453,7 @@ export function LessonEditorForm({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field id="mat-title" label="Material sarlavhasi (ixtiyoriy)">
+            <Field htmlFor="mat-title" label="Material sarlavhasi (ixtiyoriy)">
               <Input
                 id="mat-title"
                 value={matTitle}
@@ -463,7 +463,7 @@ export function LessonEditorForm({
             </Field>
 
             {materialType === "file" ? (
-              <Field id="file-upload" label="Faylni tanlang">
+              <Field htmlFor="file-upload" label="Faylni tanlang">
                 <input
                   id="file-upload"
                   type="file"
@@ -475,7 +475,7 @@ export function LessonEditorForm({
               </Field>
             ) : (
               <Field
-                id="mat-url"
+                htmlFor="mat-url"
                 label={materialType === "youtube" ? "YouTube video havolasi" : "Tashqi veb havola"}
               >
                 <div className="flex items-center gap-2">

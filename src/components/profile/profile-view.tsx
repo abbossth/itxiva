@@ -193,7 +193,7 @@ export function ProfileView({ user }: ProfileViewProps) {
 
         <form action={formAction} className="space-y-4 max-w-md">
           <Field
-            id="new-password"
+            htmlFor="new-password"
             label="Yangi parol"
             required
             hint="Kamida 8 ta belgi (harf va raqamlar)"
@@ -220,7 +220,7 @@ export function ProfileView({ user }: ProfileViewProps) {
           </Field>
 
           <Field
-            id="confirm-password"
+            htmlFor="confirm-password"
             label="Yangi parolni tasdiqlang"
             required
             error={state?.errors?.confirmPassword?.[0]}

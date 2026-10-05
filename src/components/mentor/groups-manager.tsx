@@ -209,7 +209,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               </div>
             )}
 
-            <Field id="group-name" label="Guruh nomi" required hint="Masalan: 8-A, 8-B, 9-A, 11-A">
+            <Field htmlFor="group-name" label="Guruh nomi" required hint="Masalan: 8-A, 8-B, 9-A, 11-A">
               <Input
                 id="group-name"
                 value={name}
@@ -219,7 +219,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               />
             </Field>
 
-            <Field id="group-grade" label="Sinf darajasi" required>
+            <Field htmlFor="group-grade" label="Sinf darajasi" required>
               <div className="flex items-center gap-4 pt-1">
                 {[8, 9, 11].map((g) => (
                   <label
@@ -240,7 +240,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               </div>
             </Field>
 
-            <Field id="academic-year" label="O'quv yili" required>
+            <Field htmlFor="academic-year" label="O'quv yili" required>
               <Input
                 id="academic-year"
                 value={academicYear}

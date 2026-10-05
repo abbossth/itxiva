@@ -92,7 +92,7 @@ export function CoinBadge({
           C
         </text>
       </svg>
-      <span className="tabular-nums">{valueToRender.toLocaleString("uz-UZ")}</span>
+      <span className="tabular-nums">{String(Math.round(valueToRender)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0")}</span>
     </div>
   );
 }

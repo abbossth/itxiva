@@ -12,6 +12,7 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireStudent, requireAuth } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ActionResult } from "./auth.actions";
+import { formatDateUz, formatDateTimeUz } from "@/lib/utils";
 
 export interface ProjectorSessionData {
   _id: string;
@@ -50,6 +51,9 @@ export async function startAttendanceSessionAction(
   coinsReward: number = 10
 ): Promise<ActionResult<{ sessionId: string }>> {
   const session = await requireMentor();
+  if (!Number.isInteger(coinsReward) || coinsReward < 0 || coinsReward > 1000) {
+    return { success: false, message: "Coin miqdori 0 dan 1000 gacha butun son bo'lishi kerak" };
+  }
   await connectToDatabase();
 
   const group = await Group.findById(groupId);
@@ -236,8 +240,8 @@ export async function markAttendanceAction(params: {
 
   const effectiveUserId = dbUser?._id ? dbUser._id.toString() : sessionUser.userId;
 
-  const cleanCode = params.code?.trim().toUpperCase();
-  const cleanToken = params.token?.trim();
+  const cleanCode = typeof params?.code === "string" ? params.code.trim().toUpperCase() : undefined;
+  const cleanToken = typeof params?.token === "string" ? params.token.trim() : undefined;
 
   if (!cleanCode && !cleanToken) {
     return {
@@ -257,7 +261,7 @@ export async function markAttendanceAction(params: {
       status: "active",
       $or: [
         { currentCode: cleanCode },
-        { "previousTokens.code": cleanCode, "previousTokens.expiredAt": { $gt: now } },
+        { previousTokens: { $elemMatch: { code: cleanCode, expiredAt: { $gt: now } } } },
       ],
     });
   } else if (cleanToken) {
@@ -266,7 +270,7 @@ export async function markAttendanceAction(params: {
       status: "active",
       $or: [
         { currentToken: cleanToken },
-        { "previousTokens.token": cleanToken, "previousTokens.expiredAt": { $gt: now } },
+        { previousTokens: { $elemMatch: { token: cleanToken, expiredAt: { $gt: now } } } },
       ],
     });
   }
@@ -328,18 +332,29 @@ export async function markAttendanceAction(params: {
     await dbUser.save();
   }
 
-  const coinsAwarded = activeSession.defaultCoinsReward || 10;
+  const coinsAwarded = activeSession.defaultCoinsReward ?? 10;
 
-  // Create attendance record
-  await AttendanceRecord.create({
-    sessionId: activeSession._id,
-    studentId: effectiveUserId,
-    groupId: activeSession.groupId,
-    status: "present",
-    method,
-    markedAt: now,
-    coinsAwarded,
-  });
+  // Create attendance record. Unique (sessionId, studentId) indeksi parallel so'rovlarda
+  // ikki marta coin berilishining oldini oladi.
+  try {
+    await AttendanceRecord.create({
+      sessionId: activeSession._id,
+      studentId: effectiveUserId,
+      groupId: activeSession.groupId,
+      status: "present",
+      method,
+      markedAt: now,
+      coinsAwarded,
+    });
+  } catch (err: unknown) {
+    if ((err as { code?: number })?.code === 11000) {
+      return {
+        success: false,
+        message: "Siz ushbu dars uchun allaqachon davomatdan o'tgansiz!",
+      };
+    }
+    throw err;
+  }
 
   // Award coins to user
   const updatedUser = await User.findByIdAndUpdate(
@@ -672,7 +687,7 @@ export async function exportAttendanceCsvAction(sessionId: string): Promise<stri
     .lean();
 
   const groupName = (session.groupId as unknown as { name?: string })?.name || "Guruh";
-  const dateStr = new Date(session.date).toLocaleDateString("uz-UZ");
+  const dateStr = formatDateUz(session.date);
 
   let csv = `\uFEFF#;FIO;Login;Guruh;Sana;Holat;Usul;Vaqt;Coinlar\n`;
 
@@ -689,7 +704,7 @@ export async function exportAttendanceCsvAction(sessionId: string): Promise<stri
         ? "Sababli"
         : "Kelmagan";
     const methodText = r.method === "qr" ? "QR Kod" : r.method === "code" ? "Kod" : "Qo'lda";
-    const timeStr = r.markedAt ? new Date(r.markedAt).toLocaleTimeString("uz-UZ") : "—";
+    const timeStr = r.markedAt ? formatDateTimeUz(r.markedAt) : "—";
 
     csv += `${idx + 1};"${name}";"@${login}";"${groupName}";"${dateStr}";"${statusText}";"${methodText}";"${timeStr}";${r.coinsAwarded}\n`;
   });
