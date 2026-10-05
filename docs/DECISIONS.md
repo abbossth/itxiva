@@ -62,3 +62,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
   2. **Kamera QR Skaneri (`html5-qrcode`)**: "QR Skaner" orqali kamera ochiladi, proyektor ekranidagi QR belgini real vaqtda o'qiydi (yoki rasm yuklash orqali ham ishlaydi).
   3. **Universal token/kod tekshiruvi**: Serverda `markAttendanceAction` kiritilgan kod yoki skaner qilingan token orqali to'g'ridan-to'g'ri faol sessiyani topadi va talabaning guruhidan qat'i nazar davomatni adolatli qayd etadi.
   4. **Profilga tezkor havola**: O'quvchi profilida (`/profile`) dars davomatiga to'g'ridan-to'g'ri o'tuvchi tezkor karta qo'shildi.
+
+### [2026-10-05] 13-qaror: Proyektor ekrani — setState-in-render va Router yangilanishi xatosi bartaraf etildi
+- **Holat**: `ProjectorScreen`da 180 soniyalik teskari hisoblagich nolga tushganda, `setSecondsLeft((prev) => { rotateCode(); ... })` orqali Server Action render jarayonida chaqirilgan va bu `Cannot update a component ('Router') while rendering a different component ('ProjectorScreen')` xatosini keltirib chiqarayotgan edi. Shuningdek `getAttendanceSessionForProjector` o'qish funksiyasi ichida mutatsiya chaqirilgan edi.
+- **Qaror**:
+  1. **Toza taymer**: 1 soniyalik interval faqat sof raqamni kamaytiradi (`prev - 1`), hech qanday nojo'ya ta'sirsiz.
+  2. **Effect orqali rotatsiya**: Taymer 0 ga yetganda alohida `useEffect` render to'liq yakunlangandan so'ng xavfsiz tarzda `rotateCode()`ni ishga tushiradi (`isRotatingRef` orqali takroriy chaqiruvlardan himoyalangan).
+  3. **O'qish so'rovi tozaligi**: `getAttendanceSessionForProjector` funksiyasidan nojo'ya mutatsiya chaqiruvi olib tashlandi.

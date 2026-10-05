@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -68,25 +68,35 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  const isRotatingRef = useRef(false);
+
   const sessionId = data.session._id;
   const isClosed = data.session.status === "closed";
 
   // Polling data every 3 seconds to keep attendee list fresh
   const refreshData = useCallback(async () => {
+    if (isClosed || isRotatingRef.current) return;
     try {
       const fresh = await getAttendanceSessionForProjector(sessionId);
       if (fresh) {
         setData(fresh);
-        setSecondsLeft(fresh.secondsRemaining);
+        // Synchronize secondsLeft only if local drift is significant (> 5s)
+        setSecondsLeft((prev) => {
+          if (Math.abs(prev - fresh.secondsRemaining) > 5) {
+            return fresh.secondsRemaining;
+          }
+          return prev;
+        });
       }
     } catch (err) {
       console.error("Attendance polling error:", err);
     }
-  }, [sessionId]);
+  }, [sessionId, isClosed]);
 
   const rotateCode = useCallback(async () => {
-    if (isRotating || isClosed) return;
+    if (isRotatingRef.current || isClosed) return;
     try {
+      isRotatingRef.current = true;
       setIsRotating(true);
       const res = await rotateAttendanceSessionAction(sessionId);
       if (res.success && res.data) {
@@ -100,14 +110,19 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
           },
         }));
         setSecondsLeft(data.session.rotateIntervalSeconds || 180);
-        refreshData();
+        // Refresh QR image and attendees
+        const fresh = await getAttendanceSessionForProjector(sessionId);
+        if (fresh) {
+          setData(fresh);
+        }
       }
     } catch {
       toast.error("Kodni yangilab bo'lmadi");
     } finally {
+      isRotatingRef.current = false;
       setIsRotating(false);
     }
-  }, [sessionId, isRotating, isClosed, data.session.rotateIntervalSeconds, refreshData, toast]);
+  }, [sessionId, isClosed, data.session.rotateIntervalSeconds, toast]);
 
   useEffect(() => {
     if (isClosed) return;
@@ -115,23 +130,24 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
     return () => clearInterval(pollTimer);
   }, [isClosed, refreshData]);
 
-  // Local 1-second countdown tick
+  // Local 1-second countdown tick (pure state update, zero side-effects inside updater)
   useEffect(() => {
     if (isClosed) return;
 
     const tick = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          // Trigger code rotation
-          rotateCode();
-          return data.session.rotateIntervalSeconds || 180;
-        }
-        return prev - 1;
-      });
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
     return () => clearInterval(tick);
-  }, [isClosed, data.session.rotateIntervalSeconds, rotateCode]);
+  }, [isClosed]);
+
+  // When timer hits 0, trigger rotation safely inside effect (after render is committed)
+  useEffect(() => {
+    if (isClosed) return;
+    if (secondsLeft === 0 && !isRotatingRef.current) {
+      rotateCode();
+    }
+  }, [secondsLeft, isClosed, rotateCode]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {

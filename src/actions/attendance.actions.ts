@@ -158,14 +158,10 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
 
   const group = await Group.findById(attSession.groupId).lean();
 
-  // Check if session needs auto-rotation (> 180s elapsed)
+  // Calculate elapsed time
   const elapsedSeconds = Math.floor(
     (Date.now() - new Date(attSession.codeRotatedAt).getTime()) / 1000
   );
-  if (attSession.status === "active" && elapsedSeconds >= attSession.rotateIntervalSeconds) {
-    await rotateAttendanceSessionAction(sessionId);
-    return getAttendanceSessionForProjector(sessionId);
-  }
 
   // Fetch attendees
   const records = await AttendanceRecord.find({ sessionId })
