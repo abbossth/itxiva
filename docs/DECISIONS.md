@@ -51,4 +51,6 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
   2. **Proyektor rejimi**: Mentor uchun ulkan QR kod, katta shriftli kod, SVG taymer aylana (`CountdownRing`) va kelganlarning jonli oqimi.
   3. **Auto-coin va Ledger**: Har bir kelgan o'quvchiga avtomatik +10 coin beriladi va bu `CoinLedger` tranzaksiyalar kitobiga qayd etiladi. Sessiya yopilganda qatnashmagan barcha o'quvchilarga avtomatik `absent` (0 coin) yoziladi.
 
-
+### [2026-10-05] 11-qaror: Joriy o'quv yili (2026-2027) standartlashtirilishi
+- **Holat**: Platforma 2026-2027 o'quv yilida faoliyat ko'rsatmoqda, biroq guruh yaratish formasi, Mongoose modeli va Zod validatsiyasida sukut bo'yicha `2025-2026` qolgan edi.
+- **Qaror**: Barcha standart qiymatlar (`Group` modeli, `groupSchema`, `GroupsManager` overview va formasi, `scripts/seed.ts` guruhlari) `2026-2027` ga yangilandi.

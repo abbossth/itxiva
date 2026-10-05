@@ -31,7 +31,7 @@ const GroupSchema = new Schema<IGroup>(
     academicYear: {
       type: String,
       required: true,
-      default: "2025-2026",
+      default: "2026-2027",
     },
     studentCount: {
       type: Number,

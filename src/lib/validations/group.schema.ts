@@ -9,7 +9,7 @@ export const groupSchema = z.object({
   grade: z.coerce
     .number()
     .refine((val) => [8, 9, 11].includes(val), "Sinf faqat 8, 9 yoki 11 bo'lishi mumkin"),
-  academicYear: z.string().default("2025-2026"),
+  academicYear: z.string().default("2026-2027"),
   isActive: z.boolean().default(true),
 });
 

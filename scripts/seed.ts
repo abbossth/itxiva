@@ -32,11 +32,11 @@ async function runSeed() {
 
   // 1. Create the 5 cohorts
   const cohortsData = [
-    { name: "8-A", grade: 8, academicYear: "2025-2026", isActive: true },
-    { name: "8-B", grade: 8, academicYear: "2025-2026", isActive: true },
-    { name: "9-A", grade: 9, academicYear: "2025-2026", isActive: true },
-    { name: "9-B", grade: 9, academicYear: "2025-2026", isActive: true },
-    { name: "11-A", grade: 11, academicYear: "2025-2026", isActive: true },
+    { name: "8-A", grade: 8, academicYear: "2026-2027", isActive: true },
+    { name: "8-B", grade: 8, academicYear: "2026-2027", isActive: true },
+    { name: "9-A", grade: 9, academicYear: "2026-2027", isActive: true },
+    { name: "9-B", grade: 9, academicYear: "2026-2027", isActive: true },
+    { name: "11-A", grade: 11, academicYear: "2026-2027", isActive: true },
   ];
 
   const groupDocs: Array<{ _id: mongoose.Types.ObjectId; name: string; grade: number }> = [];

@@ -25,7 +25,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
 
   const [name, setName] = useState("");
   const [grade, setGrade] = useState<number>(8);
-  const [academicYear, setAcademicYear] = useState("2025-2026");
+  const [academicYear, setAcademicYear] = useState("2026-2027");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -133,7 +133,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
           </div>
           <div>
             <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-              2025-2026
+              2026-2027
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
               Joriy o&apos;quv yili
@@ -245,7 +245,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
                 id="academic-year"
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
-                placeholder="2025-2026"
+                placeholder="2026-2027"
                 required
               />
             </Field>
