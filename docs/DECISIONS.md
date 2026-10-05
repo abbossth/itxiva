@@ -32,3 +32,23 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
   3. **Loyiha fayllari va GitHub**: Amaliy topshiriqlar uchun GitHub repozitoriy havolasi yoki Cloudflare R2 presigned PUT URL orqali to'g'ridan-to'g'ri fayl (zip/rar/pdf/py/js/ipynb, max 50MB) yuklanadi. Mentor baholash oynasida presigned GET URL orqali faylni yuklab oladi.
   4. **Natijalarni e'lon qilish nazorati**: Mentor tekshirib `isResultsPublished`ni yoqmaguncha, test javoblari va natijalar o'quvchilarga sir tutiladi.
 
+### [2026-10-05] 7-qaror: Mobil-first jadval arxitekturasi (K1 muammosi yechimi)
+- **Holat**: Guruh tafsilotlari (`/mentor/groups/[id]`) va audit jurnali (`/mentor/audit`) 400px mobil ekranda `overflow-hidden` sababli kesilib, amallar tugmalariga yetib bo'lmayotgan edi.
+- **Qaror**: 768px dan kichik ekranlarda har bir o'quvchi va audit yozuvi alohida Karta (`StudentCard`, `AuditCard`) ko'rinishida chiqarildi. Karta ichida avatar, ism, login, coinlar, oxirgi kirish vaqti va kamida 44×44px o'lchamdagi tezkor amallar (Parol, Ko'chirish, O'chirish) joylashtirildi. Desktopda esa `overflow-x-auto` jadvali saqlandi.
+
+### [2026-10-05] 8-qaror: Inter shrifti va Tailwind CSS v4 `@theme` integratsiyasi (K2 muammosi yechimi)
+- **Holat**: Inter shrifti yuklangan bo'lsa-da, Tailwind CSS v4 tizim shriftini ko'rsatayotgan va yorug' rejimda kontrast WCAG AA talablariga yetmayotgan edi.
+- **Qaror**: `globals.css`da `@theme { --font-sans: var(--font-inter), ...; }` o'rnatildi. Matnlar uchun firuza `#0F766E` (5.5:1 nisbat), sarlavhalar uchun to'q ranglar va asosiy gradient `#0D9488 → #2563EB` sifatida to'qlashtirildi.
+
+### [2026-10-05] 9-qaror: Reyting podiumi va tenglik mantiqi (K3 muammosi yechimi)
+- **Holat**: Barcha o'quvchilarda 0 coin bo'lganda ham podium 1-2-3 o'rinni soxta ko'rsatayotgan edi.
+- **Qaror**: Agar yetakchilarda tangalar soni 0 bo'lsa, podium o'rniga "Hali hech kim coin to'plamagan — birinchi bo'ling!" rag'batlantiruvchi bo'sh holati chiqadi. Teng coin to'plangan hollarda bir xil o'rin berilib, keyingi o'rin o'tkazib yuboriladi (1, 1, 3). Shuningdek, talaba uchun qayerda ekanini ko'rsatuvchi "Mening o'rnim" fiksatsiyalangan paneli kiritildi.
+
+### [2026-10-05] 10-qaror: 180 soniyalik aylanuvchi QR va 6 belgili OTP davomat tizimi
+- **Holat**: O'quvchilar davomatini qog'ozsiz, firibgarlikdan xoli (skrinshot uzatishning oldini oluvchi) va gamifikatsiya bilan bog'langan zamonaviy tizim yaratish talabi.
+- **Qaror**: 
+  1. **180s rotatsiya va 20s grace period**: Har 180 soniyada serverda yangi crypto token va 6 belgili kod avtomatik yangilanadi. Eski kodga 20 soniya imtiyoz beriladi, bu orqali sekinroq internetli o'quvchilar uzilib qolmaydi.
+  2. **Proyektor rejimi**: Mentor uchun ulkan QR kod, katta shriftli kod, SVG taymer aylana (`CountdownRing`) va kelganlarning jonli oqimi.
+  3. **Auto-coin va Ledger**: Har bir kelgan o'quvchiga avtomatik +10 coin beriladi va bu `CoinLedger` tranzaksiyalar kitobiga qayd etiladi. Sessiya yopilganda qatnashmagan barcha o'quvchilarga avtomatik `absent` (0 coin) yoziladi.
+
+
