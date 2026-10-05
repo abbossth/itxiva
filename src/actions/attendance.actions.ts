@@ -1,0 +1,645 @@
+"use server";
+
+import crypto from "crypto";
+import QRCode from "qrcode";
+import { connectToDatabase } from "@/lib/db/connect";
+import { AttendanceSession } from "@/lib/db/models/attendance-session.model";
+import { AttendanceRecord, AttendanceStatus } from "@/lib/db/models/attendance-record.model";
+import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
+import { User, IUser } from "@/lib/db/models/user.model";
+import { Group } from "@/lib/db/models/group.model";
+import { AuditLog } from "@/lib/db/models/audit-log.model";
+import { requireMentor, requireStudent, requireAuth } from "@/lib/auth/guards";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { ActionResult } from "./auth.actions";
+
+export interface ProjectorSessionData {
+  _id: string;
+  groupId: string;
+  mentorId: string;
+  date: string;
+  startTime: string;
+  endTime?: string | null;
+  status: "active" | "closed";
+  currentCode: string;
+  currentToken: string;
+  codeRotatedAt: string;
+  rotateIntervalSeconds: number;
+  defaultCoinsReward: number;
+}
+
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateCode(): string {
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += CODE_CHARS[crypto.randomInt(CODE_CHARS.length)];
+  }
+  return result;
+}
+
+function generateToken(): string {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+/**
+ * Mentor starts an attendance session for a group
+ */
+export async function startAttendanceSessionAction(
+  groupId: string,
+  coinsReward: number = 10
+): Promise<ActionResult<{ sessionId: string }>> {
+  const session = await requireMentor();
+  await connectToDatabase();
+
+  const group = await Group.findById(groupId);
+  if (!group) {
+    return { success: false, message: "Guruh topilmadi" };
+  }
+
+  // Close any previously active session for this group
+  await AttendanceSession.updateMany(
+    { groupId, status: "active" },
+    { $set: { status: "closed", endTime: new Date() } }
+  );
+
+  const initialCode = generateCode();
+  const initialToken = generateToken();
+
+  const newSession = await AttendanceSession.create({
+    groupId,
+    mentorId: session.userId,
+    date: new Date(),
+    startTime: new Date(),
+    status: "active",
+    currentCode: initialCode,
+    currentToken: initialToken,
+    codeRotatedAt: new Date(),
+    rotateIntervalSeconds: 180,
+    previousTokens: [],
+    defaultCoinsReward: coinsReward,
+    summary: { totalPresent: 0, totalLate: 0, totalExcused: 0, totalAbsent: 0 },
+  });
+
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "START_ATTENDANCE",
+    details: {
+      groupId,
+      groupName: group.name,
+      sessionId: newSession._id.toString(),
+      code: initialCode,
+    },
+  });
+
+  return {
+    success: true,
+    data: { sessionId: newSession._id.toString() },
+  };
+}
+
+/**
+ * Rotate attendance code (called every 180s or on demand)
+ */
+export async function rotateAttendanceSessionAction(
+  sessionId: string
+): Promise<ActionResult<{ currentCode: string; currentToken: string; codeRotatedAt: Date }>> {
+  await requireMentor();
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(sessionId);
+  if (!attSession || attSession.status !== "active") {
+    return { success: false, message: "Faol sessiya topilmadi" };
+  }
+
+  // 20 seconds grace period for previous token & code
+  const gracePeriodExpiry = new Date(Date.now() + 20_000);
+
+  const prevList = [
+    {
+      token: attSession.currentToken,
+      code: attSession.currentCode,
+      expiredAt: gracePeriodExpiry,
+    },
+    ...(attSession.previousTokens || []).filter(
+      (p) => new Date(p.expiredAt) > new Date()
+    ),
+  ].slice(0, 5);
+
+  const newCode = generateCode();
+  const newToken = generateToken();
+  const now = new Date();
+
+  attSession.previousTokens = prevList;
+  attSession.currentCode = newCode;
+  attSession.currentToken = newToken;
+  attSession.codeRotatedAt = now;
+  await attSession.save();
+
+  return {
+    success: true,
+    data: {
+      currentCode: newCode,
+      currentToken: newToken,
+      codeRotatedAt: now,
+    },
+  };
+}
+
+/**
+ * Projector view data for mentor screen
+ */
+export async function getAttendanceSessionForProjector(sessionId: string) {
+  await requireMentor();
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(sessionId).lean();
+  if (!attSession) return null;
+
+  const group = await Group.findById(attSession.groupId).lean();
+
+  // Check if session needs auto-rotation (> 180s elapsed)
+  const elapsedSeconds = Math.floor(
+    (Date.now() - new Date(attSession.codeRotatedAt).getTime()) / 1000
+  );
+  if (attSession.status === "active" && elapsedSeconds >= attSession.rotateIntervalSeconds) {
+    await rotateAttendanceSessionAction(sessionId);
+    return getAttendanceSessionForProjector(sessionId);
+  }
+
+  // Fetch attendees
+  const records = await AttendanceRecord.find({ sessionId })
+    .sort({ markedAt: -1 })
+    .populate("studentId", "fullName login")
+    .lean();
+
+  // Fetch all students in group to know absent/total
+  const totalStudents = await User.countDocuments({
+    groupId: attSession.groupId,
+    role: "student",
+  });
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://itxiva.uz";
+  const deepLink = `${appUrl}/a/${attSession.currentToken}`;
+
+  let qrDataUrl = "";
+  try {
+    qrDataUrl = await QRCode.toDataURL(deepLink, {
+      width: 420,
+      margin: 2,
+      color: {
+        dark: "#0F172A",
+        light: "#FFFFFF",
+      },
+    });
+  } catch (err) {
+    console.error("QR Code generation error:", err);
+  }
+
+  const secondsRemaining = Math.max(
+    0,
+    attSession.rotateIntervalSeconds - elapsedSeconds
+  );
+
+  return {
+    session: JSON.parse(JSON.stringify(attSession)) as ProjectorSessionData,
+    group: group ? { name: group.name, grade: group.grade } : null,
+    totalStudents,
+    records: JSON.parse(JSON.stringify(records)),
+    qrDataUrl,
+    deepLink,
+    secondsRemaining,
+  };
+}
+
+/**
+ * Student marks attendance via 6-digit code OR scanned QR token
+ */
+export async function markAttendanceAction(params: {
+  token?: string;
+  code?: string;
+}): Promise<ActionResult<{ coinsEarned: number; markedAt: Date }>> {
+  const sessionUser = await requireStudent();
+  await connectToDatabase();
+
+  if (!sessionUser.groupId) {
+    return {
+      success: false,
+      message: "Sizga guruh biriktirilmagan. Mentorga murojaat qiling.",
+    };
+  }
+
+  // Rate limit: 5 attempts per minute per student
+  const rateKey = `att_mark_${sessionUser.userId}`;
+  const rate = checkRateLimit(rateKey, 5, 60_000);
+  if (!rate.allowed) {
+    return {
+      success: false,
+      message: `Juda ko'p urinish. Iltimos, ${rate.resetInSeconds} soniyadan so'ng urinib ko'ring.`,
+    };
+  }
+
+  // Find active session for student's group
+  const activeSession = await AttendanceSession.findOne({
+    groupId: sessionUser.groupId,
+    status: "active",
+  });
+
+  if (!activeSession) {
+    return {
+      success: false,
+      message: "Ayni damda guruhingiz uchun faol davomat ochilmagan.",
+    };
+  }
+
+  // Check if student already checked in
+  const existingRecord = await AttendanceRecord.findOne({
+    sessionId: activeSession._id,
+    studentId: sessionUser.userId,
+  });
+
+  if (existingRecord) {
+    return {
+      success: false,
+      message: "Siz ushbu dars uchun allaqachon davomatdan o'tgansiz!",
+    };
+  }
+
+  const now = new Date();
+  let isValid = false;
+  let method: "qr" | "code" = "qr";
+
+  if (params.token) {
+    method = "qr";
+    if (params.token === activeSession.currentToken) {
+      isValid = true;
+    } else {
+      // Check 20-second grace period in previousTokens
+      isValid = (activeSession.previousTokens || []).some(
+        (p) => p.token === params.token && new Date(p.expiredAt) > now
+      );
+    }
+  } else if (params.code) {
+    method = "code";
+    const cleanCode = params.code.trim().toUpperCase();
+    if (cleanCode === activeSession.currentCode) {
+      isValid = true;
+    } else {
+      // Check 20-second grace period in previousTokens
+      isValid = (activeSession.previousTokens || []).some(
+        (p) => p.code === cleanCode && new Date(p.expiredAt) > now
+      );
+    }
+  }
+
+  if (!isValid) {
+    return {
+      success: false,
+      message: "Kiritilgan kod yoki QR belgi eskirgan. Proyektordagi yangi kodni kiriting.",
+    };
+  }
+
+  const coinsAwarded = activeSession.defaultCoinsReward || 10;
+
+  // Create attendance record
+  await AttendanceRecord.create({
+    sessionId: activeSession._id,
+    studentId: sessionUser.userId,
+    groupId: sessionUser.groupId,
+    status: "present",
+    method,
+    markedAt: now,
+    coinsAwarded,
+  });
+
+  // Award coins to user
+  const updatedUser = await User.findByIdAndUpdate(
+    sessionUser.userId,
+    {
+      $inc: { totalCoins: coinsAwarded, spendableBalance: coinsAwarded },
+    },
+    { new: true }
+  );
+
+  // Record into CoinLedger
+  await CoinLedger.create({
+    studentId: sessionUser.userId,
+    amount: coinsAwarded,
+    type: "attendance",
+    referenceId: activeSession._id,
+    description: `Dars davomati uchun (${method === "qr" ? "QR kod" : "Kiritilgan kod"})`,
+    balanceAfter: updatedUser?.totalCoins || coinsAwarded,
+  });
+
+  // Increment session present counter
+  await AttendanceSession.findByIdAndUpdate(activeSession._id, {
+    $inc: { "summary.totalPresent": 1 },
+  });
+
+  return {
+    success: true,
+    message: `Davomat belgilandi! Sizga +${coinsAwarded} coin berildi.`,
+    data: {
+      coinsEarned: coinsAwarded,
+      markedAt: now,
+    },
+  };
+}
+
+/**
+ * Mentor closes an attendance session
+ */
+export async function closeAttendanceSessionAction(
+  sessionId: string
+): Promise<ActionResult> {
+  const session = await requireMentor();
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(sessionId);
+  if (!attSession) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+
+  attSession.status = "closed";
+  attSession.endTime = new Date();
+  await attSession.save();
+
+  // Find all students in group
+  const allStudents = (await User.find({
+    groupId: attSession.groupId,
+    role: "student",
+  }).lean()) as unknown as IUser[];
+
+  // Find existing records
+  const existingRecords = await AttendanceRecord.find({ sessionId }).lean();
+  const existingStudentIds = new Set(
+    existingRecords.map((r) => r.studentId.toString())
+  );
+
+  // Auto-mark absent for students who didn't check in
+  const absentRecords = [];
+  for (const st of allStudents) {
+    if (!existingStudentIds.has(st._id.toString())) {
+      absentRecords.push({
+        sessionId: attSession._id,
+        studentId: st._id,
+        groupId: attSession.groupId,
+        status: "absent",
+        method: "manual",
+        markedAt: new Date(),
+        coinsAwarded: 0,
+      });
+    }
+  }
+
+  if (absentRecords.length > 0) {
+    await AttendanceRecord.insertMany(absentRecords, { ordered: false });
+  }
+
+  // Update final summary
+  const presentCount = await AttendanceRecord.countDocuments({
+    sessionId,
+    status: "present",
+  });
+  const lateCount = await AttendanceRecord.countDocuments({
+    sessionId,
+    status: "late",
+  });
+  const excusedCount = await AttendanceRecord.countDocuments({
+    sessionId,
+    status: "excused",
+  });
+  const absentCount = await AttendanceRecord.countDocuments({
+    sessionId,
+    status: "absent",
+  });
+
+  attSession.summary = {
+    totalPresent: presentCount,
+    totalLate: lateCount,
+    totalExcused: excusedCount,
+    totalAbsent: absentCount,
+  };
+  await attSession.save();
+
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "CLOSE_ATTENDANCE",
+    details: {
+      sessionId,
+      summary: attSession.summary,
+    },
+  });
+
+  return { success: true, message: "Davomat sessiyasi yakunlandi" };
+}
+
+/**
+ * Mentor manually updates a student's attendance record
+ */
+export async function manualUpdateAttendanceAction(params: {
+  sessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  notes?: string;
+}): Promise<ActionResult> {
+  const session = await requireMentor();
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(params.sessionId);
+  if (!attSession) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+
+  let record = await AttendanceRecord.findOne({
+    sessionId: params.sessionId,
+    studentId: params.studentId,
+  });
+
+  const oldStatus = record?.status;
+  const newStatus = params.status;
+
+  if (!record) {
+    record = new AttendanceRecord({
+      sessionId: params.sessionId,
+      studentId: params.studentId,
+      groupId: attSession.groupId,
+      status: newStatus,
+      method: "manual",
+      markedAt: new Date(),
+      coinsAwarded: newStatus === "present" ? attSession.defaultCoinsReward : 0,
+      notes: params.notes,
+    });
+    await record.save();
+
+    if (newStatus === "present") {
+      const reward = attSession.defaultCoinsReward || 10;
+      await User.findByIdAndUpdate(params.studentId, {
+        $inc: { totalCoins: reward, spendableBalance: reward },
+      });
+      await CoinLedger.create({
+        studentId: params.studentId,
+        amount: reward,
+        type: "attendance",
+        referenceId: attSession._id,
+        description: "Mentor tomonidan davomat belgilandi (+10 coin)",
+      });
+    }
+  } else {
+    // If transitioning from absent/excused to present -> award coins
+    if (oldStatus !== "present" && newStatus === "present") {
+      const reward = attSession.defaultCoinsReward || 10;
+      record.coinsAwarded = reward;
+      await User.findByIdAndUpdate(params.studentId, {
+        $inc: { totalCoins: reward, spendableBalance: reward },
+      });
+      await CoinLedger.create({
+        studentId: params.studentId,
+        amount: reward,
+        type: "attendance",
+        referenceId: attSession._id,
+        description: "Mentor davomatni 'Kelgan' deb yangiladi (+10 coin)",
+      });
+    }
+    // If transitioning from present to absent/excused -> revoke coins
+    else if (oldStatus === "present" && newStatus !== "present") {
+      const revoked = record.coinsAwarded || 10;
+      record.coinsAwarded = 0;
+      await User.findByIdAndUpdate(params.studentId, {
+        $inc: { totalCoins: -revoked, spendableBalance: -revoked },
+      });
+      await CoinLedger.create({
+        studentId: params.studentId,
+        amount: -revoked,
+        type: "adjustment",
+        referenceId: attSession._id,
+        description: "Mentor davomatni bekor qildi (-10 coin)",
+      });
+    }
+
+    record.status = newStatus;
+    if (params.notes !== undefined) record.notes = params.notes;
+    await record.save();
+  }
+
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "MANUAL_ATTENDANCE",
+    targetUserId: params.studentId,
+    details: {
+      sessionId: params.sessionId,
+      oldStatus,
+      newStatus,
+      notes: params.notes,
+    },
+  });
+
+  return { success: true, message: "Davomat o'zgartirildi" };
+}
+
+/**
+ * Get all attendance sessions for mentor dashboard
+ */
+export async function getAttendanceSessionsForMentor(groupId?: string) {
+  await requireMentor();
+  await connectToDatabase();
+
+  const filter: Record<string, unknown> = {};
+  if (groupId) filter.groupId = groupId;
+
+  const sessions = await AttendanceSession.find(filter)
+    .sort({ createdAt: -1 })
+    .populate("groupId", "name grade")
+    .populate("mentorId", "fullName")
+    .lean();
+
+  return JSON.parse(JSON.stringify(sessions));
+}
+
+/**
+ * Get student's personal attendance history
+ */
+export async function getStudentAttendanceHistory() {
+  const user = await requireStudent();
+  await connectToDatabase();
+
+  const records = await AttendanceRecord.find({ studentId: user.userId })
+    .sort({ markedAt: -1 })
+    .populate({
+      path: "sessionId",
+      select: "date status defaultCoinsReward",
+    })
+    .populate("groupId", "name grade")
+    .lean();
+
+  return JSON.parse(JSON.stringify(records));
+}
+
+/**
+ * Get active attendance session for student's group if any
+ */
+export async function getActiveAttendanceSessionForStudent() {
+  const user = await requireAuth();
+  if (user.role !== "student" || !user.groupId) return null;
+
+  await connectToDatabase();
+  const activeSession = await AttendanceSession.findOne({
+    groupId: user.groupId,
+    status: "active",
+  }).lean();
+
+  if (!activeSession) return null;
+
+  const hasMarked = await AttendanceRecord.exists({
+    sessionId: activeSession._id,
+    studentId: user.userId,
+  });
+
+  return {
+    sessionId: activeSession._id.toString(),
+    rotateIntervalSeconds: activeSession.rotateIntervalSeconds,
+    defaultCoinsReward: activeSession.defaultCoinsReward,
+    hasMarked: Boolean(hasMarked),
+  };
+}
+
+/**
+ * Export session attendance to CSV
+ */
+export async function exportAttendanceCsvAction(sessionId: string): Promise<string> {
+  await requireMentor();
+  await connectToDatabase();
+
+  const session = await AttendanceSession.findById(sessionId).populate("groupId", "name grade").lean();
+  if (!session) throw new Error("Sessiya topilmadi");
+
+  const records = await AttendanceRecord.find({ sessionId })
+    .populate("studentId", "fullName login")
+    .sort({ "studentId.fullName": 1 })
+    .lean();
+
+  const groupName = (session.groupId as unknown as { name?: string })?.name || "Guruh";
+  const dateStr = new Date(session.date).toLocaleDateString("uz-UZ");
+
+  let csv = `\uFEFF#;FIO;Login;Guruh;Sana;Holat;Usul;Vaqt;Coinlar\n`;
+
+  records.forEach((r, idx) => {
+    const student = r.studentId as unknown as { fullName?: string; login?: string };
+    const name = student?.fullName || "—";
+    const login = student?.login || "—";
+    const statusText =
+      r.status === "present"
+        ? "Kelgan"
+        : r.status === "late"
+        ? "Kechikkan"
+        : r.status === "excused"
+        ? "Sababli"
+        : "Kelmagan";
+    const methodText = r.method === "qr" ? "QR Kod" : r.method === "code" ? "Kod" : "Qo'lda";
+    const timeStr = r.markedAt ? new Date(r.markedAt).toLocaleTimeString("uz-UZ") : "—";
+
+    csv += `${idx + 1};"${name}";"@${login}";"${groupName}";"${dateStr}";"${statusText}";"${methodText}";"${timeStr}";${r.coinsAwarded}\n`;
+  });
+
+  return csv;
+}
