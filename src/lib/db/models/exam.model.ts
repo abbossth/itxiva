@@ -31,6 +31,8 @@ export interface IExamData {
   passingScore: number;
   isPublished: boolean;
   isResultsPublished: boolean;
+  /** Mentorga "imtihon yakunlandi" xabari yuborilgan vaqt (ikki marta yuborilmasligi uchun) */
+  finishedNotifiedAt?: Date | string | null;
   questions: IExamQuestion[];
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -133,6 +135,7 @@ const ExamSchema = new Schema<IExam>(
       type: Number,
       default: 60,
     },
+    finishedNotifiedAt: { type: Date, default: null },
     isPublished: {
       type: Boolean,
       default: false,

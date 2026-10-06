@@ -111,7 +111,7 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
       {/* User profile summary block at bottom of sidebar */}
       <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800/80 mt-4">
         <Link
-          href={role === "student" ? "/profile" : "/"}
+          href="/profile"
           title={collapsed ? user.fullName : undefined}
           className={cn(
             "flex items-center gap-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors group",

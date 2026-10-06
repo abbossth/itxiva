@@ -10,6 +10,7 @@ import { quizUpsertSchema, quizSubmitSchema, quizGradeSchema } from "@/lib/valid
 import { autoGradeQuiz } from "@/lib/grading";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
+import { notifyGroup } from "@/lib/notifications/notify";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -231,6 +232,7 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
       return { success: false, error: "Dars topilmadi" };
     }
 
+    const wasPublished = Boolean(await Quiz.exists({ lessonId: parsed.data.lessonId, isPublished: true }));
     const saved = await Quiz.findOneAndUpdate(
       { lessonId: parsed.data.lessonId },
       {
@@ -265,6 +267,11 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
         revalidatePath(`/lessons/${sib._id}`);
       }
       syncedCount = siblings.length;
+    }
+
+    // Test birinchi marta e'lon qilinganda (dars ham nashr etilgan bo'lsa) guruhga xabar beriladi
+    if (saved?.isPublished && !wasPublished && lesson.isPublished) {
+      notifyGroup(lesson.groupId, "exam_new", { kind: "quiz", title: `${lesson.title}: ${saved.title}`, href: `/lessons/${lesson._id}` });
     }
 
     await AuditLog.create({

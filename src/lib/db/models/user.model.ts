@@ -13,6 +13,10 @@ export interface IUserData {
   spendableBalance?: number;
   isHiddenFromLeaderboard?: boolean;
   lastLoginAt?: Date | string | null;
+  /** Telegram bot ulangan bo'lsa — chat ma'lumotlari */
+  telegram?: { chatId: string | null; username?: string | null; linkedAt?: Date | string | null } | null;
+  /** Bildirishnoma turlari: false — o'chirilgan; yozilmagan tur yoqilgan hisoblanadi */
+  notificationPrefs?: Record<string, boolean> | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -21,6 +25,8 @@ export interface IUser extends Document, Omit<IUserData, "_id"> {
   _id: mongoose.Types.ObjectId;
   passwordHash: string;
   tempPasswordEnc?: string | null;
+  /** Telegram'ni ulash uchun bir martalik token (faqat xeshi saqlanadi) */
+  telegramLink?: { tokenHash: string; expiresAt: Date } | null;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -80,6 +86,17 @@ const UserSchema = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    telegram: {
+      chatId: { type: String, default: null },
+      username: { type: String, default: null },
+      linkedAt: { type: Date, default: null },
+    },
+    telegramLink: {
+      type: new Schema({ tokenHash: { type: String, required: true }, expiresAt: { type: Date, required: true } }, { _id: false }),
+      default: null,
+      select: false,
+    },
+    notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
   },
   {
     timestamps: true,
@@ -87,6 +104,9 @@ const UserSchema = new Schema<IUser>(
 );
 
 UserSchema.index({ role: 1, isHiddenFromLeaderboard: 1, totalCoins: -1 });
+// Bitta Telegram chat faqat bitta hisobga ulanadi; ulanmaganlar (null) indeksga kirmaydi
+UserSchema.index({ "telegram.chatId": 1 }, { unique: true, partialFilterExpression: { "telegram.chatId": { $type: "string" } } });
+UserSchema.index({ "telegramLink.tokenHash": 1 }, { sparse: true });
 UserSchema.index({ groupId: 1, role: 1, isHiddenFromLeaderboard: 1, totalCoins: -1 });
 
 export const User: Model<IUser> =

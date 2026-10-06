@@ -12,6 +12,7 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
 import { lessonSchema, homeworkSchema, HomeworkInput, LessonInput } from "@/lib/validations/lesson.schema";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
+import { notifyGroup } from "@/lib/notifications/notify";
 
 export async function getLessonsByGroupAndQuarter({
   groupId,
@@ -86,6 +87,26 @@ function normalizeHomework(input: HomeworkInput | null | undefined) {
   };
 }
 
+/** Guruh o'quvchilariga "yangi dars" xabari */
+function announceLesson(lesson: Pick<ILesson, "_id" | "groupId" | "title" | "homework">) {
+  notifyGroup(lesson.groupId, "lesson_new", {
+    lessonId: lesson._id.toString(),
+    lessonTitle: lesson.title,
+    hasHomework: Boolean(lesson.homework?.isEnabled),
+  });
+}
+
+/** Nashr etilgan darsga qo'shilgan yangi materiallar haqida xabar (har biri uchun alohida emas — bitta xabar) */
+function announceNewMaterials(lesson: Pick<ILesson, "_id" | "groupId" | "title" | "materials">, previousKeys: Set<string>) {
+  const added = lesson.materials.filter((m) => !previousKeys.has(m.urlOrKey));
+  if (added.length === 0) return;
+  notifyGroup(lesson.groupId, "material_new", {
+    lessonId: lesson._id.toString(),
+    lessonTitle: lesson.title,
+    materialTitle: added.length === 1 ? added[0].title : `${added[0].title} va yana ${added.length - 1} ta`,
+  });
+}
+
 export async function createLessonAction(input: LessonInput) {
   const mentor = await requireMentor();
   const parsed = lessonSchema.safeParse(input);
@@ -116,6 +137,8 @@ export async function createLessonAction(input: LessonInput) {
     details: { lessonId: lesson._id, title: lesson.title, groupId: lesson.groupId },
   });
 
+  if (lesson.isPublished) announceLesson(lesson);
+
   revalidatePath("/lessons");
   revalidatePath("/mentor/lessons");
   return { success: true, message: "Dars muvaffaqiyatli yaratildi", data: JSON.parse(JSON.stringify(lesson)) };
@@ -129,6 +152,9 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
   if (!lesson) {
     return { success: false, message: "Dars topilmadi" };
   }
+
+  const wasPublished = lesson.isPublished;
+  const previousMaterialKeys = new Set(lesson.materials.map((m) => m.urlOrKey));
 
   if (input.groupId && input.groupId !== lesson.groupId.toString()) {
     lesson.groupId = input.groupId as unknown as typeof lesson.groupId;
@@ -153,6 +179,8 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
   }
 
   await lesson.save();
+  if (lesson.isPublished && !wasPublished) announceLesson(lesson);
+  else if (lesson.isPublished) announceNewMaterials(lesson, previousMaterialKeys);
   const syncedCount = await syncLinkedLessons(lesson);
 
   await AuditLog.create({
@@ -183,6 +211,7 @@ export async function togglePublishLessonAction(lessonId: string) {
 
   lesson.isPublished = !lesson.isPublished;
   await lesson.save();
+  if (lesson.isPublished) announceLesson(lesson);
 
   await AuditLog.create({
     actorId: mentor.userId,
@@ -321,6 +350,7 @@ async function syncLinkedLessons(lesson: ILesson): Promise<number> {
   const source = lesson.toObject();
 
   for (const sib of siblings) {
+    const siblingMaterialKeys = new Set(sib.materials.map((m) => m.urlOrKey));
     sib.title = source.title;
     sib.topic = source.topic;
     sib.description = source.description;
@@ -346,6 +376,7 @@ async function syncLinkedLessons(lesson: ILesson): Promise<number> {
     }
 
     await sib.save();
+    if (sib.isPublished) announceNewMaterials(sib, siblingMaterialKeys);
     revalidatePath(`/lessons/${sib._id}`);
   }
   return siblings.length;
@@ -453,6 +484,8 @@ export async function copyLessonToGroupsAction(params: { lessonId: string; group
         : null,
       linkId: lesson.linkId,
     });
+
+    if (copy.isPublished) announceLesson(copy);
 
     if (quiz) {
       await Quiz.create({

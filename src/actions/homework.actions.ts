@@ -22,6 +22,7 @@ import {
   homeworkSubmitSchema,
 } from "@/lib/validations/homework.schema";
 import { DEFAULT_HOMEWORK_COINS, type HomeworkState } from "@/lib/homework-status";
+import { notify, notifyMentors } from "@/lib/notifications/notify";
 import { ActionResult } from "./auth.actions";
 
 const isObjectId = (id: unknown): id is string => typeof id === "string" && mongoose.isValidObjectId(id);
@@ -193,6 +194,16 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
       throw err;
     }
   }
+
+  const group = await Group.findById(lesson.groupId).select("name").lean();
+  notifyMentors("homework_submitted", {
+    lessonId,
+    lessonTitle: lesson.title,
+    studentName: session.fullName,
+    groupName: group?.name,
+    isLate,
+    resubmitted: Boolean(existing),
+  });
 
   revalidateHomework(lessonId);
   return {
@@ -475,6 +486,14 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
     details: { submissionId: submission._id, lessonId: submission.lessonId, score, coins, coinsDelta: delta },
   });
 
+  notify(submission.studentId, "homework_graded", {
+    lessonId: submission.lessonId.toString(),
+    lessonTitle: lesson?.title ?? "Dars",
+    score,
+    coins,
+    feedback,
+  });
+
   revalidateHomework(submission.lessonId.toString());
   return { success: true, message: "Baho saqlandi" };
 }
@@ -501,6 +520,14 @@ export async function returnHomeworkAction(input: unknown): Promise<ActionResult
     targetUserId: submission.studentId,
     action: "RETURN_HOMEWORK",
     details: { submissionId: submission._id, lessonId: submission.lessonId },
+  });
+
+  const returnedLesson = await Lesson.findById(submission.lessonId).select("title").lean();
+  notify(submission.studentId, "homework_graded", {
+    lessonId: submission.lessonId.toString(),
+    lessonTitle: returnedLesson?.title ?? "Dars",
+    returned: true,
+    feedback: parsed.data.feedback,
   });
 
   revalidateHomework(submission.lessonId.toString());

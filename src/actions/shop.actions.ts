@@ -13,6 +13,7 @@ import { requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
+import { notify, notifyAllStudents, notifyMentors } from "@/lib/notifications/notify";
 import { ActionResult } from "./auth.actions";
 
 export type ShopProduct = Omit<IProductData, "_id"> & { _id: string; imageUrl: string | null };
@@ -87,6 +88,11 @@ export async function saveProductAction(
     action: productId ? "UPDATE_PRODUCT" : "CREATE_PRODUCT",
     details: { productId: product._id, title: product.title, price: product.price },
   });
+
+  // Faqat yangi va do'konda ko'rinadigan mahsulot haqida xabar beriladi
+  if (!productId && product.isActive) {
+    notifyAllStudents("product_new", { title: product.title, price: product.price });
+  }
 
   revalidateShop();
   const [data] = await withImageUrls([JSON.parse(JSON.stringify(product)) as IProductData]);
@@ -184,6 +190,8 @@ export async function createOrderAction(productId: string): Promise<ActionResult
     throw err;
   }
 
+  notifyMentors("order_new", { productTitle: product.title, price: product.price, studentName: session.fullName });
+
   revalidateShop();
   return {
     success: true,
@@ -233,6 +241,7 @@ export async function acceptOrderAction(orderId: string): Promise<ActionResult> 
   const order = await transition(orderId, ["pending"], "accepted", { acceptedAt: new Date() });
   if (!order) return { success: false, message: "Buyurtma topilmadi yoki holati o'zgargan" };
   await AuditLog.create({ actorId: mentor.userId, action: "ACCEPT_ORDER", targetUserId: order.studentId, details: { orderId, product: order.productTitle } });
+  notify(order.studentId, "order_status", { productTitle: order.productTitle, status: "accepted" });
   revalidateShop();
   return { success: true, message: "Buyurtma qabul qilindi" };
 }
@@ -247,6 +256,12 @@ export async function rejectOrderAction(orderId: string, note?: string): Promise
   if (!order) return { success: false, message: "Buyurtma topilmadi yoki holati o'zgargan" };
   await refundOrder(order, "Buyurtma rad etildi");
   await AuditLog.create({ actorId: mentor.userId, action: "REJECT_ORDER", targetUserId: order.studentId, details: { orderId, product: order.productTitle, refunded: order.price } });
+  notify(order.studentId, "order_status", {
+    productTitle: order.productTitle,
+    status: "rejected",
+    note: order.mentorNote,
+    refunded: order.price,
+  });
   revalidateShop();
   return { success: true, message: "Buyurtma bekor qilindi, coinlar o'quvchiga qaytarildi" };
 }
@@ -257,6 +272,7 @@ export async function handOverOrderAction(orderId: string): Promise<ActionResult
   const order = await transition(orderId, ["accepted"], "handed_over", { handedOverAt: new Date() });
   if (!order) return { success: false, message: "Buyurtma topilmadi yoki holati o'zgargan" };
   await AuditLog.create({ actorId: mentor.userId, action: "HAND_OVER_ORDER", targetUserId: order.studentId, details: { orderId, product: order.productTitle } });
+  notify(order.studentId, "order_status", { productTitle: order.productTitle, status: "handed_over" });
   revalidateShop();
   return { success: true, message: "Topshirildi deb belgilandi. O'quvchi tasdiqlashi kutilmoqda" };
 }

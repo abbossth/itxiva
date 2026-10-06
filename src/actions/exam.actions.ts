@@ -22,6 +22,10 @@ import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { formatDateTimeUz } from "@/lib/utils";
+import { notifyMany } from "@/lib/notifications/notify";
+import { User } from "@/lib/db/models/user.model";
+import { after } from "next/server";
+import { notifyFinishedExams } from "@/lib/notifications/scheduled";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -573,6 +577,9 @@ export async function submitExamAction(
 
     await submission.save();
 
+    // Hamma topshirib bo'lgan bo'lsa, mentorga statistika darhol ketadi (aks holda — vaqt tugagach, kunlik tekshiruvda)
+    after(() => notifyFinishedExams(exam._id.toString()).catch((error) => console.error("Exam notify error:", error)));
+
     revalidatePath(`/exams/${exam._id}`);
     revalidatePath(`/exams`);
 
@@ -927,6 +934,15 @@ export async function togglePublishExamAction(examId: string): Promise<ActionSta
 
     exam.isPublished = !exam.isPublished;
     await exam.save();
+
+    if (exam.isPublished) {
+      const students = await User.find({ role: "student", groupId: { $in: exam.groupIds } }).select("_id").lean();
+      notifyMany(
+        students.map((s) => s._id),
+        "exam_new",
+        { kind: "exam", title: exam.title, href: `/exams/${exam._id}`, startsAt: formatDateTimeUz(exam.startTime) }
+      );
+    }
 
     revalidatePath("/mentor/exams");
     revalidatePath("/exams");

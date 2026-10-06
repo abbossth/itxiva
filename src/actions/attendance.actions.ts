@@ -15,6 +15,7 @@ import { ActionResult } from "./auth.actions";
 import { formatDateUz, formatDateTimeUz } from "@/lib/utils";
 import { dateFromKey, toDateKey, addDaysToKey, isValidSchedule } from "@/lib/schedule";
 import mongoose from "mongoose";
+import { notify } from "@/lib/notifications/notify";
 
 /** Darsda qatnashgan deb hisoblanadigan (coin beriladigan) holatlar */
 const ATTENDED: AttendanceStatus[] = ["present", "late"];
@@ -570,6 +571,11 @@ export async function manualUpdateAttendanceAction(params: {
           ? `Mentor davomatni belgiladi (+${coinDelta} coin)`
           : `Mentor davomatni bekor qildi (${coinDelta} coin)`,
       balanceAfter: updated?.totalCoins,
+    });
+    notify(params.studentId, "coins_changed", {
+      amount: coinDelta,
+      reason: coinDelta > 0 ? "Mentor dars davomatini belgiladi" : "Mentor dars davomatini bekor qildi",
+      balance: updated?.spendableBalance,
     });
   }
 

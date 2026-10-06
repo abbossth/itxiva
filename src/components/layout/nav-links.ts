@@ -45,6 +45,7 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
   { href: "/mentor/import", label: "Excel import", shortLabel: "Import", icon: FileSpreadsheet },
   { href: "/mentor/audit", label: "Audit loglar", shortLabel: "Audit", icon: ShieldCheck },
+  { href: "/profile", label: "Profil va Telegram", shortLabel: "Profil", icon: User },
 ];
 
 export const STUDENT_LINKS: NavLink[] = [

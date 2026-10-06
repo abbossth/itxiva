@@ -6,7 +6,13 @@ vi.mock("@/lib/auth/session", async (orig) => ({ ...(await orig<object>()), getS
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 // Limit testlar orasida to'planib qolmasligi uchun
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true, remaining: 99, resetInSeconds: 1 }), resetRateLimit: vi.fn() }));
-vi.mock("@/lib/notifications/notify", () => ({ notify: vi.fn(), notifyMany: vi.fn(), notifyMentors: vi.fn() }));
+vi.mock("@/lib/notifications/notify", () => ({
+  notify: vi.fn(),
+  notifyMany: vi.fn(),
+  notifyMentors: vi.fn(),
+  notifyGroup: vi.fn(),
+  notifyAllStudents: vi.fn(),
+}));
 
 const { User } = await import("@/lib/db/models/user.model");
 const { Product } = await import("@/lib/db/models/product.model");

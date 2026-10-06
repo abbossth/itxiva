@@ -120,3 +120,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Har guruhda alohida**: sana (guruh jadvaliga moslanadi), chorak ichidagi tartib, nashr holati, vazifa muddati, o'quvchilarning javoblari, baholari va test natijalari.
 - **Sabab**: guruhlarning dars kunlari har xil, javoblar esa darsga bog'langan — bitta umumiy hujjatda sana/muddat/nashr holatini guruh kesimida yuritish barcha so'rovlarni murakkablashtirardi; oddiy nusxa esa tahrirda ikki joyni qo'lda tuzatishni talab qilardi.
 - **Chiqish yo'li**: "Bog'lanishni uzish" darsni mustaqil qiladi (hech narsa o'chmaydi).
+
+### [2026-10-07] 26-qaror: Telegram bildirishnomalari
+- **Ulash**: profilda bir martalik token (10 daqiqa, bazada faqat SHA-256 xeshi) → `t.me/<bot>?start=<token>` → webhook chatni hisobga bog'laydi; sayt holatni 3 soniyada bir so'raydi. Bitta chat — bitta hisob.
+- **Webhook**: `/api/telegram/webhook`, `X-Telegram-Bot-Api-Secret-Token` bilan himoyalangan, faqat shaxsiy chat. Buyruqlar: `/start`, `/help`, `/status`, `/stop`. O'rnatish: `scripts/telegram-webhook.mjs`.
+- **Yuborish**: yagona modul `lib/notifications/notify.ts` (`notify`, `notifyMany`, `notifyGroup`, `notifyAllStudents`, `notifyMentors`). Javobdan keyin (`after`) yuboriladi — so'rovni bloklamaydi. 25 tadan batch, 403 da chat avtomatik uziladi. Har tur profilda yoqiladi/o'chiriladi.
+- **Vaqtga bog'liq**: `/api/cron/daily` (Vercel Cron, 09:00 Toshkent, `CRON_SECRET`) — muddati 24 soat ichida tugaydigan vazifalar eslatmasi va yakunlangan imtihon statistikasi. Imtihonni hamma topshirib bo'lsa, statistika kutmasdan ketadi.

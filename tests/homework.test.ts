@@ -5,7 +5,13 @@ import { actAs, clearDb, guardsMock, sessionFor, startDb, stopDb } from "./helpe
 vi.mock("@/lib/auth/guards", () => guardsMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true, remaining: 99, resetInSeconds: 1 }), resetRateLimit: vi.fn() }));
-vi.mock("@/lib/notifications/notify", () => ({ notify: vi.fn(), notifyMany: vi.fn(), notifyMentors: vi.fn() }));
+vi.mock("@/lib/notifications/notify", () => ({
+  notify: vi.fn(),
+  notifyMany: vi.fn(),
+  notifyMentors: vi.fn(),
+  notifyGroup: vi.fn(),
+  notifyAllStudents: vi.fn(),
+}));
 
 const { User } = await import("@/lib/db/models/user.model");
 const { Group } = await import("@/lib/db/models/group.model");

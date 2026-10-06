@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { changePasswordAction, ActionResult } from "@/actions/auth.actions";
+import { TelegramSection } from "@/components/profile/telegram-section";
+import type { TelegramStatus } from "@/actions/telegram.actions";
 
 interface ProfileViewProps {
   user: {
@@ -21,13 +23,14 @@ interface ProfileViewProps {
     totalCoins?: number;
     spendableBalance?: number;
   };
+  telegram: TelegramStatus;
 }
 
 const initialState: ActionResult = {
   success: false,
 };
 
-export function ProfileView({ user }: ProfileViewProps) {
+export function ProfileView({ user, telegram }: ProfileViewProps) {
   const [state, formAction, isPending] = useActionState(changePasswordAction, initialState);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -162,6 +165,8 @@ export function ProfileView({ user }: ProfileViewProps) {
           </Link>
         </div>
       )}
+
+      <TelegramSection initial={telegram} role={user.role} />
 
       {/* Change Password Card */}
       <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
