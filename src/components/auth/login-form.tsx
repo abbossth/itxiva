@@ -18,6 +18,9 @@ interface LoginFormProps {
 export function LoginForm({ nextUrl }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
+  // Maydonlar boshqariladigan (controlled): xato qaytganda forma tozalanmaydi, yozilgan qiymatlar joyida qoladi
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
     <div>
@@ -48,6 +51,8 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
               id="login"
               name="login"
               type="text"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
               placeholder="masalan: ali_valiyev"
               required
               autoCapitalize="none"
@@ -72,6 +77,8 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
               id="password"
               name="password"
               type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
               autoComplete="current-password"

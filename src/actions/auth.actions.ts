@@ -45,11 +45,13 @@ export async function loginAction(
 
   await connectToDatabase();
 
+  // Mentor talabi bilan xato aniq ko'rsatiladi: login topilmadimi yoki parol noto'g'rimi.
+  // (Login mavjudligini taxmin qilishdan yuqoridagi urinishlar limiti himoya qiladi.)
   const user = await User.findOne({ login: login.toLowerCase() });
   if (!user) {
     return {
       success: false,
-      message: "Login yoki parol noto'g'ri",
+      errors: { login: ["Login xato: bunday foydalanuvchi topilmadi"] },
     };
   }
 
@@ -57,7 +59,7 @@ export async function loginAction(
   if (!isPasswordValid) {
     return {
       success: false,
-      message: "Login yoki parol noto'g'ri",
+      errors: { password: ["Parol xato"] },
     };
   }
 
