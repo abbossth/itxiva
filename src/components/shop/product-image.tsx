@@ -12,7 +12,7 @@ export function ProductImage({ src, alt, className }: { src?: string | null; alt
       {src ? (
         // Presigned (muddatli) havola bo'lgani uchun next/image optimizatsiyasi ishlatilmaydi
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+        <img src={src} alt={alt} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <Gift className="w-10 h-10" aria-hidden />
       )}

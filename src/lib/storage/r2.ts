@@ -79,6 +79,8 @@ export async function getDownloadPresignedUrl({
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET,
     Key: key,
+    // Fayl nomi noyob va o'zgarmas — havola amal qilguncha brauzer qayta yuklamaydi (boshqalar keshlamaydi)
+    ResponseCacheControl: `private, max-age=${expiresInSeconds}, immutable`,
   });
 
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
@@ -100,6 +102,12 @@ export async function uploadBuffer({
     throw new Error("Fayl ombori (R2) sozlanmagan");
   }
   await getS3Client().send(
-    new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: body, ContentType: contentType })
+    new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      CacheControl: "private, max-age=31536000, immutable",
+    })
   );
 }

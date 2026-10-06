@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardCheck,
@@ -40,6 +40,7 @@ import {
   HOMEWORK_STATE_LABELS,
 } from "@/lib/homework-status";
 import { uploadFileToStorage } from "@/lib/upload-client";
+import { fireConfetti } from "@/lib/confetti";
 import { formatDateTimeUz } from "@/lib/utils";
 
 interface HomeworkPanelProps {
@@ -77,6 +78,19 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
   const [uploading, setUploading] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Baholangan natija birinchi marta ko'rilganda kichik bayram (har bir baho uchun bir marta)
+  const gradedKey = submission && isGraded ? `hw-seen:${submission._id}:${submission.gradedAt ?? ""}` : null;
+  useEffect(() => {
+    if (!gradedKey || readOnly) return;
+    try {
+      if (localStorage.getItem(gradedKey)) return;
+      localStorage.setItem(gradedKey, "1");
+    } catch {
+      return;
+    }
+    if ((submission?.score ?? 0) >= 60) fireConfetti({ particleCount: 70, spread: 60 });
+  }, [gradedKey, readOnly, submission?.score]);
 
   const addLink = () => {
     const value = linkDraft.trim();
@@ -196,7 +210,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
 
       {/* Mentor bahosi yoki qaytargan izohi */}
       {submission && isGraded && (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5 space-y-2 animate-in fade-in">
+        <div className="success-pulse rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 sm:p-5 space-y-2">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
               {submission.score} <span className="text-sm font-bold text-slate-500">/ 100 ball</span>

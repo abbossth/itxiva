@@ -66,6 +66,8 @@ export function YouTubeFacade({ url, title = "YouTube Video", className }: YouTu
         src={thumbnailUrl}
         alt=""
         fill
+        // Dars sahifasidagi eng katta element — birinchi navbatda yuklanadi
+        priority
         className="object-cover transition-transform duration-300 group-hover:scale-105 opacity-90 group-hover:opacity-100"
         sizes="(max-width: 768px) 100vw, 800px"
       />

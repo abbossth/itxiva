@@ -5,14 +5,16 @@ import "./globals.css";
 
 // Fontlar build vaqtida yuklab olinib, saytning o'zidan beriladi (Google'ga so'rov ketmaydi)
 const geist = Geist({
-  subsets: ["latin", "latin-ext"],
+  // Faqat lotin to'plami oldindan yuklanadi (o'zbek lotin yozuvi uchun yetarli, ʻ va ʼ ham shu to'plamda)
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-geist",
 });
 
 // Sarlavhalar, raqamlar, coin va kod uchun
 const jetbrains = JetBrains_Mono({
-  subsets: ["latin", "latin-ext"],
+  // Faqat lotin to'plami oldindan yuklanadi (o'zbek lotin yozuvi uchun yetarli, ʻ va ʼ ham shu to'plamda)
+  subsets: ["latin"],
   display: "swap",
   variable: "--font-jetbrains",
   weight: ["500", "700", "800"],

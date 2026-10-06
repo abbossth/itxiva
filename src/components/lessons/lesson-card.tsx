@@ -25,7 +25,7 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
   return (
     <div
       className={cn(
-        "group relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-200",
+        "stagger-item card-press group relative flex flex-col justify-between p-5 rounded-2xl border",
         "bg-white dark:bg-surface hover:shadow-md",
         lesson.isPublished
           ? "border-slate-200/80 dark:border-slate-800/80 hover:border-teal-500/40"

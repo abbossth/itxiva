@@ -104,7 +104,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
             return (
               <div
                 key={item._id}
-                className="p-3 sm:p-4 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 hover:border-teal-500/40 hover:shadow-md transition-all"
+                className="stagger-item card-press p-3 sm:p-4 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 hover:border-teal-500/40 hover:shadow-md"
               >
                 <ProductImage src={item.imageUrl} alt={item.title} className="aspect-[4/3] w-full" />
 

@@ -67,7 +67,7 @@ export function Logo({ className, size = "md", href = "/", animated = false, mar
     <div className={cn("flex items-center gap-2.5 select-none text-slate-900 dark:text-slate-100", className)}>
       <LogoMark size={dimensions.icon} animated={animated} title={markOnly ? "ITXiva" : undefined} />
       {!markOnly && (
-        <div className={cn("flex flex-col", animated && "logo-wordmark")}>
+        <div className="flex flex-col">
           <span className={cn("font-display font-extrabold leading-none", dimensions.text)}>
             IT<span className="text-teal-600 dark:text-teal-400">Xiva</span>
           </span>

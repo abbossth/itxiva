@@ -3,6 +3,7 @@
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
+import { RankDelta } from "@/components/leaderboard/rank-delta";
 import { cn } from "@/lib/utils";
 
 interface RankTableProps {
@@ -88,6 +89,7 @@ export function RankTable({ entries, currentUserEntry }: RankTableProps) {
                           Siz
                         </Badge>
                       )}
+                      {entry.isCurrentUser && <RankDelta rank={entry.rank} />}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       <span>{entry.groupName}</span>
