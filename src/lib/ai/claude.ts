@@ -1,13 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
+import { generateStructuredWithGemini, GeminiError, isGeminiConfigured } from "./gemini";
 
 const MODEL = "claude-opus-5-5";
 
 let client: Anthropic | null = null;
 
-export function isAiConfigured(): boolean {
+function isClaudeConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+/** Kamida bitta AI provayder (Claude yoki zaxiradagi Gemini) sozlanganmi */
+export function isAiConfigured(): boolean {
+  return isClaudeConfigured() || isGeminiConfigured();
 }
 
 function getClient(): Anthropic {
@@ -16,6 +22,18 @@ function getClient(): Anthropic {
 }
 
 export class AiError extends Error {}
+
+// Claude hisobida mablag' tugagan yoki kalit yaroqsiz bo'lsa, har so'rovda uni qayta sinab vaqt yo'qotmaslik uchun
+// shu vaqtgacha to'g'ridan-to'g'ri Gemini ishlatiladi
+const CLAUDE_COOLDOWN_MS = 10 * 60 * 1000;
+let claudeUnavailableUntil = 0;
+
+/** Claude xatosi: `sticky` — sabab o'z-o'zidan tuzalmaydi (balans, kalit) */
+class ClaudeFailure extends AiError {
+  constructor(message: string, readonly sticky = false) {
+    super(message);
+  }
+}
 
 const SYSTEM_PROMPT = `Sen ITXiva o'quv platformasida mentorga yordam beradigan metodist-yordamchisan.
 O'quvchilar — Xiva shahridagi "Muhammad al-Xorazmiy vorislari" dasturining 8–11-sinf o'quvchilari; ular dasturlashni (web, back-end, DevOps) o'rganadi. Har bir dars 1 soat 30 daqiqa davom etadi.
@@ -26,24 +44,58 @@ Yozish qoidalari:
 - Faktlar va kod namunalari to'g'ri bo'lsin; ishonching komil bo'lmagan narsani yozma.
 - Mentor bergan mavzudan chetga chiqma.`;
 
-/**
- * Claude'dan berilgan Zod sxemasiga mos tuzilgan javob oladi
- */
-export async function generateStructured<Schema extends z.ZodType>({
-  schema,
-  prompt,
-  effort = "medium",
-  maxTokens = 16000,
-}: {
+interface GenerateParams<Schema extends z.ZodType> {
   schema: Schema;
   prompt: string;
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
-}): Promise<z.infer<Schema>> {
+}
+
+/**
+ * Berilgan Zod sxemasiga mos tuzilgan javob oladi: avval Claude, u ishlamasa — Gemini
+ */
+export async function generateStructured<Schema extends z.ZodType>(
+  params: GenerateParams<Schema>
+): Promise<z.infer<Schema>> {
   if (!isAiConfigured()) {
-    throw new AiError("AI yordamchi sozlanmagan: ANTHROPIC_API_KEY kiritilmagan");
+    throw new AiError("AI yordamchi sozlanmagan: ANTHROPIC_API_KEY yoki GEMINI_API_KEY kiritilmagan");
   }
 
+  const canUseGemini = isGeminiConfigured();
+  const tryClaude = isClaudeConfigured() && (!canUseGemini || Date.now() >= claudeUnavailableUntil);
+
+  if (tryClaude) {
+    try {
+      return await generateWithClaude(params);
+    } catch (error) {
+      if (!canUseGemini || !(error instanceof AiError)) throw error;
+      if (error instanceof ClaudeFailure && error.sticky) {
+        claudeUnavailableUntil = Date.now() + CLAUDE_COOLDOWN_MS;
+      }
+      console.warn("Claude ishlamadi, Gemini'ga o'tildi:", error.message);
+    }
+  }
+
+  try {
+    return await generateStructuredWithGemini({
+      schema: params.schema,
+      system: SYSTEM_PROMPT,
+      prompt: params.prompt,
+      maxTokens: params.maxTokens ?? 16000,
+    });
+  } catch (error) {
+    if (error instanceof GeminiError) throw new AiError(error.message);
+    console.error("Gemini request failed:", error);
+    throw new AiError("AI xizmatiga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring");
+  }
+}
+
+async function generateWithClaude<Schema extends z.ZodType>({
+  schema,
+  prompt,
+  effort = "medium",
+  maxTokens = 16000,
+}: GenerateParams<Schema>): Promise<z.infer<Schema>> {
   try {
     const response = await getClient().beta.messages.parse({
       model: MODEL,
@@ -66,12 +118,13 @@ export async function generateStructured<Schema extends z.ZodType>({
   } catch (error) {
     if (error instanceof AiError) throw error;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-      throw new AiError("AI kaliti (ANTHROPIC_API_KEY) noto'g'ri yoki ruxsati yo'q");
+      throw new ClaudeFailure("AI kaliti (ANTHROPIC_API_KEY) noto'g'ri yoki ruxsati yo'q", true);
     }
     // Hisobda mablag' tugaganda API 400 qaytaradi — mentorga aniq sababini ko'rsatamiz
     if (error instanceof Anthropic.BadRequestError && /credit balance/i.test(error.message)) {
-      throw new AiError(
-        "Anthropic hisobida mablag' yetarli emas. console.anthropic.com → Plans & Billing bo'limida balansni to'ldiring"
+      throw new ClaudeFailure(
+        "Anthropic hisobida mablag' yetarli emas. console.anthropic.com → Plans & Billing bo'limida balansni to'ldiring",
+        true
       );
     }
     if (error instanceof Anthropic.RateLimitError) {

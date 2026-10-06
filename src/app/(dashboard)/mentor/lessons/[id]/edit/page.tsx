@@ -48,7 +48,7 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
         groups={groups}
         initialLesson={lesson}
         initialQuiz={quizRes.data ?? null}
-        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
+        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)}
       />
     </div>
   );

@@ -103,7 +103,8 @@ export function AiAssistantPanel({
       <div className="p-5 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 flex items-start gap-3">
         <Sparkles className="w-5 h-5 shrink-0 text-slate-400 mt-0.5" />
         <span>
-          AI yordamchi o&apos;chirilgan: serverda <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> sozlanmagan.
+          AI yordamchi o&apos;chirilgan: serverda <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> yoki{" "}
+          <code className="font-mono text-xs">GEMINI_API_KEY</code> sozlanmagan.
         </span>
       </div>
     );

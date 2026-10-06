@@ -33,7 +33,7 @@ function describeLesson(ctx: z.output<typeof lessonContextSchema>): string {
 /** Har bir AI amali oldidan: mentor ekanini, kalit borligini va limitni tekshiradi */
 async function guard(): Promise<string | null> {
   const mentor = await requireMentor();
-  if (!isAiConfigured()) return "AI yordamchi sozlanmagan: ANTHROPIC_API_KEY kiritilmagan";
+  if (!isAiConfigured()) return "AI yordamchi sozlanmagan: ANTHROPIC_API_KEY yoki GEMINI_API_KEY kiritilmagan";
   const rate = checkRateLimit(`ai_${mentor.userId}`, 20, 10 * 60_000);
   if (!rate.allowed) return `Juda ko'p so'rov. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring`;
   return null;

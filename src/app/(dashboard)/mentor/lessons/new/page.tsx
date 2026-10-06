@@ -42,7 +42,7 @@ export default async function NewLessonPage({ searchParams }: NewLessonPageProps
         groups={groups}
         defaultGroupId={defaultGroupId}
         defaultQuarter={defaultQuarter}
-        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
+        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)}
       />
     </div>
   );
