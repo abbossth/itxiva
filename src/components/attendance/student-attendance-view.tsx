@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import confetti from "canvas-confetti";
 import {
@@ -57,6 +58,7 @@ export function StudentAttendanceView({
   nextLessonLabel,
 }: StudentAttendanceViewProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   const [code, setCode] = useState("");
   const [activeTab, setActiveTab] = useState<"code" | "qr">("code");
@@ -98,6 +100,8 @@ export function StudentAttendanceView({
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "Davomat muvaffaqiyatli belgilandi!");
         triggerConfetti();
+        // Statistika va tarix serverdan qayta olinadi — yangi yozuv darhol ko'rinadi
+        router.refresh();
       } else {
         setErrorMsg(res.message || "Kodni tekshirib qaytadan kiriting");
         toast.error(res.message || "Xatolik yuz berdi");
@@ -140,6 +144,8 @@ export function StudentAttendanceView({
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "QR Davomat muvaffaqiyatli belgilandi!");
         triggerConfetti();
+        // Statistika va tarix serverdan qayta olinadi — yangi yozuv darhol ko'rinadi
+        router.refresh();
       } else {
         setErrorMsg(res.message || "QR kod eskirgan yoki noto'g'ri");
         toast.error(res.message || "Davomatdan o'tib bo'lmadi");
