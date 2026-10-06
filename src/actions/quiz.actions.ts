@@ -231,7 +231,7 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
       return { success: false, error: "Dars topilmadi" };
     }
 
-    await Quiz.findOneAndUpdate(
+    const saved = await Quiz.findOneAndUpdate(
       { lessonId: parsed.data.lessonId },
       {
         lessonId: parsed.data.lessonId,
@@ -242,7 +242,30 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
         passingScore: parsed.data.passingScore,
       },
       { upsert: true, returnDocument: "after", runValidators: true }
-    );
+    ).lean();
+
+    // Dars boshqa guruhlar bilan bog'langan bo'lsa, test ham o'sha nusxalarda yangilanadi.
+    // Savollar o'z _id lari bilan ko'chiriladi — topshirilgan javoblar savollarga bog'lanib qolaveradi.
+    let syncedCount = 0;
+    if (lesson.linkId && saved) {
+      const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } }).select("_id").lean();
+      for (const sib of siblings) {
+        await Quiz.findOneAndUpdate(
+          { lessonId: sib._id },
+          {
+            lessonId: sib._id,
+            title: saved.title,
+            description: saved.description,
+            questions: saved.questions,
+            isPublished: saved.isPublished,
+            passingScore: saved.passingScore,
+          },
+          { upsert: true, runValidators: true }
+        );
+        revalidatePath(`/lessons/${sib._id}`);
+      }
+      syncedCount = siblings.length;
+    }
 
     await AuditLog.create({
       actorId: user.userId,
@@ -253,7 +276,13 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
     revalidatePath(`/lessons/${parsed.data.lessonId}`);
     revalidatePath(`/mentor/lessons/${parsed.data.lessonId}`);
 
-    return { success: true, message: "Kichik test muvaffaqiyatli saqlandi" };
+    return {
+      success: true,
+      message:
+        syncedCount > 0
+          ? `Kichik test saqlandi (${syncedCount} ta bog'langan guruhda ham)`
+          : "Kichik test muvaffaqiyatli saqlandi",
+    };
   } catch (err: unknown) {
     unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Testni saqlashda xatolik";

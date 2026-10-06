@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Video, FileText, ChevronRight, Eye, EyeOff, ClipboardCheck } from "lucide-react";
+import { Sparkles, Video, FileText, ChevronRight, Eye, EyeOff, ClipboardCheck, Link2 } from "lucide-react";
 import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS, type HomeworkState } from "@/lib/homework-status";
 import { ILessonData } from "@/lib/db/models/lesson.model";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +96,12 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
           )}
           {videoCount === 0 && fileCount === 0 && !hasHomework && (
             <span className="text-[11px] text-slate-400">Materiallar yo&apos;q</span>
+          )}
+          {isMentor && lesson.linkId && (
+            <span className="flex items-center gap-1" title="Bu dars boshqa guruhlar bilan bog'langan">
+              <Link2 className="w-3.5 h-3.5 text-teal-500" />
+              Bog&apos;langan
+            </span>
           )}
           {hasHomework &&
             (isMentor || !homeworkState ? (

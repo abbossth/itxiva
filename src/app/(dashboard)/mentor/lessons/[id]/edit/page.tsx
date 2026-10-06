@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
-import { getLessonById } from "@/actions/lesson.actions";
+import { getLessonById, getLinkedLessons } from "@/actions/lesson.actions";
 import { getQuizForMentor } from "@/actions/quiz.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 
@@ -22,10 +22,11 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
   await requireMentorPage();
   const resolvedParams = await params;
 
-  const [lesson, groups, quizRes] = await Promise.all([
+  const [lesson, groups, quizRes, linkedLessons] = await Promise.all([
     getLessonById(resolvedParams.id),
     getGroups(),
     getQuizForMentor(resolvedParams.id),
+    getLinkedLessons(resolvedParams.id),
   ]);
 
   if (!lesson) {
@@ -48,6 +49,7 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
         groups={groups}
         initialLesson={lesson}
         initialQuiz={quizRes.data ?? null}
+        linkedLessons={linkedLessons}
         aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)}
       />
     </div>

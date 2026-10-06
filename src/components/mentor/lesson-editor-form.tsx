@@ -13,7 +13,14 @@ import {
   ClipboardCheck,
   Sparkles,
   CalendarClock,
+  Link2,
+  Unlink,
+  Copy,
 } from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatDateUz } from "@/lib/utils";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData, IMaterial } from "@/lib/db/models/lesson.model";
 import { DEFAULT_HOMEWORK_COINS } from "@/lib/homework-status";
@@ -22,11 +29,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
+import {
+  createLessonAction,
+  updateLessonAction,
+  copyLessonToGroupsAction,
+  unlinkLessonAction,
+  type LinkedLessonInfo,
+} from "@/actions/lesson.actions";
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
 import { compressImageToWebP, uploadFileToStorage } from "@/lib/upload-client";
 import { generateHomeworkAction } from "@/actions/ai.actions";
-import { fromTashkentInputValue, getNextLessonAfter, toTashkentInputValue } from "@/lib/schedule";
+import { fromTashkentInputValue, getNextLessonAfter, toDateKey, toTashkentInputValue } from "@/lib/schedule";
 import { AiAssistantPanel } from "@/components/mentor/ai-assistant-panel";
 
 interface LessonEditorFormProps {
@@ -36,6 +49,8 @@ interface LessonEditorFormProps {
   defaultGroupId?: string;
   defaultQuarter?: number;
   aiEnabled?: boolean;
+  /** Shu darsning boshqa guruhlardagi bog'langan nusxalari (faqat tahrirlashda) */
+  linkedLessons?: LinkedLessonInfo[];
 }
 
 /**
@@ -54,6 +69,7 @@ export function LessonEditorForm({
   defaultGroupId,
   defaultQuarter = 1,
   aiEnabled = false,
+  linkedLessons = [],
 }: LessonEditorFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -67,7 +83,8 @@ export function LessonEditorForm({
   const [topic, setTopic] = useState(initialLesson?.topic || "");
   const [description, setDescription] = useState(initialLesson?.description || "");
   const [date, setDate] = useState(
-    initialLesson?.date ? new Date(initialLesson.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
+    // Yangi dars: Toshkent bo'yicha bugungi sana (UTC bo'yicha olinsa, tungi 00:00–05:00 da kechagi sana chiqadi)
+    initialLesson?.date ? new Date(initialLesson.date).toISOString().split("T")[0] : toDateKey()
   );
   const [isPublished, setIsPublished] = useState(initialLesson?.isPublished ?? false);
   const [materials, setMaterials] = useState<IMaterial[]>(initialLesson?.materials || []);
@@ -80,15 +97,82 @@ export function LessonEditorForm({
   const [hwAttachments, setHwAttachments] = useState<IMaterial[]>(initialHomework?.attachments ?? []);
   const [hwDue, setHwDue] = useState(initialHomework?.dueAt ? toTashkentInputValue(initialHomework.dueAt) : "");
   const [hwCoins, setHwCoins] = useState<number>(initialHomework?.coinsReward ?? DEFAULT_HOMEWORK_COINS);
+  // Mentor muddatni o'zi belgilamaguncha, u dars sanasi yoki guruh o'zgarganda jadvaldan qayta hisoblanadi
+  const [hwDueTouched, setHwDueTouched] = useState(Boolean(initialHomework?.dueAt));
   const [hwUploading, setHwUploading] = useState(false);
   const [hwGenerating, setHwGenerating] = useState(false);
 
   const currentGroup = groups.find((g) => g._id.toString() === groupId);
 
+  // Bitta dars — bir nechta guruh: qo'shimcha guruhlar uchun bog'langan nusxa yaratiladi
+  const [extraGroupIds, setExtraGroupIds] = useState<string[]>([]);
+  const [isCopying, setIsCopying] = useState(false);
+  const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const linkedGroupIds = new Set(linkedLessons.map((l) => l.groupId));
+  // Avval shu sinfdagi guruhlar, keyin qolganlari
+  const otherGroups = groups
+    .filter((g) => g._id.toString() !== groupId && !linkedGroupIds.has(g._id.toString()))
+    .sort((a, b) => Number(b.grade === currentGroup?.grade) - Number(a.grade === currentGroup?.grade));
+  const selectedExtraIds = extraGroupIds.filter((id) => otherGroups.some((g) => g._id.toString() === id));
+
+  const toggleExtraGroup = (id: string) =>
+    setExtraGroupIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const handleCopyToGroups = async () => {
+    if (!initialLesson || selectedExtraIds.length === 0) return;
+    try {
+      setIsCopying(true);
+      const res = await copyLessonToGroupsAction({ lessonId: initialLesson._id.toString(), groupIds: selectedExtraIds });
+      if (res.success) {
+        toast.success(res.message || "Dars qo'shildi");
+        setExtraGroupIds([]);
+        router.refresh();
+      } else {
+        toast.error(res.message || "Darsni qo'shib bo'lmadi");
+      }
+    } catch {
+      toast.error("Darsni qo'shib bo'lmadi");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
+  const handleUnlink = async () => {
+    if (!initialLesson) return;
+    try {
+      setIsUnlinking(true);
+      const res = await unlinkLessonAction(initialLesson._id.toString());
+      if (res.success) {
+        toast.success(res.message || "Bog'lanish uzildi");
+        setShowUnlinkDialog(false);
+        router.refresh();
+      } else {
+        toast.error(res.message || "Xatolik yuz berdi");
+      }
+    } catch {
+      toast.error("Bog'lanishni uzib bo'lmadi");
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
   /** Guruh jadvalidagi keyingi dars boshlanishi — muddatning sukut qiymati */
-  const nextLessonDue = (): string => {
-    const next = date ? getNextLessonAfter(currentGroup?.schedule, date) : null;
+  const dueFor = (forGroupId: string, forDate: string): string => {
+    const schedule = groups.find((g) => g._id.toString() === forGroupId)?.schedule;
+    const next = forDate ? getNextLessonAfter(schedule, forDate) : null;
     return next ? toTashkentInputValue(next) : "";
+  };
+  const nextLessonDue = (): string => dueFor(groupId, date);
+
+  const handleDateChange = (value: string) => {
+    setDate(value);
+    if (hwEnabled && !hwDueTouched) setHwDue(dueFor(groupId, value));
+  };
+
+  const handleGroupChange = (value: string) => {
+    setGroupId(value);
+    if (hwEnabled && !hwDueTouched) setHwDue(dueFor(value, date));
   };
 
   const handleToggleHomework = (enabled: boolean) => {
@@ -286,7 +370,23 @@ export function LessonEditorForm({
       }
 
       if (res.success) {
-        toast.success(initialLesson ? "Dars muvaffaqiyatli yangilandi" : "Yangi dars yaratildi");
+        // Yangi dars: tanlangan boshqa guruhlarga ham bog'langan nusxa yaratiladi
+        let copyError: string | null = null;
+        if (!initialLesson && selectedExtraIds.length > 0 && res.data?._id) {
+          const copyRes = await copyLessonToGroupsAction({ lessonId: String(res.data._id), groupIds: selectedExtraIds });
+          if (!copyRes.success) copyError = copyRes.message || "Boshqa guruhlarga qo'shib bo'lmadi";
+        }
+        if (copyError) {
+          toast.error(`Dars yaratildi, lekin: ${copyError}`);
+        } else if (initialLesson) {
+          toast.success(res.message || "Dars muvaffaqiyatli yangilandi");
+        } else {
+          toast.success(
+            selectedExtraIds.length > 0
+              ? `Dars ${selectedExtraIds.length + 1} ta guruhga yaratildi`
+              : "Yangi dars yaratildi"
+          );
+        }
         router.push("/mentor/lessons");
         router.refresh();
       } else {
@@ -337,7 +437,7 @@ export function LessonEditorForm({
             <select
               id="lesson-group"
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
+              onChange={(e) => handleGroupChange(e.target.value)}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-sm min-h-[44px] text-slate-900 dark:text-slate-100"
               required
             >
@@ -401,7 +501,7 @@ export function LessonEditorForm({
               id="lesson-date"
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
             />
           </Field>
         </div>
@@ -433,6 +533,123 @@ export function LessonEditorForm({
           </label>
         </div>
       </div>
+
+      {/* Bitta dars — bir nechta guruh */}
+      {(linkedLessons.length > 0 || otherGroups.length > 0) && (
+        <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              Boshqa guruhlar
+            </h2>
+            {linkedLessons.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowUnlinkDialog(true)}
+                className="gap-2 min-h-[40px] text-slate-500"
+              >
+                <Unlink className="w-4 h-4" />
+                Bog&apos;lanishni uzish
+              </Button>
+            )}
+          </div>
+
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Bitta darsni bir nechta guruhga bering — har safar qaytadan yaratish shart emas. Sarlavha, konspekt,
+            materiallar, uyga vazifa matni va test barcha bog&apos;langan guruhlarda <strong>birga yangilanadi</strong>.
+            Sana, tartib raqami, nashr holati, vazifa muddati hamda o&apos;quvchilarning javob va baholari har
+            guruhda <strong>alohida</strong> qoladi.
+          </p>
+
+          {linkedLessons.length > 0 && (
+            <ul className="space-y-2">
+              {linkedLessons.map((l) => (
+                <li
+                  key={l._id}
+                  className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
+                >
+                  <span className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{l.groupName}</span>
+                    {l.grade !== null && <span className="text-xs text-slate-400">{l.grade}-sinf</span>}
+                    {l.date && <span className="text-xs text-slate-500 dark:text-slate-400">· {formatDateUz(l.date)}</span>}
+                    <Badge variant={l.isPublished ? "success" : "warning"}>
+                      {l.isPublished ? "Nashr etilgan" : "Qoralama"}
+                    </Badge>
+                  </span>
+                  <Link
+                    href={`/mentor/lessons/${l._id}/edit`}
+                    className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline min-h-[36px] flex items-center"
+                  >
+                    Shu guruhdagi nusxani ochish
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {otherGroups.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {initialLesson ? "Yana qaysi guruhlarga qo'shilsin?" : "Shu darsni quyidagi guruhlarga ham yaratish"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {otherGroups.map((g) => {
+                  const id = g._id.toString();
+                  const checked = selectedExtraIds.includes(id);
+                  return (
+                    <label
+                      key={id}
+                      className={`flex items-center gap-2.5 px-3.5 rounded-xl border text-sm font-semibold cursor-pointer min-h-[44px] transition-colors ${
+                        checked
+                          ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300"
+                          : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleExtraGroup(id)}
+                        className="w-4 h-4 accent-teal-600 cursor-pointer"
+                      />
+                      <span>{g.name}</span>
+                      <span className={`text-xs font-normal ${g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-400"}`}>
+                        {g.grade}-sinf
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {initialLesson ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCopyToGroups}
+                    isLoading={isCopying}
+                    disabled={selectedExtraIds.length === 0}
+                    className="gap-2 min-h-[44px]"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Tanlangan guruhlarga qo&apos;shish
+                  </Button>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Darsning saqlangan holati ko&apos;chiriladi; sana har guruhning jadvaliga moslanadi.
+                  </span>
+                </div>
+              ) : (
+                selectedExtraIds.length > 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Dars {selectedExtraIds.length + 1} ta guruhga yaratiladi; sana va vazifa muddati har guruhning
+                    jadvaliga moslanadi.
+                  </p>
+                )
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Materials Builder Card */}
       <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
@@ -643,15 +860,20 @@ export function LessonEditorForm({
                     id="hw-due"
                     type="datetime-local"
                     value={hwDue}
-                    onChange={(e) => setHwDue(e.target.value)}
+                    onChange={(e) => {
+                      setHwDueTouched(true);
+                      setHwDue(e.target.value);
+                    }}
                   />
                   <Button
                     type="button"
                     variant="secondary"
                     onClick={() => {
                       const next = nextLessonDue();
-                      if (next) setHwDue(next);
-                      else toast.error("Guruh jadvali kiritilmagan — muddatni qo'lda tanlang");
+                      if (next) {
+                        setHwDue(next);
+                        setHwDueTouched(false);
+                      } else toast.error("Guruh jadvali kiritilmagan — muddatni qo'lda tanlang");
                     }}
                     className="shrink-0 gap-1.5 min-h-[44px]"
                     title="Guruh jadvalidagi keyingi dars boshlanishi"
@@ -750,6 +972,21 @@ export function LessonEditorForm({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showUnlinkDialog}
+        onClose={() => setShowUnlinkDialog(false)}
+        onConfirm={handleUnlink}
+        title="Bog'lanishni uzish"
+        confirmText="Ha, uzish"
+        isLoading={isUnlinking}
+        description={
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Bu dars mustaqil bo&apos;ladi: bundan keyin undagi o&apos;zgarishlar boshqa guruhlarga o&apos;tmaydi va
+            ulardagi o&apos;zgarishlar bunga ta&apos;sir qilmaydi. Hech narsa o&apos;chirilmaydi.
+          </p>
+        }
+      />
 
       {initialLesson && (
         <QuizEditorModal

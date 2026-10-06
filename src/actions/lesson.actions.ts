@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db/connect";
-import { Lesson, ILessonData } from "@/lib/db/models/lesson.model";
+import mongoose from "mongoose";
+import { Lesson, ILesson, ILessonData } from "@/lib/db/models/lesson.model";
+import { Group } from "@/lib/db/models/group.model";
+import { Quiz } from "@/lib/db/models/quiz.model";
+import { addDaysToKey, getLessonDatesInRange, getNextLessonAfter, toDateKey, type GroupSchedule } from "@/lib/schedule";
 import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
@@ -149,18 +153,23 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
   }
 
   await lesson.save();
+  const syncedCount = await syncLinkedLessons(lesson);
 
   await AuditLog.create({
     actorId: mentor.userId,
     action: "UPDATE_LESSON",
-    details: { lessonId: lesson._id, title: lesson.title },
+    details: { lessonId: lesson._id, title: lesson.title, syncedCopies: syncedCount },
   });
 
   revalidatePath("/", "layout");
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath("/mentor/lessons");
-  return { success: true, message: "Dars yangilandi", data: JSON.parse(JSON.stringify(lesson)) };
+  return {
+    success: true,
+    message: syncedCount > 0 ? `Dars yangilandi (${syncedCount} ta bog'langan guruhda ham)` : "Dars yangilandi",
+    data: JSON.parse(JSON.stringify(lesson)),
+  };
 }
 
 export async function togglePublishLessonAction(lessonId: string) {
@@ -197,7 +206,14 @@ export async function deleteLessonAction(lessonId: string) {
 
   const lesson = await Lesson.findByIdAndDelete(lessonId);
   if (lesson) {
-    await HomeworkSubmission.deleteMany({ lessonId: lesson._id });
+    await Promise.all([
+      HomeworkSubmission.deleteMany({ lessonId: lesson._id }),
+      Quiz.deleteMany({ lessonId: lesson._id }),
+    ]);
+    if (lesson.linkId) {
+      const rest = await Lesson.find({ linkId: lesson.linkId }).select("_id").lean();
+      if (rest.length === 1) await Lesson.updateOne({ _id: rest[0]._id }, { $set: { linkId: null } });
+    }
   }
 
   await AuditLog.create({
@@ -278,4 +294,217 @@ export async function getMaterialDownloadUrlAction({
     console.error("Presigned URL error:", error);
     return { success: false, message: "Faylga kirishda xatolik yuz berdi" };
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Bog'langan nusxalar: bitta dars — bir nechta guruh                   */
+/* ------------------------------------------------------------------ */
+// Har bir guruhda darsning o'z nusxasi bo'ladi (o'z sanasi, tartibi, nashr holati, vazifa muddati,
+// o'quvchilar javoblari va baholari bilan). Mazmun — sarlavha, konspekt, materiallar, vazifa matni va test —
+// bog'langan nusxalarda birga yangilanadi. Shu sabab bir guruhdagi javoblar boshqasinikiga aralashmaydi.
+
+/** Guruh jadvali bo'yicha berilgan sanadan boshlab birinchi dars kuni; jadval bo'lmasa o'sha sana */
+function alignDateToSchedule(schedule: Partial<GroupSchedule> | null | undefined, date: Date): Date {
+  const key = toDateKey(date);
+  const [first] = getLessonDatesInRange(schedule, key, addDaysToKey(key, 6));
+  return first ? new Date(first) : date;
+}
+
+/** Saqlangan darsning mazmunini bog'langan nusxalarga ko'chiradi. Nusxalar soni qaytadi */
+async function syncLinkedLessons(lesson: ILesson): Promise<number> {
+  if (!lesson.linkId) return 0;
+  const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } });
+  if (siblings.length === 0) return 0;
+
+  const groups = await Group.find({ _id: { $in: siblings.map((s) => s.groupId) } }).select("schedule").lean();
+  const scheduleOf = new Map(groups.map((g) => [g._id.toString(), g.schedule]));
+  const source = lesson.toObject();
+
+  for (const sib of siblings) {
+    sib.title = source.title;
+    sib.topic = source.topic;
+    sib.description = source.description;
+    sib.materials = source.materials as typeof sib.materials;
+
+    if (source.homework) {
+      // Muddat har guruhda o'ziniki: bor bo'lsa saqlanadi, yo'q bo'lsa o'sha guruh jadvalidan olinadi
+      const ownDue = sib.homework?.dueAt ?? null;
+      const due =
+        ownDue ??
+        (source.homework.isEnabled && sib.date
+          ? getNextLessonAfter(scheduleOf.get(sib.groupId.toString()), toDateKey(sib.date))
+          : null);
+      sib.homework = {
+        isEnabled: source.homework.isEnabled,
+        instructions: source.homework.instructions,
+        attachments: source.homework.attachments,
+        coinsReward: source.homework.coinsReward,
+        dueAt: due,
+      } as typeof sib.homework;
+    } else if (sib.homework) {
+      sib.homework.isEnabled = false;
+    }
+
+    await sib.save();
+    revalidatePath(`/lessons/${sib._id}`);
+  }
+  return siblings.length;
+}
+
+export interface LinkedLessonInfo {
+  _id: string;
+  groupId: string;
+  groupName: string;
+  grade: number | null;
+  date: string | null;
+  isPublished: boolean;
+}
+
+/** Shu dars bilan bog'langan boshqa guruhlardagi nusxalar */
+export async function getLinkedLessons(lessonId: string): Promise<LinkedLessonInfo[]> {
+  await requireMentor();
+  if (!mongoose.isValidObjectId(lessonId)) return [];
+  await connectToDatabase();
+
+  const lesson = await Lesson.findById(lessonId).select("linkId").lean();
+  if (!lesson?.linkId) return [];
+  const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } })
+    .select("groupId date isPublished")
+    .lean();
+  const groups = await Group.find({ _id: { $in: siblings.map((s) => s.groupId) } }).select("name grade").lean();
+  const groupOf = new Map(groups.map((g) => [g._id.toString(), g]));
+
+  return siblings
+    .map((s) => {
+      const g = groupOf.get(s.groupId.toString());
+      return {
+        _id: s._id.toString(),
+        groupId: s.groupId.toString(),
+        groupName: g?.name ?? "O'chirilgan guruh",
+        grade: g?.grade ?? null,
+        date: s.date ? new Date(s.date).toISOString() : null,
+        isPublished: s.isPublished,
+      };
+    })
+    .sort((a, b) => a.groupName.localeCompare(b.groupName));
+}
+
+/** Darsni boshqa guruhlarga ham qo'shadi: har biriga bog'langan nusxa (testi bilan) yaratiladi */
+export async function copyLessonToGroupsAction(params: { lessonId: string; groupIds: string[] }) {
+  const mentor = await requireMentor();
+  const groupIds = [...new Set((params.groupIds ?? []).filter((id) => mongoose.isValidObjectId(id)))];
+  if (!mongoose.isValidObjectId(params.lessonId) || groupIds.length === 0) {
+    return { success: false, message: "Guruh tanlanmagan" };
+  }
+  await connectToDatabase();
+
+  const lesson = await Lesson.findById(params.lessonId);
+  if (!lesson) return { success: false, message: "Dars topilmadi" };
+
+  if (!lesson.linkId) {
+    lesson.linkId = lesson._id;
+    await lesson.save();
+  }
+
+  // Shu dars allaqachon bor guruhlarga (o'zining guruhi ham) ikkinchi nusxa yaratilmaydi
+  const existing = await Lesson.find({ linkId: lesson.linkId }).select("groupId").lean();
+  const taken = new Set(existing.map((l) => l.groupId.toString()));
+  const targets = await Group.find({ _id: { $in: groupIds.filter((id) => !taken.has(id)) } })
+    .select("name schedule")
+    .lean();
+  if (targets.length === 0) {
+    return { success: false, message: "Tanlangan guruhlarda bu dars allaqachon bor" };
+  }
+
+  const source = lesson.toObject();
+  const quiz = await Quiz.findOne({ lessonId: lesson._id }).lean();
+  const created: string[] = [];
+
+  for (const group of targets) {
+    const last = await Lesson.findOne({ groupId: group._id, quarter: source.quarter }).sort({ order: -1 }).select("order").lean();
+    const date = alignDateToSchedule(group.schedule, source.date ? new Date(source.date) : new Date());
+
+    const copy = await Lesson.create({
+      groupId: group._id,
+      quarter: source.quarter,
+      order: last ? last.order + 1 : 1,
+      title: source.title,
+      topic: source.topic,
+      description: source.description,
+      date,
+      isPublished: source.isPublished,
+      materials: source.materials.map((m) => ({
+        type: m.type,
+        title: m.title,
+        urlOrKey: m.urlOrKey,
+        mimeType: m.mimeType,
+        fileSize: m.fileSize,
+      })),
+      homework: source.homework
+        ? {
+            isEnabled: source.homework.isEnabled,
+            instructions: source.homework.instructions,
+            attachments: source.homework.attachments,
+            coinsReward: source.homework.coinsReward,
+            dueAt: source.homework.isEnabled
+              ? getNextLessonAfter(group.schedule, toDateKey(date)) ?? source.homework.dueAt ?? null
+              : null,
+          }
+        : null,
+      linkId: lesson.linkId,
+    });
+
+    if (quiz) {
+      await Quiz.create({
+        lessonId: copy._id,
+        title: quiz.title,
+        description: quiz.description,
+        questions: quiz.questions,
+        isPublished: quiz.isPublished,
+        passingScore: quiz.passingScore,
+      });
+    }
+    created.push(group.name);
+  }
+
+  await AuditLog.create({
+    actorId: mentor.userId,
+    action: "COPY_LESSON_TO_GROUPS",
+    details: { lessonId: lesson._id, title: lesson.title, groups: created },
+  });
+
+  revalidatePath("/", "layout");
+  revalidatePath("/lessons");
+  revalidatePath("/mentor/lessons");
+  return { success: true, message: `Dars ${created.join(", ")} guruhiga ham qo'shildi`, created };
+}
+
+/** Darsni bog'lanishdan chiqaradi: keyingi o'zgarishlar boshqa guruhlarga o'tmaydi */
+export async function unlinkLessonAction(lessonId: string) {
+  const mentor = await requireMentor();
+  if (!mongoose.isValidObjectId(lessonId)) return { success: false, message: "Dars topilmadi" };
+  await connectToDatabase();
+
+  const lesson = await Lesson.findById(lessonId);
+  if (!lesson) return { success: false, message: "Dars topilmadi" };
+  if (!lesson.linkId) return { success: true, message: "Dars bog'lanmagan" };
+
+  const linkId = lesson.linkId;
+  lesson.linkId = null;
+  await lesson.save();
+
+  // Bog'lanishda bitta dars qolsa, u ham mustaqil bo'ladi
+  const rest = await Lesson.find({ linkId }).select("_id").lean();
+  if (rest.length === 1) {
+    await Lesson.updateOne({ _id: rest[0]._id }, { $set: { linkId: null } });
+  }
+
+  await AuditLog.create({
+    actorId: mentor.userId,
+    action: "UNLINK_LESSON",
+    details: { lessonId: lesson._id, title: lesson.title },
+  });
+
+  revalidatePath("/mentor/lessons");
+  return { success: true, message: "Bog'lanish uzildi — bu dars endi mustaqil" };
 }

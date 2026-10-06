@@ -113,3 +113,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Muddat**: sukut bo'yicha guruh jadvalidagi keyingi dars boshlanishi; muddatdan keyin ham qabul qilinadi, lekin `isLate` belgilanadi va coin taklifi 0 bo'ladi (mentor o'zgartira oladi).
 - **Baholash**: 0–100 ball + izoh + coin (ballga mutanosib taklif). Qayta baholashda faqat farq `CoinLedger`ga (`homework`) yoziladi. "Qayta ishlashga qaytarish" faqat baholanmagan javob uchun.
 - **Fayllar**: `homework/{lessonId}/{userId}/...` kaliti bilan R2'ga; har biri 50 MB gacha, 5 tagacha, bajariladigan fayllar rad etiladi. Havola faqat mentor yoki javob egasiga beriladi.
+
+### [2026-10-07] 25-qaror: Bitta dars — bir nechta guruh (bog'langan nusxalar)
+- **Qaror**: Dars bitta hujjat bo'lib bir nechta guruhga ulanmaydi; har bir guruhda o'z nusxasi yaratiladi va nusxalar `Lesson.linkId` bilan bog'lanadi.
+- **Birga yangilanadi**: sarlavha, qisqa mavzu, konspekt, materiallar, uyga vazifa (yoqilgani, matni, biriktirmalari, coin) va test (savollar o'z `_id`lari bilan).
+- **Har guruhda alohida**: sana (guruh jadvaliga moslanadi), chorak ichidagi tartib, nashr holati, vazifa muddati, o'quvchilarning javoblari, baholari va test natijalari.
+- **Sabab**: guruhlarning dars kunlari har xil, javoblar esa darsga bog'langan — bitta umumiy hujjatda sana/muddat/nashr holatini guruh kesimida yuritish barcha so'rovlarni murakkablashtirardi; oddiy nusxa esa tahrirda ikki joyni qo'lda tuzatishni talab qilardi.
+- **Chiqish yo'li**: "Bog'lanishni uzish" darsni mustaqil qiladi (hech narsa o'chmaydi).

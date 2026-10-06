@@ -36,6 +36,8 @@ export interface ILessonData {
   isPublished: boolean;
   materials: IMaterial[];
   homework?: IHomework | null;
+  /** Bir xil darsning boshqa guruhlardagi nusxalari shu qiymat bilan bog'lanadi (mazmuni birga yangilanadi) */
+  linkId?: string | mongoose.Types.ObjectId | null;
   isNew?: boolean;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -132,6 +134,7 @@ const LessonSchema = new Schema<ILesson>(
     },
     materials: [MaterialSchema],
     homework: { type: HomeworkSchema, default: null },
+    linkId: { type: Schema.Types.ObjectId, default: null, index: true },
   },
   {
     timestamps: true,
