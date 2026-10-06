@@ -47,11 +47,14 @@ interface StudentAttendanceViewProps {
     hasMarked: boolean;
   } | null;
   history: AttendanceRecordItem[];
+  /** Guruh jadvali bo'yicha keyingi dars, masalan "Ertaga 16:30–18:00" */
+  nextLessonLabel?: string | null;
 }
 
 export function StudentAttendanceView({
   activeSession,
   history,
+  nextLessonLabel,
 }: StudentAttendanceViewProps) {
   const { toast } = useToast();
 
@@ -149,12 +152,14 @@ export function StudentAttendanceView({
     }
   };
 
-  const presentCount = history.filter((r) => r.status === "present").length;
+  // Kechikkan ham qatnashgan hisoblanadi; sababli qoldirilgan dars foizga ta'sir qilmaydi
+  const presentCount = history.filter((r) => r.status === "present" || r.status === "late").length;
+  const countedLessons = history.filter((r) => r.status !== "excused").length;
   const totalCoinsEarned = history.reduce((acc, r) => acc + (r.coinsAwarded || 0), 0);
-  const attendanceRate = history.length > 0 ? Math.round((presentCount / history.length) * 100) : 100;
+  const attendanceRate = countedLessons > 0 ? Math.round((presentCount / countedLessons) * 100) : 100;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in pb-12">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       {/* Header */}
       <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
@@ -164,6 +169,12 @@ export function StudentAttendanceView({
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
           Proyektorda ko&apos;rsatilgan kod yoki QR belgi orqali dars davomatidan o&apos;ting
         </p>
+        {nextLessonLabel && (
+          <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-lg px-2.5 py-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            Keyingi dars: {nextLessonLabel}
+          </p>
+        )}
       </div>
 
       {/* Main Interactive Check-in Card (ALWAYS accessible) */}

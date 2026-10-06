@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Maximize2,
@@ -60,6 +61,7 @@ interface ProjectorScreenProps {
 
 export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   const [data, setData] = useState(initialData);
   const [secondsLeft, setSecondsLeft] = useState(initialData.secondsRemaining);
@@ -176,7 +178,8 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
       if (res.success) {
         toast.success("Davomat sessiyasi yakunlandi");
         setShowCloseDialog(false);
-        refreshData();
+        // Sahifa yakunlangan dars ko'rinishiga (to'liq ro'yxat) almashadi
+        router.refresh();
       } else {
         toast.error(res.message || "Xatolik yuz berdi");
       }

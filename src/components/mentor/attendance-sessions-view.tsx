@@ -11,6 +11,9 @@ import {
   Clock,
   ArrowRight,
   ExternalLink,
+  CalendarClock,
+  PencilLine,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +21,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
-import { startAttendanceSessionAction } from "@/actions/attendance.actions";
-import { formatDateUz, formatTimeUz } from "@/lib/utils";
+import { startAttendanceSessionAction, createManualSessionAction } from "@/actions/attendance.actions";
+import { cn, formatDateUz, formatTimeUz } from "@/lib/utils";
+import { AttendanceJournal } from "@/components/mentor/attendance-journal";
+import { Select } from "@/components/ui/select";
+import { hasLessonOn, isLessonNow, isValidSchedule, toDateKey } from "@/lib/schedule";
 
 interface AttendanceSessionItem {
   _id: string;
@@ -65,6 +71,62 @@ export function AttendanceSessionsView({
   );
   const [coinsReward, setCoinsReward] = useState<number>(10);
   const [isLoading, setIsLoading] = useState(false);
+  const [tab, setTab] = useState<"lessons" | "journal">("lessons");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [quickStartId, setQuickStartId] = useState<string | null>(null);
+
+  // Qo'lda (QR'siz) davomat kiritish oynasi
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [manualDate, setManualDate] = useState(() => toDateKey());
+  const [isCreatingManual, setIsCreatingManual] = useState(false);
+
+  const todayKey = toDateKey();
+  const todaysGroups = groups
+    .filter((g) => hasLessonOn(g.schedule))
+    .sort((a, b) => (a.schedule?.startTime ?? "").localeCompare(b.schedule?.startTime ?? ""));
+  const sessionsToday = (groupId: string) =>
+    sessions.find((s) => s.groupId?._id === groupId && toDateKey(s.date) === todayKey);
+
+  const startSession = async (groupId: string, reward: number) => {
+    const res = await startAttendanceSessionAction(groupId, reward);
+    if (res.success && res.data?.sessionId) {
+      toast.success("Davomat sessiyasi ochildi!");
+      router.push(`/mentor/attendance/${res.data.sessionId}`);
+      return true;
+    }
+    toast.error(res.message || "Xatolik yuz berdi");
+    return false;
+  };
+
+  const handleQuickStart = async (groupId: string) => {
+    try {
+      setQuickStartId(groupId);
+      await startSession(groupId, 10);
+    } catch {
+      toast.error("Sessiyani boshlab bo'lmadi");
+    } finally {
+      setQuickStartId(null);
+    }
+  };
+
+  const handleCreateManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGroupId) return;
+    try {
+      setIsCreatingManual(true);
+      const res = await createManualSessionAction({ groupId: selectedGroupId, dateKey: manualDate, coinsReward });
+      if (res.success && res.data?.sessionId) {
+        if (res.message) toast.info(res.message);
+        router.push(`/mentor/attendance/${res.data.sessionId}`);
+      } else {
+        toast.error(res.message || "Xatolik yuz berdi");
+      }
+    } catch {
+      toast.error("Davomatni yaratib bo'lmadi");
+    } finally {
+      setIsCreatingManual(false);
+    }
+  };
 
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,10 +153,12 @@ export function AttendanceSessionsView({
   };
 
   const activeSessions = sessions.filter((s) => s.status === "active");
-  const closedSessions = sessions.filter((s) => s.status === "closed");
+  const closedSessions = sessions.filter(
+    (s) => s.status === "closed" && (groupFilter === "all" || s.groupId?._id === groupFilter)
+  );
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in pb-12">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <div>
@@ -107,14 +171,108 @@ export function AttendanceSessionsView({
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={() => setIsStartOpen(true)}
-          className="gap-2 shrink-0 min-h-[44px]"
-        >
-          <Plus className="w-4 h-4" />
-          Yangi davomat ochish
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="secondary" onClick={() => setIsManualOpen(true)} className="gap-2 min-h-[44px]">
+            <PencilLine className="w-4 h-4" />
+            Qo&apos;lda kiritish
+          </Button>
+          <Button variant="primary" onClick={() => setIsStartOpen(true)} className="gap-2 min-h-[44px]">
+            <Plus className="w-4 h-4" />
+            Yangi davomat ochish
+          </Button>
+        </div>
+      </div>
+
+      {/* Bo'limlar */}
+      <div role="tablist" className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60">
+        {([
+          ["lessons", "Darslar"],
+          ["journal", "Jurnal"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            type="button"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "px-5 min-h-[40px] rounded-xl text-sm font-semibold transition-all cursor-pointer",
+              tab === id
+                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "journal" && (
+        <div className="page-enter">
+          <AttendanceJournal groups={groups} />
+        </div>
+      )}
+
+      {tab === "lessons" && (
+      <div className="space-y-6 page-enter">
+      {/* Bugungi jadval */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <CalendarClock className="w-4 h-4" />
+          Bugungi darslar
+        </h2>
+        {todaysGroups.length === 0 ? (
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-sm text-slate-500 dark:text-slate-400">
+            {groups.some((g) => isValidSchedule(g.schedule))
+              ? "Bugun jadval bo'yicha dars yo'q."
+              : "Guruhlarga dars jadvali belgilanmagan. Guruhlar sahifasida jadvalni kiriting yoki Excel'dan import qiling."}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {todaysGroups.map((g) => {
+              const id = g._id.toString();
+              const existing = sessionsToday(id);
+              const live = isLessonNow(g.schedule);
+              return (
+                <div
+                  key={id}
+                  className={cn(
+                    "p-4 rounded-2xl bg-white dark:bg-[#131E32] border shadow-xs flex items-center gap-3",
+                    live && !existing
+                      ? "border-teal-500/60 ring-2 ring-teal-500/15"
+                      : "border-slate-200/80 dark:border-slate-800/80"
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{g.name}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                      {g.schedule?.startTime}–{g.schedule?.endTime}
+                      {live && <span className="ml-1.5 font-bold text-teal-700 dark:text-teal-300">· hozir</span>}
+                    </div>
+                  </div>
+                  {existing ? (
+                    <Link href={`/mentor/attendance/${existing._id}`}>
+                      <Button variant="secondary" size="sm" className="min-h-[44px]">
+                        {existing.status === "active" ? "Ekranni ochish" : "Davomatni ko'rish"}
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button
+                      variant={live ? "primary" : "outline"}
+                      size="sm"
+                      isLoading={quickStartId === id}
+                      onClick={() => handleQuickStart(id)}
+                      className="gap-1.5 min-h-[44px]"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Davomat ochish
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Active Sessions Banner */}
@@ -168,9 +326,25 @@ export function AttendanceSessionsView({
 
       {/* Past Sessions List */}
       <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          O&apos;tgan davomat sessiyalari ({closedSessions.length})
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            O&apos;tgan darslar davomati ({closedSessions.length})
+          </h2>
+          <div className="sm:w-56">
+            <Select
+              aria-label="Guruh bo'yicha saralash"
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+            >
+              <option value="all">Barcha guruhlar</option>
+              {groups.map((g) => (
+                <option key={g._id.toString()} value={g._id.toString()}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
 
         {closedSessions.length === 0 ? (
           <div className="p-12 text-center rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-400">
@@ -200,6 +374,9 @@ export function AttendanceSessionsView({
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       {s.summary?.totalPresent || 0} kelgan
                     </span>
+                    {s.summary?.totalLate ? (
+                      <span className="text-amber-600 dark:text-amber-400">{s.summary.totalLate} kechikkan</span>
+                    ) : null}
                     {s.summary?.totalAbsent ? (
                       <span className="text-rose-500">
                         {s.summary.totalAbsent} kelmagan
@@ -212,7 +389,7 @@ export function AttendanceSessionsView({
                   href={`/mentor/attendance/${s._id}`}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 hover:underline min-h-[44px]"
                 >
-                  <span>Natijalar va jurnali</span>
+                  <span>Kim keldi, kim kelmadi</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -220,6 +397,53 @@ export function AttendanceSessionsView({
           </div>
         )}
       </div>
+
+      </div>
+      )}
+
+      {/* Manual (no QR) session modal */}
+      <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader className="space-y-1 mb-4">
+            <DialogTitle>Davomatni qo&apos;lda kiritish</DialogTitle>
+            <DialogDescription>
+              QR ochilmagan yoki o&apos;tib ketgan dars uchun. Keyingi sahifada kelganlarni belgilab chiqasiz.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateManual} className="space-y-4">
+            <Field htmlFor="manual-group" label="O'quv guruhi" required>
+              <Select id="manual-group" value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)} required>
+                {groups.map((g) => (
+                  <option key={g._id.toString()} value={g._id.toString()}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            <Field htmlFor="manual-date" label="Dars sanasi" required>
+              <Input
+                id="manual-date"
+                type="date"
+                max={todayKey}
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                required
+              />
+            </Field>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="secondary" onClick={() => setIsManualOpen(false)} disabled={isCreatingManual}>
+                Bekor qilish
+              </Button>
+              <Button type="submit" variant="primary" isLoading={isCreatingManual}>
+                Davom etish
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Start Session Modal */}
       <Dialog open={isStartOpen} onOpenChange={setIsStartOpen}>
@@ -242,7 +466,7 @@ export function AttendanceSessionsView({
               >
                 {groups.map((g) => (
                   <option key={g._id.toString()} value={g._id.toString()}>
-                    {g.name} guruhi ({g.grade}-sinf)
+                    {g.name} ({g.grade}-sinf)
                   </option>
                 ))}
               </select>
