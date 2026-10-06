@@ -91,7 +91,7 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
                         <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{h.title}</span>
                         {h.dueAt && (
                           <span
-                            className={`mt-0.5 flex items-center gap-1 text-[11px] ${due?.overdue ? "text-rose-600 dark:text-rose-400" : "text-slate-500 dark:text-slate-400"}`}
+                            className={`mt-0.5 flex items-center gap-1 text-xs ${due?.overdue ? "text-rose-600 dark:text-rose-400" : "text-slate-500 dark:text-slate-400"}`}
                           >
                             <Clock className="w-3 h-3 shrink-0" />
                             {formatDateTimeUz(h.dueAt)}
@@ -124,7 +124,7 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{l.title}</span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">
                         {l.quarter}-chorak{l.date ? ` · ${formatDateUz(l.date)}` : ""}
                       </span>
                     </span>

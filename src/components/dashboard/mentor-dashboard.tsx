@@ -74,7 +74,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{h.title}</span>
-                      <span className="block text-[11px] text-slate-500 dark:text-slate-400">{h.groupName}</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">{h.groupName}</span>
                     </span>
                     <Badge variant="gold">{h.ungraded} ta javob</Badge>
                   </Link>
@@ -97,7 +97,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{o.productTitle}</span>
-                      <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{o.studentName}</span>
+                      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{o.studentName}</span>
                     </span>
                     <CoinBadge amount={o.price} size="sm" animate={false} />
                   </Link>
@@ -129,13 +129,13 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
                         </Badge>
                       )}
                     </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
                       {g.grade}-sinf · {g.schedule}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{g.students}</span>
-                    <span className="block text-[10px] text-slate-500 dark:text-slate-400">o&apos;quvchi · {g.lessons} dars</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">o&apos;quvchi · {g.lessons} dars</span>
                   </span>
                 </Link>
               </li>

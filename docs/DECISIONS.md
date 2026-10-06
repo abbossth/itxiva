@@ -126,3 +126,12 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Webhook**: `/api/telegram/webhook`, `X-Telegram-Bot-Api-Secret-Token` bilan himoyalangan, faqat shaxsiy chat. Buyruqlar: `/start`, `/help`, `/status`, `/stop`. O'rnatish: `scripts/telegram-webhook.mjs`.
 - **Yuborish**: yagona modul `lib/notifications/notify.ts` (`notify`, `notifyMany`, `notifyGroup`, `notifyAllStudents`, `notifyMentors`). Javobdan keyin (`after`) yuboriladi — so'rovni bloklamaydi. 25 tadan batch, 403 da chat avtomatik uziladi. Har tur profilda yoqiladi/o'chiriladi.
 - **Vaqtga bog'liq**: `/api/cron/daily` (Vercel Cron, 09:00 Toshkent, `CRON_SECRET`) — muddati 24 soat ichida tugaydigan vazifalar eslatmasi va yakunlangan imtihon statistikasi. Imtihonni hamma topshirib bo'lsa, statistika kutmasdan ketadi.
+
+### [2026-10-07] 27-qaror: Design system, navigatsiya va tezlik
+- **Tokenlar**: neytral "dev tool" palitrasi va firuza accent Tailwind `@theme` tokenlari sifatida (`globals.css`); qotirilgan ranglar tokenlarga almashtirilgan. Yorug' fonda ikkinchi darajali matn `slate-500`, qorong'ida `slate-400` (WCAG AA).
+- **Shrift**: Geist Sans (UI) va JetBrains Mono (`h1`, yirik raqamlar, coin, kod) — `next/font`, faqat lotin to'plami oldindan yuklanadi.
+- **Logo**: kod qavslari orasidagi minora (`components/layout/logo.tsx`); barcha rastr ikonkalar `scripts/generate-icons.mjs` bilan generatsiya qilinadi.
+- **Navigatsiya**: `/` — rolga qarab dashboard; desktop sidebar yig'iladi (holati cookie'da); `Ctrl+K` palitra birinchi ochilganda yuklanadi.
+- **Tezlik**: og'ir kutubxonalar (konfetti, QR skaner, palitra) kerak bo'lganda yuklanadi. Animatsiyalar faqat `transform`/`opacity`, `prefers-reduced-motion` da o'chadi.
+- **Xavfsizlik**: CSP (skript va freymlar faqat o'zimizdan + YouTube), `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` (kamera faqat o'zimizga), HSTS.
+- **Testlar**: `npm test` — vitest + xotiradagi MongoDB (auth, do'kon, vazifa, Telegram).

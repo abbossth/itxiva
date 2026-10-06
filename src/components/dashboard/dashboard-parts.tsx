@@ -80,7 +80,7 @@ export function StatLink({
       <span className="font-display text-2xl sm:text-3xl font-extrabold tabular-nums text-slate-900 dark:text-slate-100 leading-none">
         {value}
       </span>
-      {hint && <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{hint}</span>}
+      {hint && <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{hint}</span>}
     </Link>
   );
 }
