@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PackageCheck, Check, PartyPopper } from "lucide-react";
-import confetti from "canvas-confetti";
+import { fireConfetti } from "@/lib/confetti";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function MyOrdersView({ initialOrders }: { initialOrders: ShopOrder[] }) 
       const res = await action(order._id);
       if (res.success) {
         setOrders((prev) => prev.map((o) => (o._id === order._id ? { ...o, status: nextStatus } : o)));
-        if (celebrate) confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } });
+        if (celebrate) fireConfetti({ origin: { y: 0.7 } });
         toast.success(res.message || "Bajarildi");
         router.refresh();
       } else {

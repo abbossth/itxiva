@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import confetti from "canvas-confetti";
+import { fireConfetti } from "@/lib/confetti";
 import {
   QrCode,
   CheckCircle2,
@@ -19,8 +20,13 @@ import { CoinBadge } from "@/components/ui/coin-badge";
 import { OTPInput } from "@/components/ui/otp-input";
 import { useToast } from "@/components/ui/toast";
 import { markAttendanceAction } from "@/actions/attendance.actions";
-import { QRScannerModal } from "@/components/attendance/qr-scanner-modal";
 import { formatDateUz } from "@/lib/utils";
+
+// Kamera skaneri og'ir kutubxona — faqat "QR Skaner" ochilganda yuklanadi
+const QRScannerModal = dynamic(
+  () => import("@/components/attendance/qr-scanner-modal").then((m) => m.QRScannerModal),
+  { ssr: false }
+);
 
 interface AttendanceRecordItem {
   _id: string;
@@ -69,17 +75,7 @@ export function StudentAttendanceView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Trigger celebration confetti
-  const triggerConfetti = () => {
-    try {
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.6 },
-      });
-    } catch {
-      // ignore
-    }
-  };
+  const triggerConfetti = () => fireConfetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
 
   // Submit via 6-digit code
   const handleSubmitCode = async (submitCode?: string) => {
@@ -453,11 +449,13 @@ export function StudentAttendanceView({
       </div>
 
       {/* Live QR Camera Scanner Modal */}
-      <QRScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScanSuccess={handleScanSuccess}
-      />
+      {isScannerOpen && (
+        <QRScannerModal
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScanSuccess={handleScanSuccess}
+        />
+      )}
     </div>
   );
 }

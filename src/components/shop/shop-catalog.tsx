@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShoppingBag, Sparkles, PackageCheck, ArrowRight } from "lucide-react";
-import confetti from "canvas-confetti";
+import { fireConfetti } from "@/lib/confetti";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
         if (selected.stock !== null) {
           setStockOverrides((prev) => ({ ...prev, [selected._id]: (prev[selected._id] ?? selected.stock ?? 1) - 1 }));
         }
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+        fireConfetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
         toast.success(res.message || "Buyurtma berildi");
         setSelected(null);
         router.refresh();
