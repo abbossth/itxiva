@@ -197,7 +197,7 @@ body {
 }
 
 .page-enter {
-  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 @keyframes fade-in {
@@ -215,6 +215,8 @@ body {
 }
 
 /* Sahifa almashganda va skeleton o'rniga kontent kelganda yangi blok silliq paydo bo'ladi */
+/* "backwards": animatsiya tugagach transform qolmaydi — aks holda ichidagi position: fixed
+   elementlar (modal foni) butun ekran o'rniga shu blokka qamalib qoladi */
 .page-stage > * {
-  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }

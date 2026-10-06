@@ -195,3 +195,28 @@ export function getNextLesson(
   }
   return null;
 }
+
+/** Berilgan dars sanasidan KEYINGI birinchi dars boshlanishi — uyga vazifa muddati uchun */
+export function getNextLessonAfter(
+  s: Partial<GroupSchedule> | null | undefined,
+  lessonDateKey: string
+): Date | null {
+  if (!isValidSchedule(s)) return null;
+  const [next] = getLessonDatesInRange(s, addDaysToKey(lessonDateKey, 1), addDaysToKey(lessonDateKey, 8));
+  return next ? dateFromKey(next, s.startTime) : null;
+}
+
+/** <input type="datetime-local"> uchun qiymat — brauzer qaysi vaqt mintaqasida bo'lmasin, Toshkent vaqti bilan */
+export function toTashkentInputValue(date: Date | string | number): string {
+  const { dateKey, minutes } = getTashkentParts(date);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dateKey}T${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+}
+
+/** "2026-10-09T16:30" (Toshkent vaqti) -> Date; noto'g'ri qiymatda null */
+export function fromTashkentInputValue(value: string): Date | null {
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (!m) return null;
+  const date = dateFromKey(m[1], m[2]);
+  return Number.isNaN(date.getTime()) ? null : date;
+}

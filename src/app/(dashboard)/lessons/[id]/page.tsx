@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, BookOpen } from "lucide-react";
 import { getLessonById } from "@/actions/lesson.actions";
 import { getQuizForLesson } from "@/actions/quiz.actions";
+import { getHomeworkForStudent } from "@/actions/homework.actions";
+import { getCurrentUser } from "@/lib/auth/guards";
+import { HomeworkPanel } from "@/components/homework/homework-panel";
 import { YouTubeFacade } from "@/components/lessons/youtube-facade";
 import { FilePreview } from "@/components/lessons/file-preview";
 import { QuizView } from "@/components/quiz/quiz-view";
@@ -26,7 +29,11 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
     notFound();
   }
 
-  const quizRes = await getQuizForLesson(resolvedParams.id);
+  const [quizRes, homework, session] = await Promise.all([
+    getQuizForLesson(resolvedParams.id),
+    getHomeworkForStudent(resolvedParams.id),
+    getCurrentUser(),
+  ]);
   const quizData = quizRes.data;
 
   const youtubeMaterial = lesson.materials?.find((m) => m.type === "youtube");
@@ -102,6 +109,20 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
             <FilePreview
               lessonId={lesson._id.toString()}
               materials={lesson.materials}
+            />
+          </div>
+        )}
+
+        {/* Uyga vazifa */}
+        {homework && (
+          <div id="homework" className="pt-4 border-t border-slate-100 dark:border-slate-800 scroll-mt-24">
+            <HomeworkPanel
+              // Javob yuborilgach yoki mentor baholagach forma holati yangidan boshlanadi
+              key={`${homework.submission?.status ?? "missing"}-${homework.submission?.attempt ?? 0}`}
+              lessonId={lesson._id.toString()}
+              task={homework.task}
+              submission={homework.submission}
+              readOnly={session?.role !== "student"}
             />
           </div>
         )}

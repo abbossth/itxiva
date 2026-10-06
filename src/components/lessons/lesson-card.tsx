@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Video, FileText, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Sparkles, Video, FileText, ChevronRight, Eye, EyeOff, ClipboardCheck } from "lucide-react";
+import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS, type HomeworkState } from "@/lib/homework-status";
 import { ILessonData } from "@/lib/db/models/lesson.model";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -10,9 +11,12 @@ interface LessonCardProps {
   lesson: ILessonData;
   isMentor?: boolean;
   onTogglePublish?: (id: string) => void;
+  /** O'quvchi uchun: shu darsdagi uyga vazifasining holati */
+  homeworkState?: HomeworkState;
 }
 
-export function LessonCard({ lesson, isMentor = false, onTogglePublish }: LessonCardProps) {
+export function LessonCard({ lesson, isMentor = false, onTogglePublish, homeworkState }: LessonCardProps) {
+  const hasHomework = Boolean(lesson.homework?.isEnabled);
   const isNew = Boolean(lesson.isNew);
 
   const videoCount = lesson.materials?.filter((m) => m.type === "youtube").length || 0;
@@ -90,9 +94,21 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish }: Lesson
               {fileCount} fayl
             </span>
           )}
-          {videoCount === 0 && fileCount === 0 && (
+          {videoCount === 0 && fileCount === 0 && !hasHomework && (
             <span className="text-[11px] text-slate-400">Materiallar yo&apos;q</span>
           )}
+          {hasHomework &&
+            (isMentor || !homeworkState ? (
+              <span className="flex items-center gap-1">
+                <ClipboardCheck className="w-3.5 h-3.5 text-amber-500" />
+                Vazifa
+              </span>
+            ) : (
+              <Badge variant={HOMEWORK_STATE_BADGE[homeworkState]} className="gap-1">
+                <ClipboardCheck className="w-3 h-3" />
+                {homeworkState === "missing" ? "Vazifa bor" : HOMEWORK_STATE_LABELS[homeworkState]}
+              </Badge>
+            ))}
         </div>
 
         <Link

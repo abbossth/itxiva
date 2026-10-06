@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   PackageCheck,
   FileSpreadsheet,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,15 +21,19 @@ export interface NavLink {
   icon: LucideIcon;
   /** Mobil pastki panelda ko'rinadi (qolganlari "Yana" ichida) */
   primary?: boolean;
-  /** Buyurtmalar soni ko'rsatiladigan havola */
-  badge?: "orders";
+  /** Son ko'rsatiladigan havola: buyurtmalar yoki uyga vazifalar */
+  badge?: NavBadgeKind;
 }
+
+export type NavBadgeKind = "orders" | "homework";
+export type NavBadges = Partial<Record<NavBadgeKind, number>>;
 
 export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/groups", label: "Guruhlar", shortLabel: "Guruhlar", icon: Users, primary: true },
   { href: "/mentor/lessons", label: "Darslar boshqaruvi", shortLabel: "Darslar", icon: BookOpen, primary: true },
   { href: "/mentor/attendance", label: "Davomat jurnali", shortLabel: "Davomat", icon: QrCode, primary: true },
-  { href: "/mentor/orders", label: "Buyurtmalar", shortLabel: "Buyurtma", icon: PackageCheck, primary: true, badge: "orders" },
+  { href: "/mentor/homework", label: "Uyga vazifalar", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
+  { href: "/mentor/orders", label: "Buyurtmalar", shortLabel: "Buyurtma", icon: PackageCheck, badge: "orders" },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/mentor/shop", label: "Do'kon mahsulotlari", shortLabel: "Do'kon", icon: ShoppingBag },
@@ -39,7 +44,8 @@ export const MENTOR_LINKS: NavLink[] = [
 
 export const STUDENT_LINKS: NavLink[] = [
   { href: "/lessons", label: "Darslarim", shortLabel: "Darslar", icon: BookOpen, primary: true },
-  { href: "/exams", label: "Imtihonlarim", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
+  { href: "/homework", label: "Vazifalarim", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
+  { href: "/exams", label: "Imtihonlarim", shortLabel: "Imtihon", icon: GraduationCap },
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, primary: true, badge: "orders" },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },

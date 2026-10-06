@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Lesson, ILessonData } from "@/lib/db/models/lesson.model";
+import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
-import { lessonSchema, LessonInput } from "@/lib/validations/lesson.schema";
+import { lessonSchema, homeworkSchema, HomeworkInput, LessonInput } from "@/lib/validations/lesson.schema";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 
 export async function getLessonsByGroupAndQuarter({
@@ -68,6 +69,19 @@ export async function getLessonById(lessonId: string) {
   };
 }
 
+/** Formadan kelgan vazifani bazaga yoziladigan ko'rinishga keltiradi (faqat fayl biriktirmalar, sana Date) */
+function normalizeHomework(input: HomeworkInput | null | undefined) {
+  if (!input) return null;
+  const due = input.dueAt ? new Date(input.dueAt) : null;
+  return {
+    isEnabled: input.isEnabled,
+    instructions: input.instructions,
+    attachments: input.attachments.filter((a) => a.type === "file"),
+    dueAt: due && !Number.isNaN(due.getTime()) ? due : null,
+    coinsReward: input.coinsReward,
+  };
+}
+
 export async function createLessonAction(input: LessonInput) {
   const mentor = await requireMentor();
   const parsed = lessonSchema.safeParse(input);
@@ -87,6 +101,7 @@ export async function createLessonAction(input: LessonInput) {
 
   const lesson = await Lesson.create({
     ...parsed.data,
+    homework: normalizeHomework(parsed.data.homework),
     order: parsed.data.order || order,
     date: parsed.data.date ? new Date(parsed.data.date) : new Date(),
   });
@@ -122,6 +137,16 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
   if (input.date) lesson.date = new Date(input.date);
   if (input.isPublished !== undefined) lesson.isPublished = input.isPublished;
   if (input.materials) lesson.materials = input.materials as unknown as typeof lesson.materials;
+  if (input.homework !== undefined) {
+    const parsedHomework = homeworkSchema.nullable().safeParse(input.homework);
+    if (!parsedHomework.success) {
+      return { success: false, message: parsedHomework.error.issues[0].message };
+    }
+    if (parsedHomework.data?.isEnabled && !parsedHomework.data.instructions && parsedHomework.data.attachments.length === 0) {
+      return { success: false, message: "Uyga vazifa matnini yozing yoki fayl biriktiring" };
+    }
+    lesson.homework = normalizeHomework(parsedHomework.data) as unknown as typeof lesson.homework;
+  }
 
   await lesson.save();
 
@@ -131,6 +156,7 @@ export async function updateLessonAction(lessonId: string, input: Partial<Lesson
     details: { lessonId: lesson._id, title: lesson.title },
   });
 
+  revalidatePath("/", "layout");
   revalidatePath("/lessons");
   revalidatePath(`/lessons/${lessonId}`);
   revalidatePath("/mentor/lessons");
@@ -170,6 +196,9 @@ export async function deleteLessonAction(lessonId: string) {
   await connectToDatabase();
 
   const lesson = await Lesson.findByIdAndDelete(lessonId);
+  if (lesson) {
+    await HomeworkSubmission.deleteMany({ lessonId: lesson._id });
+  }
 
   await AuditLog.create({
     actorId: mentor.userId,
@@ -235,7 +264,9 @@ export async function getMaterialDownloadUrlAction({
   }
 
   // Verify material belongs to this lesson
-  const material = lesson.materials.find((m) => m.urlOrKey === materialKey);
+  const material =
+    lesson.materials.find((m) => m.urlOrKey === materialKey) ??
+    lesson.homework?.attachments?.find((m) => m.urlOrKey === materialKey);
   if (!material) {
     return { success: false, message: "Material topilmadi" };
   }

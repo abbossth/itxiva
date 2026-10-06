@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getGroupById } from "@/actions/group.actions";
+import { getMyHomeworkStates } from "@/actions/homework.actions";
 import { LessonCard } from "@/components/lessons/lesson-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { BookOpen } from "lucide-react";
@@ -39,6 +40,9 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
     groupId ? getLessonsByGroupAndQuarter({ groupId, quarter }) : [],
     groupId ? getGroupById(groupId) : null,
   ]);
+
+  const homeworkLessonIds = lessons.filter((l) => l.homework?.isEnabled).map((l) => l._id.toString());
+  const homeworkStates = homeworkLessonIds.length > 0 ? await getMyHomeworkStates(homeworkLessonIds) : {};
 
   const quarters = [1, 2, 3, 4];
 
@@ -87,7 +91,14 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {lessons.map((lesson) => (
-            <LessonCard key={lesson._id.toString()} lesson={lesson} isMentor={false} />
+            <LessonCard
+              key={lesson._id.toString()}
+              lesson={lesson}
+              isMentor={false}
+              homeworkState={
+                lesson.homework?.isEnabled ? homeworkStates[lesson._id.toString()] ?? "missing" : undefined
+              }
+            />
           ))}
         </div>
       )}

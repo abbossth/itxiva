@@ -10,9 +10,13 @@ import {
   AlertCircle,
   FileText,
   HelpCircle,
+  ClipboardCheck,
+  Sparkles,
+  CalendarClock,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData, IMaterial } from "@/lib/db/models/lesson.model";
+import { DEFAULT_HOMEWORK_COINS } from "@/lib/homework-status";
 import { IQuizData } from "@/lib/db/models/quiz.model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +24,9 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
-import { compressImageToWebP } from "@/lib/upload-client";
+import { compressImageToWebP, uploadFileToStorage } from "@/lib/upload-client";
+import { generateHomeworkAction } from "@/actions/ai.actions";
+import { fromTashkentInputValue, getNextLessonAfter, toTashkentInputValue } from "@/lib/schedule";
 import { AiAssistantPanel } from "@/components/mentor/ai-assistant-panel";
 
 interface LessonEditorFormProps {
@@ -66,6 +72,64 @@ export function LessonEditorForm({
   const [isPublished, setIsPublished] = useState(initialLesson?.isPublished ?? false);
   const [materials, setMaterials] = useState<IMaterial[]>(initialLesson?.materials || []);
   const [showQuizModal, setShowQuizModal] = useState(false);
+
+  // Uyga vazifa
+  const initialHomework = initialLesson?.homework ?? null;
+  const [hwEnabled, setHwEnabled] = useState(Boolean(initialHomework?.isEnabled));
+  const [hwInstructions, setHwInstructions] = useState(initialHomework?.instructions ?? "");
+  const [hwAttachments, setHwAttachments] = useState<IMaterial[]>(initialHomework?.attachments ?? []);
+  const [hwDue, setHwDue] = useState(initialHomework?.dueAt ? toTashkentInputValue(initialHomework.dueAt) : "");
+  const [hwCoins, setHwCoins] = useState<number>(initialHomework?.coinsReward ?? DEFAULT_HOMEWORK_COINS);
+  const [hwUploading, setHwUploading] = useState(false);
+  const [hwGenerating, setHwGenerating] = useState(false);
+
+  const currentGroup = groups.find((g) => g._id.toString() === groupId);
+
+  /** Guruh jadvalidagi keyingi dars boshlanishi — muddatning sukut qiymati */
+  const nextLessonDue = (): string => {
+    const next = date ? getNextLessonAfter(currentGroup?.schedule, date) : null;
+    return next ? toTashkentInputValue(next) : "";
+  };
+
+  const handleToggleHomework = (enabled: boolean) => {
+    setHwEnabled(enabled);
+    if (enabled && !hwDue) setHwDue(nextLessonDue());
+  };
+
+  const handleHomeworkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      setHwUploading(true);
+      const uploaded = await uploadFileToStorage(file);
+      setHwAttachments((prev) => [
+        ...prev,
+        { type: "file", title: file.name, urlOrKey: uploaded.key, mimeType: uploaded.contentType, fileSize: uploaded.size },
+      ]);
+      toast.success("Fayl vazifaga biriktirildi");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Fayl yuklashda xatolik yuz berdi");
+    } finally {
+      setHwUploading(false);
+    }
+  };
+
+  const handleGenerateHomework = async () => {
+    try {
+      setHwGenerating(true);
+      const res = await generateHomeworkAction({ title, topic, description, grade: currentGroup?.grade });
+      if (res.success && res.data) {
+        setHwInstructions(res.data.instructions);
+      } else {
+        toast.error(res.message || "AI vazifa tuza olmadi");
+      }
+    } catch {
+      toast.error("AI vazifa tuza olmadi");
+    } finally {
+      setHwGenerating(false);
+    }
+  };
 
   // Material builder states
   const [materialType, setMaterialType] = useState<"file" | "youtube" | "link">("youtube");
@@ -182,6 +246,10 @@ export function LessonEditorForm({
       setErrorMsg("Dars sarlavhasini kiriting");
       return;
     }
+    if (hwEnabled && !hwInstructions.trim() && hwAttachments.length === 0) {
+      setErrorMsg("Uyga vazifa matnini yozing yoki fayl biriktiring");
+      return;
+    }
 
     try {
       setIsSaving(true);
@@ -197,6 +265,17 @@ export function LessonEditorForm({
         date,
         isPublished,
         materials,
+        // Vazifa hech qachon yoqilmagan bo'lsa, bo'sh yozuv saqlanmaydi
+        homework:
+          hwEnabled || initialHomework
+            ? {
+                isEnabled: hwEnabled,
+                instructions: hwInstructions,
+                attachments: hwAttachments,
+                dueAt: fromTashkentInputValue(hwDue)?.toISOString() ?? null,
+                coinsReward: Number.isFinite(hwCoins) ? hwCoins : DEFAULT_HOMEWORK_COINS,
+              }
+            : null,
       };
 
       let res;
@@ -498,6 +577,140 @@ export function LessonEditorForm({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Uyga vazifa */}
+      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            Uyga vazifa
+          </h2>
+          <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+            <input
+              type="checkbox"
+              checked={hwEnabled}
+              onChange={(e) => handleToggleHomework(e.target.checked)}
+              className="w-5 h-5 rounded-md accent-teal-600 cursor-pointer"
+            />
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Bu darsga vazifa berish
+            </span>
+          </label>
+        </div>
+
+        {!hwEnabled ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Yoqilsa, o&apos;quvchilar dars sahifasida javobini (matn, kod, havola yoki fayl) yuboradi, siz esa
+            &quot;Uyga vazifalar&quot; bo&apos;limida tekshirib baholaysiz.
+          </p>
+        ) : (
+          <div className="space-y-4 animate-in fade-in">
+            <Field htmlFor="hw-instructions" label="Topshiriq matni" required>
+              <textarea
+                id="hw-instructions"
+                value={hwInstructions}
+                onChange={(e) => setHwInstructions(e.target.value)}
+                rows={6}
+                maxLength={10000}
+                placeholder="1. ...&#10;2. ...&#10;Topshirish: kodni yoki GitHub havolasini yuboring"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+              />
+            </Field>
+
+            {aiEnabled && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleGenerateHomework}
+                isLoading={hwGenerating}
+                className="gap-2 min-h-[44px]"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                {hwInstructions.trim() ? "AI bilan qayta tuzish" : "AI bilan tuzish"}
+              </Button>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                htmlFor="hw-due"
+                label="Topshirish muddati (Toshkent vaqti)"
+                hint="Bo'sh qoldirilsa — muddatsiz. Muddatdan keyin ham qabul qilinadi, lekin “kechikkan” deb belgilanadi"
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="hw-due"
+                    type="datetime-local"
+                    value={hwDue}
+                    onChange={(e) => setHwDue(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      const next = nextLessonDue();
+                      if (next) setHwDue(next);
+                      else toast.error("Guruh jadvali kiritilmagan — muddatni qo'lda tanlang");
+                    }}
+                    className="shrink-0 gap-1.5 min-h-[44px]"
+                    title="Guruh jadvalidagi keyingi dars boshlanishi"
+                  >
+                    <CalendarClock className="w-4 h-4" />
+                    <span className="hidden sm:inline">Keyingi darsgacha</span>
+                  </Button>
+                </div>
+              </Field>
+
+              <Field htmlFor="hw-coins" label="Coin (100 ball uchun)" hint="Ballga mutanosib beriladi, baholashda o'zgartirish mumkin">
+                <Input
+                  id="hw-coins"
+                  type="number"
+                  min={0}
+                  max={1000}
+                  value={Number.isFinite(hwCoins) ? hwCoins : ""}
+                  onChange={(e) => setHwCoins(parseInt(e.target.value, 10))}
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                Biriktirilgan fayllar <span className="font-normal text-slate-400">(ixtiyoriy)</span>
+              </p>
+              {hwAttachments.map((m) => (
+                <div
+                  key={m.urlOrKey}
+                  className="flex items-center justify-between gap-2 pl-3.5 pr-1 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <FileText className="w-4 h-4 text-teal-500 shrink-0" />
+                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.title}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHwAttachments((prev) => prev.filter((a) => a.urlOrKey !== m.urlOrKey))}
+                    className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label={`${m.title} faylini olib tashlash`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  onChange={handleHomeworkFile}
+                  disabled={hwUploading}
+                  accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
+                  aria-label="Vazifaga fayl biriktirish"
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[44px] flex items-center"
+                />
+                {hwUploading && <Loader2 className="w-4 h-4 shrink-0 animate-spin text-teal-600" />}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sticky action bar */}

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatTile, ReportSection } from "@/components/reports/report-parts";
 import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER } from "@/lib/attendance-status";
 import { ORDER_STATUS_BADGE, ORDER_STATUS_LABELS } from "@/lib/order-status";
+import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS } from "@/lib/homework-status";
 import { downloadCsv } from "@/lib/csv";
 import { cn, formatDateUz, formatDateTimeUz } from "@/lib/utils";
 import type { StudentReport } from "@/actions/report.actions";
@@ -73,6 +74,33 @@ export function StudentReportView({ report }: { report: StudentReport }) {
             ))}
           </div>
         )}
+      </ReportSection>
+
+      <ReportSection title="Uyga vazifalar">
+        {report.homework.length === 0
+          ? empty("Hali vazifa topshirmagan")
+          : (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              {report.homework.map((h) => (
+                <li key={h.lessonId} className="py-2 flex items-center justify-between gap-3">
+                  <Link
+                    href={`/mentor/homework/${h.lessonId}`}
+                    className="min-w-0 truncate text-slate-700 dark:text-slate-200 hover:text-teal-600 dark:hover:text-teal-400 hover:underline"
+                  >
+                    {h.title}
+                  </Link>
+                  <span className="shrink-0 flex items-center gap-2">
+                    {h.isLate && <Badge variant="danger">Kechikkan</Badge>}
+                    {h.status === "graded" ? (
+                      <span className="font-bold tabular-nums text-slate-900 dark:text-slate-100">{h.score} / 100</span>
+                    ) : (
+                      <Badge variant={HOMEWORK_STATE_BADGE[h.status]}>{HOMEWORK_STATE_LABELS[h.status]}</Badge>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
       </ReportSection>
 
       <div className="grid gap-6 lg:grid-cols-2">

@@ -8,6 +8,7 @@ import { AttendanceSession } from "@/lib/db/models/attendance-session.model";
 import { AttendanceRecord, AttendanceStatus } from "@/lib/db/models/attendance-record.model";
 import { CoinLedger, CoinTransactionType } from "@/lib/db/models/coin-ledger.model";
 import { QuizSubmission } from "@/lib/db/models/quiz-submission.model";
+import { HomeworkSubmission, HomeworkStatus } from "@/lib/db/models/homework-submission.model";
 import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
 import { Exam } from "@/lib/db/models/exam.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
@@ -42,6 +43,16 @@ export interface ReportData {
   attendanceByLesson: { sessionId: string; dateKey: string; groupName: string; percent: number | null; attended: number; total: number }[];
   mostAbsent: { studentId: string; fullName: string; groupName: string; absent: number; total: number; percent: number | null }[];
   quizzesByGroup: { groupId: string; name: string; submissions: number; avgPercent: number | null }[];
+  /** Davr ichidagi darslarga berilgan uyga vazifalar: topshirish ulushi va o'rtacha ball */
+  homeworkByGroup: {
+    groupId: string;
+    name: string;
+    assigned: number;
+    expected: number;
+    submitted: number;
+    percent: number | null;
+    avgScore: number | null;
+  }[];
   exams: { examId: string; title: string; submissions: number; avgPercent: number | null; passPercent: number | null }[];
   coinsByType: { type: CoinTransactionType; amount: number }[];
   topEarners: { studentId: string; fullName: string; groupName: string; earned: number }[];
@@ -166,6 +177,37 @@ export async function getReportData(params: {
     g.sum += (q.totalScore / q.maxScore) * 100;
   }
 
+  // ---------- Uyga vazifalar ----------
+  const homeworkLessons = await Lesson.find({
+    "homework.isEnabled": true,
+    isPublished: true,
+    date: { $gte: start, $lt: end },
+    ...groupFilter,
+  })
+    .select("groupId")
+    .lean();
+  const homeworkSubs = await HomeworkSubmission.find({ lessonId: { $in: homeworkLessons.map((l) => l._id) } })
+    .select("groupId status score")
+    .lean();
+  const studentsPerGroup = new Map<string, number>();
+  for (const s of students) {
+    if (s.groupId) studentsPerGroup.set(s.groupId.toString(), (studentsPerGroup.get(s.groupId.toString()) ?? 0) + 1);
+  }
+  const homeworkAgg = new Map<string, { assigned: number; submitted: number; graded: number; scoreSum: number }>();
+  const homeworkOf = (key: string) => {
+    if (!homeworkAgg.has(key)) homeworkAgg.set(key, { assigned: 0, submitted: 0, graded: 0, scoreSum: 0 });
+    return homeworkAgg.get(key)!;
+  };
+  for (const l of homeworkLessons) homeworkOf(l.groupId.toString()).assigned++;
+  for (const s of homeworkSubs) {
+    const agg = homeworkOf(s.groupId.toString());
+    agg.submitted++;
+    if (s.status === "graded" && typeof s.score === "number") {
+      agg.graded++;
+      agg.scoreSum += s.score;
+    }
+  }
+
   const examAgg = new Map<string, { n: number; sum: number; graded: number; passed: number }>();
   for (const e of examSubs) {
     const key = e.examId.toString();
@@ -255,6 +297,22 @@ export async function getReportData(params: {
         avgPercent: q && q.n > 0 ? Math.round(q.sum / q.n) : null,
       };
     }),
+    homeworkByGroup: groups.flatMap((g) => {
+      const h = homeworkAgg.get(g._id.toString());
+      if (!h || h.assigned === 0) return [];
+      const expected = h.assigned * (studentsPerGroup.get(g._id.toString()) ?? 0);
+      return [
+        {
+          groupId: g._id.toString(),
+          name: g.name,
+          assigned: h.assigned,
+          expected,
+          submitted: h.submitted,
+          percent: expected > 0 ? Math.min(100, Math.round((h.submitted / expected) * 100)) : null,
+          avgScore: h.graded > 0 ? Math.round(h.scoreSum / h.graded) : null,
+        },
+      ];
+    }),
     exams: [...examAgg.entries()].map(([examId, a]) => ({
       examId,
       title: examTitle.get(examId) ?? "O'chirilgan imtihon",
@@ -295,6 +353,7 @@ export interface StudentReport {
     records: { sessionId: string; date: string; status: AttendanceStatus; notes: string }[];
   };
   quizzes: { title: string; totalScore: number; maxScore: number; status: string; submittedAt: string | null }[];
+  homework: { lessonId: string; title: string; status: HomeworkStatus; score: number | null; isLate: boolean; submittedAt: string | null }[];
   exams: { title: string; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
   ledger: { amount: number; type: CoinTransactionType; description: string; createdAt: string | null }[];
   orders: { productTitle: string; price: number; status: OrderStatus; createdAt: string | null }[];
@@ -311,7 +370,7 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
   const student = await User.findOne({ _id: studentId, role: "student" }).select("-passwordHash").lean();
   if (!student) return null;
 
-  const [group, records, quizSubs, examSubs, ledger, orders] = await Promise.all([
+  const [group, records, quizSubs, examSubs, ledger, orders, homeworkSubs] = await Promise.all([
     student.groupId ? Group.findById(student.groupId).select("name").lean() : null,
     AttendanceRecord.find({ studentId }).select("sessionId status notes").lean(),
     QuizSubmission.find({ studentId }).select("lessonId totalScore maxScore status submittedAt").sort({ submittedAt: -1 }).lean(),
@@ -321,11 +380,18 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       .lean(),
     CoinLedger.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
     Order.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
+    HomeworkSubmission.find({ studentId })
+      .select("lessonId status score isLate submittedAt")
+      .sort({ submittedAt: -1 })
+      .limit(100)
+      .lean(),
   ]);
 
   const [sessionDocs, lessonDocs, examDocs] = await Promise.all([
     AttendanceSession.find({ _id: { $in: records.map((r) => r.sessionId) } }).select("date").lean(),
-    Lesson.find({ _id: { $in: quizSubs.map((q) => q.lessonId) } }).select("title").lean(),
+    Lesson.find({ _id: { $in: [...quizSubs.map((q) => q.lessonId), ...homeworkSubs.map((h) => h.lessonId)] } })
+      .select("title")
+      .lean(),
     Exam.find({ _id: { $in: examSubs.map((e) => e.examId) } }).select("title").lean(),
   ]);
   const sessionDate = new Map(sessionDocs.map((s) => [s._id.toString(), s.date]));
@@ -363,6 +429,14 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       maxScore: q.maxScore,
       status: q.status,
       submittedAt: iso(q.submittedAt),
+    })),
+    homework: homeworkSubs.map((h) => ({
+      lessonId: h.lessonId.toString(),
+      title: lessonTitle.get(h.lessonId.toString()) ?? "O'chirilgan dars",
+      status: h.status,
+      score: h.score ?? null,
+      isLate: Boolean(h.isLate),
+      submittedAt: iso(h.submittedAt),
     })),
     exams: examSubs.map((e) => ({
       title: examTitle.get(e.examId.toString()) ?? "O'chirilgan imtihon",

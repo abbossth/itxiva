@@ -60,7 +60,11 @@ export interface UploadedFile {
 /**
  * Faylni (rasm bo'lsa WebP ga siqib) omborga yuklaydi va saqlangan kalitni qaytaradi
  */
-export async function uploadFileToStorage(file: File): Promise<UploadedFile> {
+export async function uploadFileToStorage(
+  file: File,
+  /** So'rovga qo'shiladigan maydonlar, masalan { homeworkLessonId } */
+  extra: Record<string, string> = {}
+): Promise<UploadedFile> {
   let body: Blob | File = file;
   let contentType = file.type || "application/octet-stream";
   let filename = file.name;
@@ -74,7 +78,7 @@ export async function uploadFileToStorage(file: File): Promise<UploadedFile> {
   const presignedRes = await fetch("/api/upload/presigned-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentType, fileSize: body.size }),
+    body: JSON.stringify({ filename, contentType, fileSize: body.size, ...extra }),
   });
   if (!presignedRes.ok) {
     const data = await presignedRes.json().catch(() => ({}));

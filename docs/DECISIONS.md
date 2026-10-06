@@ -103,3 +103,12 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 
 ### [2026-10-06] 22-qaror: Yuklanish holatlari
 - **Qaror**: Barcha sahifalarda `loading.tsx` skeletonlari (haqiqiy maket o'lchamida), `(dashboard)/template.tsx` + `.page-stage` orqali skeleton va kontent yumshoq paydo bo'ladi, nav havolalarida `useLinkStatus` indikatori.
+
+### [2026-10-07] 23-qaror: AI zaxirasi (Gemini)
+- **Qaror**: Avval Claude sinaladi; balans tugagan yoki kalit yaroqsiz bo'lsa 10 daqiqa davomida so'rovlar to'g'ridan-to'g'ri Gemini'ga (`gemini-flash-latest`, band bo'lsa `gemini-flash-lite-latest`) ketadi. SDK'siz, REST orqali; javob o'sha Zod sxemasi bilan tekshiriladi. `GEMINI_API_KEY` ixtiyoriy.
+
+### [2026-10-07] 24-qaror: Uyga vazifa
+- **Qaror**: Vazifa darsning ichki maydoni (`Lesson.homework`: matn, biriktirma fayllar, muddat, coin); javoblar alohida `HomeworkSubmission` (bitta darsga bitta o'quvchidan bitta hujjat, qayta yuborish shu hujjatni yangilaydi). Javob — matn/kod, havolalar va fayllar birga bo'lishi mumkin.
+- **Muddat**: sukut bo'yicha guruh jadvalidagi keyingi dars boshlanishi; muddatdan keyin ham qabul qilinadi, lekin `isLate` belgilanadi va coin taklifi 0 bo'ladi (mentor o'zgartira oladi).
+- **Baholash**: 0–100 ball + izoh + coin (ballga mutanosib taklif). Qayta baholashda faqat farq `CoinLedger`ga (`homework`) yoziladi. "Qayta ishlashga qaytarish" faqat baholanmagan javob uchun.
+- **Fayllar**: `homework/{lessonId}/{userId}/...` kaliti bilan R2'ga; har biri 50 MB gacha, 5 tagacha, bajariladigan fayllar rad etiladi. Havola faqat mentor yoki javob egasiga beriladi.

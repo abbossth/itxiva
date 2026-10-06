@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/header";
 import { DesktopNav } from "@/components/layout/desktop-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { getOrdersBadgeCount } from "@/actions/shop.actions";
+import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 
 export default async function DashboardLayout({
   children,
@@ -20,7 +21,8 @@ export default async function DashboardLayout({
     redirect("/change-password");
   }
 
-  const ordersBadge = await getOrdersBadgeCount();
+  const [orders, homework] = await Promise.all([getOrdersBadgeCount(), getHomeworkBadgeCount()]);
+  const badges = { orders, homework };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0B1220]">
@@ -36,7 +38,7 @@ export default async function DashboardLayout({
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        <DesktopNav user={session} ordersBadge={ordersBadge} />
+        <DesktopNav user={session} badges={badges} />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-5xl w-full">
           {children}
@@ -44,7 +46,7 @@ export default async function DashboardLayout({
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <MobileNav role={session.role} ordersBadge={ordersBadge} />
+      <MobileNav role={session.role} badges={badges} />
     </div>
   );
 }

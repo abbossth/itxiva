@@ -6,15 +6,15 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive } from "./nav-links";
+import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 
 interface MobileNavProps {
   role: "mentor" | "student";
-  ordersBadge?: number;
+  badges?: NavBadges;
 }
 
-export function MobileNav({ role, ordersBadge = 0 }: MobileNavProps) {
+export function MobileNav({ role, badges = {} }: MobileNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -22,6 +22,9 @@ export function MobileNav({ role, ordersBadge = 0 }: MobileNavProps) {
   const primaryLinks = links.filter((l) => l.primary);
   const moreLinks = links.filter((l) => !l.primary);
   const isMoreActive = moreLinks.some((l) => isNavLinkActive(l.href, pathname));
+  const badgeOf = (link: (typeof links)[number]) => (link.badge ? badges[link.badge] ?? 0 : 0);
+  // "Yana" ichidagi bo'limlarda kutilayotgan narsa bo'lsa, tugmaning o'zida ham ko'rinadi
+  const moreBadge = moreLinks.reduce((sum, l) => sum + badgeOf(l), 0);
 
   const itemClass = (isActive: boolean) =>
     cn(
@@ -47,9 +50,9 @@ export function MobileNav({ role, ordersBadge = 0 }: MobileNavProps) {
               <Link key={link.href} href={link.href} className={itemClass(isActive)}>
                 <div className={iconWrapClass(isActive)}>
                   <Icon className="w-5 h-5 shrink-0" />
-                  {link.badge === "orders" && ordersBadge > 0 && (
+                  {badgeOf(link) > 0 && (
                     <span className="absolute -top-1 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
-                      {ordersBadge}
+                      {badgeOf(link)}
                     </span>
                   )}
                 </div>
@@ -68,6 +71,11 @@ export function MobileNav({ role, ordersBadge = 0 }: MobileNavProps) {
           >
             <div className={iconWrapClass(isMoreActive)}>
               <Menu className="w-5 h-5 shrink-0" />
+              {moreBadge > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {moreBadge}
+                </span>
+              )}
             </div>
             <span className="text-[10px] tracking-tight mt-0.5 leading-none">Yana</span>
           </button>
@@ -92,7 +100,12 @@ export function MobileNav({ role, ordersBadge = 0 }: MobileNavProps) {
                 )}
               >
                 <Icon className="w-5 h-5 shrink-0 text-teal-600 dark:text-teal-400" />
-                <span className="truncate">{link.label}</span>
+                <span className="truncate flex-1">{link.label}</span>
+                {badgeOf(link) > 0 && (
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {badgeOf(link)}
+                  </span>
+                )}
               </Link>
             );
           })}

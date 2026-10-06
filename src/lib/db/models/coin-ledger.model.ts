@@ -4,6 +4,7 @@ export type CoinTransactionType =
   | "attendance"
   | "quiz"
   | "exam"
+  | "homework"
   | "bonus"
   | "purchase"
   | "adjustment";
@@ -37,7 +38,7 @@ const CoinLedgerSchema = new Schema<ICoinLedger>(
     },
     type: {
       type: String,
-      enum: ["attendance", "quiz", "exam", "bonus", "purchase", "adjustment"],
+      enum: ["attendance", "quiz", "exam", "homework", "bonus", "purchase", "adjustment"],
       required: true,
       index: true,
     },

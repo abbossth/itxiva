@@ -295,3 +295,37 @@ ${describeLesson(ctx.data)}`,
     return fail(error);
   }
 }
+
+// ---------- Uyga vazifa ----------
+
+const homeworkDraftSchema = z.object({
+  instructions: z
+    .string()
+    .describe(
+      "O'quvchi o'qiydigan uyga vazifa matni, oddiy matn (markdown belgilarisiz). 2–4 ta raqamlangan topshiriq: osonidan qiyiniga. Oxirida 'Topshirish:' qatori — nima yuborilishi kerakligi (kod, fayl yoki havola)."
+    ),
+});
+
+export async function generateHomeworkAction(
+  input: LessonContextInput
+): Promise<ActionResult<z.infer<typeof homeworkDraftSchema>>> {
+  const blocked = await guard();
+  if (blocked) return { success: false, message: blocked };
+
+  const ctx = lessonContextSchema.safeParse(input);
+  if (!ctx.success || (!ctx.data.title && !ctx.data.topic && !ctx.data.description)) {
+    return { success: false, message: "Avval dars nomini yoki konspektini yozing" };
+  }
+
+  try {
+    const data = await generateStructured({
+      schema: homeworkDraftSchema,
+      effort: "low",
+      maxTokens: 4000,
+      prompt: `Quyidagi dars uchun uyga vazifa tuz. Vazifa darsda o'tilgan narsalarni mustahkamlasin va uyda 30–45 daqiqada bajarilsin.\n\n${describeLesson(ctx.data)}`,
+    });
+    return { success: true, data };
+  } catch (error) {
+    return fail(error);
+  }
+}

@@ -29,6 +29,7 @@ const COIN_TYPE_LABELS: Record<string, string> = {
   attendance: "Davomat",
   quiz: "Testlar",
   exam: "Imtihonlar",
+  homework: "Uyga vazifalar",
   bonus: "Bonus",
   purchase: "Do'kon xaridlari",
   adjustment: "Tuzatishlar",
@@ -256,6 +257,30 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
                 </div>
               </div>
             )}
+          </ReportSection>
+
+          <ReportSection
+            title="Uyga vazifalar"
+            description="Davr ichidagi darslarga berilgan vazifalar: topshirish ulushi va o'rtacha ball"
+            onExport={() =>
+              downloadCsv(
+                `vazifalar_${suffix}.csv`,
+                ["Guruh", "Berilgan vazifalar", "Kutilgan javoblar", "Topshirilgan", "Topshirish %", "O'rtacha ball"],
+                data.homeworkByGroup.map((h) => [h.name, h.assigned, h.expected, h.submitted, h.percent ?? "", h.avgScore ?? ""])
+              )
+            }
+          >
+            <BarList
+              max={100}
+              emptyText="Bu davrda uyga vazifa berilmagan"
+              items={data.homeworkByGroup.map((h) => ({
+                key: h.groupId,
+                label: h.name,
+                sub: `${h.assigned} ta vazifa · ${h.submitted}/${h.expected} javob${h.avgScore === null ? "" : ` · o'rtacha ${h.avgScore} ball`}`,
+                value: h.percent,
+                display: h.percent === null ? "—" : `${h.percent}%`,
+              }))}
+            />
           </ReportSection>
 
           <div className="grid gap-6 lg:grid-cols-2">

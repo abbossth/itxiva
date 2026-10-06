@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive } from "./nav-links";
+import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -15,11 +15,11 @@ interface DesktopNavProps {
     login: string;
     totalCoins?: number;
   };
-  /** Mentor: yangi buyurtmalar; o'quvchi: tasdiqlashni kutayotgan buyurtmalar */
-  ordersBadge?: number;
+  /** Havolalar yonidagi sonlar (yangi buyurtmalar, tekshirilmagan / topshirilmagan vazifalar) */
+  badges?: NavBadges;
 }
 
-export function DesktopNav({ user, ordersBadge = 0 }: DesktopNavProps) {
+export function DesktopNav({ user, badges = {} }: DesktopNavProps) {
   const pathname = usePathname();
   const role = user.role;
 
@@ -55,9 +55,9 @@ export function DesktopNav({ user, ordersBadge = 0 }: DesktopNavProps) {
                 )}
               />
               <span className="truncate flex-1">{link.label}</span>
-              {link.badge === "orders" && ordersBadge > 0 && (
+              {link.badge && (badges[link.badge] ?? 0) > 0 && (
                 <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  {ordersBadge}
+                  {badges[link.badge]}
                 </span>
               )}
               <NavPending />

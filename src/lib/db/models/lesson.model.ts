@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { DEFAULT_HOMEWORK_COINS } from "@/lib/homework-status";
 
 export type MaterialType = "file" | "youtube" | "link";
 
@@ -12,6 +13,17 @@ export interface IMaterial {
   createdAt?: Date | string;
 }
 
+export interface IHomework {
+  isEnabled: boolean;
+  instructions: string;
+  /** Mentor biriktirgan fayllar (faqat type: "file") */
+  attachments: IMaterial[];
+  /** Topshirish muddati; null — muddatsiz */
+  dueAt?: Date | string | null;
+  /** 100 ball uchun beriladigan coin */
+  coinsReward: number;
+}
+
 export interface ILessonData {
   _id: string | mongoose.Types.ObjectId;
   groupId: string | mongoose.Types.ObjectId;
@@ -23,6 +35,7 @@ export interface ILessonData {
   date?: Date | string;
   isPublished: boolean;
   materials: IMaterial[];
+  homework?: IHomework | null;
   isNew?: boolean;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -66,6 +79,17 @@ const MaterialSchema = new Schema<IMaterial>(
   }
 );
 
+const HomeworkSchema = new Schema<IHomework>(
+  {
+    isEnabled: { type: Boolean, default: false },
+    instructions: { type: String, default: "", trim: true },
+    attachments: [MaterialSchema],
+    dueAt: { type: Date, default: null },
+    coinsReward: { type: Number, default: DEFAULT_HOMEWORK_COINS, min: 0 },
+  },
+  { _id: false }
+);
+
 const LessonSchema = new Schema<ILesson>(
   {
     groupId: {
@@ -107,6 +131,7 @@ const LessonSchema = new Schema<ILesson>(
       index: true,
     },
     materials: [MaterialSchema],
+    homework: { type: HomeworkSchema, default: null },
   },
   {
     timestamps: true,
