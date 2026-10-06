@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { Header } from "@/components/layout/header";
 import { DesktopNav } from "@/components/layout/desktop-nav";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { CommandPaletteTrigger } from "@/components/layout/command-palette-trigger";
+import { SIDEBAR_COOKIE } from "@/components/layout/nav-links";
 import { getOrdersBadgeCount } from "@/actions/shop.actions";
 import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 
@@ -21,7 +24,8 @@ export default async function DashboardLayout({
     redirect("/change-password");
   }
 
-  const [orders, homework] = await Promise.all([getOrdersBadgeCount(), getHomeworkBadgeCount()]);
+  const [orders, homework, cookieStore] = await Promise.all([getOrdersBadgeCount(), getHomeworkBadgeCount(), cookies()]);
+  const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const badges = { orders, homework };
 
   return (
@@ -38,7 +42,7 @@ export default async function DashboardLayout({
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        <DesktopNav user={session} badges={badges} />
+        <DesktopNav user={session} badges={badges} defaultCollapsed={sidebarCollapsed} />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-5xl w-full">
           {children}
@@ -47,6 +51,9 @@ export default async function DashboardLayout({
 
       {/* Mobile Bottom Navigation Bar */}
       <MobileNav role={session.role} badges={badges} />
+
+      {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
+      <CommandPaletteTrigger role={session.role} />
     </div>
   );
 }

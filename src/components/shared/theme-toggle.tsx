@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,13 @@ export function ThemeToggle({ className }: { className?: string }) {
     }
     return "light";
   });
+
+  // Tema boshqa joydan (buyruqlar palitrasi) almashtirilsa, tugma belgisi ham yangilanadi
+  useEffect(() => {
+    const sync = () => setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+    window.addEventListener("itxiva:theme", sync);
+    return () => window.removeEventListener("itxiva:theme", sync);
+  }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";

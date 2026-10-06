@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/guards";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LoginForm } from "@/components/auth/login-form";
@@ -16,13 +16,10 @@ interface LoginPageProps {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await getSession();
+  // Bazada tekshiriladi: o'chirilgan foydalanuvchining eski cookie'si bilan cheksiz yo'naltirish bo'lmasligi uchun
+  const session = await getCurrentUser();
   if (session) {
-    if (session.role === "mentor") {
-      redirect("/mentor/groups");
-    } else {
-      redirect("/lessons");
-    }
+    redirect("/");
   }
 
   const resolvedSearchParams = await searchParams;

@@ -169,10 +169,13 @@ h1,
   font-variant-numeric: tabular-nums;
 }
 
-/* Klaviatura bilan yurganda fokus doim ko'rinadi */
-:focus-visible {
-  outline: 2px solid var(--color-teal-500);
-  outline-offset: 2px;
+/* Klaviatura bilan yurganda fokus doim ko'rinadi. base qatlamida — o'z fokus uslubi bor
+   elementlar (outline-hidden + ring) buni bekor qila oladi */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-teal-500);
+    outline-offset: 2px;
+  }
 }
 
 
@@ -298,3 +301,20 @@ h1,
   animation: logo-tower 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .logo-wordmark { animation: page-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.25s backwards; }
+
+/* Buyruqlar palitrasi */
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.palette-panel { animation: palette-in 0.16s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.palette-backdrop { animation: fade-in 0.16s ease-out backwards; }
+
+/* Kartalar ketma-ket paydo bo'ladi (stagger): har biri oldingisidan 45ms keyin */
+.stagger-item { animation: page-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.stagger-item:nth-child(2) { animation-delay: 45ms; }
+.stagger-item:nth-child(3) { animation-delay: 90ms; }
+.stagger-item:nth-child(4) { animation-delay: 135ms; }
+.stagger-item:nth-child(5) { animation-delay: 180ms; }
+.stagger-item:nth-child(6) { animation-delay: 225ms; }
+.stagger-item:nth-child(n + 7) { animation-delay: 270ms; }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogOut, User as UserIcon, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { SearchButton } from "@/components/layout/command-palette-trigger";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -25,9 +26,10 @@ export function Header({ user }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-bg/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Logo size="sm" href={user.role === "mentor" ? "/mentor/groups" : "/lessons"} />
+        <Logo size="sm" href="/" animated />
 
         <div className="flex items-center gap-2.5 sm:gap-3">
+          <SearchButton />
           <ThemeToggle />
 
           {/* Desktop User badge & name */}

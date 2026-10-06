@@ -98,11 +98,8 @@ export async function loginAction(
     redirect(safeNext);
   }
 
-  if (user.role === "mentor") {
-    redirect("/mentor/groups");
-  } else {
-    redirect("/lessons");
-  }
+  // Ikkala rol ham bosh sahifaga (dashboard) tushadi
+  redirect("/");
 }
 
 export async function changePasswordAction(
@@ -152,11 +149,8 @@ export async function changePasswordAction(
     mustChangePassword: false,
   });
 
-  if (user.role === "mentor") {
-    redirect("/mentor/groups");
-  } else {
-    redirect("/lessons");
-  }
+  // Ikkala rol ham bosh sahifaga (dashboard) tushadi
+  redirect("/");
 }
 
 export async function logoutAction(): Promise<void> {
