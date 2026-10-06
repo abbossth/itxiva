@@ -136,6 +136,8 @@ export async function changePasswordAction(
   const hashedPassword = await hashPassword(parsed.data.newPassword);
   user.passwordHash = hashedPassword;
   user.mustChangePassword = false;
+  // O'quvchi o'z parolini qo'ydi — mentor ko'ra oladigan vaqtinchalik parol endi yaroqsiz
+  user.tempPasswordEnc = null;
   await user.save();
 
   // Re-issue session cookie with updated mustChangePassword=false

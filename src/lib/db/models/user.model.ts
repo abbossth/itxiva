@@ -20,6 +20,7 @@ export interface IUserData {
 export interface IUser extends Document, Omit<IUserData, "_id"> {
   _id: mongoose.Types.ObjectId;
   passwordHash: string;
+  tempPasswordEnc?: string | null;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -39,6 +40,12 @@ const UserSchema = new Schema<IUser>(
     passwordHash: {
       type: String,
       required: true,
+    },
+    // Mentor bergan vaqtinchalik parol (shifrlangan). O'quvchi parolini o'zgartirganda o'chiriladi.
+    tempPasswordEnc: {
+      type: String,
+      default: null,
+      select: false,
     },
     role: {
       type: String,

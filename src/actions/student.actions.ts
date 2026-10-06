@@ -6,7 +6,9 @@ import { User, IUser } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor } from "@/lib/auth/guards";
-import { hashPassword, generateRandomPassword } from "@/lib/auth/password";
+import { hashPassword, verifyPassword, generateRandomPassword } from "@/lib/auth/password";
+import { encryptTempPassword, decryptTempPassword } from "@/lib/auth/temp-password";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { slugifyLogin } from "@/lib/utils";
 
 export interface ImportedStudentResult {
@@ -68,6 +70,7 @@ export async function importStudentsAction({
     fullName: string;
     login: string;
     passwordHash: string;
+    tempPasswordEnc: string;
     role: "student";
     groupId: string;
     mustChangePassword: boolean;
@@ -108,6 +111,7 @@ export async function importStudentsAction({
       fullName,
       login: candidateLogin,
       passwordHash,
+      tempPasswordEnc: encryptTempPassword(plainPassword),
       role: "student",
       groupId,
       mustChangePassword: true,
@@ -168,6 +172,7 @@ export async function resetPasswordAction(userId: string): Promise<{
   const newPassword = generateRandomPassword(8);
   user.passwordHash = await hashPassword(newPassword);
   user.mustChangePassword = true;
+  user.tempPasswordEnc = encryptTempPassword(newPassword);
   await user.save();
 
   await AuditLog.create({
@@ -265,4 +270,85 @@ export async function deleteStudentAction(userId: string): Promise<{ success: bo
   if (groupId) revalidatePath(`/mentor/groups/${groupId}`);
 
   return { success: true, message: "O'quvchi o'chirildi" };
+}
+
+
+export interface GroupCredentialRow {
+  fullName: string;
+  login: string;
+  /** Faqat hali o'zgartirilmagan vaqtinchalik parol; aks holda null */
+  password: string | null;
+  passwordStatus: string;
+  lastLoginAt: string | null;
+}
+
+/**
+ * Guruh o'quvchilarining login va (mavjud bo'lsa) vaqtinchalik parollari.
+ * Mentor o'z parolini qayta kiritib tasdiqlashi shart. O'quvchi o'zi qo'ygan parollar
+ * bazada faqat xesh sifatida turadi, shuning uchun ularni qaytarib bo'lmaydi.
+ */
+export async function exportGroupCredentialsAction({
+  groupId,
+  mentorPassword,
+}: {
+  groupId: string;
+  mentorPassword: string;
+}): Promise<{ success: boolean; message?: string; groupName?: string; rows?: GroupCredentialRow[] }> {
+  const session = await requireMentor();
+
+  const rate = checkRateLimit(`cred_export_${session.userId}`, 5, 15 * 60 * 1000);
+  if (!rate.allowed) {
+    return {
+      success: false,
+      message: `Juda ko'p urinish. ${rate.resetInSeconds} soniyadan keyin qayta urinib ko'ring`,
+    };
+  }
+
+  await connectToDatabase();
+
+  const mentor = await User.findById(session.userId);
+  if (!mentor || mentor.role !== "mentor") {
+    return { success: false, message: "Ruxsat berilmagan" };
+  }
+  if (typeof mentorPassword !== "string" || !(await verifyPassword(mentorPassword, mentor.passwordHash))) {
+    await AuditLog.create({
+      actorId: session.userId,
+      action: "EXPORT_CREDENTIALS_DENIED",
+      details: { groupId },
+    });
+    return { success: false, message: "Parol noto'g'ri" };
+  }
+
+  const group = await Group.findById(groupId).lean();
+  if (!group) {
+    return { success: false, message: "Guruh topilmadi" };
+  }
+
+  const students = await User.find({ groupId, role: "student" })
+    .select("fullName login mustChangePassword lastLoginAt +tempPasswordEnc")
+    .sort({ fullName: 1 })
+    .lean();
+
+  const rows: GroupCredentialRow[] = students.map((s) => {
+    const temp = s.mustChangePassword ? decryptTempPassword(s.tempPasswordEnc) : null;
+    return {
+      fullName: s.fullName,
+      login: s.login,
+      password: temp,
+      passwordStatus: temp
+        ? "Vaqtinchalik parol (hali o'zgartirilmagan)"
+        : s.mustChangePassword
+        ? "Vaqtinchalik parol saqlanmagan — \"Parolni tiklash\" orqali yangilang"
+        : "O'quvchi o'zi o'zgartirgan (ko'rib bo'lmaydi)",
+      lastLoginAt: s.lastLoginAt ? new Date(s.lastLoginAt).toISOString() : null,
+    };
+  });
+
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "EXPORT_CREDENTIALS",
+    details: { groupId, groupName: group.name, count: rows.length },
+  });
+
+  return { success: true, groupName: group.name, rows };
 }

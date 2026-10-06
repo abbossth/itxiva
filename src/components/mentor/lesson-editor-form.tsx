@@ -20,6 +20,7 @@ import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
+import { compressImageToWebP } from "@/lib/upload-client";
 
 interface LessonEditorFormProps {
   groups: IGroupData[];
@@ -36,57 +37,6 @@ function extractYouTubeId(url: string): string | null {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
   return match && match[2].length === 11 ? match[2] : null;
-}
-
-/**
- * Compress image to WebP with max 1600px dimension using Canvas (in-browser)
- */
-async function compressImageToWebP(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = reject;
-
-    img.onload = () => {
-      let { width, height } = img;
-      const maxDim = 1600;
-
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(file);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
-          else resolve(file);
-        },
-        "image/webp",
-        0.85
-      );
-    };
-
-    reader.readAsDataURL(file);
-  });
 }
 
 export function LessonEditorForm({

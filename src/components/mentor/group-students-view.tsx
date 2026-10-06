@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { StudentImportModal } from "@/components/mentor/student-import-modal";
 import { ResetPasswordModal } from "@/components/mentor/reset-password-modal";
+import { CredentialsExport } from "@/components/mentor/credentials-export";
 import { moveStudentAction, deleteStudentAction } from "@/actions/student.actions";
 import { formatDateUz } from "@/lib/utils";
 
@@ -409,6 +410,8 @@ export function GroupStudentsView({
         groupId={group._id.toString()}
         groupName={group.name}
       />
+
+      <CredentialsExport groupId={group._id.toString()} groupName={group.name} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Users, ArrowRight, Trash2, GraduationCap, School } from "lucide-react";
+import { Plus, Users, ArrowRight, Trash2, GraduationCap, School, CalendarClock, Pencil } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -11,7 +11,11 @@ import { Field } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { createGroupAction, deleteGroupAction } from "@/actions/group.actions";
+import { createGroupAction, deleteGroupAction, updateGroupAction } from "@/actions/group.actions";
+import { ScheduleFields } from "@/components/mentor/schedule-fields";
+import { formatSchedule, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
+
+const DEFAULT_SCHEDULE: GroupSchedule = { days: ODD_DAYS, startTime: "15:00", endTime: "16:30" };
 
 interface GroupsManagerProps {
   initialGroups: IGroupData[];
@@ -26,6 +30,13 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState<number>(8);
   const [academicYear, setAcademicYear] = useState("2026-2027");
+  const [schedule, setSchedule] = useState<GroupSchedule>(DEFAULT_SCHEDULE);
+
+  // Jadvalni tahrirlash oynasi
+  const [groupToEdit, setGroupToEdit] = useState<IGroupData | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editSchedule, setEditSchedule] = useState<GroupSchedule>(DEFAULT_SCHEDULE);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -38,7 +49,11 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
     try {
       setIsLoading(true);
       setErrorMsg(null);
-      const res = await createGroupAction({ name, grade, academicYear, isActive: true });
+      if (!isValidSchedule(schedule)) {
+        setErrorMsg("Dars kunlari va vaqtini to'g'ri belgilang");
+        return;
+      }
+      const res = await createGroupAction({ name, grade, academicYear, isActive: true, schedule });
       if (res.success && res.data) {
         setGroups([...groups, res.data as IGroupData]);
         setIsCreateOpen(false);
@@ -51,6 +66,37 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
       setErrorMsg("Kutilmagan xatolik yuz berdi");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openEdit = (group: IGroupData) => {
+    setGroupToEdit(group);
+    setEditName(group.name);
+    setEditSchedule(isValidSchedule(group.schedule) ? group.schedule : DEFAULT_SCHEDULE);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupToEdit) return;
+    if (!isValidSchedule(editSchedule)) {
+      toast.error("Dars kunlari va vaqtini to'g'ri belgilang");
+      return;
+    }
+    try {
+      setIsSavingEdit(true);
+      const id = groupToEdit._id.toString();
+      const res = await updateGroupAction(id, { name: editName.trim(), schedule: editSchedule });
+      if (res.success && res.data) {
+        setGroups(groups.map((g) => (g._id.toString() === id ? (res.data as IGroupData) : g)));
+        toast.success("Guruh ma'lumotlari saqlandi");
+        setGroupToEdit(null);
+      } else {
+        toast.error(res.message || "Saqlashda xatolik");
+      }
+    } catch {
+      toast.error("Saqlab bo'lmadi");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -167,9 +213,26 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
                   <strong>{group.studentCount || 0}</strong> nafar o&apos;quvchi
                 </span>
               </div>
+
+              <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300">
+                <CalendarClock className="w-4 h-4 text-slate-400" />
+                <span className={isValidSchedule(group.schedule) ? "font-semibold" : "text-amber-600 dark:text-amber-400"}>
+                  {formatSchedule(group.schedule)}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => openEdit(group)}
+                className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
+                aria-label={`${group.name} guruhini tahrirlash`}
+                title="Nom va jadvalni tahrirlash"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               <button
                 type="button"
                 onClick={() => setGroupToDelete(group)}
@@ -179,6 +242,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               >
                 <Trash2 className="w-4 h-4" />
               </button>
+              </div>
 
               <Link
                 href={`/mentor/groups/${group._id.toString()}`}
@@ -209,19 +273,19 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               </div>
             )}
 
-            <Field htmlFor="group-name" label="Guruh nomi" required hint="Masalan: 8-A, 8-B, 9-A, 11-A">
+            <Field htmlFor="group-name" label="Guruh nomi" required hint="Masalan: XSH-25I0802">
               <Input
                 id="group-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="masalan: 8-A"
+                placeholder="masalan: XSH-25I0802"
                 required
               />
             </Field>
 
             <Field htmlFor="group-grade" label="Sinf darajasi" required>
               <div className="flex items-center gap-4 pt-1">
-                {[8, 9, 11].map((g) => (
+                {[8, 9, 10, 11].map((g) => (
                   <label
                     key={g}
                     className="flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200 cursor-pointer min-h-[44px]"
@@ -250,6 +314,8 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               />
             </Field>
 
+            <ScheduleFields idPrefix="create-schedule" value={schedule} onChange={setSchedule} />
+
             <DialogFooter className="pt-2">
               <Button
                 type="button"
@@ -261,6 +327,43 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               </Button>
               <Button type="submit" variant="primary" isLoading={isLoading}>
                 Yaratish
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Group (name + schedule) Modal */}
+      <Dialog open={Boolean(groupToEdit)} onOpenChange={(open) => !open && setGroupToEdit(null)}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader className="space-y-1 mb-4">
+            <DialogTitle>Guruhni tahrirlash</DialogTitle>
+            <DialogDescription>Guruh nomi va dars jadvalini o&apos;zgartiring</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <Field htmlFor="edit-group-name" label="Guruh nomi" required>
+              <Input
+                id="edit-group-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+              />
+            </Field>
+
+            <ScheduleFields idPrefix="edit-schedule" value={editSchedule} onChange={setEditSchedule} />
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setGroupToEdit(null)}
+                disabled={isSavingEdit}
+              >
+                Bekor qilish
+              </Button>
+              <Button type="submit" variant="primary" isLoading={isSavingEdit}>
+                Saqlash
               </Button>
             </DialogFooter>
           </form>

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import type { GroupSchedule } from "@/lib/schedule";
 
 export interface IGroupData {
   _id: string | mongoose.Types.ObjectId;
@@ -7,6 +8,7 @@ export interface IGroupData {
   academicYear: string;
   studentCount: number;
   isActive: boolean;
+  schedule?: GroupSchedule | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -26,7 +28,7 @@ const GroupSchema = new Schema<IGroup>(
     grade: {
       type: Number,
       required: true,
-      enum: [8, 9, 11],
+      enum: [8, 9, 10, 11],
     },
     academicYear: {
       type: String,
@@ -40,6 +42,18 @@ const GroupSchema = new Schema<IGroup>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    // Dars jadvali: days — ISO hafta kunlari (1 = Dushanba), vaqtlar "HH:MM" (Asia/Tashkent)
+    schedule: {
+      type: new Schema(
+        {
+          days: { type: [Number], default: [] },
+          startTime: { type: String, required: true },
+          endTime: { type: String, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
     },
   },
   {

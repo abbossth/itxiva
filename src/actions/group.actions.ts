@@ -6,7 +6,7 @@ import { Group, IGroup } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
-import { groupSchema, GroupInput } from "@/lib/validations/group.schema";
+import { groupSchema, scheduleSchema, GroupInput } from "@/lib/validations/group.schema";
 
 export async function getGroups() {
   await connectToDatabase();
@@ -77,6 +77,17 @@ export async function updateGroupAction(id: string, input: Partial<GroupInput>) 
   if (input.grade) group.grade = input.grade;
   if (input.academicYear) group.academicYear = input.academicYear;
   if (input.isActive !== undefined) group.isActive = input.isActive;
+  if (input.schedule !== undefined) {
+    if (input.schedule === null) {
+      group.schedule = null;
+    } else {
+      const parsedSchedule = scheduleSchema.safeParse(input.schedule);
+      if (!parsedSchedule.success) {
+        return { success: false, message: parsedSchedule.error.issues[0]?.message || "Jadval noto'g'ri" };
+      }
+      group.schedule = parsedSchedule.data;
+    }
+  }
 
   await group.save();
 

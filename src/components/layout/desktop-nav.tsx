@@ -2,15 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Users,
-  BookOpen,
-  Trophy,
-  ShieldCheck,
-  GraduationCap,
-  QrCode,
-  User,
-} from "lucide-react";
+import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive } from "./nav-links";
+import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -22,30 +15,15 @@ interface DesktopNavProps {
     login: string;
     totalCoins?: number;
   };
+  /** Mentor: yangi buyurtmalar; o'quvchi: tasdiqlashni kutayotgan buyurtmalar */
+  ordersBadge?: number;
 }
 
-export function DesktopNav({ user }: DesktopNavProps) {
+export function DesktopNav({ user, ordersBadge = 0 }: DesktopNavProps) {
   const pathname = usePathname();
   const role = user.role;
 
-  const mentorLinks = [
-    { href: "/mentor/groups", label: "Guruhlar", icon: Users },
-    { href: "/mentor/lessons", label: "Darslar boshqaruvi", icon: BookOpen },
-    { href: "/mentor/exams", label: "Imtihonlar", icon: GraduationCap },
-    { href: "/mentor/attendance", label: "Davomat jurnali", icon: QrCode },
-    { href: "/leaderboard", label: "Reyting", icon: Trophy },
-    { href: "/mentor/audit", label: "Audit loglar", icon: ShieldCheck },
-  ];
-
-  const studentLinks = [
-    { href: "/lessons", label: "Darslarim", icon: BookOpen },
-    { href: "/exams", label: "Imtihonlarim", icon: GraduationCap },
-    { href: "/attendance", label: "Davomat", icon: QrCode },
-    { href: "/leaderboard", label: "Reyting", icon: Trophy },
-    { href: "/profile", label: "Mening profilim", icon: User },
-  ];
-
-  const links = role === "mentor" ? mentorLinks : studentLinks;
+  const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
 
   return (
     <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto justify-between bg-white/40 dark:bg-[#0B1220]/40 backdrop-blur-xs select-none">
@@ -56,10 +34,7 @@ export function DesktopNav({ user }: DesktopNavProps) {
 
         {links.map((link) => {
           const Icon = link.icon;
-          const isActive =
-            link.href === "/leaderboard"
-              ? pathname === "/leaderboard"
-              : pathname.startsWith(link.href);
+          const isActive = isNavLinkActive(link.href, pathname);
 
           return (
             <Link
@@ -79,7 +54,13 @@ export function DesktopNav({ user }: DesktopNavProps) {
                   isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-400"
                 )}
               />
-              <span className="truncate">{link.label}</span>
+              <span className="truncate flex-1">{link.label}</span>
+              {link.badge === "orders" && ordersBadge > 0 && (
+                <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {ordersBadge}
+                </span>
+              )}
+              <NavPending />
             </Link>
           );
         })}
