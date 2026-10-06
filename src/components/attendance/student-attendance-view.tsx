@@ -156,7 +156,8 @@ export function StudentAttendanceView({
   const presentCount = history.filter((r) => r.status === "present" || r.status === "late").length;
   const countedLessons = history.filter((r) => r.status !== "excused").length;
   const totalCoinsEarned = history.reduce((acc, r) => acc + (r.coinsAwarded || 0), 0);
-  const attendanceRate = countedLessons > 0 ? Math.round((presentCount / countedLessons) * 100) : 100;
+  // Hali birorta dars hisobga olinmagan bo'lsa, foiz ko'rsatilmaydi (100% yozish chalg'itadi)
+  const attendanceRate = countedLessons > 0 ? Math.round((presentCount / countedLessons) * 100) : null;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -359,7 +360,7 @@ export function StudentAttendanceView({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-            {attendanceRate}%
+            {attendanceRate === null ? "—" : `${attendanceRate}%`}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
             Umumiy davomat darajasi
