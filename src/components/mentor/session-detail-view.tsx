@@ -35,7 +35,9 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   }, [roster]);
 
   const attended = counts.present + counts.late;
-  const percent = roster.length > 0 ? Math.round((attended / roster.length) * 100) : 0;
+  // Sababli qoldirganlar foiz hisobiga kirmaydi (jurnal va hisobotlar bilan bir xil qoida)
+  const counted = roster.length - counts.excused;
+  const percent = counted > 0 ? Math.round((attended / counted) * 100) : 0;
 
   const visible = roster.filter(
     (r) =>

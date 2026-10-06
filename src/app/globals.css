@@ -213,3 +213,8 @@ body {
 .animate-in.fade-in {
   animation: fade-in 0.25s ease-out both;
 }
+
+/* Sahifa almashganda va skeleton o'rniga kontent kelganda yangi blok silliq paydo bo'ladi */
+.page-stage > * {
+  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

@@ -76,3 +76,30 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
   1. Chorak tanlash 4 ta tab o'rniga ixcham `<select>` ga o'zgartirildi (`1-chorak`, `2-chorak`, `3-chorak`, `4-chorak`).
   2. Sukut bo'yicha (default) qiymati `1` (`1-chorak`) etib belgilandi.
   3. Guruhlar ro'yxatiga ko'proq joy ajratilib, mobil va planshetlarda aylantirish osonlashdi.
+
+### [2026-10-06] 15-qaror: Guruh dars jadvali
+- **Holat**: Har bir guruh haftada 3 kun, 1 soat 30 daqiqadan dars o'tadi (toq yoki juft kunlar).
+- **Qaror**: `Group.schedule = { days (1=Dushanba), startTime, endTime }`. Barcha sana hisob-kitoblari `src/lib/schedule.ts` da `Asia/Tashkent` bo'yicha. Davomat sahifasida "Bugungi darslar" va o'quvchida "Keyingi dars" shu jadvaldan chiqadi.
+
+### [2026-10-06] 16-qaror: Excel import — mavjud o'quvchilar paroliga tegilmaydi
+- **Holat**: Yil boshida ro'yxat Excel'da keladi; o'quvchilar allaqachon o'z parolini qo'ygan.
+- **Qaror**: `/mentor/import` fayl brauzerda o'qiladi (JSHSHIR/pasport serverga ketmaydi), avval ko'rib chiqish (mos keldi / guruhi o'zgaradi / yangi / shubhali), keyin tasdiqlash. Mavjud o'quvchida faqat `groupId` yoziladi. O'quvchining guruhi endi har so'rovda bazadan olinadi (`getCurrentUser`), shuning uchun ko'chirish darhol kuchga kiradi.
+
+### [2026-10-06] 17-qaror: Login/parollarni eksport qilish
+- **Holat**: Mentor guruh login-parollarini fayl qilib olmoqchi, lekin parollar bcrypt xesh sifatida saqlanadi.
+- **Qaror**: Mentor bergan vaqtinchalik parol AES-256-GCM bilan shifrlab saqlanadi (`User.tempPasswordEnc`) va o'quvchi parolini o'zgartirganda o'chiriladi. Eksport (guruh sahifasi pastidagi yashirin tugma) mentor parolini qayta so'raydi, audit logga yoziladi. O'quvchi o'zi qo'ygan parol hech qachon ko'rsatilmaydi.
+
+### [2026-10-06] 18-qaror: Davomat — dars kesimida ko'rish
+- **Qaror**: Yakunlangan sessiya sahifasi guruhning to'liq ro'yxatini ko'rsatadi (4 holat, bir bosishda o'zgartirish); oylik jurnal matritsasi; QR ochilmagan dars uchun qo'lda sessiya. O'quvchi faqat o'z guruhi sessiyasida belgilana oladi (12-qarordagi "guruhdan qat'i nazar" qoidasi bekor qilindi — jurnal aralashib ketardi). "Kechikkan" ham coin oladi; sababli qoldirilgan dars foizga kirmaydi.
+
+### [2026-10-06] 19-qaror: Coin do'koni va buyurtmalar
+- **Qaror**: `Product` va `Order` modellari. Holatlar: `pending → accepted → handed_over → received`, `rejected`/`cancelled` da coin va zaxira qaytadi. Coin buyurtma paytida atomik yechiladi (`spendableBalance >= price` sharti bilan bitta so'rovda); reytingdagi `totalCoins` kamaymaydi.
+
+### [2026-10-06] 20-qaror: Hisobotlar
+- **Qaror**: `/mentor/reports` — davr va guruh filtri URL'da; davomat, test/imtihon, coin va do'kon bo'limlari, har birida CSV. `/mentor/reports/students/[id]` — bitta o'quvchi kartasi.
+
+### [2026-10-06] 21-qaror: AI yordamchi (Claude API)
+- **Qaror**: `@anthropic-ai/sdk`, model `claude-opus-5-5`, tuzilgan javob (Zod) bilan. Dars matni, konspektni yaxshilash, test savollari, taqdimot (`pptxgenjs`) va konspekt (`docx`). Natija hech qachon avtomatik saqlanmaydi — mentor tasdiqlaydi. `ANTHROPIC_API_KEY` bo'lmasa panel o'chiq.
+
+### [2026-10-06] 22-qaror: Yuklanish holatlari
+- **Qaror**: Barcha sahifalarda `loading.tsx` skeletonlari (haqiqiy maket o'lchamida), `(dashboard)/template.tsx` + `.page-stage` orqali skeleton va kontent yumshoq paydo bo'ladi, nav havolalarida `useLinkStatus` indikatori.
