@@ -1,12 +1,27 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/lib/db/connect";
+import { User } from "@/lib/db/models/user.model";
 import { getSession, SessionPayload } from "./session";
 
 /**
- * Get current authenticated session or null
+ * Get current authenticated session or null.
+ *
+ * Sessiya cookie'si 14 kun yashaydi, o'quvchining guruhi esa shu orada o'zgarishi mumkin
+ * (mentor ko'chirsa yoki Excel import qilinsa). Shuning uchun o'quvchining guruhi har so'rovda
+ * bazadan olinadi — aks holda u eski guruhining darslarini ko'rib qolardi.
+ * `cache` bitta so'rov davomida bazaga faqat bir marta murojaat qilinishini ta'minlaydi.
  */
-export async function getCurrentUser(): Promise<SessionPayload | null> {
-  return getSession();
-}
+export const getCurrentUser = cache(async (): Promise<SessionPayload | null> => {
+  const session = await getSession();
+  if (!session || session.role !== "student") return session;
+
+  await connectToDatabase();
+  const user = await User.findById(session.userId).select("groupId role").lean();
+  // O'chirilgan o'quvchining eski cookie'si endi yaroqsiz
+  if (!user || user.role !== "student") return null;
+  return { ...session, groupId: user.groupId ? user.groupId.toString() : null };
+});
 
 /**
  * Require valid session, otherwise redirect to /login

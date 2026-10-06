@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/guards";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Exam } from "@/lib/db/models/exam.model";
 import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
@@ -14,7 +14,7 @@ function randomSuffix(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getCurrentUser();
   if (!session) {
     return NextResponse.json({ error: "Tizimga kirilmagan" }, { status: 401 });
   }
