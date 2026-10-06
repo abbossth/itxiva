@@ -75,6 +75,7 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
 // Bitta darsga bitta o'quvchidan bitta javob (qayta yuborish shu hujjatni yangilaydi)
 HomeworkSubmissionSchema.index({ lessonId: 1, studentId: 1 }, { unique: true });
 HomeworkSubmissionSchema.index({ groupId: 1, status: 1 });
+HomeworkSubmissionSchema.index({ studentId: 1, submittedAt: -1 });
 
 export const HomeworkSubmission: Model<IHomeworkSubmission> =
   mongoose.models.HomeworkSubmission ||

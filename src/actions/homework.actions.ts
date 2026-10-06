@@ -442,7 +442,7 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
         gradedBy: mentor.userId,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!updated) {
     return { success: false, message: "Javob hozirgina o'zgartirildi. Sahifani yangilab, qayta urinib ko'ring" };
@@ -453,7 +453,7 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
     const student = await User.findByIdAndUpdate(
       submission.studentId,
       { $inc: { totalCoins: delta, spendableBalance: delta } },
-      { new: true }
+      { returnDocument: "after" }
     );
     await CoinLedger.create({
       studentId: submission.studentId,
@@ -490,7 +490,7 @@ export async function returnHomeworkAction(input: unknown): Promise<ActionResult
   const submission = await HomeworkSubmission.findOneAndUpdate(
     { _id: parsed.data.submissionId, status: { $ne: "graded" } },
     { $set: { status: "returned", feedback: parsed.data.feedback, gradedAt: new Date(), gradedBy: mentor.userId } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!submission) {
     return { success: false, message: "Javob topilmadi yoki allaqachon baholangan" };

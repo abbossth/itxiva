@@ -401,7 +401,7 @@ export async function markAttendanceAction(params: {
     {
       $inc: { totalCoins: coinsAwarded, spendableBalance: coinsAwarded },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   // Record into CoinLedger
@@ -558,7 +558,7 @@ export async function manualUpdateAttendanceAction(params: {
     const updated = await User.findByIdAndUpdate(
       params.studentId,
       { $inc: { totalCoins: coinDelta, spendableBalance: coinDelta } },
-      { new: true }
+      { returnDocument: "after" }
     );
     await CoinLedger.create({
       studentId: params.studentId,

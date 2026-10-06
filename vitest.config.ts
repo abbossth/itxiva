@@ -1,0 +1,16 @@
+import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
+
+export default defineConfig({
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
+  test: {
+    environment: "node",
+    include: ["tests/**/*.test.ts"],
+    // Har bir test fayli o'zining xotiradagi MongoDB'sini ishga tushiradi
+    testTimeout: 30_000,
+    hookTimeout: 120_000,
+    fileParallelism: false,
+  },
+});

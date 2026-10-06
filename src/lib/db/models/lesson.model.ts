@@ -144,6 +144,8 @@ const LessonSchema = new Schema<ILesson>(
 // Compound indexes
 LessonSchema.index({ groupId: 1, quarter: 1, order: 1 });
 LessonSchema.index({ groupId: 1, isPublished: 1, quarter: 1 });
+// Vazifalar ro'yxati va navigatsiyadagi son: guruhning vazifali darslari
+LessonSchema.index({ groupId: 1, "homework.isEnabled": 1, date: -1 });
 
 export const Lesson: Model<ILesson> =
   mongoose.models.Lesson || mongoose.model<ILesson>("Lesson", LessonSchema);

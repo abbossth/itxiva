@@ -76,7 +76,7 @@ export async function saveProductAction(
   let product;
   if (productId) {
     if (!isObjectId(productId)) return { success: false, message: "Mahsulot topilmadi" };
-    product = await Product.findByIdAndUpdate(productId, { $set: parsed.data }, { new: true });
+    product = await Product.findByIdAndUpdate(productId, { $set: parsed.data }, { returnDocument: "after" });
     if (!product) return { success: false, message: "Mahsulot topilmadi" };
   } else {
     product = await Product.create(parsed.data);
@@ -153,7 +153,7 @@ export async function createOrderAction(productId: string): Promise<ActionResult
   const user = await User.findOneAndUpdate(
     { _id: session.userId, role: "student", spendableBalance: { $gte: product.price } },
     { $inc: { spendableBalance: -product.price } },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!user) {
     await releaseStock();
@@ -196,7 +196,7 @@ async function refundOrder(order: IOrder, reason: string) {
   const user = await User.findByIdAndUpdate(
     order.studentId,
     { $inc: { spendableBalance: order.price } },
-    { new: true }
+    { returnDocument: "after" }
   );
   await Product.updateOne({ _id: order.productId, stock: { $ne: null } }, { $inc: { stock: 1 } });
   await CoinLedger.create({
@@ -223,7 +223,7 @@ async function transition(
   return Order.findOneAndUpdate(
     { _id: orderId, status: { $in: from }, ...(ownerId ? { studentId: ownerId } : {}) },
     { $set: { status: to, ...extra } },
-    { new: true }
+    { returnDocument: "after" }
   );
 }
 

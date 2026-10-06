@@ -14,12 +14,13 @@ import { getSession, SessionPayload } from "./session";
  */
 export const getCurrentUser = cache(async (): Promise<SessionPayload | null> => {
   const session = await getSession();
-  if (!session || session.role !== "student") return session;
+  if (!session) return null;
 
   await connectToDatabase();
   const user = await User.findById(session.userId).select("groupId role").lean();
-  // O'chirilgan o'quvchining eski cookie'si endi yaroqsiz
-  if (!user || user.role !== "student") return null;
+  // O'chirilgan yoki roli o'zgargan foydalanuvchining eski cookie'si endi yaroqsiz (mentor uchun ham)
+  if (!user || user.role !== session.role) return null;
+  if (session.role !== "student") return session;
   return { ...session, groupId: user.groupId ? user.groupId.toString() : null };
 });
 

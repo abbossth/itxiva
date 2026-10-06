@@ -109,6 +109,8 @@ const AttendanceSessionSchema = new Schema<IAttendanceSession>(
 );
 
 AttendanceSessionSchema.index({ groupId: 1, status: 1 });
+// Hisobotlar va jurnal: davr bo'yicha yopilgan darslar
+AttendanceSessionSchema.index({ status: 1, date: 1 });
 
 export const AttendanceSession: Model<IAttendanceSession> =
   mongoose.models.AttendanceSession ||
