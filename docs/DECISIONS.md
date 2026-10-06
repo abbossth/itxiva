@@ -104,8 +104,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 ### [2026-10-06] 22-qaror: Yuklanish holatlari
 - **Qaror**: Barcha sahifalarda `loading.tsx` skeletonlari (haqiqiy maket o'lchamida), `(dashboard)/template.tsx` + `.page-stage` orqali skeleton va kontent yumshoq paydo bo'ladi, nav havolalarida `useLinkStatus` indikatori.
 
-### [2026-10-07] 23-qaror: AI zaxirasi (Gemini)
-- **Qaror**: Avval Claude sinaladi; balans tugagan yoki kalit yaroqsiz bo'lsa 10 daqiqa davomida so'rovlar to'g'ridan-to'g'ri Gemini'ga (`gemini-flash-latest`, band bo'lsa `gemini-flash-lite-latest`) ketadi. SDK'siz, REST orqali; javob o'sha Zod sxemasi bilan tekshiriladi. `GEMINI_API_KEY` ixtiyoriy.
+### [2026-10-07] 23-qaror: AI provayderi — Gemini (bepul tarif)
+- **Qaror**: Asosiy provayder Gemini: `gemini-3.8-flash`, band bo'lsa `gemini-flash-latest`, so'ng `gemini-flash-lite-latest` (band model 3 daqiqa o'tkazib yuboriladi). SDK'siz, REST orqali; javob o'sha Zod sxemasi bilan tekshiriladi. Pro modellar bepul tarifda yo'q.
+- **Zaxira**: `ANTHROPIC_API_KEY` bo'lsa, Gemini javob bera olmaganda Claude sinaladi (balans/kalit xatosidan keyin 10 daqiqa o'tkazib yuboriladi).
 
 ### [2026-10-07] 24-qaror: Uyga vazifa
 - **Qaror**: Vazifa darsning ichki maydoni (`Lesson.homework`: matn, biriktirma fayllar, muddat, coin); javoblar alohida `HomeworkSubmission` (bitta darsga bitta o'quvchidan bitta hujjat, qayta yuborish shu hujjatni yangilaydi). Javob — matn/kod, havolalar va fayllar birga bo'lishi mumkin.

@@ -23,8 +23,8 @@ function getClient(): Anthropic {
 
 export class AiError extends Error {}
 
-// Claude hisobida mablag' tugagan yoki kalit yaroqsiz bo'lsa, har so'rovda uni qayta sinab vaqt yo'qotmaslik uchun
-// shu vaqtgacha to'g'ridan-to'g'ri Gemini ishlatiladi
+// Zaxiradagi Claude hisobida mablag' tugagan yoki kalit yaroqsiz bo'lsa, har safar uni qayta sinab
+// vaqt yo'qotmaslik uchun shu vaqtgacha u o'tkazib yuboriladi
 const CLAUDE_COOLDOWN_MS = 10 * 60 * 1000;
 let claudeUnavailableUntil = 0;
 
@@ -52,7 +52,7 @@ interface GenerateParams<Schema extends z.ZodType> {
 }
 
 /**
- * Berilgan Zod sxemasiga mos tuzilgan javob oladi: avval Claude, u ishlamasa — Gemini
+ * Berilgan Zod sxemasiga mos tuzilgan javob oladi: avval Gemini, u ishlamasa — Claude
  */
 export async function generateStructured<Schema extends z.ZodType>(
   params: GenerateParams<Schema>
@@ -61,32 +61,39 @@ export async function generateStructured<Schema extends z.ZodType>(
     throw new AiError("AI yordamchi sozlanmagan: ANTHROPIC_API_KEY yoki GEMINI_API_KEY kiritilmagan");
   }
 
-  const canUseGemini = isGeminiConfigured();
-  const tryClaude = isClaudeConfigured() && (!canUseGemini || Date.now() >= claudeUnavailableUntil);
-
-  if (tryClaude) {
+  // Asosiy provayder — Gemini. Claude faqat Gemini sozlanmagan yoki javob bera olmagan holatda ishlatiladi.
+  let geminiError: AiError | null = null;
+  if (isGeminiConfigured()) {
     try {
-      return await generateWithClaude(params);
+      return await generateStructuredWithGemini({
+        schema: params.schema,
+        system: SYSTEM_PROMPT,
+        prompt: params.prompt,
+        maxTokens: params.maxTokens ?? 16000,
+      });
     } catch (error) {
-      if (!canUseGemini || !(error instanceof AiError)) throw error;
-      if (error instanceof ClaudeFailure && error.sticky) {
-        claudeUnavailableUntil = Date.now() + CLAUDE_COOLDOWN_MS;
+      if (error instanceof GeminiError) {
+        geminiError = new AiError(error.message);
+      } else {
+        console.error("Gemini request failed:", error);
+        geminiError = new AiError("AI xizmatiga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring");
       }
-      console.warn("Claude ishlamadi, Gemini'ga o'tildi:", error.message);
     }
   }
 
+  if (!isClaudeConfigured() || (geminiError && Date.now() < claudeUnavailableUntil)) {
+    throw geminiError ?? new AiError("AI yordamchi sozlanmagan");
+  }
+
   try {
-    return await generateStructuredWithGemini({
-      schema: params.schema,
-      system: SYSTEM_PROMPT,
-      prompt: params.prompt,
-      maxTokens: params.maxTokens ?? 16000,
-    });
+    return await generateWithClaude(params);
   } catch (error) {
-    if (error instanceof GeminiError) throw new AiError(error.message);
-    console.error("Gemini request failed:", error);
-    throw new AiError("AI xizmatiga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring");
+    if (error instanceof ClaudeFailure && error.sticky) {
+      claudeUnavailableUntil = Date.now() + CLAUDE_COOLDOWN_MS;
+    }
+    // Gemini ham ishlamagan bo'lsa, mentorga asosiy provayderning xabari ko'rsatiladi
+    if (geminiError && error instanceof AiError) throw geminiError;
+    throw error;
   }
 }
 
