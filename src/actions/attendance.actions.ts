@@ -195,11 +195,18 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
     .populate("studentId", "fullName login")
     .lean();
 
-  // Fetch all students in group to know absent/total
-  const totalStudents = await User.countDocuments({
-    groupId: attSession.groupId,
-    role: "student",
-  });
+  // Guruhning barcha o'quvchilari: jami soni va hali belgilanmaganlar (kelmaganlar) ro'yxati uchun
+  const students = await User.find({ groupId: attSession.groupId, role: "student" })
+    .select("fullName login")
+    .lean();
+  const totalStudents = students.length;
+  const markedIds = new Set(
+    records.map((r) => (r.studentId as unknown as { _id: mongoose.Types.ObjectId } | null)?._id.toString())
+  );
+  const absentStudents = students
+    .filter((st) => !markedIds.has(st._id.toString()))
+    .map((st) => ({ _id: st._id.toString(), fullName: st.fullName, login: st.login }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://itxiva.uz";
   const deepLink = `${appUrl}/a/${attSession.currentToken}`;
@@ -227,6 +234,7 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
     session: JSON.parse(JSON.stringify(attSession)) as ProjectorSessionData,
     group: group ? { name: group.name, grade: group.grade } : null,
     totalStudents,
+    absentStudents,
     records: JSON.parse(JSON.stringify(records)),
     qrDataUrl,
     deepLink,

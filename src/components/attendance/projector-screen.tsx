@@ -15,6 +15,9 @@ import {
   ArrowLeft,
   Square,
   Sparkles,
+  UserX,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +33,7 @@ import {
   ProjectorSessionData,
 } from "@/actions/attendance.actions";
 import { formatTimeUz } from "@/lib/utils";
+import { playCheckInSound, unlockSound } from "@/lib/sound";
 
 interface AttendeeRecord {
   _id: string;
@@ -52,6 +56,7 @@ interface ProjectorScreenProps {
       grade: number;
     } | null;
     totalStudents: number;
+    absentStudents: { _id: string; fullName: string; login: string }[];
     records: AttendeeRecord[];
     qrDataUrl: string;
     deepLink: string;
@@ -71,7 +76,12 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  const [soundOn, setSoundOn] = useState(true);
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+
   const isRotatingRef = useRef(false);
+  // Sahifa ochilganda ro'yxatda bor yozuvlar uchun ovoz chiqmaydi — faqat keyin qo'shilganlar uchun
+  const knownIdsRef = useRef(new Set(initialData.records.map((r) => r._id)));
 
   const sessionId = data.session._id;
   const isClosed = data.session.status === "closed";
@@ -126,6 +136,43 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
       setIsRotating(false);
     }
   }, [sessionId, isClosed, data.session.rotateIntervalSeconds, toast]);
+
+  // Brauzer ovozni faqat foydalanuvchi harakatidan keyin chiqaradi — birinchi bosishda ochib qo'yamiz
+  useEffect(() => {
+    const unlock = () => unlockSound();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  // Kelganlar ro'yxatiga yangi o'quvchi qo'shilganda ovoz va qisqa ajratib ko'rsatish
+  useEffect(() => {
+    const added = data.records.filter((r) => !knownIdsRef.current.has(r._id)).map((r) => r._id);
+    if (added.length === 0) return;
+    added.forEach((id) => knownIdsRef.current.add(id));
+    if (soundOn) playCheckInSound(added.length);
+    setFreshIds((prev) => new Set([...prev, ...added]));
+    const timer = setTimeout(() => {
+      setFreshIds((prev) => {
+        const next = new Set(prev);
+        added.forEach((id) => next.delete(id));
+        return next;
+      });
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [data.records, soundOn]);
+
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    if (next) {
+      unlockSound();
+      playCheckInSound(1);
+    }
+  };
 
   useEffect(() => {
     if (isClosed) return;
@@ -247,6 +294,20 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             <Download className="w-4 h-4" />
             <span>CSV Eksport</span>
           </Button>
+
+          {!isClosed && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              title={soundOn ? "Ovozni o'chirish" : "Ovozni yoqish"}
+              className="gap-2 min-h-[44px]"
+            >
+              {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              <span className="hidden sm:inline">{soundOn ? "Ovoz yoniq" : "Ovoz o'chiq"}</span>
+            </Button>
+          )}
 
           <Button
             variant="secondary"
@@ -402,7 +463,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             </div>
 
             {/* List of attendees */}
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[500px] overflow-y-auto pr-1 space-y-1">
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1 space-y-1">
               {data.records.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-400">
                   Hali hech kim davomatdan o&apos;tmadi...
@@ -411,7 +472,11 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                 data.records.map((r) => (
                   <div
                     key={r._id}
-                    className="flex items-center justify-between py-2.5 px-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors animate-in fade-in"
+                    className={`flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors duration-700 animate-in fade-in ${
+                      freshIds.has(r._id)
+                        ? "bg-teal-50 dark:bg-teal-950/40"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                    }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
                       <Avatar name={r.studentId.fullName} size="sm" />
@@ -432,6 +497,41 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                       <span className="text-[10px] text-slate-400 font-mono">
                         {formatTimeUz(r.markedAt)}
                       </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Kelmaganlar: hali davomatdan o'tmagan o'quvchilar */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <UserX className="w-5 h-5 text-rose-500" />
+                <span>Kelmaganlar ro&apos;yxati</span>
+              </h3>
+              <span className="text-xs font-bold font-mono text-rose-600 dark:text-rose-400">
+                {data.absentStudents.length}
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1">
+              {data.absentStudents.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  {data.totalStudents === 0
+                    ? "Guruhda o'quvchi yo'q"
+                    : "Hamma davomatdan o'tdi"}
+                </div>
+              ) : (
+                data.absentStudents.map((st) => (
+                  <div key={st._id} className="flex items-center gap-2.5 py-2.5 px-2 min-w-0">
+                    <Avatar name={st.fullName} size="sm" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
+                        {st.fullName}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">@{st.login}</div>
                     </div>
                   </div>
                 ))
