@@ -15,7 +15,7 @@ export default function MentorExamsLoading() {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] space-y-4"
+            className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface space-y-4"
           >
             <div className="flex justify-between">
               <Skeleton className="h-6 w-1/3 rounded-md" />

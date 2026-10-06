@@ -46,7 +46,7 @@ export function QrCheckin({ token }: QrCheckinProps) {
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xl text-center space-y-6 animate-in fade-in">
+      <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xl text-center space-y-6 animate-in fade-in">
         {status === "loading" && (
           <div className="py-12 space-y-4">
             <Loader2 className="w-12 h-12 text-teal-600 animate-spin mx-auto" />

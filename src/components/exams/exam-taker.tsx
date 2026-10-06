@@ -212,7 +212,7 @@ export function ExamTaker({
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24 animate-in fade-in">
       {/* Sticky Top Header with Timer and Status */}
-      <div className="sticky top-16 z-40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B1220]/95 backdrop-blur-lg shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="sticky top-16 z-40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-bg/95 backdrop-blur-lg shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 truncate max-w-xs sm:max-w-md">
             {exam.title}
@@ -223,7 +223,7 @@ export function ExamTaker({
               {answeredCount} / {exam.questions.length} ta yechildi
             </span>
             <span>&bull;</span>
-            <span className="flex items-center gap-1 text-slate-400">
+            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
               {savingDraft ? (
                 <>
                   <Clock className="w-3.5 h-3.5 animate-spin" />
@@ -303,16 +303,16 @@ export function ExamTaker({
             <Card
               key={qId}
               id={`question-${idx}`}
-              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-4"
+              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-4"
             >
               <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div className="space-y-1">
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                     {idx + 1}-savol &bull; {q.points} ball
                   </span>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap leading-relaxed">
+                  <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap leading-relaxed">
                     {q.prompt}
-                  </h3>
+                  </h2>
                 </div>
               </div>
 
@@ -473,7 +473,7 @@ export function ExamTaker({
                       className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100 text-sm focus:outline-hidden focus:ring-2 focus:ring-teal-500"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     GitHub loyihangiz public yoki mentor uchun ochiq ekanligiga ishonch hosil qiling.
                   </p>
                 </div>
@@ -505,7 +505,7 @@ export function ExamTaker({
                 Diqqat: Siz {exam.questions.length - answeredCount} ta savolga javob bermagansiz.
               </div>
             )}
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Topshirgandan so&apos;ng javoblarni qayta o&apos;zgartirib bo&apos;lmaydi.
             </p>
           </div>

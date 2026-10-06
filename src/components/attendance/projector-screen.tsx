@@ -259,7 +259,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in">
       {/* Top action header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
         <div className="flex items-center gap-3">
           <Link
             href="/mentor/attendance"
@@ -339,7 +339,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Giant QR and Huge Code Display (8 columns) */}
         <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-          <div className="p-6 sm:p-10 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-md text-center flex flex-col items-center justify-center space-y-6">
+          <div className="p-6 sm:p-10 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-md text-center flex flex-col items-center justify-center space-y-6">
             {isClosed ? (
               <div className="py-16 space-y-4 text-center">
                 <CheckCircle2 className="w-16 h-16 text-teal-500 mx-auto" />
@@ -369,7 +369,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                       <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
                         {secondsLeft} soniya
                       </div>
-                      <div className="text-[11px] text-slate-400">avtomatik yangilanish</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">avtomatik yangilanish</div>
                     </div>
                   </div>
 
@@ -406,7 +406,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                   <div className="flex items-center justify-center gap-3">
                     <div
                       onClick={handleCopyCode}
-                      className="px-6 py-4 rounded-2xl bg-slate-100 dark:bg-[#0B1220] border-2 border-teal-500/40 text-4xl sm:text-5xl font-black font-mono tracking-[0.25em] text-teal-700 dark:text-teal-300 select-all cursor-pointer shadow-inner hover:scale-[1.02] transition-transform"
+                      className="px-6 py-4 rounded-2xl bg-slate-100 dark:bg-bg border-2 border-teal-500/40 text-4xl sm:text-5xl font-black font-mono tracking-[0.25em] text-teal-700 dark:text-teal-300 select-all cursor-pointer shadow-inner hover:scale-[1.02] transition-transform"
                       title="Nusxalash uchun bosing"
                     >
                       {data.session.currentCode}
@@ -440,14 +440,14 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
 
         {/* Right: Live Attendee Feed (4 columns) */}
         <div className="lg:col-span-5 xl:col-span-4 space-y-4">
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+          <div className="p-5 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
             {/* Header with stats */}
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <h2 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Users className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                   <span>Kelganlar ro&apos;yxati</span>
-                </h3>
+                </h2>
                 <span className="text-xs font-bold font-mono text-teal-600 dark:text-teal-400">
                   {presentCount} / {data.totalStudents} ({progressPercent}%)
                 </span>
@@ -465,7 +465,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             {/* List of attendees */}
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1 space-y-1">
               {data.records.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400">
+                <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
                   Hali hech kim davomatdan o&apos;tmadi...
                 </div>
               ) : (
@@ -484,7 +484,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                         <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                           {r.studentId.fullName}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                           @{r.studentId.login}
                         </div>
                       </div>
@@ -494,7 +494,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                       <Badge variant={r.method === "qr" ? "teal" : "gold"}>
                         {r.method === "qr" ? "QR" : "Kod"}
                       </Badge>
-                      <span className="text-[10px] text-slate-400 font-mono">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                         {formatTimeUz(r.markedAt)}
                       </span>
                     </div>
@@ -505,12 +505,12 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
           </div>
 
           {/* Kelmaganlar: hali davomatdan o'tmagan o'quvchilar */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3">
+          <div className="p-5 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <h2 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <UserX className="w-5 h-5 text-rose-500" />
                 <span>Kelmaganlar ro&apos;yxati</span>
-              </h3>
+              </h2>
               <span className="text-xs font-bold font-mono text-rose-600 dark:text-rose-400">
                 {data.absentStudents.length}
               </span>
@@ -518,7 +518,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1">
               {data.absentStudents.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
+                <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
                   {data.totalStudents === 0
                     ? "Guruhda o'quvchi yo'q"
                     : "Hamma davomatdan o'tdi"}
@@ -531,7 +531,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                       <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
                         {st.fullName}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">@{st.login}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{st.login}</div>
                     </div>
                   </div>
                 ))

@@ -76,10 +76,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           };
 
           const borders = {
-            success: "border-emerald-500/30 bg-white dark:bg-[#111A2E]",
-            error: "border-rose-500/30 bg-white dark:bg-[#111A2E]",
-            warning: "border-amber-500/30 bg-white dark:bg-[#111A2E]",
-            info: "border-teal-500/30 bg-white dark:bg-[#111A2E]",
+            success: "border-emerald-500/30 bg-white dark:bg-surface",
+            error: "border-rose-500/30 bg-white dark:bg-surface",
+            warning: "border-amber-500/30 bg-white dark:bg-surface",
+            info: "border-teal-500/30 bg-white dark:bg-surface",
           };
 
           return (
@@ -100,7 +100,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => removeToast(t.id)}
                 aria-label="Yopish"
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

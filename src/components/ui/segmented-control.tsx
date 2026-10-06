@@ -49,7 +49,7 @@ export function SegmentedControl<T extends string | number>({
               "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
               size === "sm" ? "px-3 py-1.5 text-xs min-h-[36px]" : "px-4 py-2 text-xs sm:text-sm min-h-[40px]",
               isSelected
-                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs scale-100"
+                ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs scale-100"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             )}
           >

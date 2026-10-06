@@ -12,7 +12,7 @@ import { downloadCsv } from "@/lib/csv";
 import { cn, formatDateUz, formatDateTimeUz } from "@/lib/utils";
 import type { StudentReport } from "@/actions/report.actions";
 
-const empty = (text: string) => <p className="py-6 text-center text-xs text-slate-400">{text}</p>;
+const empty = (text: string) => <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">{text}</p>;
 
 export function StudentReportView({ report }: { report: StudentReport }) {
   const { student, attendance } = report;
@@ -164,7 +164,7 @@ export function StudentReportView({ report }: { report: StudentReport }) {
                   <li key={i} className="py-2 flex items-center justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block truncate text-slate-700 dark:text-slate-200">{l.description}</span>
-                      <span className="text-slate-400">{l.createdAt ? formatDateTimeUz(l.createdAt) : ""}</span>
+                      <span className="text-slate-500 dark:text-slate-400">{l.createdAt ? formatDateTimeUz(l.createdAt) : ""}</span>
                     </span>
                     <span className="shrink-0 font-bold tabular-nums text-slate-900 dark:text-slate-100">
                       {l.amount > 0 ? "+" : ""}
@@ -185,7 +185,7 @@ export function StudentReportView({ report }: { report: StudentReport }) {
                   <li key={i} className="py-2 flex items-center justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block truncate text-slate-700 dark:text-slate-200">{o.productTitle}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
                         {o.createdAt ? formatDateUz(o.createdAt) : ""} · {o.price} coin
                       </span>
                     </span>

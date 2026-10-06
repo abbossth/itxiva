@@ -99,12 +99,12 @@ export function SubmissionContent({ submissionId, text, links, files }: Submissi
                     <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {file.name}
                     </span>
-                    <span className="block text-[11px] text-slate-400">{formatFileSize(file.size)}</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-slate-400">{formatFileSize(file.size)}</span>
                   </span>
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 shrink-0 animate-spin text-teal-600" />
                   ) : (
-                    <Download className="w-4 h-4 shrink-0 text-slate-400" />
+                    <Download className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" />
                   )}
                 </button>
                 {previews[file.key] && (

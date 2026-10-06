@@ -73,7 +73,7 @@ export function Dialog({
         />
         <div
           className={cn(
-            "relative w-full rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
+            "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
             maxWidths
           )}
           role="dialog"
@@ -92,7 +92,7 @@ export function Dialog({
             </div>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="Yopish"
             >
               <X className="w-5 h-5" />
@@ -131,7 +131,7 @@ export function DialogContent({
   return (
     <div
       className={cn(
-        "relative w-full rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
+        "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
         className
       )}
       role="dialog"
@@ -140,7 +140,7 @@ export function DialogContent({
       {ctx && (
         <button
           onClick={ctx.onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           aria-label="Yopish"
         >
           <X className="w-5 h-5" />

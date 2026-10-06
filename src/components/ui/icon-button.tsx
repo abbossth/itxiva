@@ -52,7 +52,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         disabled={disabled || isLoading}
         className={cn(
           "inline-flex items-center justify-center transition-all duration-150 cursor-pointer select-none",
-          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B1220]",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-bg",
           "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
           variants[variant],
           sizes[size],

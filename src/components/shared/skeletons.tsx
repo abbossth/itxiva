@@ -13,7 +13,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function LessonCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] p-5 space-y-3">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-5 space-y-3">
       <div className="flex items-center justify-between">
         <Skeleton className="h-5 w-20 rounded-md" />
         <Skeleton className="h-5 w-16 rounded-full" />
@@ -30,7 +30,7 @@ export function LessonCardSkeleton() {
 
 export function GroupCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] p-5 space-y-4">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between">
         <Skeleton className="h-6 w-24 rounded-md" />
         <Skeleton className="h-6 w-16 rounded-full" />
@@ -67,7 +67,7 @@ export function LeaderboardSkeleton() {
       </div>
 
       {/* Table Skeleton */}
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] p-4 space-y-3">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-4 space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800/60 last:border-0">
             <div className="flex items-center gap-3">
@@ -87,7 +87,7 @@ export function LeaderboardSkeleton() {
 
 // ---- Sahifa darajasidagi skeletonlar: haqiqiy maket o'lchamiga yaqin, shunda kontent kelganda sahifa "sakramaydi" ----
 
-const CARD = "rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]";
+const CARD = "rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface";
 
 export function PageHeaderSkeleton({ withAction = false, withBack = false }: { withAction?: boolean; withBack?: boolean }) {
   return (

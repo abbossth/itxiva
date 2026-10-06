@@ -26,7 +26,7 @@ export function DesktopNav({ user, badges = {} }: DesktopNavProps) {
   const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
 
   return (
-    <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto justify-between bg-white/40 dark:bg-[#0B1220]/40 backdrop-blur-xs select-none">
+    <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto justify-between bg-white/40 dark:bg-bg/40 backdrop-blur-xs select-none">
       <div className="space-y-1">
         <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-3 py-2">
           Asosiy menyu
@@ -51,7 +51,7 @@ export function DesktopNav({ user, badges = {} }: DesktopNavProps) {
               <Icon
                 className={cn(
                   "w-5 h-5 shrink-0 transition-colors",
-                  isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-400"
+                  isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"
                 )}
               />
               <span className="truncate flex-1">{link.label}</span>

@@ -18,13 +18,13 @@ export default function ChangePasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-[#0B1220] p-4 sm:p-6">
+    <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-bg p-4 sm:p-6">
       <div className="flex justify-end max-w-5xl mx-auto w-full pt-2">
         <ThemeToggle />
       </div>
 
       <div className="w-full max-w-md mx-auto my-auto">
-        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-6 sm:p-8 shadow-xl">
+        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-6 sm:p-8 shadow-xl">
           <div className="flex flex-col items-center text-center mb-6">
             <Logo size="md" />
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mt-4 mb-2">
@@ -53,7 +53,7 @@ export default function ChangePasswordPage() {
                 Yangi parol (kamida 6 ta belgi)
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 dark:text-slate-400">
                   <KeyRound className="w-4 h-4" />
                 </div>
                 <Input
@@ -69,7 +69,7 @@ export default function ChangePasswordPage() {
                   type="button"
                   onClick={() => setShowNewPassword((prev) => !prev)}
                   aria-label={showNewPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
                 >
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -89,7 +89,7 @@ export default function ChangePasswordPage() {
                 Yangi parolni tasdiqlang
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 dark:text-slate-400">
                   <KeyRound className="w-4 h-4" />
                 </div>
                 <Input
@@ -105,7 +105,7 @@ export default function ChangePasswordPage() {
                   type="button"
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
                   aria-label={showConfirmPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -130,7 +130,7 @@ export default function ChangePasswordPage() {
         </div>
       </div>
 
-      <footer className="text-center py-4 text-xs text-slate-400 dark:text-slate-600">
+      <footer className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">
         &copy; {new Date().getFullYear()} ITXiva
       </footer>
     </div>

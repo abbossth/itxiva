@@ -20,7 +20,7 @@ export default function ExamsLoading() {
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] space-y-4"
+            className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface space-y-4"
           >
             <div className="flex justify-between items-center">
               <Skeleton className="h-5 w-24 rounded-md" />

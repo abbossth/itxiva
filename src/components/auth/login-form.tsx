@@ -44,7 +44,7 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
           error={state?.errors?.login?.[0]}
         >
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 dark:text-slate-400">
               <User className="w-4 h-4" />
             </div>
             <Input
@@ -70,7 +70,7 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
           error={state?.errors?.password?.[0]}
         >
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 dark:text-slate-400">
               <Lock className="w-4 h-4" />
             </div>
             <Input
@@ -89,7 +89,7 @@ export function LoginForm({ nextUrl }: LoginFormProps) {
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
               aria-label={showPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer transition-colors focus-visible:outline-hidden"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>

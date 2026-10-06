@@ -23,7 +23,7 @@ export function ErrorState({ error, retry, fullScreen = false }: ErrorStateProps
       role="alert"
       className={
         fullScreen
-          ? "min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50 dark:bg-[#0B1220]"
+          ? "min-h-screen flex flex-col items-center justify-center p-4 text-center bg-slate-50 dark:bg-bg"
           : "flex flex-col items-center justify-center text-center p-8 sm:p-12 rounded-2xl border border-dashed border-rose-300 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/10"
       }
     >
@@ -36,7 +36,7 @@ export function ErrorState({ error, retry, fullScreen = false }: ErrorStateProps
         xabar bering.
       </p>
       {error.digest && (
-        <p className="mt-2 text-[11px] font-mono text-slate-400">Xato kodi: {error.digest}</p>
+        <p className="mt-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">Xato kodi: {error.digest}</p>
       )}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
         <Button variant="primary" onClick={() => retry()} className="gap-2 min-h-[44px]">

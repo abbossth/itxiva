@@ -63,9 +63,9 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
 
   return (
     <div className="space-y-3">
-      <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
         Materiallar va fayllar ({nonVideoMaterials.length})
-      </h4>
+      </h3>
 
       {errorMsg && (
         <div className="p-3 text-xs rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900">

@@ -52,7 +52,7 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
       </div>
 
       {/* Main card */}
-      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-5 sm:p-8 space-y-6 shadow-xs">
+      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-5 sm:p-8 space-y-6 shadow-xs">
         <div className="space-y-2 border-b border-slate-100 dark:border-slate-800/80 pb-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
@@ -80,10 +80,10 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
         {/* YouTube Video Player Facade */}
         {youtubeMaterial && (
           <div className="space-y-2">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-red-500" />
               Dars videosi
-            </h3>
+            </h2>
             <YouTubeFacade
               url={youtubeMaterial.urlOrKey}
               title={youtubeMaterial.title || lesson.title}
@@ -94,9 +94,9 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
         {/* Lesson Description */}
         {lesson.description && (
           <div className="space-y-2">
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200">
               Dars tavsifi
-            </h3>
+            </h2>
             <div className="text-sm sm:text-base text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800">
               {lesson.description}
             </div>

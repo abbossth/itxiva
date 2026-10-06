@@ -56,7 +56,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
         </Link>
       </div>
 
-      <Card className="p-6 sm:p-8 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-sm space-y-6">
+      <Card className="p-6 sm:p-8 rounded-3xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-sm space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex p-4 rounded-3xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
             <GraduationCap className="w-10 h-10" />
@@ -82,7 +82,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
 
         <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-center">
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wider block">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block">
               Vaqt
             </span>
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -91,7 +91,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
             </div>
           </div>
           <div className="space-y-1 border-x border-slate-200 dark:border-slate-800">
-            <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wider block">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block">
               Savollar
             </span>
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -100,7 +100,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
             </div>
           </div>
           <div className="space-y-1">
-            <span className="text-[11px] text-slate-400 uppercase font-bold tracking-wider block">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block">
               O&apos;tish bali
             </span>
             <div className="flex items-center justify-center gap-1 text-sm font-bold text-amber-500">

@@ -77,7 +77,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
         }
       />
 
-      <details className="group rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-4 sm:p-5">
+      <details className="group rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-5">
         <summary className="flex cursor-pointer items-center justify-between gap-3 text-sm font-bold text-slate-900 dark:text-slate-100 min-h-[32px]">
           <span>Topshiriq matni</span>
           {roster.task.dueAt && (
@@ -111,7 +111,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
                 "shrink-0 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold min-h-[44px] transition-colors cursor-pointer",
                 tab === t.id
                   ? "bg-teal-600 text-white shadow-xs"
-                  : "bg-white dark:bg-[#131E32] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+                  : "bg-white dark:bg-surface text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
               )}
             >
               {t.label} <span className="opacity-80">({count})</span>
@@ -127,7 +127,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
           description={tab === "submitted" ? "Hamma yuborilgan javoblar ko'rib chiqilgan." : undefined}
         />
       ) : (
-        <ul className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] divide-y divide-slate-100 dark:divide-slate-800/70 overflow-hidden">
+        <ul className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface divide-y divide-slate-100 dark:divide-slate-800/70 overflow-hidden">
           {visible.map((row) => (
             <li key={row.studentId}>
               <button
@@ -144,7 +144,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
                   <span className="block truncate text-sm font-bold text-slate-900 dark:text-slate-100">
                     {row.fullName}
                   </span>
-                  <span className="block truncate text-[11px] text-slate-400">
+                  <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
                     {row.submission
                       ? `Yuborilgan: ${formatDateTimeUz(row.submission.submittedAt)}`
                       : `@${row.login}`}
@@ -160,7 +160,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
                     </Badge>
                   )}
                 </span>
-                {row.submission && <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />}
+                {row.submission && <ChevronRight className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" />}
               </button>
             </li>
           ))}

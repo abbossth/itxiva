@@ -203,7 +203,7 @@ export function QRScannerModal({
       aria-labelledby="qr-scanner-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in"
     >
-      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden animate-in zoom-in-95">
+      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden animate-in zoom-in-95">
         {/* Header */}
         <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -217,7 +217,7 @@ export function QRScannerModal({
               >
                 QR Kodni skanerlash
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Proyektordagi QR belgisiga qarating
               </p>
             </div>
@@ -227,7 +227,7 @@ export function QRScannerModal({
             type="button"
             onClick={onClose}
             aria-label="Yopish"
-            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

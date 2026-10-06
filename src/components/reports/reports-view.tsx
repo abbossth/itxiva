@@ -90,7 +90,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
                 className={cn(
                   "px-3.5 min-h-[40px] rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer",
                   (p.id === "custom" ? customOpen : period === p.id && !customOpen)
-                    ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                    ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
@@ -230,7 +230,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
             }
           >
             {data.attendanceByLesson.length === 0 ? (
-              <p className="py-6 text-center text-xs text-slate-400">Bu davrda davomat olinmagan</p>
+              <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Bu davrda davomat olinmagan</p>
             ) : (
               <div className="overflow-x-auto pb-1">
                 <div className="flex items-end gap-0.5 h-40 min-w-max border-b border-slate-200 dark:border-slate-700">
@@ -251,7 +251,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
                     </Link>
                   ))}
                 </div>
-                <div className="flex justify-between text-[10px] text-slate-400 mt-1 min-w-max">
+                <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1 min-w-max">
                   <span>{formatDateUz(dateFromKey(data.attendanceByLesson[0].dateKey, "12:00"))}</span>
                   <span>{formatDateUz(dateFromKey(data.attendanceByLesson[data.attendanceByLesson.length - 1].dateKey, "12:00"))}</span>
                 </div>
@@ -373,7 +373,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               {data.coinsByType.length === 0 ? (
-                <p className="py-6 text-center text-xs text-slate-400">Bu davrda coin harakati yo&apos;q</p>
+                <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Bu davrda coin harakati yo&apos;q</p>
               ) : (
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

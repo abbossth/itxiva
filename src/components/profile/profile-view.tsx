@@ -46,7 +46,7 @@ export function ProfileView({ user }: ProfileViewProps) {
       </div>
 
       {/* User Info Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <Avatar
             name={user.fullName}
@@ -93,12 +93,12 @@ export function ProfileView({ user }: ProfileViewProps) {
 
       {/* Gamification / Badges Card (for student) */}
       {user.role === "student" && (
-        <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+        <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-500" />
-            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+            <h2 className="font-bold text-base text-slate-900 dark:text-slate-100">
               Mening yutuqlarim va nishonlar
-            </h3>
+            </h2>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -107,7 +107,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Faol start</div>
-              <div className="text-[10px] text-slate-400">Platformaga qo&apos;shildi</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Platformaga qo&apos;shildi</div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-center space-y-1.5">
@@ -115,7 +115,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 <Award className="w-5 h-5" />
               </div>
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Davomatchi</div>
-              <div className="text-[10px] text-slate-400">Darslarda muntazam</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Darslarda muntazam</div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-center space-y-1.5">
@@ -123,7 +123,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 <Shield className="w-5 h-5" />
               </div>
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Bilimdon</div>
-              <div className="text-[10px] text-slate-400">Testlarni yechish</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Testlarni yechish</div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-center space-y-1.5">
@@ -131,7 +131,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Vorislardan biri</div>
-              <div className="text-[10px] text-slate-400">Al-Xorazmiy vorisi</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">Al-Xorazmiy vorisi</div>
             </div>
           </div>
         </div>
@@ -139,15 +139,15 @@ export function ProfileView({ user }: ProfileViewProps) {
 
       {/* Attendance Quick Action Card (for student) */}
       {user.role === "student" && (
-        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-[#131E32] dark:to-blue-950/30 border border-teal-500/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-surface dark:to-blue-950/30 border border-teal-500/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
               <QrCode className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+              <h2 className="font-bold text-base text-slate-900 dark:text-slate-100">
                 Bugungi dars davomati
-              </h3>
+              </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Proyektordagi 6 xonali kod yoki QR belgi orqali davomatdan o&apos;ting (+10 coin)
               </p>
@@ -164,12 +164,12 @@ export function ProfileView({ user }: ProfileViewProps) {
       )}
 
       {/* Change Password Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
+      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
         <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <Lock className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-          <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+          <h2 className="font-bold text-base text-slate-900 dark:text-slate-100">
             Parolni yangilash
-          </h3>
+          </h2>
         </div>
 
         {state?.success && (
@@ -212,7 +212,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 type="button"
                 onClick={() => setShowNewPassword((prev) => !prev)}
                 aria-label={showNewPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
               >
                 {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -238,7 +238,7 @@ export function ProfileView({ user }: ProfileViewProps) {
                 type="button"
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
                 aria-label={showConfirmPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>

@@ -43,11 +43,11 @@ export function TaskAttachments({ lessonId, attachments }: { lessonId: string; a
           >
             <FileText className="w-4 h-4 shrink-0 text-teal-600 dark:text-teal-400" />
             <span className="truncate">{m.title}</span>
-            {m.fileSize ? <span className="text-slate-400 font-normal shrink-0">{formatFileSize(m.fileSize)}</span> : null}
+            {m.fileSize ? <span className="text-slate-500 dark:text-slate-400 font-normal shrink-0">{formatFileSize(m.fileSize)}</span> : null}
             {loadingKey === m.urlOrKey ? (
               <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
             ) : (
-              <Download className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+              <Download className="w-3.5 h-3.5 shrink-0 text-slate-500 dark:text-slate-400" />
             )}
           </button>
         ))}

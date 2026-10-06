@@ -23,7 +23,7 @@ export function Header({ user }: HeaderProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-[#0B1220]/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-bg/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <Logo size="sm" href={user.role === "mentor" ? "/mentor/groups" : "/lessons"} />
 
@@ -67,11 +67,14 @@ export function Header({ user }: HeaderProps) {
             aria-label="Mening profilim va sozlamalar"
             className="sm:hidden p-1 min-h-[44px] min-w-[44px] rounded-2xl flex items-center justify-center cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
           >
-            <Avatar
-              name={user.fullName}
-              size="sm"
-              variant={user.role === "mentor" ? "gold" : "primary"}
-            />
+            {/* Bosh harflar ekran o'quvchisi uchun yashirin — tugma nomi aria-label'dan olinadi */}
+            <span aria-hidden="true">
+              <Avatar
+                name={user.fullName}
+                size="sm"
+                variant={user.role === "mentor" ? "gold" : "primary"}
+              />
+            </span>
           </button>
         </div>
       </div>

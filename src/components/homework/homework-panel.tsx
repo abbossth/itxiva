@@ -158,10 +158,10 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
   return (
     <section aria-labelledby="homework-heading" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="homework-heading" className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <h2 id="homework-heading" className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
           Uyga vazifa
-        </h3>
+        </h2>
         <div className="flex flex-wrap items-center gap-2">
           {!readOnly && (
             <Badge variant={HOMEWORK_STATE_BADGE[state]}>{HOMEWORK_STATE_LABELS[state]}</Badge>
@@ -266,7 +266,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
 
           <div className="space-y-2">
             <label htmlFor="hw-link" className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Havolalar <span className="font-normal text-slate-400">(GitHub, Scratch, Google Drive...)</span>
+              Havolalar <span className="font-normal text-slate-500 dark:text-slate-400">(GitHub, Scratch, Google Drive...)</span>
             </label>
             {links.length > 0 && (
               <ul className="space-y-1.5">
@@ -281,7 +281,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
                       type="button"
                       onClick={() => setLinks(links.filter((l) => l !== link))}
                       aria-label={`${link} havolasini olib tashlash`}
-                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-rose-600 cursor-pointer"
+                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -320,7 +320,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
               Fayllar{" "}
-              <span className="font-normal text-slate-400">
+              <span className="font-normal text-slate-500 dark:text-slate-400">
                 ({HOMEWORK_MAX_FILES} tagacha, har biri {HOMEWORK_MAX_FILE_MB} MB gacha)
               </span>
             </p>
@@ -333,12 +333,12 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
                   >
                     <Paperclip className="w-3.5 h-3.5 shrink-0 text-teal-600" />
                     <span className="truncate flex-1">{file.name}</span>
-                    <span className="text-[11px] text-slate-400 shrink-0">{formatFileSize(file.size)}</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatFileSize(file.size)}</span>
                     <button
                       type="button"
                       onClick={() => setFiles(files.filter((f) => f.key !== file.key))}
                       aria-label={`${file.name} faylini olib tashlash`}
-                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-400 hover:text-rose-600 cursor-pointer"
+                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -346,7 +346,15 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
                 ))}
               </ul>
             )}
-            <input ref={fileInputRef} type="file" multiple onChange={handleFiles} className="sr-only" tabIndex={-1} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFiles}
+              className="sr-only"
+              tabIndex={-1}
+              aria-label="Javob fayllarini tanlash"
+            />
             <Button
               type="button"
               variant="secondary"

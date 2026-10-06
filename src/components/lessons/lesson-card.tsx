@@ -26,7 +26,7 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
     <div
       className={cn(
         "group relative flex flex-col justify-between p-5 rounded-2xl border transition-all duration-200",
-        "bg-white dark:bg-[#131E32] hover:shadow-md",
+        "bg-white dark:bg-surface hover:shadow-md",
         lesson.isPublished
           ? "border-slate-200/80 dark:border-slate-800/80 hover:border-teal-500/40"
           : "border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10"
@@ -55,7 +55,7 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
                 <button
                   type="button"
                   onClick={() => onTogglePublish(lesson._id.toString())}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                   title={lesson.isPublished ? "Qoralamaga olish" : "Nashr qilish"}
                 >
                   {lesson.isPublished ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -69,9 +69,9 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
           href={isMentor ? `/mentor/lessons/${lesson._id}/edit` : `/lessons/${lesson._id}`}
           className="block group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors"
         >
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 line-clamp-2">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 line-clamp-2">
             {lesson.title}
-          </h3>
+          </h2>
           {lesson.topic && (
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
               {lesson.topic}
@@ -95,7 +95,7 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
             </span>
           )}
           {videoCount === 0 && fileCount === 0 && !hasHomework && (
-            <span className="text-[11px] text-slate-400">Materiallar yo&apos;q</span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">Materiallar yo&apos;q</span>
           )}
           {isMentor && lesson.linkId && (
             <span className="flex items-center gap-1" title="Bu dars boshqa guruhlar bilan bog'langan">

@@ -427,7 +427,7 @@ export function LessonEditorForm({
       />
 
       {/* Main Lesson Info Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
+      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
           {initialLesson ? "Darsni tahrirlash" : "Yangi dars ma'lumotlari"}
         </h2>
@@ -536,7 +536,7 @@ export function LessonEditorForm({
 
       {/* Bitta dars — bir nechta guruh */}
       {(linkedLessons.length > 0 || otherGroups.length > 0) && (
-        <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+        <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Link2 className="w-5 h-5 text-teal-600 dark:text-teal-400" />
@@ -572,7 +572,7 @@ export function LessonEditorForm({
                 >
                   <span className="flex flex-wrap items-center gap-2 min-w-0">
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{l.groupName}</span>
-                    {l.grade !== null && <span className="text-xs text-slate-400">{l.grade}-sinf</span>}
+                    {l.grade !== null && <span className="text-xs text-slate-500 dark:text-slate-400">{l.grade}-sinf</span>}
                     {l.date && <span className="text-xs text-slate-500 dark:text-slate-400">· {formatDateUz(l.date)}</span>}
                     <Badge variant={l.isPublished ? "success" : "warning"}>
                       {l.isPublished ? "Nashr etilgan" : "Qoralama"}
@@ -614,7 +614,7 @@ export function LessonEditorForm({
                         className="w-4 h-4 accent-teal-600 cursor-pointer"
                       />
                       <span>{g.name}</span>
-                      <span className={`text-xs font-normal ${g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-400"}`}>
+                      <span className={`text-xs font-normal ${g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`}>
                         {g.grade}-sinf
                       </span>
                     </label>
@@ -652,7 +652,7 @@ export function LessonEditorForm({
       )}
 
       {/* Materials Builder Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
           Dars materiallari ({materials.length})
         </h2>
@@ -676,13 +676,13 @@ export function LessonEditorForm({
                   <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
                     {m.title}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-400">({m.type})</span>
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">({m.type})</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleRemoveMaterial(idx)}
-                  className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label={`${m.title} materialini o'chirish`}
                   title="O'chirish"
                 >
@@ -767,7 +767,7 @@ export function LessonEditorForm({
 
           {/* YouTube Video Preview Facade */}
           {youtubeId && (
-            <div className="p-3 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
               <div className="relative w-28 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -780,7 +780,7 @@ export function LessonEditorForm({
                 <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                   YouTube video aniqlandi
                 </div>
-                <div className="text-[11px] text-slate-400 font-mono truncate">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
                   ID: {youtubeId}
                 </div>
               </div>
@@ -797,7 +797,7 @@ export function LessonEditorForm({
       </div>
 
       {/* Uyga vazifa */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
@@ -898,7 +898,7 @@ export function LessonEditorForm({
 
             <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Biriktirilgan fayllar <span className="font-normal text-slate-400">(ixtiyoriy)</span>
+                Biriktirilgan fayllar <span className="font-normal text-slate-500 dark:text-slate-400">(ixtiyoriy)</span>
               </p>
               {hwAttachments.map((m) => (
                 <div
@@ -912,7 +912,7 @@ export function LessonEditorForm({
                   <button
                     type="button"
                     onClick={() => setHwAttachments((prev) => prev.filter((a) => a.urlOrKey !== m.urlOrKey))}
-                    className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                     aria-label={`${m.title} faylini olib tashlash`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -936,7 +936,7 @@ export function LessonEditorForm({
       </div>
 
       {/* Sticky action bar */}
-      <div className="sticky bottom-0 z-30 p-4 rounded-2xl bg-white/95 dark:bg-[#0B1220]/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg flex flex-wrap items-center justify-between gap-3">
+      <div className="sticky bottom-0 z-30 p-4 rounded-2xl bg-white/95 dark:bg-bg/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg flex flex-wrap items-center justify-between gap-3">
         {initialLesson ? (
           <Button
             type="button"

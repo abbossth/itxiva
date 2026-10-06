@@ -64,7 +64,7 @@ export function YouTubeFacade({ url, title = "YouTube Video", className }: YouTu
     >
       <Image
         src={thumbnailUrl}
-        alt={title}
+        alt=""
         fill
         className="object-cover transition-transform duration-300 group-hover:scale-105 opacity-90 group-hover:opacity-100"
         sizes="(max-width: 768px) 100vw, 800px"

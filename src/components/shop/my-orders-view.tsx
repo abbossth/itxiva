@@ -71,7 +71,7 @@ export function MyOrdersView({ initialOrders }: { initialOrders: ShopOrder[] }) 
               <div
                 key={order._id}
                 className={cn(
-                  "p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border shadow-xs space-y-4 transition-colors",
+                  "p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border shadow-xs space-y-4 transition-colors",
                   order.status === "handed_over"
                     ? "border-amber-500/60 ring-2 ring-amber-500/15"
                     : "border-slate-200/80 dark:border-slate-800/80"
@@ -79,8 +79,8 @@ export function MyOrdersView({ initialOrders }: { initialOrders: ShopOrder[] }) 
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100 truncate">{order.productTitle}</h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <h2 className="font-bold text-slate-900 dark:text-slate-100 truncate">{order.productTitle}</h2>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                       {order.createdAt ? formatDateTimeUz(order.createdAt) : ""}
                     </p>
                   </div>

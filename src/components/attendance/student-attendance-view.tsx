@@ -182,7 +182,7 @@ export function StudentAttendanceView({
 
       {/* Main Interactive Check-in Card (ALWAYS accessible) */}
       {!alreadyMarked && (
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-[#131E32] dark:to-blue-950/30 border-2 border-teal-500/40 shadow-lg space-y-6">
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-surface dark:to-blue-950/30 border-2 border-teal-500/40 shadow-lg space-y-6">
           {/* Top Session Status Banner */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-teal-500/20">
             <div className="flex items-center gap-2.5">
@@ -212,7 +212,7 @@ export function StudentAttendanceView({
               onClick={() => setActiveTab("code")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === "code"
-                  ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                  ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -224,7 +224,7 @@ export function StudentAttendanceView({
               onClick={() => setActiveTab("qr")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === "qr"
-                  ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                  ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                   : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -308,7 +308,7 @@ export function StudentAttendanceView({
                   <span>Kamerani ochish va skanerlash</span>
                 </Button>
 
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Kamera yoqilmagan taqdirda QR kod rasmini yuklab ham davomatdan o&apos;tish mumkin.
                 </p>
               </div>
@@ -325,9 +325,9 @@ export function StudentAttendanceView({
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <div className="space-y-0.5">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">
+              <h2 className="font-bold text-lg text-slate-900 dark:text-slate-100">
                 Bugungi dars davomatidan o&apos;tgansiz!
-              </h3>
+              </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Siz darsda faol ishtirok etyapsiz. Tangalar hisobingizga muvaffaqiyatli qo&apos;shildi.
               </p>
@@ -360,7 +360,7 @@ export function StudentAttendanceView({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
             {attendanceRate === null ? "—" : `${attendanceRate}%`}
           </div>
@@ -369,7 +369,7 @@ export function StudentAttendanceView({
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
             {presentCount} ta
           </div>
@@ -378,7 +378,7 @@ export function StudentAttendanceView({
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="text-2xl font-black text-amber-500">
             +{totalCoinsEarned}
           </div>
@@ -395,9 +395,9 @@ export function StudentAttendanceView({
           <span>Mening davomat tarixim</span>
         </h2>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]">
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
           {history.length === 0 ? (
-            <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+            <div className="p-8 text-center text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center gap-2">
               <Clock className="w-8 h-8 text-slate-300 dark:text-slate-700" />
               <span>Hali davomat yozuvlari mavjud emas</span>
             </div>
@@ -418,13 +418,13 @@ export function StudentAttendanceView({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <Calendar className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                       </div>
                       <div className="min-w-0">
                         <div className="font-bold text-slate-900 dark:text-slate-100">
                           {record.sessionId?.date ? formatDateUz(record.sessionId.date) : "Dars"}
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                           {record.method === "qr"
                             ? "QR Kod orqali"
                             : record.method === "code"

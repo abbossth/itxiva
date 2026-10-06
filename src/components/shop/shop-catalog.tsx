@@ -104,13 +104,13 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
             return (
               <div
                 key={item._id}
-                className="p-3 sm:p-4 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 hover:border-teal-500/40 hover:shadow-md transition-all"
+                className="p-3 sm:p-4 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 hover:border-teal-500/40 hover:shadow-md transition-all"
               >
                 <ProductImage src={item.imageUrl} alt={item.title} className="aspect-[4/3] w-full" />
 
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                       {item.category || "Sovg'a"}
                     </span>
                     {soldOut ? (
@@ -119,9 +119,9 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
                       <Badge variant="warning">{stock} ta qoldi</Badge>
                     ) : null}
                   </div>
-                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 leading-snug">
+                  <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 leading-snug">
                     {item.title}
-                  </h3>
+                  </h2>
                   {item.description && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">
                       {item.description}

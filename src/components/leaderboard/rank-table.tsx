@@ -49,7 +49,7 @@ export function RankTable({ entries, currentUserEntry }: RankTableProps) {
       )}
 
       {/* Main Ranking Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
         <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
           {entries.map((entry) => {
             const rankStyles = {
@@ -92,7 +92,7 @@ export function RankTable({ entries, currentUserEntry }: RankTableProps) {
                     <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       <span>{entry.groupName}</span>
                       {entry.fullName && entry.fullName !== entry.displayName && (
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
                           ({entry.fullName})
                         </span>
                       )}

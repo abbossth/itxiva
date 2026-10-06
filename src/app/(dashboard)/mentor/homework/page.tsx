@@ -28,7 +28,7 @@ export default async function MentorHomeworkPage({ searchParams }: PageProps) {
       "shrink-0 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold min-h-[44px] flex items-center transition-colors",
       active
         ? "bg-teal-600 text-white shadow-xs"
-        : "bg-white dark:bg-[#131E32] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+        : "bg-white dark:bg-surface text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
     );
 
   return (
@@ -73,7 +73,7 @@ export default async function MentorHomeworkPage({ searchParams }: PageProps) {
               <li key={item.lessonId}>
                 <Link
                   href={`/mentor/homework/${item.lessonId}`}
-                  className="group flex h-full flex-col gap-3 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] hover:border-teal-500/40 hover:shadow-md transition-all"
+                  className="group flex h-full flex-col gap-3 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface hover:border-teal-500/40 hover:shadow-md transition-all"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="teal">{item.groupName}</Badge>

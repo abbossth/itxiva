@@ -114,7 +114,7 @@ export function LessonsManager({
                   "px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 min-h-[44px] flex items-center justify-center snap-start",
                   isSelected
                     ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
-                    : "bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    : "bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >
                 {g.name} ({g.grade}-sinf)
@@ -140,14 +140,14 @@ export function LessonsManager({
                 router.push(`/mentor/lessons?groupId=${currentGroupId}&quarter=${q}`);
               }}
               aria-label="Chorakni tanlang"
-              className="appearance-none pl-3.5 pr-9 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 shadow-xs hover:border-teal-500/50 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer min-h-[44px]"
+              className="appearance-none pl-3.5 pr-9 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 shadow-xs hover:border-teal-500/50 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer min-h-[44px]"
             >
               <option value={1}>1-chorak</option>
               <option value={2}>2-chorak</option>
               <option value={3}>3-chorak</option>
               <option value={4}>4-chorak</option>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+            <ChevronDown className="w-4 h-4 text-slate-500 dark:text-slate-400 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@ export function LessonsManager({
                 key={lesson._id.toString()}
                 className={cn(
                   "flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all gap-4",
-                  "bg-white dark:bg-[#131E32]",
+                  "bg-white dark:bg-surface",
                   lesson.isPublished
                     ? "border-slate-200/80 dark:border-slate-800/80 shadow-xs"
                     : "border-dashed border-amber-300 dark:border-amber-800/60 bg-amber-50/15 dark:bg-amber-950/10"
@@ -196,9 +196,9 @@ export function LessonsManager({
                     </Badge>
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
                     {lesson.title}
-                  </h3>
+                  </h2>
 
                   {lesson.topic && (
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
@@ -206,7 +206,7 @@ export function LessonsManager({
                     </p>
                   )}
 
-                  <div className="flex items-center gap-3 text-xs text-slate-400 pt-1">
+                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1">
                     {videoCount > 0 && (
                       <span className="flex items-center gap-1 font-medium text-rose-600 dark:text-rose-400">
                         <Video className="w-3.5 h-3.5" />
@@ -261,7 +261,7 @@ export function LessonsManager({
                   <button
                     type="button"
                     onClick={() => setLessonToDelete(lesson)}
-                    className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer min-h-[44px] flex items-center justify-center"
+                    className="p-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer min-h-[44px] flex items-center justify-center"
                     aria-label={`${lesson.title} darsini o'chirish`}
                     title="O'chirish"
                   >

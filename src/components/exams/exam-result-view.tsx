@@ -109,9 +109,9 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
 
       {/* Detailed Question Review */}
       <div className="space-y-4">
-        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
           Savollar tahlili va xatolar
-        </h3>
+        </h2>
 
         {exam.questions.map((q, idx) => {
           const qId = q._id?.toString() || "";
@@ -121,16 +121,16 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
           return (
             <Card
               key={qId}
-              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-4"
+              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-4"
             >
               <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div className="space-y-1">
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                     {idx + 1}-savol &bull; Ball: {studentAns?.pointsAwarded || 0} / {q.points}
                   </span>
-                  <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap">
                     {q.prompt}
-                  </h4>
+                  </h3>
                 </div>
 
                 <div>
@@ -153,7 +153,7 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
               {/* Answers preview */}
               <div className="space-y-2 text-sm">
                 <div>
-                  <span className="text-xs font-semibold text-slate-400 block">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
                     Sizning javobingiz:
                   </span>
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 text-slate-800 dark:text-slate-200 mt-1">
@@ -174,7 +174,7 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
                         <span>{studentAns.repoUrl}</span>
                       </div>
                     ) : (
-                      <span className="text-slate-400 italic">Javob berilmagan</span>
+                      <span className="text-slate-500 dark:text-slate-400 italic">Javob berilmagan</span>
                     )}
                   </div>
                 </div>

@@ -104,9 +104,9 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
             <span className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
               <HelpCircle className="w-5 h-5" />
             </span>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
               {quiz.title}
-            </h3>
+            </h2>
           </div>
           {quiz.description && (
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -153,7 +153,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     {idx + 1}-savol ({q.points} ball)
                   </span>
                   <p className="text-base font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap">

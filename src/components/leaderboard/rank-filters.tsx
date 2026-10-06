@@ -35,7 +35,7 @@ export function RankFilters({
           className={cn(
             "flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] whitespace-nowrap cursor-pointer",
             filterType === "all"
-              ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+              ? "bg-white dark:bg-surface text-teal-600 dark:text-teal-400 shadow-xs"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           )}
         >
@@ -48,7 +48,7 @@ export function RankFilters({
           className={cn(
             "flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] whitespace-nowrap cursor-pointer",
             filterType === "group"
-              ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+              ? "bg-white dark:bg-surface text-teal-600 dark:text-teal-400 shadow-xs"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           )}
         >
@@ -61,7 +61,7 @@ export function RankFilters({
           className={cn(
             "flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all min-h-[40px] whitespace-nowrap cursor-pointer",
             filterType === "grade"
-              ? "bg-white dark:bg-[#131E32] text-teal-600 dark:text-teal-400 shadow-xs"
+              ? "bg-white dark:bg-surface text-teal-600 dark:text-teal-400 shadow-xs"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
           )}
         >

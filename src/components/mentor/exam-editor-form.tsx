@@ -210,11 +210,11 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
       )}
 
       {/* Basic Settings Card */}
-      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-5">
-        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-5">
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-teal-600 dark:text-teal-400" />
           <span>Asosiy ma&apos;lumotlar</span>
-        </h3>
+        </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5 sm:col-span-2">
@@ -361,12 +361,12 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
       </Card>
 
       {/* Questions Builder Card */}
-      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-5">
+      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               Savollar va topshiriqlar ({questions.length})
-            </h3>
+            </h2>
             <p className="text-xs text-slate-500">
               Jami ball: {questions.reduce((sum, q) => sum + q.points, 0)}
             </p>
@@ -459,7 +459,7 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
                   <button
                     type="button"
                     onClick={() => removeQuestion(qIdx)}
-                    className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                    className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -514,7 +514,7 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
                         <button
                           type="button"
                           onClick={() => removeOption(qIdx, optIdx)}
-                          className="p-1 text-slate-400 hover:text-rose-500"
+                          className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

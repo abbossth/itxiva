@@ -25,7 +25,7 @@ export default async function DashboardLayout({
   const badges = { orders, homework };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0B1220]">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-bg">
       {/* Lokal ishlab chiqishda: bu yerdagi o'zgarishlar (masalan, parol tiklash) itxiva.uz ga ta'sir qilmaydi */}
       {process.env.NODE_ENV !== "production" && (
         <div className="bg-amber-400 text-amber-950 text-xs font-bold text-center px-3 py-1.5">

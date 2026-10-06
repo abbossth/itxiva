@@ -206,19 +206,19 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
             <div
               key={p._id}
               className={cn(
-                "p-4 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 transition-opacity",
+                "p-4 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 transition-opacity",
                 !p.isActive && "opacity-60"
               )}
             >
               <ProductImage src={p.imageUrl} alt={p.title} className="aspect-[4/3] w-full" />
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                     {p.category || "Sovg'a"}
                   </span>
                   <Badge variant={p.isActive ? "success" : "secondary"}>{p.isActive ? "Do'konda" : "Yashirilgan"}</Badge>
                 </div>
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 leading-snug">{p.title}</h3>
+                <h2 className="font-bold text-slate-900 dark:text-slate-100 leading-snug">{p.title}</h2>
                 {p.description && (
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{p.description}</p>
                 )}
@@ -287,7 +287,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                   <ImagePlus className="w-4 h-4" />
                   {form.imageKey ? "Rasmni almashtirish" : "Rasm yuklash"}
                 </Button>
-                <p className="text-[11px] text-slate-400">Ixtiyoriy. Rasm avtomatik siqiladi.</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Ixtiyoriy. Rasm avtomatik siqiladi.</p>
               </div>
             </div>
 

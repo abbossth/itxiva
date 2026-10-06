@@ -39,7 +39,7 @@ export function MobileNav({ role, badges = {} }: MobileNavProps) {
   return (
     <>
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-[#0B1220]/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-bg/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]"
         aria-label="Pastki mobil navigatsiya"
       >
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">

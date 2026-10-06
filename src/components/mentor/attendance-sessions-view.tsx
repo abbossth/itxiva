@@ -198,7 +198,7 @@ export function AttendanceSessionsView({
             className={cn(
               "px-5 min-h-[40px] rounded-xl text-sm font-semibold transition-all cursor-pointer",
               tab === id
-                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
             )}
           >
@@ -222,7 +222,7 @@ export function AttendanceSessionsView({
           Bugungi darslar
         </h2>
         {todaysGroups.length === 0 ? (
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-sm text-slate-500 dark:text-slate-400">
+          <div className="p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-sm text-slate-500 dark:text-slate-400">
             {groups.some((g) => isValidSchedule(g.schedule))
               ? "Bugun jadval bo'yicha dars yo'q."
               : "Guruhlarga dars jadvali belgilanmagan. Guruhlar sahifasida jadvalni kiriting yoki Excel'dan import qiling."}
@@ -237,7 +237,7 @@ export function AttendanceSessionsView({
                 <div
                   key={id}
                   className={cn(
-                    "p-4 rounded-2xl bg-white dark:bg-[#131E32] border shadow-xs flex items-center gap-3",
+                    "p-4 rounded-2xl bg-white dark:bg-surface border shadow-xs flex items-center gap-3",
                     live && !existing
                       ? "border-teal-500/60 ring-2 ring-teal-500/15"
                       : "border-slate-200/80 dark:border-slate-800/80"
@@ -296,9 +296,9 @@ export function AttendanceSessionsView({
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     {s.groupId?.name} ({s.groupId?.grade}-sinf)
-                  </h3>
+                  </h2>
 
                   <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300 mt-2">
                     <span className="flex items-center gap-1">
@@ -347,7 +347,7 @@ export function AttendanceSessionsView({
         </div>
 
         {closedSessions.length === 0 ? (
-          <div className="p-12 text-center rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-400">
+          <div className="p-12 text-center rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
             Hali yakunlangan davomatlar mavjud emas
           </div>
         ) : (
@@ -355,19 +355,19 @@ export function AttendanceSessionsView({
             {closedSessions.map((s) => (
               <div
                 key={s._id}
-                className="p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                className="p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col justify-between space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-xs text-slate-400 font-mono">
+                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                       {formatDateUz(s.date)}
                     </span>
                     <Badge variant="default">Yakunlangan</Badge>
                   </div>
 
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                     {s.groupId?.name} ({s.groupId?.grade}-sinf)
-                  </h3>
+                  </h2>
 
                   <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-2">
                     <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -461,7 +461,7 @@ export function AttendanceSessionsView({
                 id="session-group"
                 value={selectedGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 text-sm min-h-[44px]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-bg text-slate-900 dark:text-slate-100 text-sm min-h-[44px]"
                 required
               >
                 {groups.map((g) => (

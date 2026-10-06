@@ -128,7 +128,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: ShopOrder[] })
           {visible.map((order) => (
             <div
               key={order._id}
-              className="p-4 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3"
+              className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3"
             >
               <div className="flex items-center gap-3">
                 <Avatar name={order.student?.fullName || "?"} size="sm" />
@@ -152,7 +152,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: ShopOrder[] })
                 <CoinBadge amount={order.price} size="sm" animate={false} />
               </div>
 
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                 <Clock className="w-3.5 h-3.5" />
                 {order.createdAt ? formatDateTimeUz(order.createdAt) : ""}
                 {order.mentorNote ? <span className="italic truncate"> · {order.mentorNote}</span> : null}

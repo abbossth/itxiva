@@ -22,7 +22,7 @@ export default async function QrAttendancePage({ params }: QrAttendancePageProps
   if (session.role === "mentor") {
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-4">
-        <div className="max-w-md p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-center space-y-3">
+        <div className="max-w-md p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-center space-y-3">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
             Mentor hisobi aniqlandi
           </h2>

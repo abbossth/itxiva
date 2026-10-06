@@ -102,7 +102,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
       />
 
       {/* Xulosa */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
             <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{percent}%</div>
@@ -137,7 +137,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400 pointer-events-none" />
         <Input
           aria-label="O'quvchini qidirish"
           value={search}
@@ -148,9 +148,9 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
       </div>
 
       {/* Ro'yxat */}
-      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] divide-y divide-slate-100 dark:divide-slate-800">
+      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface divide-y divide-slate-100 dark:divide-slate-800">
         {visible.length === 0 ? (
-          <div className="p-10 text-center text-sm text-slate-400">O&apos;quvchi topilmadi</div>
+          <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">O&apos;quvchi topilmadi</div>
         ) : (
           visible.map((row) => {
             const current = row.status ?? "absent";
@@ -160,7 +160,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
                   <Avatar name={row.fullName} size="sm" />
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{row.fullName}</div>
-                    <div className="text-[11px] text-slate-400">
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
                       {row.status === null
                         ? "Belgilanmagan"
                         : `${row.method ? METHOD_LABEL[row.method] : ""}${

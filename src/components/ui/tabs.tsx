@@ -87,7 +87,7 @@ export function TabsTrigger({
         "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-xs sm:text-sm font-medium transition-all select-none cursor-pointer min-h-[38px] snap-start shrink-0",
         "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
         isActive
-          ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 font-semibold shadow-xs"
+          ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 font-semibold shadow-xs"
           : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200",
         className
       )}

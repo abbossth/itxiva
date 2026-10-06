@@ -83,7 +83,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
       </div>
 
       {/* Desktop Table View (>= md) */}
-      <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]">
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
         <table className="w-full text-left text-xs sm:text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">
             <tr>
@@ -97,7 +97,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-800 dark:text-slate-200">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-slate-400">
+                <td colSpan={5} className="p-10 text-center text-slate-500 dark:text-slate-400">
                   Audit loglar hali mavjud emas
                 </td>
               </tr>
@@ -113,7 +113,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
                   <tr key={log._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="p-4 text-xs text-slate-500 whitespace-nowrap">
                       <span className="flex items-center gap-1.5 font-mono">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                         {formatDateTimeUz(log.createdAt)}
                       </span>
                     </td>
@@ -122,12 +122,12 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
                     </td>
                     <td className="p-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <User className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                         <span className="font-semibold text-slate-900 dark:text-slate-100">
                           {log.actorId ? log.actorId.fullName : "Tizim"}
                         </span>
                         {log.actorId && (
-                          <span className="text-xs text-slate-400 font-mono">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                             @{log.actorId.login}
                           </span>
                         )}
@@ -150,7 +150,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
                         <button
                           type="button"
                           onClick={() => toggleExpand(log._id)}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
+                          className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
                           title={isExpanded ? "Yopish" : "JSON kodini ko'rish"}
                         >
                           {isExpanded ? (
@@ -172,7 +172,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
       {/* Mobile Card View (< md, fixes K2) */}
       <div className="md:hidden space-y-3">
         {logs.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 text-slate-400">
+          <div className="p-8 text-center rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-slate-500 dark:text-slate-400">
             Audit loglar hali mavjud emas
           </div>
         ) : (
@@ -186,11 +186,11 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
             return (
               <div
                 key={log._id}
-                className="p-4 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5"
+                className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5"
               >
                 <div className="flex items-center justify-between gap-2">
                   <Badge variant={actionInfo.variant}>{actionInfo.label}</Badge>
-                  <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {formatDateTimeUz(log.createdAt)}
                   </span>
@@ -203,7 +203,7 @@ export function AuditLogView({ logs }: AuditLogViewProps) {
                       {log.actorId ? log.actorId.fullName : "Tizim"}
                     </span>
                     {log.actorId && (
-                      <span className="text-slate-400 ml-1 font-mono">@{log.actorId.login}</span>
+                      <span className="text-slate-500 dark:text-slate-400 ml-1 font-mono">@{log.actorId.login}</span>
                     )}
                   </div>
                 </div>

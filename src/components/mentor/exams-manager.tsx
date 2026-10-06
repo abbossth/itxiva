@@ -148,9 +148,9 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
           <div className="inline-flex p-4 rounded-3xl bg-teal-500/10 text-teal-600">
             <FileCheck className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200">
             Imtihonlar mavjud emas
-          </h3>
+          </h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Yangi imtihon yaratish orqali o&apos;quvchilar bilimini choraklar bo&apos;yicha baholang.
           </p>
@@ -165,7 +165,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
             return (
               <Card
                 key={eId}
-                className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-4 hover:border-teal-500/30 transition-all"
+                className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-4 hover:border-teal-500/30 transition-all"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="space-y-1.5 flex-1">
@@ -192,15 +192,15 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
                           <span>Natijalar ochiq</span>
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-xs text-slate-400">
+                        <Badge variant="outline" className="text-xs text-slate-500 dark:text-slate-400">
                           Natijalar yopiq
                         </Badge>
                       )}
                     </div>
 
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                       {exam.title}
-                    </h3>
+                    </h2>
 
                     {exam.description && (
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
@@ -209,7 +209,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
                     )}
 
                     <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" />
                         Guruhlar:
                       </span>
@@ -257,7 +257,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
                     <span>O&apos;tish: {exam.passingScore}%</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                     <span className="truncate">
                       {formatDateTimeUz(exam.startTime)} —{" "}
                       {formatDateTimeUz(exam.endTime)}

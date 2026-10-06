@@ -27,7 +27,7 @@ function shiftMonth(monthKey: string, delta: number) {
 }
 
 function percentClass(percent: number | null) {
-  if (percent === null) return "text-slate-400";
+  if (percent === null) return "text-slate-500 dark:text-slate-400";
   if (percent >= 85) return "text-emerald-600 dark:text-emerald-400";
   if (percent >= 60) return "text-amber-600 dark:text-amber-400";
   return "text-rose-600 dark:text-rose-400";
@@ -82,7 +82,7 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
           </Select>
         </div>
 
-        <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131E32] p-1">
+        <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-1">
           <button
             type="button"
             onClick={() => setMonthKey(shiftMonth(monthKey, -1))}
@@ -122,11 +122,11 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
         />
       ) : (
         <div className="space-y-3 page-enter">
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
-                  <th className="sticky left-0 z-10 bg-slate-50 dark:bg-[#1A2740] text-left font-bold p-3 min-w-[160px]">
+                  <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold p-3 min-w-[160px]">
                     O&apos;quvchi
                   </th>
                   {journal.sessions.map((s) => {
@@ -150,8 +150,8 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {journal.students.map((st, idx) => (
                   <tr key={st.studentId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                    <td className="sticky left-0 z-10 bg-white dark:bg-[#131E32] p-3 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
-                      <span className="text-slate-400 font-normal mr-1.5">{idx + 1}.</span>
+                    <td className="sticky left-0 z-10 bg-white dark:bg-surface p-3 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
+                      <span className="text-slate-500 dark:text-slate-400 font-normal mr-1.5">{idx + 1}.</span>
                       {st.fullName}
                     </td>
                     {journal.sessions.map((s) => {
@@ -173,7 +173,7 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
                     })}
                     <td className={cn("p-3 text-right font-black tabular-nums", percentClass(st.percent))}>
                       {st.percent === null ? "—" : `${st.percent}%`}
-                      <span className="block text-[10px] font-normal text-slate-400">
+                      <span className="block text-[10px] font-normal text-slate-500 dark:text-slate-400">
                         {st.attended}/{st.total}
                       </span>
                     </td>

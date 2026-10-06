@@ -21,7 +21,7 @@ function HomeworkRow({ item }: { item: MyHomeworkItem }) {
     <li>
       <Link
         href={`/lessons/${item.lessonId}#homework`}
-        className="group flex items-center gap-3 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] hover:border-teal-500/40 hover:shadow-md transition-all min-h-[72px]"
+        className="group flex items-center gap-3 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface hover:border-teal-500/40 hover:shadow-md transition-all min-h-[72px]"
       >
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -31,9 +31,9 @@ function HomeworkRow({ item }: { item: MyHomeworkItem }) {
             <Badge variant={HOMEWORK_STATE_BADGE[item.state]}>{HOMEWORK_STATE_LABELS[item.state]}</Badge>
             {item.isLate && <Badge variant="danger">Kechikkan</Badge>}
           </div>
-          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 line-clamp-2 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 line-clamp-2 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
             {item.lessonTitle}
-          </h3>
+          </h2>
           {item.dueAt && item.state !== "graded" && (
             <p
               className={`flex flex-wrap items-center gap-1.5 text-xs font-medium ${
@@ -57,7 +57,7 @@ function HomeworkRow({ item }: { item: MyHomeworkItem }) {
             <CoinBadge amount={item.coinsReward} size="sm" animate={false} />
           )}
         </div>
-        <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />
+        <ChevronRight className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" />
       </Link>
     </li>
   );
@@ -68,7 +68,7 @@ function Section({ title, items }: { title: string; items: MyHomeworkItem[] }) {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-        {title} <span className="text-slate-400 font-semibold">({items.length})</span>
+        {title} <span className="text-slate-500 dark:text-slate-400 font-semibold">({items.length})</span>
       </h2>
       <ul className="space-y-2.5">
         {items.map((item) => (

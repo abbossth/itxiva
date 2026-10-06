@@ -24,7 +24,7 @@ export default function MentorLessonsLoading() {
         {[1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
-            className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+            className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4"
           >
             <div className="space-y-2 flex-1">
               <div className="flex items-center gap-2">

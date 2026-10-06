@@ -4,9 +4,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
+  /* Semantik tokenlar (qiymatlari :root va .dark ichida) */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -19,25 +20,55 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
 
+  /* Neytral shkala: sof kulrangga yaqin, ozgina sovuq tus ("dev tool" uslubi).
+     400 — qorong'i fonda, 500 — yorug' fonda ikkinchi darajali matn uchun (ikkalasi ham WCAG AA). */
+  --color-slate-50: #F6F7F9;
+  --color-slate-100: #EEF0F3;
+  --color-slate-200: #E1E4E9;
+  --color-slate-300: #C9CED6;
+  --color-slate-400: #98A0AB;
+  --color-slate-500: #626B77;
+  --color-slate-600: #4A525E;
+  --color-slate-700: #343B46;
+  --color-slate-800: #1F252E;
+  --color-slate-900: #14181F;
+  --color-slate-950: #0A0D12;
+
+  /* Accent — Xiva koshinlarining firuza rangi. 600 oq matn bilan AA kontrast beradi (4.75:1). */
+  --color-teal-50: #EDFCF9;
+  --color-teal-100: #CFF8F0;
+  --color-teal-200: #9FF0E2;
+  --color-teal-300: #63E2D0;
+  --color-teal-400: #2DD4BF;
+  --color-teal-500: #12B5A3;
+  --color-teal-600: #0B8177;
+  --color-teal-700: #0C6B63;
+  --color-teal-800: #0E5650;
+  --color-teal-900: #104843;
+  --color-teal-950: #052B28;
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+
+  --shadow-xs: 0 1px 2px 0 rgb(10 13 18 / 0.05);
+  --shadow-card: 0 1px 2px 0 rgb(10 13 18 / 0.04), 0 8px 24px -12px rgb(10 13 18 / 0.12);
 }
 
 @layer base {
   :root {
     /* Audit Design Tokens (Light Theme) */
-    --bg: #F8FAFC;
+    --bg: #F6F7F9;
     --surface: #FFFFFF;
-    --surface-2: #F1F5F9;
-    --border: #E2E8F0;
-    --text: #0F172A;
-    --text-muted: #475569;
-    --primary: #0F766E;
-    --primary-grad: linear-gradient(135deg, #0D9488 0%, #2563EB 100%);
-    --primary-gradient-from: #0D9488;
-    --primary-gradient-to: #2563EB;
+    --surface-2: #EEF0F3;
+    --border: #E1E4E9;
+    --text: #14181F;
+    --text-muted: #4A525E;
+    --primary: #0B8177;
+    --primary-grad: linear-gradient(135deg, #0B8177 0%, #0C6B63 100%);
+    --primary-gradient-from: #0B8177;
+    --primary-gradient-to: #0C6B63;
     --primary-foreground: #FFFFFF;
     --gold: #B45309;
     --gold-surface: #FEF3C7;
@@ -69,17 +100,17 @@
 
   .dark {
     /* Audit Design Tokens (Dark Theme) */
-    --bg: #0B1220;
-    --surface: #111A2E;
-    --surface-2: #16213A;
-    --border: #1F2B45;
-    --text: #F1F5F9;
-    --text-muted: #94A3B8;
+    --bg: #0A0D12;
+    --surface: #11151C;
+    --surface-2: #171C25;
+    --border: #232A36;
+    --text: #EEF0F3;
+    --text-muted: #98A0AB;
     --primary: #2DD4BF;
-    --primary-grad: linear-gradient(135deg, #14B8A6 0%, #3B82F6 100%);
-    --primary-gradient-from: #14B8A6;
-    --primary-gradient-to: #3B82F6;
-    --primary-foreground: #0B1220;
+    --primary-grad: linear-gradient(135deg, #0B8177 0%, #0C6B63 100%);
+    --primary-gradient-from: #0B8177;
+    --primary-gradient-to: #0C6B63;
+    --primary-foreground: #0A0D12;
     --gold: #FBBF24;
     --gold-surface: rgba(245, 158, 11, 0.15);
     --success: #4ADE80;
@@ -99,10 +130,10 @@
     --muted: var(--surface-2);
     --muted-foreground: var(--text-muted);
     --accent: var(--gold);
-    --accent-foreground: #0B1220;
+    --accent-foreground: #0A0D12;
     --destructive: var(--danger);
     --destructive-foreground: #FFFFFF;
-    --success-foreground: #0B1220;
+    --success-foreground: #0A0D12;
     --input: var(--border);
     --ring: var(--primary);
   }
@@ -115,10 +146,35 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
-/* Tabular numbers utility for consistent digits/counters/timers */
-.tabular-nums {
+/* Sarlavhalar, raqamlar va kod — mono shriftda; raqamlar bir xil kenglikda */
+/* font-black faqat katta sarlavha va yirik raqamlarda ishlatiladi */
+h1,
+code,
+pre,
+kbd,
+.tabular-nums,
+.font-black,
+.font-display {
+  font-family: var(--font-mono);
+}
+
+h1,
+.font-black,
+.font-display {
+  letter-spacing: -0.035em;
+}
+
+.tabular-nums,
+.font-mono {
   font-variant-numeric: tabular-nums;
 }
+
+/* Klaviatura bilan yurganda fokus doim ko'rinadi */
+:focus-visible {
+  outline: 2px solid var(--color-teal-500);
+  outline-offset: 2px;
+}
+
 
 /* Custom Gradients */
 .bg-itxiva-gradient {
@@ -220,3 +276,25 @@ body {
 .page-stage > * {
   animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
+
+/* Logo animatsiyasi: qavslar ikki yondan yaqinlashadi, minora pastdan ko'tariladi (faqat transform va opacity) */
+@keyframes logo-bracket-left {
+  from { opacity: 0; transform: translateX(-7px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes logo-bracket-right {
+  from { opacity: 0; transform: translateX(7px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes logo-tower {
+  from { opacity: 0; transform: translateY(8px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+.logo-animated .logo-bracket-left { animation: logo-bracket-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards; }
+.logo-animated .logo-bracket-right { animation: logo-bracket-right 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards; }
+.logo-animated .logo-tower {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: logo-tower 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.logo-wordmark { animation: page-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.25s backwards; }

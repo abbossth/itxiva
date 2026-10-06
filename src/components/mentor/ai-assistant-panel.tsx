@@ -101,7 +101,7 @@ export function AiAssistantPanel({
   if (!enabled) {
     return (
       <div className="p-5 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 flex items-start gap-3">
-        <Sparkles className="w-5 h-5 shrink-0 text-slate-400 mt-0.5" />
+        <Sparkles className="w-5 h-5 shrink-0 text-slate-500 dark:text-slate-400 mt-0.5" />
         <span>
           AI yordamchi o&apos;chirilgan: serverda <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> yoki{" "}
           <code className="font-mono text-xs">GEMINI_API_KEY</code> sozlanmagan.
@@ -113,7 +113,7 @@ export function AiAssistantPanel({
   const canUseLesson = lesson.title.trim().length >= 3;
 
   return (
-    <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-[#131E32] dark:to-blue-950/30 border border-teal-500/30 space-y-5">
+    <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-surface dark:to-blue-950/30 border border-teal-500/30 space-y-5">
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-xl bg-itxiva-gradient text-white flex items-center justify-center shrink-0">
           <Sparkles className="w-5 h-5" />
@@ -214,7 +214,7 @@ export function AiAssistantPanel({
       )}
 
       {draft && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#0B1220] border border-slate-200 dark:border-slate-800 space-y-3 page-enter">
+        <div className="p-4 rounded-2xl bg-white dark:bg-bg border border-slate-200 dark:border-slate-800 space-y-3 page-enter">
           <div>
             <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{draft.title}</div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{draft.topic}</div>
@@ -246,7 +246,7 @@ export function AiAssistantPanel({
       )}
 
       {improved !== null && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#0B1220] border border-slate-200 dark:border-slate-800 space-y-3 page-enter">
+        <div className="p-4 rounded-2xl bg-white dark:bg-bg border border-slate-200 dark:border-slate-800 space-y-3 page-enter">
           <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Yaxshilangan konspekt
           </div>
@@ -281,7 +281,7 @@ export function AiAssistantPanel({
           {files.map((file, i) => (
             <li
               key={`${file.filename}-${i}`}
-              className="p-3 rounded-2xl bg-white dark:bg-[#0B1220] border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center gap-2 page-enter"
+              className="p-3 rounded-2xl bg-white dark:bg-bg border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center gap-2 page-enter"
             >
               <span className="flex items-center gap-2 min-w-0 flex-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {file.filename.endsWith(".pptx") ? (

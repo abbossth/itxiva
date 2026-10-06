@@ -145,7 +145,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
 
       {/* "Bugun" Summary Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
             <School className="w-6 h-6" />
           </div>
@@ -159,7 +159,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
             <Users className="w-6 h-6" />
           </div>
@@ -173,7 +173,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
             <GraduationCap className="w-6 h-6" />
           </div>
@@ -193,29 +193,29 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
         {groups.map((group) => (
           <div
             key={group._id.toString()}
-            className="group relative flex flex-col justify-between p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all"
+            className="group relative flex flex-col justify-between p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all"
           >
             <div>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <Badge variant="teal">{group.grade}-sinf</Badge>
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {group.academicYear}
                 </span>
               </div>
 
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
                 {group.name} guruhi
-              </h3>
+              </h2>
 
               <div className="flex items-center gap-2 mt-3 text-xs text-slate-600 dark:text-slate-300">
-                <Users className="w-4 h-4 text-slate-400" />
+                <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                 <span>
                   <strong>{group.studentCount || 0}</strong> nafar o&apos;quvchi
                 </span>
               </div>
 
               <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300">
-                <CalendarClock className="w-4 h-4 text-slate-400" />
+                <CalendarClock className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                 <span className={isValidSchedule(group.schedule) ? "font-semibold" : "text-amber-600 dark:text-amber-400"}>
                   {formatSchedule(group.schedule)}
                 </span>
@@ -227,7 +227,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               <button
                 type="button"
                 onClick={() => openEdit(group)}
-                className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
+                className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
                 aria-label={`${group.name} guruhini tahrirlash`}
                 title="Nom va jadvalni tahrirlash"
               >
@@ -236,7 +236,7 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               <button
                 type="button"
                 onClick={() => setGroupToDelete(group)}
-                className="p-2.5 min-h-[44px] min-w-[44px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
+                className="p-2.5 min-h-[44px] min-w-[44px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors cursor-pointer flex items-center justify-center"
                 aria-label={`${group.name} guruhini o'chirish`}
                 title="Guruhni o'chirish"
               >

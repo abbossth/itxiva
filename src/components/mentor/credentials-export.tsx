@@ -77,7 +77,7 @@ export function CredentialsExport({ groupId, groupName }: { groupId: string; gro
           onClick={() => setIsOpen(true)}
           aria-label="Login va parollarni Excelga yuklab olish"
           title="Login va parollarni yuklab olish"
-          className="h-11 w-44 rounded-xl opacity-0 hover:opacity-60 focus-visible:opacity-100 transition-opacity cursor-pointer flex items-center justify-center gap-2 text-[11px] text-slate-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
+          className="h-11 w-44 rounded-xl opacity-0 hover:opacity-60 focus-visible:opacity-100 transition-opacity cursor-pointer flex items-center justify-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
         >
           <FileSpreadsheet className="w-4 h-4" />
           Login va parollar

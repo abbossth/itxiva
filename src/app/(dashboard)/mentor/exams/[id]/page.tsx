@@ -55,7 +55,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
       </div>
 
       {/* Exam Overview Banner */}
-      <Card className="p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
@@ -98,16 +98,16 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
 
         {submissions.length === 0 ? (
           <Card className="p-12 text-center rounded-3xl border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-            <FileCheck className="w-8 h-8 text-slate-400 mx-auto" />
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
+            <FileCheck className="w-8 h-8 text-slate-500 dark:text-slate-400 mx-auto" />
+            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">
               Hozircha hech kim topshirmagan
-            </h3>
+            </h2>
             <p className="text-xs text-slate-500">
               O&apos;quvchilar imtihonni topshirishi bilan ularning javoblari shu yerda ko&apos;rinadi.
             </p>
           </Card>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32]">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500 border-b border-slate-200 dark:border-slate-800">
                 <tr>
@@ -133,7 +133,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
                         <div className="font-semibold text-slate-900 dark:text-slate-100">
                           {sub.studentName}
                         </div>
-                        <div className="text-xs text-slate-400">{sub.studentLogin}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{sub.studentLogin}</div>
                       </td>
                       <td className="px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300">
                         {sub.groupName}

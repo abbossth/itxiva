@@ -59,7 +59,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             className={cn(
               "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "all"
-                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -75,7 +75,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             className={cn(
               "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "group"
-                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -87,7 +87,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             className={cn(
               "flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap snap-start",
               type === "grade"
-                ? "bg-white dark:bg-[#131E32] text-teal-700 dark:text-teal-300 shadow-xs"
+                ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             )}
           >
@@ -108,7 +108,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                     "px-4 py-2 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[40px] flex items-center justify-center snap-start",
                     isSelected
                       ? "bg-teal-600 text-white shadow-xs"
-                      : "bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      : "bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                 >
                   {g.name} ({g.grade}-sinf)
@@ -131,7 +131,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
                     "px-4 py-2 rounded-xl text-xs font-semibold transition-colors shrink-0 min-h-[40px] flex items-center justify-center snap-start",
                     isSelected
                       ? "bg-teal-600 text-white shadow-xs"
-                      : "bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      : "bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                 >
                   {gr}-sinflar
@@ -144,7 +144,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
       {/* Top 3 Podium or Empty Inspiration Banner (fixes K3) */}
       {hasAnyCoins ? (
-        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-4 sm:p-6 shadow-xs">
+        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-6 shadow-xs">
           <Podium top3={leaderboardData.top3} />
         </div>
       ) : (
@@ -152,9 +152,9 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
             Hali hech kim coin to&apos;plamagan — birinchi bo&apos;ling!
-          </h3>
+          </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             Darslarda qatnashing, davomatdan o&apos;ting va testlarni yechib birinchi o&apos;ringa ko&apos;tariling.
           </p>

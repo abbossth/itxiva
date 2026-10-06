@@ -14,13 +14,13 @@ export function StatTile({
   hint?: string;
 }) {
   return (
-    <div className="p-4 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
+    <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
       <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
         <Icon className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
         <span className="truncate">{label}</span>
       </div>
       <div className="mt-2 text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{value}</div>
-      {hint && <div className="text-[11px] text-slate-400 mt-0.5">{hint}</div>}
+      {hint && <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{hint}</div>}
     </div>
   );
 }
@@ -41,7 +41,7 @@ export function ReportSection({
   return (
     <section
       className={cn(
-        "p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4",
+        "p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4",
         className
       )}
     >
@@ -77,7 +77,7 @@ export function BarList({
   emptyText?: string;
 }) {
   if (items.length === 0) {
-    return <p className="py-6 text-center text-xs text-slate-400">{emptyText}</p>;
+    return <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">{emptyText}</p>;
   }
   const top = max ?? Math.max(1, ...items.map((i) => i.value ?? 0));
   return (
@@ -87,7 +87,7 @@ export function BarList({
           <div className="flex items-baseline justify-between gap-3 text-xs">
             <span className="min-w-0 truncate font-semibold text-slate-800 dark:text-slate-200">
               {item.label}
-              {item.sub && <span className="ml-1.5 font-normal text-slate-400">{item.sub}</span>}
+              {item.sub && <span className="ml-1.5 font-normal text-slate-500 dark:text-slate-400">{item.sub}</span>}
             </span>
             <span className="shrink-0 font-bold tabular-nums text-slate-900 dark:text-slate-100">{item.display}</span>
           </div>

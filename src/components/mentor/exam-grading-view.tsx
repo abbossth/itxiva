@@ -128,7 +128,7 @@ export function ExamGradingView({
       </div>
 
       {/* Student Banner */}
-      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
             <User className="w-6 h-6" />
@@ -148,7 +148,7 @@ export function ExamGradingView({
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block">
+            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block">
               Hisoblangan ball
             </span>
             <span className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono">
@@ -187,16 +187,16 @@ export function ExamGradingView({
           return (
             <Card
               key={qId}
-              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-4"
+              className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-4"
             >
               <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800/80 pb-3">
                 <div className="space-y-1">
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                     {idx + 1}-savol &bull; Maksimal ball: {q.points}
                   </span>
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap">
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap">
                     {q.prompt}
-                  </h3>
+                  </h2>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -209,14 +209,14 @@ export function ExamGradingView({
                     onChange={(e) => updateGrade(qId, Number(e.target.value) || 0)}
                     className="w-16 px-2 py-1 text-center font-bold text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   />
-                  <span className="text-xs text-slate-400">/ {q.points}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">/ {q.points}</span>
                 </div>
               </div>
 
               {/* Student's answer display */}
               <div className="space-y-3">
                 <div>
-                  <span className="text-xs font-semibold text-slate-400 block">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
                     O&apos;quvchi javobi:
                   </span>
                   <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 text-slate-800 dark:text-slate-200 mt-1 text-sm">
@@ -231,7 +231,7 @@ export function ExamGradingView({
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-teal-600" />
                           <span className="font-semibold">{ans.fileName}</span>
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             ({Math.round((ans.fileSize || 0) / 1024)} KB)
                           </span>
                         </div>
@@ -263,7 +263,7 @@ export function ExamGradingView({
                         </a>
                       </div>
                     ) : (
-                      <span className="italic text-slate-400">Javob berilmagan</span>
+                      <span className="italic text-slate-500 dark:text-slate-400">Javob berilmagan</span>
                     )}
                   </div>
                 </div>
@@ -298,7 +298,7 @@ export function ExamGradingView({
         })}
 
         {/* General Feedback Card */}
-        <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] shadow-xs space-y-3">
+        <Card className="p-5 sm:p-6 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-3">
           <label className="text-sm font-bold text-slate-900 dark:text-slate-100 block">
             Umumiy xulosa va tavsiyalar
           </label>

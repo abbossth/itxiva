@@ -64,32 +64,32 @@ export default function UIDevShowroomPage() {
           <span>1. Rang va Kontrast tokenlari</span>
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-teal-700 dark:bg-teal-400" />
             <p className="text-xs font-bold">Primary</p>
             <p className="text-[10px] text-slate-500 font-mono">#0F766E / #2DD4BF</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-itxiva-gradient" />
             <p className="text-xs font-bold">Primary Grad</p>
             <p className="text-[10px] text-slate-500 font-mono">Teal &rarr; Blue</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-amber-500" />
             <p className="text-xs font-bold">Gold / Coin</p>
             <p className="text-[10px] text-slate-500 font-mono">#B45309 / #FBBF24</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-emerald-600 dark:bg-emerald-400" />
             <p className="text-xs font-bold">Success</p>
             <p className="text-[10px] text-slate-500 font-mono">#15803D / #4ADE80</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-rose-600 dark:bg-rose-400" />
             <p className="text-xs font-bold">Danger</p>
             <p className="text-[10px] text-slate-500 font-mono">#B91C1C / #F87171</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
+          <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 space-y-2 shadow-xs">
             <div className="w-full h-8 rounded-lg bg-amber-600 dark:bg-amber-400" />
             <p className="text-xs font-bold">Warning</p>
             <p className="text-[10px] text-slate-500 font-mono">#A16207 / #FACC15</p>

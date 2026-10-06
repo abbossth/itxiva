@@ -17,7 +17,7 @@ export default function MentorGroupsLoading() {
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div
             key={i}
-            className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] space-y-4"
+            className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface space-y-4"
           >
             <div className="flex items-center justify-between">
               <Skeleton className="h-6 w-28 rounded-lg" />

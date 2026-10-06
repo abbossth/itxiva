@@ -188,7 +188,7 @@ export function ExcelImportView() {
       </div>
 
       {/* 1. Fayl tanlash */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 space-y-4">
+      <div className="p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <input ref={fileRef} type="file" accept=".xlsx" onChange={handleFile} className="hidden" id="excel-file" />
           <Button
@@ -243,18 +243,18 @@ export function ExcelImportView() {
             {preview.groups.map((g) => (
               <div
                 key={g.name}
-                className="p-4 rounded-2xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 space-y-2"
+                className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-slate-900 dark:text-slate-100">{g.name}</span>
                   <Badge variant={g.exists ? "secondary" : "success"}>{g.exists ? "Mavjud" : "Yangi guruh"}</Badge>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                  <Users className="w-3.5 h-3.5 text-slate-400" />
+                  <Users className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                   {g.rowCount} o&apos;quvchi · {g.grade}-sinf
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                  <CalendarClock className="w-3.5 h-3.5 text-slate-400" />
+                  <CalendarClock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                   <span className={g.schedule ? "font-semibold" : "text-amber-600 dark:text-amber-400"}>
                     {g.scheduleLabel}
                   </span>
@@ -270,7 +270,7 @@ export function ExcelImportView() {
             {counts.skip > 0 && <Badge variant="warning">{counts.skip} ta o&apos;tkazib yuboriladi</Badge>}
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] divide-y divide-slate-100 dark:divide-slate-800">
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface divide-y divide-slate-100 dark:divide-slate-800">
             {preview.rows.map((row) => {
               const choice = choices[row.index];
               const options = row.match ? [row.match] : row.candidates;
@@ -318,14 +318,14 @@ export function ExcelImportView() {
           </div>
 
           {preview.untouched.length > 0 && (
-            <details className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#131E32] p-4 text-xs text-slate-600 dark:text-slate-300">
+            <details className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 text-xs text-slate-600 dark:text-slate-300">
               <summary className="cursor-pointer font-semibold min-h-[28px]">
                 Excel&apos;da yo&apos;q, bazada bor {preview.untouched.length} ta o&apos;quvchi (ularga tegilmaydi)
               </summary>
               <ul className="mt-3 grid gap-1 sm:grid-cols-2">
                 {preview.untouched.map((u) => (
                   <li key={u.userId} className="truncate">
-                    {u.fullName} <span className="text-slate-400">@{u.login} · {u.groupName || "guruhsiz"}</span>
+                    {u.fullName} <span className="text-slate-500 dark:text-slate-400">@{u.login} · {u.groupName || "guruhsiz"}</span>
                   </li>
                 ))}
               </ul>
@@ -354,7 +354,7 @@ export function ExcelImportView() {
 
       {/* 3. Natija */}
       {result && (
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#131E32] border border-emerald-500/30 space-y-4 page-enter">
+        <div className="p-5 rounded-2xl bg-white dark:bg-surface border border-emerald-500/30 space-y-4 page-enter">
           <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-bold">
             <CheckCircle2 className="w-5 h-5" />
             Import yakunlandi

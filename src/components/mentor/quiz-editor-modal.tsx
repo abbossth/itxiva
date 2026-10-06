@@ -211,9 +211,9 @@ export function QuizEditorModal({
 
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Savollar ({questions.length})
-              </h4>
+              </h3>
               <div className="flex flex-wrap items-center justify-end gap-1">
                 {aiEnabled && lessonContext && (
                   <Button
@@ -302,7 +302,7 @@ export function QuizEditorModal({
                     <button
                       type="button"
                       onClick={() => removeQuestion(qIdx)}
-                      className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                      className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -357,7 +357,7 @@ export function QuizEditorModal({
                           <button
                             type="button"
                             onClick={() => removeOption(qIdx, optIdx)}
-                            className="p-1 text-slate-400 hover:text-rose-500"
+                            className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

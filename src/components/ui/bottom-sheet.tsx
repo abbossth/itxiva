@@ -58,7 +58,7 @@ export function BottomSheet({
       <div
         ref={sheetRef}
         className={cn(
-          "relative z-10 w-full max-h-[85vh] rounded-t-3xl bg-white dark:bg-[#111A2E] border-t border-slate-200/80 dark:border-slate-800",
+          "relative z-10 w-full max-h-[85vh] rounded-t-3xl bg-white dark:bg-surface border-t border-slate-200/80 dark:border-slate-800",
           "p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl flex flex-col overflow-hidden",
           "animate-in slide-in-from-bottom duration-300 ease-out",
           className
@@ -76,7 +76,7 @@ export function BottomSheet({
             type="button"
             onClick={onClose}
             aria-label="Yopish"
-            className="p-2 min-h-[44px] min-w-[44px] rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center"
+            className="p-2 min-h-[44px] min-w-[44px] rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center"
           >
             <X className="w-5 h-5" />
           </button>
