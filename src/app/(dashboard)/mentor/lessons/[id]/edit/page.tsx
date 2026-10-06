@@ -7,6 +7,9 @@ import { getLessonById } from "@/actions/lesson.actions";
 import { getQuizForMentor } from "@/actions/quiz.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 
+// AI yordamchi taqdimot/konspekt tuzishi 1-2 daqiqa olishi mumkin
+export const maxDuration = 300;
+
 export const metadata = {
   title: "Darsni tahrirlash — ITXiva",
 };
@@ -41,7 +44,12 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
         </Link>
       </div>
 
-      <LessonEditorForm groups={groups} initialLesson={lesson} initialQuiz={quizRes.data ?? null} />
+      <LessonEditorForm
+        groups={groups}
+        initialLesson={lesson}
+        initialQuiz={quizRes.data ?? null}
+        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
+      />
     </div>
   );
 }

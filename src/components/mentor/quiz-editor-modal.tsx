@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { IQuizData, IQuizQuestion, QuizQuestionType } from "@/lib/db/models/quiz.model";
 import { upsertQuizAction } from "@/actions/quiz.actions";
+import { generateQuizAction, LessonContextInput } from "@/actions/ai.actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,8 @@ interface QuizEditorModalProps {
   onClose: () => void;
   lessonId: string;
   initialQuiz?: IQuizData | null;
+  aiEnabled?: boolean;
+  lessonContext?: LessonContextInput;
 }
 
 export function QuizEditorModal({
@@ -20,6 +23,8 @@ export function QuizEditorModal({
   onClose,
   lessonId,
   initialQuiz,
+  aiEnabled = false,
+  lessonContext,
 }: QuizEditorModalProps) {
   const [title, setTitle] = useState(initialQuiz?.title || "Dars bo'yicha kichik test");
   const [description, setDescription] = useState(initialQuiz?.description || "");
@@ -41,6 +46,26 @@ export function QuizEditorModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!lessonContext || generating) return;
+    setError(null);
+    setGenerating(true);
+    try {
+      const res = await generateQuizAction(lessonContext, 5);
+      if (res.success && res.data) {
+        // Hali to'ldirilmagan (bo'sh) savollar o'rniga qo'yiladi, mentor yozganlari saqlanadi
+        setQuestions((prev) => [...prev.filter((q) => q.prompt.trim()), ...res.data!.questions]);
+      } else {
+        setError(res.message || "AI savol tuza olmadi");
+      }
+    } catch {
+      setError("AI yordamchiga ulanib bo'lmadi");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const addQuestion = (type: QuizQuestionType = "single_choice") => {
     setQuestions((prev) => [
@@ -189,7 +214,19 @@ export function QuizEditorModal({
               <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Savollar ({questions.length})
               </h4>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-end gap-1">
+                {aiEnabled && lessonContext && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    onClick={handleGenerate}
+                    isLoading={generating}
+                    className="text-xs h-8"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1" /> AI bilan tuzish
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"

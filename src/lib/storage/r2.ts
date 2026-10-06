@@ -83,3 +83,23 @@ export async function getDownloadPresignedUrl({
 
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
+
+/**
+ * Serverda yaratilgan faylni (masalan, AI tuzgan taqdimot) to'g'ridan-to'g'ri omborga yozadi
+ */
+export async function uploadBuffer({
+  key,
+  body,
+  contentType,
+}: {
+  key: string;
+  body: Buffer | Uint8Array;
+  contentType: string;
+}): Promise<void> {
+  if (!process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
+    throw new Error("Fayl ombori (R2) sozlanmagan");
+  }
+  await getS3Client().send(
+    new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: body, ContentType: contentType })
+  );
+}

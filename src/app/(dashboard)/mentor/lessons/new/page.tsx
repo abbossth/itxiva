@@ -11,6 +11,9 @@ interface NewLessonPageProps {
   }>;
 }
 
+// AI yordamchi taqdimot/konspekt tuzishi 1-2 daqiqa olishi mumkin
+export const maxDuration = 300;
+
 export const metadata = {
   title: "Yangi dars — ITXiva",
 };
@@ -39,6 +42,7 @@ export default async function NewLessonPage({ searchParams }: NewLessonPageProps
         groups={groups}
         defaultGroupId={defaultGroupId}
         defaultQuarter={defaultQuarter}
+        aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY)}
       />
     </div>
   );

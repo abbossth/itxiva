@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { createLessonAction, updateLessonAction } from "@/actions/lesson.actions";
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
 import { compressImageToWebP } from "@/lib/upload-client";
+import { AiAssistantPanel } from "@/components/mentor/ai-assistant-panel";
 
 interface LessonEditorFormProps {
   groups: IGroupData[];
@@ -28,6 +29,7 @@ interface LessonEditorFormProps {
   initialQuiz?: IQuizData | null;
   defaultGroupId?: string;
   defaultQuarter?: number;
+  aiEnabled?: boolean;
 }
 
 /**
@@ -45,6 +47,7 @@ export function LessonEditorForm({
   initialQuiz,
   defaultGroupId,
   defaultQuarter = 1,
+  aiEnabled = false,
 }: LessonEditorFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -231,6 +234,19 @@ export function LessonEditorForm({
         </div>
       )}
 
+      <AiAssistantPanel
+        enabled={aiEnabled}
+        grade={groups.find((g) => g._id.toString() === groupId)?.grade}
+        lesson={{ title, topic, description }}
+        onApplyDraft={(draft) => {
+          setTitle(draft.title);
+          setTopic(draft.topic);
+          setDescription(draft.description);
+        }}
+        onApplyDescription={setDescription}
+        onAttachMaterial={(material) => setMaterials((prev) => [...prev, material])}
+      />
+
       {/* Main Lesson Info Card */}
       <div className="p-6 rounded-3xl bg-white dark:bg-[#131E32] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -317,7 +333,7 @@ export function LessonEditorForm({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Dars konspekti, asosiy mavzular va o'quvchiga yo'riqnoma..."
-            rows={5}
+            rows={10}
             className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
           />
         </Field>
@@ -528,6 +544,13 @@ export function LessonEditorForm({
           onClose={() => setShowQuizModal(false)}
           lessonId={initialLesson._id.toString()}
           initialQuiz={initialQuiz}
+          aiEnabled={aiEnabled}
+          lessonContext={{
+            title,
+            topic,
+            description,
+            grade: groups.find((g) => g._id.toString() === groupId)?.grade,
+          }}
         />
       )}
     </form>
