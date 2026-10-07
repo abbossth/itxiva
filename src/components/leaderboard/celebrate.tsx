@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { fireConfetti } from "@/lib/confetti";
+import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 
 // Medal ranglari: 1-o'rin oltin, 2-o'rin kumush, 3-o'rin bronza (firuza — sayt rangi)
 const COLORS: Record<number, string[]> = {
@@ -19,6 +19,14 @@ export function TopThreeCelebration({ rank }: { rank: number }) {
     if (rank < 1 || rank > 3) return;
     const colors = COLORS[rank];
     const count = rank === 1 ? 110 : 70;
+    // Qurilmada "harakatni kamaytirish" yoqilgan bo'lsa ham tabrik ko'rinadi, lekin yengil: bitta, sekin va kichik otilish
+    if (prefersReducedMotion()) {
+      const timer = setTimeout(
+        () => void fireConfetti({ particleCount: 45, spread: 80, startVelocity: 22, gravity: 0.7, origin: { y: 0.35 }, colors }, { evenIfReducedMotion: true }),
+        300
+      );
+      return () => clearTimeout(timer);
+    }
     const timers = [
       // Shohsupa ko'tarilib bo'lgach boshlanadi
       setTimeout(() => {
