@@ -6,7 +6,7 @@ import { Exam } from "@/lib/db/models/exam.model";
 import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { HOMEWORK_BLOCKED_EXTENSIONS, HOMEWORK_MAX_FILE_MB } from "@/lib/homework-status";
+import { HOMEWORK_BLOCKED_EXTENSIONS, HOMEWORK_MAX_FILE_MB, STUDENT_MAX_UPLOAD_MB } from "@/lib/homework-status";
 import { getUploadPresignedUrl, ALLOWED_FILE_TYPES, MAX_FILE_SIZE_BYTES } from "@/lib/storage/r2";
 
 function cleanFilename(filename: string): string {
@@ -119,12 +119,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const maxBytes = (question.maxFileSizeMb || 50) * 1024 * 1024;
-      if (typeof fileSize !== "number" || fileSize <= 0 || fileSize > maxBytes) {
-        return NextResponse.json(
-          { error: `Fayl hajmi ${question.maxFileSizeMb || 50} MB dan oshmasligi kerak` },
-          { status: 400 }
-        );
+      // Savolda kattaroq chegara qo'yilgan bo'lsa ham, o'quvchi fayli umumiy chegaradan oshmaydi
+      const maxMb = Math.min(question.maxFileSizeMb || STUDENT_MAX_UPLOAD_MB, STUDENT_MAX_UPLOAD_MB);
+      if (typeof fileSize !== "number" || fileSize <= 0 || fileSize > maxMb * 1024 * 1024) {
+        return NextResponse.json({ error: `Fayl hajmi ${maxMb} MB dan oshmasligi kerak` }, { status: 400 });
       }
 
       const key = `exams/${exam._id}/${session.userId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;

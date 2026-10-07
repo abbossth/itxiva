@@ -22,7 +22,9 @@ export const DEFAULT_HOMEWORK_COINS = 20;
 export const HOMEWORK_MAX_TEXT = 20000;
 export const HOMEWORK_MAX_LINKS = 5;
 export const HOMEWORK_MAX_FILES = 5;
-export const HOMEWORK_MAX_FILE_MB = 50;
+/** O'quvchi yuklaydigan har qanday fayl (vazifa javobi, imtihon loyihasi) uchun yuqori chegara */
+export const STUDENT_MAX_UPLOAD_MB = 5;
+export const HOMEWORK_MAX_FILE_MB = STUDENT_MAX_UPLOAD_MB;
 /** Bajariladigan fayllar qabul qilinmaydi */
 export const HOMEWORK_BLOCKED_EXTENSIONS = [".exe", ".bat", ".cmd", ".msi", ".scr", ".apk", ".sh", ".com", ".vbs"];
 

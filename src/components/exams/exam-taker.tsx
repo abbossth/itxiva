@@ -1,5 +1,6 @@
 "use client";
 
+import { STUDENT_MAX_UPLOAD_MB } from "@/lib/homework-status";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { IExamData } from "@/lib/db/models/exam.model";
@@ -112,6 +113,11 @@ export function ExamTaker({
   // Upload project file to R2
   const handleFileUpload = async (questionId: string, file: File) => {
     setError(null);
+    // Katta fayl serverga yuborilmasdan oldin rad etiladi
+    if (file.size > STUDENT_MAX_UPLOAD_MB * 1024 * 1024) {
+      setError(`${file.name}: fayl hajmi ${STUDENT_MAX_UPLOAD_MB} MB dan oshmasligi kerak`);
+      return;
+    }
     setUploadProgress((prev) => ({ ...prev, [questionId]: "Yuklanmoqda..." }));
 
     try {
@@ -415,7 +421,7 @@ export function ExamTaker({
                         {q.allowedFileTypes?.length ? ` (${q.allowedFileTypes.join(", ")})` : ""}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Maksimal hajm: {q.maxFileSizeMb || 50} MB.
+                        Maksimal hajm: {Math.min(q.maxFileSizeMb || STUDENT_MAX_UPLOAD_MB, STUDENT_MAX_UPLOAD_MB)} MB.
                       </p>
                     </div>
 

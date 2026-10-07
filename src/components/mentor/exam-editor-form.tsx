@@ -81,7 +81,7 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
         correctAnswers: type === "single_choice" ? ["Variant 1"] : [],
         points: type === "project_upload" ? 20 : 5,
         allowedFileTypes: [".zip", ".pdf", ".png", ".jpg"],
-        maxFileSizeMb: 50,
+        maxFileSizeMb: 5,
       },
     ]);
   };
