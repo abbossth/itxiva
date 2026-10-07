@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { sendLessonReminders } from "@/lib/notifications/scheduled";
+import { closeExpiredSessions } from "@/lib/attendance/core";
+import { connectToDatabase } from "@/lib/db/connect";
 
 // Har 5 daqiqada GitHub Actions chaqiradi (.github/workflows/lesson-reminders.yml):
 // Vercel'ning bepul tarifida cron kuniga bir martadan ortiq ishlamaydi.
@@ -13,8 +15,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const lessons = await sendLessonReminders();
-    return NextResponse.json({ ok: true, lessons });
+    await connectToDatabase();
+    // Mentor yopishni unutgan davomat sessiyalari shu yerda yopiladi
+    const [lessons, closedSessions] = await Promise.all([sendLessonReminders(), closeExpiredSessions()]);
+    return NextResponse.json({ ok: true, lessons, closedSessions });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

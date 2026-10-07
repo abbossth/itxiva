@@ -20,6 +20,12 @@ export interface IAttendanceSessionData {
   rotateIntervalSeconds: number;
   previousTokens: IPreviousToken[];
   defaultCoinsReward: number;
+  /** Shu dars uchun coin qoidasi (holat -> coin). Eski sessiyalarda yo'q */
+  coinRules?: { present: number; late: number; excused: number; absent: number } | null;
+  /** Kelmaganlarga jarima qo'llangan vaqt; null — hali yakunlanmagan */
+  finalizedAt?: Date | string | null;
+  /** QR'siz, mentor qo'lda kiritgan dars */
+  isManual?: boolean;
   summary?: {
     totalPresent: number;
     totalLate: number;
@@ -96,6 +102,26 @@ const AttendanceSessionSchema = new Schema<IAttendanceSession>(
       type: Number,
       default: 10,
     },
+    coinRules: {
+      type: new Schema(
+        {
+          present: { type: Number, required: true },
+          late: { type: Number, required: true },
+          excused: { type: Number, required: true },
+          absent: { type: Number, required: true },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    finalizedAt: {
+      type: Date,
+      default: null,
+    },
+    isManual: {
+      type: Boolean,
+      default: false,
+    },
     summary: {
       totalPresent: { type: Number, default: 0 },
       totalLate: { type: Number, default: 0 },
@@ -111,6 +137,8 @@ const AttendanceSessionSchema = new Schema<IAttendanceSession>(
 AttendanceSessionSchema.index({ groupId: 1, status: 1 });
 // Hisobotlar va jurnal: davr bo'yicha yopilgan darslar
 AttendanceSessionSchema.index({ status: 1, date: 1 });
+// Bir guruhning bir kundagi darsini topish (dublikat ochilmasligi uchun tekshiruv)
+AttendanceSessionSchema.index({ groupId: 1, date: 1 });
 
 export const AttendanceSession: Model<IAttendanceSession> =
   mongoose.models.AttendanceSession ||

@@ -124,6 +124,12 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
         />
       ) : (
         <div className="space-y-3 page-enter">
+          {journal.sessions.some((s) => s.isDuplicate) && (
+            <p className="rounded-xl border border-amber-500/50 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs text-slate-800 dark:text-slate-200">
+              <strong>Dublikat davomat bor.</strong> Sariq rangdagi sanalarda bir kunga bir nechta davomat olingan. Ortiqchasini
+              ochib, &quot;O&apos;chirish&quot; tugmasi bilan olib tashlang — coinlar qayta hisoblanadi.
+            </p>
+          )}
           <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -137,8 +143,13 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
                       <th key={s._id} className="p-0 font-semibold">
                         <Link
                           href={`/mentor/attendance/${s._id}`}
-                          title="Dars davomatini ochish"
-                          className="flex flex-col items-center justify-center min-w-[44px] min-h-[48px] px-1 hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
+                          title={s.isDuplicate ? "Bu kunda bir nechta davomat bor — ochib, ortiqchasini o'chiring" : "Dars davomatini ochish"}
+                          className={cn(
+                            "flex flex-col items-center justify-center min-w-[44px] min-h-[48px] px-1 transition-colors",
+                            s.isDuplicate
+                              ? "bg-amber-500/20 text-amber-800 dark:text-amber-300 hover:bg-amber-500/30"
+                              : "hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300"
+                          )}
                         >
                           <span className="font-bold tabular-nums">{Number(s.dateKey.slice(8))}</span>
                           <span className="text-[10px] font-normal opacity-70">{UZ_WEEKDAYS_SHORT[weekday - 1]}</span>

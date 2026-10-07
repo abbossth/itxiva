@@ -1,19 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ClipboardCheck, Download, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, ClipboardCheck, Download, Search, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   manualUpdateAttendanceAction,
   exportAttendanceCsvAction,
+  finalizeAttendanceSessionAction,
+  deleteAttendanceSessionAction,
   SessionDetail,
   SessionRosterRow,
 } from "@/actions/attendance.actions";
-import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER } from "@/lib/attendance-status";
+import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
 import { triggerDownload } from "@/lib/xlsx-client";
 import { cn, formatDateUz, formatTimeUz } from "@/lib/utils";
 import { UZ_WEEKDAYS, getTashkentParts } from "@/lib/schedule";
@@ -23,6 +27,13 @@ const METHOD_LABEL = { qr: "QR", code: "Kod", manual: "Qo'lda" } as const;
 
 export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   const { toast } = useToast();
+  const router = useRouter();
+  const rules = detail.session.coinRules;
+  const [isFinalized, setIsFinalized] = useState(detail.session.isFinalized);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const groupHref = detail.group ? `/mentor/groups/${detail.group._id}/attendance` : "/mentor/groups";
   const [roster, setRoster] = useState<SessionRosterRow[]>(detail.roster);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AttendanceStatus | "all">("all");
@@ -69,6 +80,42 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
     }
   };
 
+  const handleFinalize = async () => {
+    try {
+      setIsFinalizing(true);
+      const res = await finalizeAttendanceSessionAction(detail.session._id);
+      if (res.success) {
+        setIsFinalized(true);
+        toast.success("Davomat yakunlandi");
+        router.refresh();
+      } else {
+        toast.error(res.message || "Yakunlab bo'lmadi");
+      }
+    } catch {
+      toast.error("Yakunlab bo'lmadi");
+    } finally {
+      setIsFinalizing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      const res = await deleteAttendanceSessionAction(detail.session._id);
+      if (res.success) {
+        toast.success(res.message || "Davomat o'chirildi");
+        router.push(groupHref);
+        router.refresh();
+      } else {
+        toast.error(res.message || "O'chirib bo'lmadi");
+        setIsDeleting(false);
+      }
+    } catch {
+      toast.error("O'chirib bo'lmadi");
+      setIsDeleting(false);
+    }
+  };
+
   const handleExport = async () => {
     try {
       const csv = await exportAttendanceCsvAction(detail.session._id);
@@ -90,16 +137,36 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         title={`${detail.group?.name ?? "Guruh"} — ${formatDateUz(detail.session.date)}`}
         subtitle={`${weekday}, ${formatTimeUz(detail.session.startTime)}${
           detail.session.endTime ? `–${formatTimeUz(detail.session.endTime)}` : ""
-        } · qatnashganga +${detail.session.defaultCoinsReward} coin`}
-        backHref={detail.group ? `/mentor/groups/${detail.group._id}/attendance` : "/mentor/groups"}
+        } · coin: ${ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${formatCoinDelta(rules[st])}`).join(", ")}`}
+        backHref={groupHref}
         backLabel="Guruh davomatiga qaytish"
         actions={
-          <Button variant="secondary" onClick={handleExport} className="gap-2">
-            <Download className="w-4 h-4" />
-            CSV
-          </Button>
+          <>
+            <Button variant="secondary" onClick={handleExport} className="gap-2">
+              <Download className="w-4 h-4" />
+              CSV
+            </Button>
+            <Button variant="outline" onClick={() => setIsDeleteOpen(true)} className="gap-2 text-rose-700 dark:text-rose-400">
+              <Trash2 className="w-4 h-4" />
+              O&apos;chirish
+            </Button>
+          </>
         }
       />
+
+      {/* Qo'lda kiritilgan dars: jarima mentor belgilab bo'lgach qo'llanadi */}
+      {!isFinalized && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 dark:bg-amber-500/10 p-4">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700 dark:text-amber-400" />
+          <div className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">
+            <span className="font-bold">Davomat hali yakunlanmagan.</span> Kelganlarni belgilab chiqing, so&apos;ng yakunlang:
+            shunda &quot;kelmagan&quot; bo&apos;lib qolganlardan {formatCoinDelta(rules.absent)} coin olinadi.
+          </div>
+          <Button variant="primary" onClick={handleFinalize} isLoading={isFinalizing} className="shrink-0 min-h-[44px]">
+            Davomatni yakunlash
+          </Button>
+        </div>
+      )}
 
       {/* Xulosa */}
       <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
@@ -186,13 +253,16 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
                         disabled={pendingId === row.studentId}
                         onClick={() => setStatus(row, s)}
                         className={cn(
-                          "min-h-[40px] rounded-lg text-[11px] font-bold border transition-colors cursor-pointer",
+                          "min-h-[44px] rounded-lg text-[11px] font-bold border transition-colors cursor-pointer",
                           active
                             ? ATTENDANCE_STATUS_META[s].activeClassName
                             : "border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400"
                         )}
                       >
-                        {ATTENDANCE_STATUS_META[s].label}
+                        <span className="block leading-tight">{ATTENDANCE_STATUS_META[s].label}</span>
+                        <span className={cn("block font-mono text-[10px] leading-tight", active ? "opacity-90" : "opacity-70")}>
+                          {formatCoinDelta(rules[s])}
+                        </span>
                       </button>
                     );
                   })}
@@ -202,6 +272,23 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           })
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleDelete}
+        title="Davomatni o'chirish"
+        description={
+          <>
+            <strong>{detail.group?.name}</strong> guruhining {formatDateUz(detail.session.date)} kungi davomati butunlay
+            o&apos;chiriladi. Shu dars uchun berilgan coinlar qaytarib olinadi, olingan jarimalar esa o&apos;quvchilarga
+            qaytariladi. Bu amalni ortga qaytarib bo&apos;lmaydi.
+          </>
+        }
+        confirmText="Ha, o'chirish"
+        danger
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

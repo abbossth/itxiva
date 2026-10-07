@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { createGroupAction, deleteGroupAction, updateGroupAction } from "@/actions/group.actions";
 import { startAttendanceSessionAction, type GroupsAttendanceOverview } from "@/actions/attendance.actions";
 import { ScheduleFields } from "@/components/mentor/schedule-fields";
-import { formatSchedule, hasLessonOn, isLessonNow, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
+import { formatSchedule, getTashkentParts, hasLessonOn, isLessonNow, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_SCHEDULE: GroupSchedule = { days: ODD_DAYS, startTime: "15:00", endTime: "16:30" };
@@ -67,7 +67,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
   const handleQuickStart = async (groupId: string) => {
     try {
       setStartingId(groupId);
-      const res = await startAttendanceSessionAction(groupId, 10);
+      const res = await startAttendanceSessionAction(groupId);
       if (res.success && res.data?.sessionId) {
         toast.success("Davomat sessiyasi ochildi!");
         router.push(`/mentor/attendance/${res.data.sessionId}`);
@@ -230,9 +230,9 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                     >
                       {isActive ? "Davom ettirish" : "Ko'rish"}
                     </Link>
-                  ) : (
+                  ) : live ? (
                     <Button
-                      variant={live ? "primary" : "outline"}
+                      variant="primary"
                       size="sm"
                       isLoading={startingId === id}
                       disabled={startingId !== null}
@@ -242,6 +242,13 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                       <Play className="w-3.5 h-3.5" />
                       Davomatni boshlash
                     </Button>
+                  ) : (
+                    // Davomat faqat dars vaqtida ochiladi
+                    <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {g.schedule && getTashkentParts().minutes < Number(g.schedule.startTime.slice(0, 2)) * 60 + Number(g.schedule.startTime.slice(3))
+                        ? "Hali boshlanmagan"
+                        : "Dars tugagan"}
+                    </span>
                   )}
                 </div>
               );

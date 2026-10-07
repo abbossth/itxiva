@@ -38,6 +38,8 @@ const ACTION_MAP: Record<string, { label: string; variant: "danger" | "success" 
   GRADE_EXAM: { label: "Imtihon baholandi", variant: "teal" },
   START_ATTENDANCE: { label: "Davomat boshlandi", variant: "success" },
   CLOSE_ATTENDANCE: { label: "Davomat yakunlandi", variant: "warning" },
+  FINALIZE_ATTENDANCE: { label: "Qo'lda davomat yakunlandi", variant: "warning" },
+  DELETE_ATTENDANCE: { label: "Davomat o'chirildi", variant: "danger" },
   MANUAL_ATTENDANCE: { label: "Qo'lda davomat belgilandi", variant: "teal" },
 };
 

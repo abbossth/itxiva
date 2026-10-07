@@ -146,3 +146,11 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Guruhlar sahifasi**: tepada "Bugungi darslar" (bir bosishda boshlash / davom ettirish / ko'rish), kartalarda joriy oy davomat foizi (`getGroupsAttendanceOverview`).
 - **URL'lar**: dars sahifalari `/mentor/attendance/[sessionId]` o'zgarmadi (eski havolalar ishlaydi); `/mentor/attendance` Guruhlarga yo'naltiradi.
 - **Menyu**: Sozlamalar va Do'kon ham bitta havola; ichki sahifalari sahifa tepasidagi tablarda (`section-tabs.tsx`).
+
+### [2026-10-07] 30-qaror: Davomat qoidalari — bir darsga bitta, yangi coin hisobi
+- **Ochish**: QR sessiya faqat jadvaldagi dars vaqtida (boshlanishidan 15 daqiqa oldin → tugashigacha) va bir guruhga kuniga bir marta ochiladi. Qo'lda kiritish — faqat jadvaldagi dars kuniga, kuniga bitta.
+- **Coin**: kelgan +5, kechikkan +3 (faqat mentor qo'lda), sababli 0, kelmagan −5 (`ATTENDANCE_COINS`). Qoida sessiyada saqlanadi (`coinRules`); qoidasiz eski sessiyalar o'z davridagi hisobda qoladi.
+- **Hisob**: har bir yozuv o'z ta'sirini saqlaydi (`coinsAwarded` — reyting, `balanceDelta` — do'kon balansi). Holat o'zgarsa farq qo'llanadi; jarima balansni 0 dan pastga tushirmaydi va bekor qilinganda aynan olingan miqdor qaytadi. Mantiq `lib/attendance/core.ts` da.
+- **Jarima vaqti**: QR sessiya yopilganda; qo'lda kiritilgan darsda mentor "Davomatni yakunlash"ni bosganda (`finalizedAt`).
+- **Avtomatik yopilish**: yopish unutilgan sessiya dars tugaganidan 30 daqiqa o'tgach yoki ertasi kuni yopiladi.
+- **O'chirish**: mentor davomatni o'chira oladi — coinlar qaytariladi, tarix `CoinLedger` da qoladi. Mavjud dublikatlar avtomatik o'chirilmaydi.

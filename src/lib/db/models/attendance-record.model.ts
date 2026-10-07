@@ -11,7 +11,10 @@ export interface IAttendanceRecordData {
   status: AttendanceStatus;
   method: AttendanceMethod;
   markedAt: Date | string;
+  /** Shu yozuvning reytingga (totalCoins) haqiqiy ta'siri; jarimada manfiy */
   coinsAwarded: number;
+  /** Do'kon balansiga (spendableBalance) haqiqiy ta'siri. Eski yozuvlarda yo'q — coinsAwarded ga teng deb olinadi */
+  balanceDelta?: number | null;
   notes?: string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -59,7 +62,11 @@ const AttendanceRecordSchema = new Schema<IAttendanceRecord>(
     },
     coinsAwarded: {
       type: Number,
-      default: 10,
+      default: 0,
+    },
+    balanceDelta: {
+      type: Number,
+      default: null,
     },
     notes: {
       type: String,

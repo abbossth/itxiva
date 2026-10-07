@@ -31,3 +31,31 @@ export const ATTENDANCE_STATUS_META: Record<
 };
 
 export const ATTENDANCE_STATUS_ORDER: AttendanceStatus[] = ["present", "late", "excused", "absent"];
+
+export type AttendanceCoinRules = Record<AttendanceStatus, number>;
+
+/** Sukutdagi coin qoidasi: kelgan +5, kechikkan +3, sababli 0, kelmagan −5 */
+export const ATTENDANCE_COINS: AttendanceCoinRules = { present: 5, late: 3, excused: 0, absent: -5 };
+
+/**
+ * Sessiyaning coin qoidasi. Qoida saqlanmagan eski sessiyalar o'z davridagi hisobda qoladi:
+ * qatnashganga belgilangan mukofot, qolganlarga 0 (o'tgan darslar qayta hisoblanmaydi).
+ */
+export function coinRulesOf(session: {
+  coinRules?: Partial<AttendanceCoinRules> | null;
+  defaultCoinsReward?: number | null;
+}): AttendanceCoinRules {
+  const r = session.coinRules;
+  if (r && typeof r.present === "number") {
+    return { present: r.present, late: r.late ?? 0, excused: r.excused ?? 0, absent: r.absent ?? 0 };
+  }
+  const reward = session.defaultCoinsReward ?? 10;
+  return { present: reward, late: reward, excused: 0, absent: 0 };
+}
+
+/** "+5", "−5", "0" */
+export function formatCoinDelta(amount: number): string {
+  if (amount > 0) return `+${amount}`;
+  if (amount < 0) return `−${Math.abs(amount)}`;
+  return "0";
+}

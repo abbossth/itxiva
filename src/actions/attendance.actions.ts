@@ -5,37 +5,39 @@ import QRCode from "qrcode";
 import { connectToDatabase } from "@/lib/db/connect";
 import { AttendanceSession } from "@/lib/db/models/attendance-session.model";
 import { AttendanceRecord, AttendanceStatus } from "@/lib/db/models/attendance-record.model";
-import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
-import { User, IUser } from "@/lib/db/models/user.model";
+import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireStudent, requireAuth } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ActionResult } from "./auth.actions";
 import { formatDateUz, formatDateTimeUz } from "@/lib/utils";
-import { dateFromKey, toDateKey, addDaysToKey, isValidSchedule } from "@/lib/schedule";
+import {
+  dateFromKey,
+  toDateKey,
+  addDaysToKey,
+  isValidSchedule,
+  isLessonNow,
+  getNextLesson,
+  getTashkentParts,
+} from "@/lib/schedule";
 import mongoose from "mongoose";
-import { notify } from "@/lib/notifications/notify";
+import { ATTENDANCE_COINS, coinRulesOf, type AttendanceCoinRules } from "@/lib/attendance-status";
+import {
+  applyAttendanceStatus,
+  closeExpiredSessions,
+  closeSession,
+  deleteSessionWithCoins,
+  finalizeSession,
+  findSessionOnDay,
+  isSessionFinalized,
+  recomputeSummary,
+  settleRecordCoins,
+} from "@/lib/attendance/core";
 
-/** Darsda qatnashgan deb hisoblanadigan (coin beriladigan) holatlar */
+/** Darsda qatnashgan deb hisoblanadigan holatlar */
 const ATTENDED: AttendanceStatus[] = ["present", "late"];
 const STATUS_VALUES: AttendanceStatus[] = ["present", "late", "excused", "absent"];
-
-async function recomputeSummary(sessionId: string | mongoose.Types.ObjectId) {
-  const counts = await AttendanceRecord.aggregate<{ _id: AttendanceStatus; n: number }>([
-    { $match: { sessionId: new mongoose.Types.ObjectId(String(sessionId)) } },
-    { $group: { _id: "$status", n: { $sum: 1 } } },
-  ]);
-  const by = Object.fromEntries(counts.map((c) => [c._id, c.n]));
-  const summary = {
-    totalPresent: by.present ?? 0,
-    totalLate: by.late ?? 0,
-    totalExcused: by.excused ?? 0,
-    totalAbsent: by.absent ?? 0,
-  };
-  await AttendanceSession.updateOne({ _id: sessionId }, { $set: { summary } });
-  return summary;
-}
 
 export interface ProjectorSessionData {
   _id: string;
@@ -67,15 +69,15 @@ function generateToken(): string {
 }
 
 /**
- * Mentor starts an attendance session for a group
+ * Mentor guruh darsi uchun davomat sessiyasini ochadi.
+ * Faqat jadvaldagi dars vaqtida (boshlanishidan 15 daqiqa oldin → tugashigacha) va bir darsga bir marta.
  */
 export async function startAttendanceSessionAction(
-  groupId: string,
-  coinsReward: number = 10
+  groupId: string
 ): Promise<ActionResult<{ sessionId: string }>> {
   const session = await requireMentor();
-  if (!Number.isInteger(coinsReward) || coinsReward < 0 || coinsReward > 1000) {
-    return { success: false, message: "Coin miqdori 0 dan 1000 gacha butun son bo'lishi kerak" };
+  if (!mongoose.isValidObjectId(groupId)) {
+    return { success: false, message: "Guruh topilmadi" };
   }
   await connectToDatabase();
 
@@ -84,11 +86,31 @@ export async function startAttendanceSessionAction(
     return { success: false, message: "Guruh topilmadi" };
   }
 
-  // Close any previously active session for this group
-  await AttendanceSession.updateMany(
-    { groupId, status: "active" },
-    { $set: { status: "closed", endTime: new Date() } }
-  );
+  await closeExpiredSessions();
+
+  // Bugun shu guruhda davomat bo'lsa, ikkinchisi ochilmaydi
+  const existing = await findSessionOnDay(groupId, toDateKey());
+  if (existing) {
+    if (existing.status === "active") {
+      return { success: true, data: { sessionId: existing._id.toString() } };
+    }
+    return {
+      success: false,
+      message: "Bugungi dars davomati allaqachon olingan. O'zgartirish kerak bo'lsa, o'sha darsni oching.",
+      data: { sessionId: existing._id.toString() },
+    };
+  }
+
+  if (!isValidSchedule(group.schedule)) {
+    return { success: false, message: "Guruhga dars jadvali belgilanmagan. Avval jadvalni kiriting." };
+  }
+  if (!isLessonNow(group.schedule)) {
+    const next = getNextLesson(group.schedule);
+    return {
+      success: false,
+      message: `Davomat faqat dars vaqtida ochiladi.${next ? ` Keyingi dars: ${next.label}.` : ""}`,
+    };
+  }
 
   const initialCode = generateCode();
   const initialToken = generateToken();
@@ -104,7 +126,8 @@ export async function startAttendanceSessionAction(
     codeRotatedAt: new Date(),
     rotateIntervalSeconds: 180,
     previousTokens: [],
-    defaultCoinsReward: coinsReward,
+    defaultCoinsReward: ATTENDANCE_COINS.present,
+    coinRules: ATTENDANCE_COINS,
     summary: { totalPresent: 0, totalLate: 0, totalExcused: 0, totalAbsent: 0 },
   });
 
@@ -281,6 +304,9 @@ export async function markAttendanceAction(params: {
     };
   }
 
+  // Mentor yopishni unutgan eski sessiyaga belgilab bo'lmaydi
+  await closeExpiredSessions();
+
   const now = new Date();
   let activeSession = null;
   let method: "qr" | "code" = "code";
@@ -372,19 +398,19 @@ export async function markAttendanceAction(params: {
     await dbUser.save();
   }
 
-  const coinsAwarded = activeSession.defaultCoinsReward ?? 10;
-
   // Create attendance record. Unique (sessionId, studentId) indeksi parallel so'rovlarda
   // ikki marta coin berilishining oldini oladi.
+  let record;
   try {
-    await AttendanceRecord.create({
+    record = await AttendanceRecord.create({
       sessionId: activeSession._id,
       studentId: effectiveUserId,
       groupId: activeSession.groupId,
       status: "present",
       method,
       markedAt: now,
-      coinsAwarded,
+      coinsAwarded: 0,
+      balanceDelta: 0,
     });
   } catch (err: unknown) {
     if ((err as { code?: number })?.code === 11000) {
@@ -396,23 +422,9 @@ export async function markAttendanceAction(params: {
     throw err;
   }
 
-  // Award coins to user
-  const updatedUser = await User.findByIdAndUpdate(
-    effectiveUserId,
-    {
-      $inc: { totalCoins: coinsAwarded, spendableBalance: coinsAwarded },
-    },
-    { returnDocument: "after" }
-  );
-
-  // Record into CoinLedger
-  await CoinLedger.create({
-    studentId: effectiveUserId,
-    amount: coinsAwarded,
-    type: "attendance",
-    referenceId: activeSession._id,
+  const coinsAwarded = await settleRecordCoins(activeSession, record, {
+    silent: true,
     description: `Dars davomati uchun (${method === "qr" ? "QR kod" : "Kiritilgan kod"})`,
-    balanceAfter: updatedUser?.totalCoins || coinsAwarded,
   });
 
   // Increment session present counter
@@ -422,7 +434,7 @@ export async function markAttendanceAction(params: {
 
   return {
     success: true,
-    message: `Davomat belgilandi! Sizga +${coinsAwarded} coin berildi.`,
+    message: coinsAwarded > 0 ? `Davomat belgilandi! Sizga +${coinsAwarded} coin berildi.` : "Davomat belgilandi!",
     data: {
       coinsEarned: coinsAwarded,
       markedAt: now,
@@ -431,67 +443,87 @@ export async function markAttendanceAction(params: {
 }
 
 /**
- * Mentor closes an attendance session
+ * Mentor davomat sessiyasini yopadi: belgilanmaganlar "kelmagan" bo'ladi va jarima qo'llanadi
  */
 export async function closeAttendanceSessionAction(
   sessionId: string
 ): Promise<ActionResult> {
   const session = await requireMentor();
+  if (!mongoose.isValidObjectId(sessionId)) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
   await connectToDatabase();
 
-  const attSession = await AttendanceSession.findById(sessionId);
+  const attSession = await AttendanceSession.findById(sessionId).select("status").lean();
   if (!attSession) {
     return { success: false, message: "Sessiya topilmadi" };
   }
-
-  attSession.status = "closed";
-  attSession.endTime = new Date();
-  await attSession.save();
-
-  // Find all students in group
-  const allStudents = (await User.find({
-    groupId: attSession.groupId,
-    role: "student",
-  }).lean()) as unknown as IUser[];
-
-  // Find existing records
-  const existingRecords = await AttendanceRecord.find({ sessionId }).lean();
-  const existingStudentIds = new Set(
-    existingRecords.map((r) => r.studentId.toString())
-  );
-
-  // Auto-mark absent for students who didn't check in
-  const absentRecords = [];
-  for (const st of allStudents) {
-    if (!existingStudentIds.has(st._id.toString())) {
-      absentRecords.push({
-        sessionId: attSession._id,
-        studentId: st._id,
-        groupId: attSession.groupId,
-        status: "absent",
-        method: "manual",
-        markedAt: new Date(),
-        coinsAwarded: 0,
-      });
-    }
+  if (attSession.status === "active") {
+    await closeSession(sessionId, session.userId);
   }
 
-  if (absentRecords.length > 0) {
-    await AttendanceRecord.insertMany(absentRecords, { ordered: false });
+  return { success: true, message: "Davomat sessiyasi yakunlandi" };
+}
+
+/**
+ * Qo'lda kiritilgan darsni yakunlaydi: "kelmagan" bo'lib qolganlarga jarima qo'llanadi
+ */
+export async function finalizeAttendanceSessionAction(sessionId: string): Promise<ActionResult> {
+  const session = await requireMentor();
+  if (!mongoose.isValidObjectId(sessionId)) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(sessionId).select("status coinRules finalizedAt").lean();
+  if (!attSession) return { success: false, message: "Sessiya topilmadi" };
+  if (attSession.status !== "closed") {
+    return { success: false, message: "Avval davomat sessiyasini yoping" };
+  }
+  if (isSessionFinalized(attSession)) {
+    return { success: true, message: "Davomat allaqachon yakunlangan" };
   }
 
-  attSession.summary = await recomputeSummary(attSession._id);
-
+  await finalizeSession(sessionId);
   await AuditLog.create({
     actorId: session.userId,
-    action: "CLOSE_ATTENDANCE",
+    action: "FINALIZE_ATTENDANCE",
+    details: { sessionId },
+  });
+  return { success: true, message: "Davomat yakunlandi" };
+}
+
+/**
+ * Davomat sessiyasini butunlay o'chiradi (masalan, dublikat): berilgan va olingan coinlar qaytariladi
+ */
+export async function deleteAttendanceSessionAction(sessionId: string): Promise<ActionResult<{ groupId: string }>> {
+  const session = await requireMentor();
+  if (!mongoose.isValidObjectId(sessionId)) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(sessionId).select("groupId date status").lean();
+  if (!attSession) return { success: false, message: "Sessiya topilmadi" };
+
+  const result = await deleteSessionWithCoins(sessionId);
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "DELETE_ATTENDANCE",
     details: {
       sessionId,
-      summary: attSession.summary,
+      groupId: attSession.groupId.toString(),
+      dateKey: toDateKey(attSession.date),
+      records: result?.records ?? 0,
+      coinsReverted: result?.reverted ?? 0,
     },
   });
 
-  return { success: true, message: "Davomat sessiyasi yakunlandi" };
+  return {
+    success: true,
+    message: "Davomat o'chirildi, coinlar qayta hisoblandi",
+    data: { groupId: attSession.groupId.toString() },
+  };
 }
 
 /**
@@ -504,6 +536,9 @@ export async function manualUpdateAttendanceAction(params: {
   notes?: string;
 }): Promise<ActionResult> {
   const session = await requireMentor();
+  if (!mongoose.isValidObjectId(params.sessionId) || !mongoose.isValidObjectId(params.studentId)) {
+    return { success: false, message: "Sessiya yoki o'quvchi topilmadi" };
+  }
   await connectToDatabase();
 
   const attSession = await AttendanceSession.findById(params.sessionId);
@@ -519,65 +554,8 @@ export async function manualUpdateAttendanceAction(params: {
     return { success: false, message: "O'quvchi topilmadi" };
   }
 
-  const record = await AttendanceRecord.findOne({
-    sessionId: params.sessionId,
-    studentId: params.studentId,
-  });
-
-  const oldStatus = record?.status;
-  const newStatus = params.status;
-  const reward = attSession.defaultCoinsReward ?? 10;
-  const wasAttended = oldStatus ? ATTENDED.includes(oldStatus) : false;
-  const isAttended = ATTENDED.includes(newStatus);
   const notes = typeof params.notes === "string" ? params.notes.trim().slice(0, 300) : undefined;
-
-  // Coin faqat "qatnashgan" <-> "qatnashmagan" o'tishida o'zgaradi (kelgan <-> kechikkan o'tishida emas)
-  let coinDelta = 0;
-  if (!wasAttended && isAttended) coinDelta = reward;
-  else if (wasAttended && !isAttended) coinDelta = -(record?.coinsAwarded ?? 0);
-
-  if (!record) {
-    await AttendanceRecord.create({
-      sessionId: params.sessionId,
-      studentId: params.studentId,
-      groupId: attSession.groupId,
-      status: newStatus,
-      method: "manual",
-      markedAt: new Date(),
-      coinsAwarded: isAttended ? reward : 0,
-      notes,
-    });
-  } else {
-    record.status = newStatus;
-    if (coinDelta > 0) record.coinsAwarded = reward;
-    if (coinDelta < 0) record.coinsAwarded = 0;
-    if (notes !== undefined) record.notes = notes;
-    await record.save();
-  }
-
-  if (coinDelta !== 0) {
-    const updated = await User.findByIdAndUpdate(
-      params.studentId,
-      { $inc: { totalCoins: coinDelta, spendableBalance: coinDelta } },
-      { returnDocument: "after" }
-    );
-    await CoinLedger.create({
-      studentId: params.studentId,
-      amount: coinDelta,
-      type: coinDelta > 0 ? "attendance" : "adjustment",
-      referenceId: attSession._id,
-      description:
-        coinDelta > 0
-          ? `Mentor davomatni belgiladi (+${coinDelta} coin)`
-          : `Mentor davomatni bekor qildi (${coinDelta} coin)`,
-      balanceAfter: updated?.totalCoins,
-    });
-    notify(params.studentId, "coins_changed", {
-      amount: coinDelta,
-      reason: coinDelta > 0 ? "Mentor dars davomatini belgiladi" : "Mentor dars davomatini bekor qildi",
-      balance: updated?.spendableBalance,
-    });
-  }
+  const { oldStatus } = await applyAttendanceStatus(attSession, params.studentId, params.status, { notes });
 
   await recomputeSummary(attSession._id);
 
@@ -588,8 +566,8 @@ export async function manualUpdateAttendanceAction(params: {
     details: {
       sessionId: params.sessionId,
       oldStatus,
-      newStatus,
-      notes: params.notes,
+      newStatus: params.status,
+      notes,
     },
   });
 
@@ -615,6 +593,11 @@ export interface SessionDetail {
     endTime: string | null;
     status: "active" | "closed";
     defaultCoinsReward: number;
+    /** Holat -> coin */
+    coinRules: AttendanceCoinRules;
+    /** false — kelmaganlarga jarima hali qo'llanmagan (qo'lda kiritilgan, yakunlanmagan dars) */
+    isFinalized: boolean;
+    isManual: boolean;
   };
   group: { _id: string; name: string; grade: number } | null;
   roster: SessionRosterRow[];
@@ -674,6 +657,9 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
       endTime: attSession.endTime ? new Date(attSession.endTime).toISOString() : null,
       status: attSession.status,
       defaultCoinsReward: attSession.defaultCoinsReward,
+      coinRules: coinRulesOf(attSession),
+      isFinalized: isSessionFinalized(attSession),
+      isManual: Boolean(attSession.isManual),
     },
     group: group ? { _id: group._id.toString(), name: group.name, grade: group.grade } : null,
     roster: [...rows.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),
@@ -682,7 +668,8 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
 
 export interface AttendanceJournal {
   group: { _id: string; name: string };
-  sessions: { _id: string; dateKey: string; status: "active" | "closed" }[];
+  /** isDuplicate — shu kunda bittadan ortiq davomat bor (ortiqchasini o'chirish kerak) */
+  sessions: { _id: string; dateKey: string; status: "active" | "closed"; isDuplicate: boolean }[];
   students: {
     studentId: string;
     fullName: string;
@@ -734,10 +721,17 @@ export async function getAttendanceJournal(params: {
     marksByStudent.get(key)![r.sessionId.toString()] = r.status;
   }
   const closedIds = sessions.filter((s) => s.status === "closed").map((s) => s._id.toString());
+  const perDay = new Map<string, number>();
+  for (const s of sessions) perDay.set(toDateKey(s.date), (perDay.get(toDateKey(s.date)) ?? 0) + 1);
 
   return {
     group: { _id: group._id.toString(), name: group.name },
-    sessions: sessions.map((s) => ({ _id: s._id.toString(), dateKey: toDateKey(s.date), status: s.status })),
+    sessions: sessions.map((s) => ({
+      _id: s._id.toString(),
+      dateKey: toDateKey(s.date),
+      status: s.status,
+      isDuplicate: (perDay.get(toDateKey(s.date)) ?? 0) > 1,
+    })),
     students: students.map((st) => {
       const marks = marksByStudent.get(st._id.toString()) ?? {};
       // Foiz faqat yakunlangan darslar bo'yicha; sababli qoldirilgan dars hisobga olinmaydi
@@ -762,17 +756,13 @@ export async function getAttendanceJournal(params: {
 export async function createManualSessionAction(params: {
   groupId: string;
   dateKey: string;
-  coinsReward?: number;
 }): Promise<ActionResult<{ sessionId: string }>> {
   const mentor = await requireMentor();
-  const coinsReward = params.coinsReward ?? 10;
-  if (!Number.isInteger(coinsReward) || coinsReward < 0 || coinsReward > 1000) {
-    return { success: false, message: "Coin miqdori 0 dan 1000 gacha butun son bo'lishi kerak" };
-  }
   if (!mongoose.isValidObjectId(params.groupId) || !/^\d{4}-\d{2}-\d{2}$/.test(params.dateKey)) {
     return { success: false, message: "Guruh yoki sana noto'g'ri" };
   }
-  if (params.dateKey > toDateKey()) {
+  const todayKey = toDateKey();
+  if (params.dateKey > todayKey) {
     return { success: false, message: "Kelajakdagi sana uchun davomat ochib bo'lmaydi" };
   }
   await connectToDatabase();
@@ -780,19 +770,25 @@ export async function createManualSessionAction(params: {
   const group = await Group.findById(params.groupId).lean();
   if (!group) return { success: false, message: "Guruh topilmadi" };
 
-  const dayStart = dateFromKey(params.dateKey);
-  const duplicate = await AttendanceSession.findOne({
-    groupId: params.groupId,
-    date: { $gte: dayStart, $lt: dateFromKey(addDaysToKey(params.dateKey, 1)) },
-  })
-    .select("_id")
-    .lean();
+  const duplicate = await findSessionOnDay(params.groupId, params.dateKey).select("_id").lean();
   if (duplicate) {
     return {
       success: true,
       message: "Bu kun uchun davomat allaqachon mavjud",
       data: { sessionId: duplicate._id.toString() },
     };
+  }
+
+  if (!isValidSchedule(group.schedule)) {
+    return { success: false, message: "Guruhga dars jadvali belgilanmagan. Avval jadvalni kiriting." };
+  }
+  // Davomat faqat jadvaldagi dars kuniga kiritiladi
+  const dayStart = dateFromKey(params.dateKey, group.schedule.startTime);
+  if (!group.schedule.days.includes(getTashkentParts(dayStart).weekday)) {
+    return { success: false, message: "Bu kunda guruhning darsi yo'q. Jadvaldagi dars kunini tanlang." };
+  }
+  if (params.dateKey === todayKey && Date.now() < dayStart.getTime() - 15 * 60_000) {
+    return { success: false, message: `Bugungi dars hali boshlanmagan (${group.schedule.startTime}).` };
   }
 
   const schedule = isValidSchedule(group.schedule) ? group.schedule : null;
@@ -810,7 +806,11 @@ export async function createManualSessionAction(params: {
     currentToken: generateToken(),
     codeRotatedAt: start,
     previousTokens: [],
-    defaultCoinsReward: coinsReward,
+    defaultCoinsReward: ATTENDANCE_COINS.present,
+    coinRules: ATTENDANCE_COINS,
+    isManual: true,
+    // Kelmaganlarga jarima mentor belgilab bo'lib, "Yakunlash"ni bosganda qo'llanadi
+    finalizedAt: null,
   });
 
   const students = await User.find({ groupId: params.groupId, role: "student" }).select("_id").lean();
@@ -824,6 +824,7 @@ export async function createManualSessionAction(params: {
         method: "manual",
         markedAt: start,
         coinsAwarded: 0,
+        balanceDelta: 0,
       }))
     );
   }
@@ -853,6 +854,8 @@ export interface GroupsAttendanceOverview {
 export async function getGroupsAttendanceOverview(): Promise<GroupsAttendanceOverview> {
   await requireMentor();
   await connectToDatabase();
+
+  await closeExpiredSessions();
 
   const todayKey = toDateKey();
   const monthStart = dateFromKey(`${todayKey.slice(0, 7)}-01`);

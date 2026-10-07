@@ -92,7 +92,7 @@ export function StudentAttendanceView({
 
       if (res.success) {
         setAlreadyMarked(true);
-        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 10;
+        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "Davomat muvaffaqiyatli belgilandi!");
         triggerConfetti();
@@ -136,7 +136,7 @@ export function StudentAttendanceView({
 
       if (res.success) {
         setAlreadyMarked(true);
-        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 10;
+        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "QR Davomat muvaffaqiyatli belgilandi!");
         triggerConfetti();
@@ -200,7 +200,7 @@ export function StudentAttendanceView({
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <Badge variant="teal" className="gap-1.5 py-1 px-3">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>+{activeSession?.defaultCoinsReward || 10} coin</span>
+                <span>+{activeSession?.defaultCoinsReward || 5} coin</span>
               </Badge>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function StudentAttendanceView({
                   isLoading={isSubmitting}
                   className="w-full font-semibold shadow-md shadow-teal-500/20 min-h-[48px]"
                 >
-                  Davomatni tasdiqlash (+{activeSession?.defaultCoinsReward || 10} coin)
+                  Davomatni tasdiqlash (+{activeSession?.defaultCoinsReward || 5} coin)
                 </Button>
               </div>
             </div>
@@ -438,6 +438,11 @@ export function StudentAttendanceView({
                       {statusBadge}
                       {record.coinsAwarded > 0 && (
                         <CoinBadge amount={record.coinsAwarded} size="sm" animate={false} />
+                      )}
+                      {record.coinsAwarded < 0 && (
+                        <span className="font-mono text-xs font-bold text-rose-700 dark:text-rose-400">
+                          −{Math.abs(record.coinsAwarded)} coin
+                        </span>
                       )}
                     </div>
                   </div>

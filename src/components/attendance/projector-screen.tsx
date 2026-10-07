@@ -279,7 +279,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
               </Badge>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {data.group?.grade}-sinf • Har bir kelgan o&apos;quvchiga +{data.session.defaultCoinsReward} coin
+              {data.group?.grade}-sinf • kelganga +{data.session.defaultCoinsReward} coin · kelmaganga jarima sessiya yopilganda
             </p>
           </div>
         </div>
