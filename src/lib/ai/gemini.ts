@@ -6,8 +6,11 @@ const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 // Bepul tarifda ishlaydigan eng kuchli model birinchi; u band bo'lsa (503/429) yoki topilmasa, keyingisiga o'tiladi.
 // (Pro modellar bepul tarifda yo'q — 429 qaytaradi.)
 const MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
-const TIMEOUT_MS = 120_000;
-// Band (503/429) deb javob bergan model shu vaqt davomida o'tkazib yuboriladi — har so'rovda kutib o'tirmaslik uchun
+// Bitta so'rov uchun qat'iy chegara
+const TIMEOUT_MS = 90_000;
+// Kuchli model shu vaqt ichida javob bermasa, tayyor turgan yengil model javobi qaytariladi
+const PRIMARY_HEAD_START_MS = 12_000;
+// Band (503/429) deb javob bergan yoki javobsiz osilib qolgan model shu vaqt davomida o'tkazib yuboriladi — har so'rovda kutib o'tirmaslik uchun
 const BUSY_COOLDOWN_MS = 3 * 60 * 1000;
 const busyUntil = new Map<string, number>();
 
@@ -23,7 +26,11 @@ interface GeminiResponse {
   error?: { code?: number; message?: string; status?: string };
 }
 
-async function callModel(model: string, body: unknown): Promise<{ status: number; data: GeminiResponse }> {
+async function callModel(
+  model: string,
+  body: unknown,
+  signal: AbortSignal
+): Promise<{ status: number; data: GeminiResponse }> {
   const res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
     method: "POST",
     headers: {
@@ -31,7 +38,7 @@ async function callModel(model: string, body: unknown): Promise<{ status: number
       "X-goog-api-key": process.env.GEMINI_API_KEY ?? "",
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), signal]),
     cache: "no-store",
   });
   const data = (await res.json().catch(() => ({}))) as GeminiResponse;
@@ -77,15 +84,23 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   });
 
   /** Bitta modelni sinaydi: javob yoki null (band, xato, noto'g'ri tuzilma). Kalit/blok xatosida GeminiError otadi */
+  // Javob olingach, hali kutilayotgan boshqa so'rovlar bekor qilinadi
+  const done = new AbortController();
+
   const tryModel = async (model: string): Promise<z.infer<Schema> | null> => {
     let result: { status: number; data: GeminiResponse };
     try {
-      result = await callModel(model, buildBody(true));
+      result = await callModel(model, buildBody(true), done.signal);
       // Sxemadagi ayrim cheklovlarni Gemini qabul qilmasligi mumkin — sxemani matn ichida berib qayta uriniladi
       if (result.status === 400) {
-        result = await callModel(model, buildBody(false));
+        result = await callModel(model, buildBody(false), done.signal);
       }
     } catch (error) {
+      if (done.signal.aborted) return null;
+      // Javobsiz osilib qolgan model keyingi so'rovlarda o'tkazib yuboriladi
+      if (error instanceof Error && error.name === "TimeoutError") {
+        busyUntil.set(model, Date.now() + BUSY_COOLDOWN_MS);
+      }
       console.error(`Gemini request failed (${model}):`, error instanceof Error ? error.message : error);
       return null;
     }
@@ -127,20 +142,43 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   // Hammasi band deb belgilangan bo'lsa ham, baribir sinab ko'riladi
   const [primary, ...rest] = available.length > 0 ? available : MODELS;
 
-  // Kuchli model band bo'lganda u "band" deb javob berguncha bir necha soniya o'tadi. Kutib qolmaslik uchun
-  // eng yengil zaxira model bir vaqtda ishga tushiriladi: kuchlisi javob bersa — o'sha, bo'lmasa zaxiraniki olinadi.
+  // Kuchli model band bo'lsa yoki javobsiz osilib qolsa, mentor uni kutib o'tirmasligi kerak. Shuning uchun
+  // eng yengil zaxira model bir vaqtda ishga tushiriladi: kuchlisi ajratilgan vaqt ichida javob bersa — o'sha,
+  // ulgurmasa — zaxiraniki olinadi.
   const backupModel = rest.pop();
-  const backup = backupModel ? tryModel(backupModel).catch(() => null) : null;
+  try {
+    const primaryRun = tryModel(primary);
+    if (!backupModel) {
+      const only = await primaryRun;
+      if (only) return only;
+    } else {
+      const backupRun = tryModel(backupModel).catch(() => null);
+      const headStart = new Promise<"late">((resolve) => setTimeout(() => resolve("late"), PRIMARY_HEAD_START_MS));
 
-  const best = await tryModel(primary);
-  if (best) return best;
-  if (backup) {
-    const fallback = await backup;
-    if (fallback) return fallback;
-  }
-  for (const model of rest) {
-    const answer = await tryModel(model);
-    if (answer) return answer;
+      const first = await Promise.race([primaryRun, headStart]);
+      if (first && first !== "late") return first;
+
+      if (first === "late") {
+        // Kuchli model sekin: qaysi biri birinchi yaroqli javob bersa, o'sha olinadi
+        const fallback = await backupRun;
+        if (fallback) {
+          busyUntil.set(primary, Date.now() + BUSY_COOLDOWN_MS);
+          return fallback;
+        }
+        const late = await primaryRun;
+        if (late) return late;
+      } else {
+        const fallback = await backupRun;
+        if (fallback) return fallback;
+      }
+    }
+
+    for (const model of rest) {
+      const answer = await tryModel(model);
+      if (answer) return answer;
+    }
+  } finally {
+    done.abort();
   }
 
   throw new GeminiError("AI xizmati hozir band. Bir daqiqadan keyin qayta urinib ko'ring");
