@@ -282,3 +282,21 @@ describe("telegram: dars eslatmasi", () => {
     expect(await sendLessonReminders(at("15:30"))).toEqual({ groups: 0, sent: 0 });
   });
 });
+
+describe("profil: reytingdagi salyut sozlamasi", () => {
+  it("har kim faqat o'zi uchun o'chiradi; sukut bo'yicha yoqilgan", async () => {
+    const { setCelebrationsEnabledAction } = await import("@/actions/profile.actions");
+    const ali = await mkUser("ali");
+    const vali = await mkUser("vali");
+    expect((await User.findById(ali._id).lean())?.celebrationsEnabled).toBe(true);
+
+    actAs(sessionFor(ali));
+    expect((await setCelebrationsEnabledAction(false)).success).toBe(true);
+    expect((await User.findById(ali._id).lean())?.celebrationsEnabled).toBe(false);
+    expect((await User.findById(vali._id).lean())?.celebrationsEnabled).toBe(true);
+
+    expect((await setCelebrationsEnabledAction("yoq")).success).toBe(false);
+    actAs(null);
+    await expect(setCelebrationsEnabledAction(true)).rejects.toThrow();
+  });
+});

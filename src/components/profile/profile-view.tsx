@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { changePasswordAction, ActionResult } from "@/actions/auth.actions";
 import { TelegramSection } from "@/components/profile/telegram-section";
+import { CelebrationSetting } from "@/components/profile/celebration-setting";
 import type { TelegramStatus } from "@/actions/telegram.actions";
 
 interface ProfileViewProps {
@@ -24,13 +25,14 @@ interface ProfileViewProps {
     spendableBalance?: number;
   };
   telegram: TelegramStatus;
+  celebrationsEnabled: boolean;
 }
 
 const initialState: ActionResult = {
   success: false,
 };
 
-export function ProfileView({ user, telegram }: ProfileViewProps) {
+export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileViewProps) {
   const [state, formAction, isPending] = useActionState(changePasswordAction, initialState);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -168,6 +170,8 @@ export function ProfileView({ user, telegram }: ProfileViewProps) {
       )}
 
       <TelegramSection initial={telegram} role={user.role} />
+
+      <CelebrationSetting initialEnabled={celebrationsEnabled} />
 
       {/* Change Password Card */}
       <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">

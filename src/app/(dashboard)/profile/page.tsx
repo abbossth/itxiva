@@ -14,7 +14,7 @@ export default async function ProfilePage() {
   await connectToDatabase();
 
   const [user, telegram] = await Promise.all([
-    User.findById(session.userId).select("fullName login groupId totalCoins spendableBalance").lean(),
+    User.findById(session.userId).select("fullName login groupId totalCoins spendableBalance celebrationsEnabled").lean(),
     getTelegramStatus(),
   ]);
   let groupName: string | undefined;
@@ -29,6 +29,7 @@ export default async function ProfilePage() {
   return (
     <ProfileView
       telegram={telegram}
+      celebrationsEnabled={user?.celebrationsEnabled !== false}
       user={{
         userId: session.userId,
         fullName: user?.fullName || session.fullName,

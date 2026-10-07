@@ -17,6 +17,8 @@ export interface IUserData {
   telegram?: { chatId: string | null; username?: string | null; linkedAt?: Date | string | null } | null;
   /** Bildirishnoma turlari: false — o'chirilgan; yozilmagan tur yoqilgan hisoblanadi */
   notificationPrefs?: Record<string, boolean> | null;
+  /** Reytingdagi salyut (konfetti, ovoz, titrash). Yozilmagan bo'lsa — yoqilgan */
+  celebrationsEnabled?: boolean;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -97,6 +99,7 @@ const UserSchema = new Schema<IUser>(
       select: false,
     },
     notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
+    celebrationsEnabled: { type: Boolean, default: true },
   },
   {
     timestamps: true,

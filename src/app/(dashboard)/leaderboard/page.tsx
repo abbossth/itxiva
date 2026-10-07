@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowDown, ClipboardCheck, Flame, GraduationCap, QrCode, Sparkles, Target, Trophy, TrendingUp, Users } from "lucide-react";
 import { requireAuth } from "@/lib/auth/guards";
+import { connectToDatabase } from "@/lib/db/connect";
+import { User } from "@/lib/db/models/user.model";
 import { getLeaderboardAction, type LeaderboardData, type LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { getGroups } from "@/actions/group.actions";
 import { Podium } from "@/components/leaderboard/podium";
@@ -135,7 +137,14 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const groupId = resolvedSearchParams.groupId;
   const grade = resolvedSearchParams.grade ? parseInt(resolvedSearchParams.grade, 10) : undefined;
 
-  const [data, groups] = await Promise.all([getLeaderboardAction({ type, groupId, grade }), getGroups()]);
+  await connectToDatabase();
+  const [data, groups, viewer] = await Promise.all([
+    getLeaderboardAction({ type, groupId, grade }),
+    getGroups(),
+    User.findById(session.userId).select("celebrationsEnabled").lean(),
+  ]);
+  // Salyutni har kim profil sozlamalarida o'zi uchun o'chirib qo'yishi mumkin
+  const celebrate = viewer?.celebrationsEnabled !== false;
 
   const grades = [...new Set(groups.map((g) => g.grade))].sort((a, b) => a - b);
   const hasAnyCoins = data.top3.some((e) => e.totalCoins > 0);
@@ -196,7 +205,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
 
       {me && <MyRankHero me={me} data={data} />}
       {/* Konfetti: o'quvchi kuchli uchlikda bo'lsa; mentorga esa uchlik ko'rsatilganda har doim (har filtr uchun qaytadan) */}
-      {hasAnyCoins && (
+      {hasAnyCoins && celebrate && (
         <TopThreeCelebration
           key={`${type}-${groupId ?? ""}-${grade ?? ""}`}
           rank={session.role === "mentor" ? 1 : me && me.totalCoins > 0 ? me.rank : 0}
