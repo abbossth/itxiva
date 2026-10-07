@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
+import { playFireworksSound } from "@/lib/sound";
 
 // Medal ranglari: 1-o'rin oltin, 2-o'rin kumush, 3-o'rin bronza (firuza — sayt rangi)
 const COLORS: Record<number, string[]> = {
@@ -22,7 +23,10 @@ export function TopThreeCelebration({ rank }: { rank: number }) {
     // Qurilmada "harakatni kamaytirish" yoqilgan bo'lsa ham tabrik ko'rinadi, lekin yengil: bitta, sekin va kichik otilish
     if (prefersReducedMotion()) {
       const timer = setTimeout(
-        () => void fireConfetti({ particleCount: 45, spread: 80, startVelocity: 22, gravity: 0.7, origin: { y: 0.35 }, colors }, { evenIfReducedMotion: true }),
+        () => {
+          void fireConfetti({ particleCount: 45, spread: 80, startVelocity: 22, gravity: 0.7, origin: { y: 0.35 }, colors }, { evenIfReducedMotion: true });
+          playFireworksSound([0], 0.7);
+        },
         300
       );
       return () => clearTimeout(timer);
@@ -30,6 +34,8 @@ export function TopThreeCelebration({ rank }: { rank: number }) {
     const timers = [
       // Shohsupa ko'tarilib bo'lgach boshlanadi
       setTimeout(() => {
+        // Ovoz konfetti bilan bir vaqtda: ikki yondan, keyin o'rtadan
+        playFireworksSound([0, 0.18, 0.6], rank === 1 ? 1 : 0.8);
         void fireConfetti({ particleCount: count, angle: 60, spread: 70, origin: { x: 0, y: 0.7 }, colors });
         void fireConfetti({ particleCount: count, angle: 120, spread: 70, origin: { x: 1, y: 0.7 }, colors });
       }, 900),
