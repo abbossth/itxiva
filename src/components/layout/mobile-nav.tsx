@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { MENTOR_LINKS, STUDENT_LINKS, isNavLinkActive, type NavBadges } from "./nav-links";
+import { MENTOR_LINKS, STUDENT_LINKS, isLinkActive, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 
 interface MobileNavProps {
@@ -21,7 +21,7 @@ export function MobileNav({ role, badges = {} }: MobileNavProps) {
   const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
   const primaryLinks = links.filter((l) => l.primary);
   const moreLinks = links.filter((l) => !l.primary);
-  const isMoreActive = moreLinks.some((l) => isNavLinkActive(l.href, pathname));
+  const isMoreActive = moreLinks.some((l) => isLinkActive(l, pathname));
   const badgeOf = (link: (typeof links)[number]) => (link.badge ? badges[link.badge] ?? 0 : 0);
   // "Yana" ichidagi bo'limlarda kutilayotgan narsa bo'lsa, tugmaning o'zida ham ko'rinadi
   const moreBadge = moreLinks.reduce((sum, l) => sum + badgeOf(l), 0);
@@ -45,7 +45,7 @@ export function MobileNav({ role, badges = {} }: MobileNavProps) {
         <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
           {primaryLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = isNavLinkActive(link.href, pathname);
+            const isActive = isLinkActive(link, pathname);
             return (
               <Link key={link.href} href={link.href} className={itemClass(isActive)}>
                 <div className={iconWrapClass(isActive)}>
@@ -86,7 +86,7 @@ export function MobileNav({ role, badges = {} }: MobileNavProps) {
         <div className="grid grid-cols-2 gap-2 pb-2">
           {moreLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = isNavLinkActive(link.href, pathname);
+            const isActive = isLinkActive(link, pathname);
             return (
               <Link
                 key={link.href}

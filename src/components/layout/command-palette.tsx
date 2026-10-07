@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CornerDownLeft, LogOut, Moon, Plus, Search, Sun, type LucideIcon } from "lucide-react";
-import { MENTOR_LINKS, STUDENT_LINKS } from "./nav-links";
+import { MENTOR_LINKS, MENTOR_SECTIONS, STUDENT_LINKS } from "./nav-links";
 import { logoutAction } from "@/actions/auth.actions";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +48,10 @@ export function CommandPalette({
 
   const commands = useMemo<Command[]>(() => {
     const go = (href: string) => () => router.push(href);
-    const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
+    // Bo'limlarning ichki sahifalari (tablar) ham alohida topiladi: "Sozlamalar · Excel import"
+    const tabs = MENTOR_SECTIONS.flatMap((s) => s.tabs.map((t) => ({ href: t.href, label: `${s.label} · ${t.label}`, shortLabel: s.label, icon: t.icon })));
+    const links =
+      role === "mentor" ? [...MENTOR_LINKS.filter((l) => !tabs.some((t) => t.href === l.href)), ...tabs] : STUDENT_LINKS;
     const actions = role === "mentor" ? MENTOR_ACTIONS : STUDENT_ACTIONS;
     const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
     return [

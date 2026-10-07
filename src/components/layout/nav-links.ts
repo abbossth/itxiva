@@ -29,18 +29,9 @@ export interface NavLink {
   primary?: boolean;
   /** Son ko'rsatiladigan havola: buyurtmalar yoki uyga vazifalar */
   badge?: NavBadgeKind;
-  /** Desktop sidebar'da shu guruh ichida, `groupLabel` nomi bilan ko'rinadi */
-  group?: NavGroupId;
-  groupLabel?: string;
+  /** Shu bo'limga kiradigan boshqa sahifalar: ular ochiq bo'lganda ham havola faol ko'rinadi */
+  match?: string[];
 }
-
-export type NavGroupId = "shop" | "settings";
-
-/** Sidebar'dagi ochiladigan guruhlar: bo'limlar ko'payib ketmasligi uchun */
-export const NAV_GROUPS: Record<NavGroupId, { label: string; icon: LucideIcon }> = {
-  shop: { label: "Do'kon", icon: ShoppingBag },
-  settings: { label: "Sozlamalar", icon: Settings },
-};
 
 export type NavBadgeKind = "orders" | "homework";
 export type NavBadges = Partial<Record<NavBadgeKind, number>>;
@@ -54,11 +45,34 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
-  { href: "/mentor/shop", label: "Do'kon mahsulotlari", shortLabel: "Do'kon", icon: Package, group: "shop", groupLabel: "Mahsulotlar" },
-  { href: "/mentor/orders", label: "Buyurtmalar", shortLabel: "Buyurtma", icon: PackageCheck, badge: "orders", group: "shop" },
-  { href: "/profile", label: "Profil va Telegram", shortLabel: "Profil", icon: User, group: "settings" },
-  { href: "/mentor/import", label: "Excel import", shortLabel: "Import", icon: FileSpreadsheet, group: "settings" },
-  { href: "/mentor/audit", label: "Audit loglar", shortLabel: "Audit", icon: ShieldCheck, group: "settings" },
+  { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },
+  { href: "/profile", label: "Sozlamalar", shortLabel: "Sozlama", icon: Settings, match: ["/mentor/import", "/mentor/audit"] },
+];
+
+/** Bir bo'limning ichki sahifalari — sahifa tepasida tab sifatida ko'rinadi (SectionTabs) */
+export interface NavTab {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: NavBadgeKind;
+}
+
+export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
+  {
+    label: "Do'kon",
+    tabs: [
+      { href: "/mentor/shop", label: "Mahsulotlar", icon: Package },
+      { href: "/mentor/orders", label: "Buyurtmalar", icon: PackageCheck, badge: "orders" },
+    ],
+  },
+  {
+    label: "Sozlamalar",
+    tabs: [
+      { href: "/profile", label: "Profil va Telegram", icon: User },
+      { href: "/mentor/import", label: "Excel import", icon: FileSpreadsheet },
+      { href: "/mentor/audit", label: "Audit loglar", icon: ShieldCheck },
+    ],
+  },
 ];
 
 export const STUDENT_LINKS: NavLink[] = [
@@ -75,4 +89,9 @@ export const STUDENT_LINKS: NavLink[] = [
 export function isNavLinkActive(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Havolaning o'zi yoki uning bo'limiga kiradigan sahifalardan biri ochiqmi */
+export function isLinkActive(link: Pick<NavLink, "href" | "match">, pathname: string): boolean {
+  return [link.href, ...(link.match ?? [])].some((href) => isNavLinkActive(href, pathname));
 }
