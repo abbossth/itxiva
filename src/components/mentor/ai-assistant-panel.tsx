@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Wand2, Presentation, FileText, Download, Check, X, Paperclip } from "lucide-react";
+import { Sparkles, Wand2, Presentation, FileText, Download, Check, X, Paperclip, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -30,6 +30,8 @@ interface AiAssistantPanelProps {
   onApplyDraft: (draft: LessonDraft) => void;
   onApplyDescription: (text: string) => void;
   onAttachMaterial: (material: IMaterial) => void;
+  /** Yangi darsda ochiq, mavjud darsni tahrirlashda yig'ilgan holda turadi */
+  defaultOpen?: boolean;
 }
 
 type Task = "draft" | "improve" | "pptx" | "docx";
@@ -53,8 +55,10 @@ export function AiAssistantPanel({
   onApplyDraft,
   onApplyDescription,
   onAttachMaterial,
+  defaultOpen = true,
 }: AiAssistantPanelProps) {
   const { toast } = useToast();
+  const [open, setOpen] = useState(defaultOpen);
   const [topicInput, setTopicInput] = useState("");
   const [notes, setNotes] = useState("");
   const [running, setRunning] = useState<Task | null>(null);
@@ -100,7 +104,7 @@ export function AiAssistantPanel({
 
   if (!enabled) {
     return (
-      <div className="p-5 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 flex items-start gap-3">
+      <div className="px-4 py-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400 flex items-start gap-3">
         <Sparkles className="w-5 h-5 shrink-0 text-slate-500 dark:text-slate-400 mt-0.5" />
         <span>
           AI yordamchi o&apos;chirilgan: serverda <code className="font-mono text-xs">ANTHROPIC_API_KEY</code> yoki{" "}
@@ -113,18 +117,24 @@ export function AiAssistantPanel({
   const canUseLesson = lesson.title.trim().length >= 3;
 
   return (
-    <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-surface dark:to-blue-950/30 border border-teal-500/30 space-y-5">
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl bg-itxiva-gradient text-white flex items-center justify-center shrink-0">
-          <Sparkles className="w-5 h-5" />
-        </div>
-        <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">AI yordamchi</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Natija avval ko&apos;rsatiladi — siz tasdiqlamaguningizcha darsga hech narsa yozilmaydi
-          </p>
-        </div>
-      </div>
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="group rounded-2xl bg-gradient-to-br from-teal-500/10 via-white to-blue-500/10 dark:from-teal-950/40 dark:via-surface dark:to-blue-950/30 border border-teal-500/30"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="w-8 h-8 rounded-xl bg-itxiva-gradient text-white flex items-center justify-center shrink-0">
+          <Sparkles className="w-4 h-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">AI yordamchi</span>
+          <span className="block truncate text-xs text-slate-600 dark:text-slate-400">
+            Dars matni, konspektni yaxshilash, taqdimot va konspekt fayli — natijani tasdiqlamaguningizcha hech narsa yozilmaydi
+          </span>
+        </span>
+        <ChevronDown className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="px-4 pb-4 pt-1 space-y-3">
 
       {/* 1. Dars matni */}
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -168,7 +178,7 @@ export function AiAssistantPanel({
           onClick={handleImprove}
           isLoading={running === "improve"}
           disabled={Boolean(running) || lesson.description.trim().length < 20}
-          className="gap-1.5 min-h-[44px] bg-white/70 dark:bg-transparent"
+          className="gap-1.5 bg-white/70 dark:bg-transparent"
         >
           <Wand2 className="w-4 h-4" />
           Konspektni yaxshilash
@@ -180,7 +190,7 @@ export function AiAssistantPanel({
           onClick={() => handleFile("pptx")}
           isLoading={running === "pptx"}
           disabled={Boolean(running) || !canUseLesson}
-          className="gap-1.5 min-h-[44px] bg-white/70 dark:bg-transparent"
+          className="gap-1.5 bg-white/70 dark:bg-transparent"
         >
           <Presentation className="w-4 h-4" />
           Taqdimot (.pptx)
@@ -192,7 +202,7 @@ export function AiAssistantPanel({
           onClick={() => handleFile("docx")}
           isLoading={running === "docx"}
           disabled={Boolean(running) || !canUseLesson}
-          className="gap-1.5 min-h-[44px] bg-white/70 dark:bg-transparent"
+          className="gap-1.5 bg-white/70 dark:bg-transparent"
         >
           <FileText className="w-4 h-4" />
           Konspekt (.docx)
@@ -318,6 +328,7 @@ export function AiAssistantPanel({
           ))}
         </ul>
       )}
-    </div>
+      </div>
+    </details>
   );
 }

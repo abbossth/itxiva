@@ -402,11 +402,11 @@ export function LessonEditorForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl mx-auto">
+    <form onSubmit={handleSubmit} className="space-y-3 max-w-4xl mx-auto">
       {errorMsg && (
         <div
           role="alert"
-          className="p-4 rounded-2xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 flex items-center gap-2.5 text-sm"
+          className="px-4 py-2.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 flex items-center gap-2.5 text-sm"
         >
           <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{errorMsg}</span>
@@ -415,6 +415,7 @@ export function LessonEditorForm({
 
       <AiAssistantPanel
         enabled={aiEnabled}
+        defaultOpen={!initialLesson}
         grade={groups.find((g) => g._id.toString() === groupId)?.grade}
         lesson={{ title, topic, description }}
         onApplyDraft={(draft) => {
@@ -427,18 +428,18 @@ export function LessonEditorForm({
       />
 
       {/* Main Lesson Info Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
+      <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
           {initialLesson ? "Darsni tahrirlash" : "Yangi dars ma'lumotlari"}
         </h2>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
           <Field htmlFor="lesson-group" label="O'quv guruhi" required>
             <select
               id="lesson-group"
               value={groupId}
               onChange={(e) => handleGroupChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-sm min-h-[44px] text-slate-900 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-sm min-h-[40px] text-slate-900 dark:text-slate-100"
               required
             >
               {groups.map((g) => (
@@ -454,7 +455,7 @@ export function LessonEditorForm({
               id="lesson-quarter"
               value={quarter}
               onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-sm min-h-[44px] text-slate-900 dark:text-slate-100"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-sm min-h-[40px] text-slate-900 dark:text-slate-100"
             >
               {[1, 2, 3, 4].map((q) => (
                 <option key={q} value={q}>
@@ -464,7 +465,7 @@ export function LessonEditorForm({
             </select>
           </Field>
 
-          <Field htmlFor="lesson-order" label="Tartib raqami (dars #)" required>
+          <Field htmlFor="lesson-order" label="Dars №" required>
             <Input
               id="lesson-order"
               type="number"
@@ -474,29 +475,7 @@ export function LessonEditorForm({
               required
             />
           </Field>
-        </div>
-
-        <Field htmlFor="lesson-title" label="Dars mavzusi / Sarlavhasi" required hint="Darsning to'liq rasmiy nomi">
-          <Input
-            id="lesson-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="masalan: 1-dars. Python asoslari va o'zgaruvchilar"
-            required
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field htmlFor="lesson-topic" label="Mavzu qisqacha (podzagolovok)" hint="Asosiy teglari yoki kalit so'zlar">
-            <Input
-              id="lesson-topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="masalan: Data types, variables, input/output"
-            />
-          </Field>
-
-          <Field htmlFor="lesson-date" label="Dars o'tiladigan sana">
+          <Field htmlFor="lesson-date" label="Sana">
             <Input
               id="lesson-date"
               type="date"
@@ -506,39 +485,44 @@ export function LessonEditorForm({
           </Field>
         </div>
 
-        <Field htmlFor="lesson-description" label="Dars konspekti / Tavsifi" hint="Dars mazmuni, uy vazifasi va ko'rsatmalar">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field htmlFor="lesson-title" label="Dars nomi" required>
+            <Input
+              id="lesson-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="masalan: 1-dars. Python asoslari va o'zgaruvchilar"
+              required
+            />
+          </Field>
+          <Field htmlFor="lesson-topic" label="Qisqacha mavzu (kalit so'zlar)">
+            <Input
+              id="lesson-topic"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="masalan: Data types, variables, input/output"
+            />
+          </Field>
+
+        </div>
+
+        <Field htmlFor="lesson-description" label="Dars konspekti">
           <textarea
             id="lesson-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Dars konspekti, asosiy mavzular va o'quvchiga yo'riqnoma..."
-            rows={10}
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+            rows={7}
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
           />
         </Field>
-
-        {/* Publish checkbox */}
-        <div className="pt-2">
-          <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-            <input
-              type="checkbox"
-              id="is-published"
-              checked={isPublished}
-              onChange={(e) => setIsPublished(e.target.checked)}
-              className="w-5 h-5 rounded-md accent-teal-600 cursor-pointer"
-            />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Darsni darhol o&apos;quvchilarga nashr etish (ko&apos;rsatish)
-            </span>
-          </label>
-        </div>
       </div>
 
       {/* Bitta dars — bir nechta guruh */}
       {(linkedLessons.length > 0 || otherGroups.length > 0) && (
-        <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Link2 className="w-5 h-5 text-teal-600 dark:text-teal-400" />
               Boshqa guruhlar
             </h2>
@@ -556,19 +540,23 @@ export function LessonEditorForm({
             )}
           </div>
 
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Bitta darsni bir nechta guruhga bering — har safar qaytadan yaratish shart emas. Sarlavha, konspekt,
-            materiallar, uyga vazifa matni va test barcha bog&apos;langan guruhlarda <strong>birga yangilanadi</strong>.
-            Sana, tartib raqami, nashr holati, vazifa muddati hamda o&apos;quvchilarning javob va baholari har
-            guruhda <strong>alohida</strong> qoladi.
-          </p>
+          <details className="text-xs text-slate-600 dark:text-slate-400">
+            <summary className="cursor-pointer font-semibold text-teal-700 dark:text-teal-300 min-h-[28px] flex items-center">
+              Bitta dars bir nechta guruhda — qanday ishlaydi?
+            </summary>
+            <p className="mt-1 leading-relaxed">
+              Sarlavha, konspekt, materiallar, uyga vazifa matni va test barcha bog&apos;langan guruhlarda{" "}
+              <strong>birga yangilanadi</strong>. Sana, tartib raqami, nashr holati, vazifa muddati hamda
+              o&apos;quvchilarning javob va baholari har guruhda <strong>alohida</strong> qoladi.
+            </p>
+          </details>
 
           {linkedLessons.length > 0 && (
             <ul className="space-y-2">
               {linkedLessons.map((l) => (
                 <li
                   key={l._id}
-                  className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
                 >
                   <span className="flex flex-wrap items-center gap-2 min-w-0">
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{l.groupName}</span>
@@ -590,7 +578,7 @@ export function LessonEditorForm({
           )}
 
           {otherGroups.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 {initialLesson ? "Yana qaysi guruhlarga qo'shilsin?" : "Shu darsni quyidagi guruhlarga ham yaratish"}
               </p>
@@ -601,7 +589,7 @@ export function LessonEditorForm({
                   return (
                     <label
                       key={id}
-                      className={`flex items-center gap-2.5 px-3.5 rounded-xl border text-sm font-semibold cursor-pointer min-h-[44px] transition-colors ${
+                      className={`flex items-center gap-2 px-3 rounded-xl border text-sm font-semibold cursor-pointer min-h-[36px] transition-colors ${
                         checked
                           ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300"
                           : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
@@ -652,18 +640,18 @@ export function LessonEditorForm({
       )}
 
       {/* Materials Builder Card */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 border-b border-slate-100 dark:border-slate-800 pb-3">
+      <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
           Dars materiallari ({materials.length})
         </h2>
 
         {/* List of currently added materials */}
         {materials.length > 0 && (
-          <div className="space-y-2 mb-4">
+          <div className="space-y-1.5">
             {materials.map((m, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
+                className="flex items-center justify-between pl-3 pr-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
               >
                 <div className="flex items-center gap-3 truncate pr-2">
                   {m.type === "youtube" ? (
@@ -682,7 +670,7 @@ export function LessonEditorForm({
                 <button
                   type="button"
                   onClick={() => handleRemoveMaterial(idx)}
-                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                   aria-label={`${m.title} materialini o'chirish`}
                   title="O'chirish"
                 >
@@ -694,21 +682,21 @@ export function LessonEditorForm({
         )}
 
         {/* Add material interface */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 space-y-4">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 space-y-2.5">
           <div className="flex flex-wrap items-center gap-2">
             {(["youtube", "file", "link"] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setMaterialType(type)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer min-h-[40px] ${
+                className={`px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer min-h-[34px] ${
                   materialType === type
                     ? "bg-teal-600 text-white shadow-xs"
                     : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                 }`}
               >
                 {type === "youtube" && "YouTube video"}
-                {type === "file" && "Material faylini yuklash (PDF, ZIP, rasm — 20 MB gacha)"}
+                {type === "file" && "Fayl (PDF, ZIP, rasm — 20 MB gacha)"}
                 {type === "link" && "Tashqi havola"}
               </button>
             ))}
@@ -732,7 +720,7 @@ export function LessonEditorForm({
                   onChange={handleFileUpload}
                   disabled={uploadingFile}
                   accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[44px] flex items-center"
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[40px] flex items-center"
                 />
               </Field>
             ) : (
@@ -756,7 +744,7 @@ export function LessonEditorForm({
                     variant="secondary"
                     onClick={handleAddLinkOrVideo}
                     disabled={!matUrl.trim()}
-                    className="shrink-0 min-h-[44px]"
+                    className="shrink-0"
                   >
                     Qo&apos;shish
                   </Button>
@@ -797,13 +785,13 @@ export function LessonEditorForm({
       </div>
 
       {/* Uyga vazifa */}
-      <div id="homework" className="scroll-mt-20 p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+      <div id="homework" className="scroll-mt-20 p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
             Uyga vazifa
           </h2>
-          <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+          <label className="flex items-center gap-2.5 cursor-pointer min-h-[32px]">
             <input
               type="checkbox"
               checked={hwEnabled}
@@ -822,16 +810,16 @@ export function LessonEditorForm({
             &quot;Darslar&quot; ro&apos;yxatidagi &quot;Tekshirish&quot; tugmasi orqali baholaysiz.
           </p>
         ) : (
-          <div className="space-y-4 animate-in fade-in">
+          <div className="space-y-3 animate-in fade-in">
             <Field htmlFor="hw-instructions" label="Topshiriq matni" required>
               <textarea
                 id="hw-instructions"
                 value={hwInstructions}
                 onChange={(e) => setHwInstructions(e.target.value)}
-                rows={6}
+                rows={4}
                 maxLength={10000}
                 placeholder="1. ...&#10;2. ...&#10;Topshirish: kodni yoki GitHub havolasini yuboring"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
               />
             </Field>
 
@@ -842,18 +830,18 @@ export function LessonEditorForm({
                 size="sm"
                 onClick={handleGenerateHomework}
                 isLoading={hwGenerating}
-                className="gap-2 min-h-[44px]"
+                className="gap-2"
               >
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 {hwInstructions.trim() ? "AI bilan qayta tuzish" : "AI bilan tuzish"}
               </Button>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <Field
                 htmlFor="hw-due"
                 label="Topshirish muddati (Toshkent vaqti)"
-                hint="Bo'sh qoldirilsa — muddatsiz. Muddatdan keyin ham qabul qilinadi, lekin “kechikkan” deb belgilanadi"
+                hint="Bo'sh — muddatsiz. Muddatdan keyin ham qabul qilinadi, “kechikkan” belgisi bilan"
               >
                 <div className="flex items-center gap-2">
                   <Input
@@ -875,7 +863,7 @@ export function LessonEditorForm({
                         setHwDueTouched(false);
                       } else toast.error("Guruh jadvali kiritilmagan — muddatni qo'lda tanlang");
                     }}
-                    className="shrink-0 gap-1.5 min-h-[44px]"
+                    className="shrink-0 gap-1.5"
                     title="Guruh jadvalidagi keyingi dars boshlanishi"
                   >
                     <CalendarClock className="w-4 h-4" />
@@ -884,7 +872,7 @@ export function LessonEditorForm({
                 </div>
               </Field>
 
-              <Field htmlFor="hw-coins" label="Coin (100 ball uchun)" hint="Ballga mutanosib beriladi, baholashda o'zgartirish mumkin">
+              <Field htmlFor="hw-coins" label="Coin (100 ball uchun)" hint="Ballga mutanosib beriladi">
                 <Input
                   id="hw-coins"
                   type="number"
@@ -903,7 +891,7 @@ export function LessonEditorForm({
               {hwAttachments.map((m) => (
                 <div
                   key={m.urlOrKey}
-                  className="flex items-center justify-between gap-2 pl-3.5 pr-1 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
+                  className="flex items-center justify-between gap-2 pl-3 pr-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
                 >
                   <span className="flex items-center gap-3 min-w-0">
                     <FileText className="w-4 h-4 text-teal-500 shrink-0" />
@@ -912,7 +900,7 @@ export function LessonEditorForm({
                   <button
                     type="button"
                     onClick={() => setHwAttachments((prev) => prev.filter((a) => a.urlOrKey !== m.urlOrKey))}
-                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                     aria-label={`${m.title} faylini olib tashlash`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -926,7 +914,7 @@ export function LessonEditorForm({
                   disabled={hwUploading}
                   accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
                   aria-label="Vazifaga fayl biriktirish"
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[44px] flex items-center"
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[40px] flex items-center"
                 />
                 {hwUploading && <Loader2 className="w-4 h-4 shrink-0 animate-spin text-teal-600" />}
               </div>
@@ -936,39 +924,40 @@ export function LessonEditorForm({
       </div>
 
       {/* Sticky action bar */}
-      <div className="sticky bottom-0 z-30 p-4 rounded-2xl bg-white/95 dark:bg-bg/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg flex flex-wrap items-center justify-between gap-3">
-        {initialLesson ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowQuizModal(true)}
-            className="flex items-center gap-2 border-teal-500/30 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10 min-h-[44px]"
-          >
-            <HelpCircle className="w-4 h-4" />
-            <span>Kichik testni sozlash (Quiz)</span>
-          </Button>
-        ) : (
-          <div />
-        )}
+      <div className="sticky bottom-0 z-30 px-3 py-2 rounded-2xl bg-white/95 dark:bg-bg/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <label className="flex items-center gap-2.5 cursor-pointer min-h-[40px]">
+            <input
+              type="checkbox"
+              id="is-published"
+              checked={isPublished}
+              onChange={(e) => setIsPublished(e.target.checked)}
+              className="w-5 h-5 rounded-md accent-teal-600 cursor-pointer"
+            />
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Nashr etilgan <span className="font-normal text-slate-600 dark:text-slate-400">(o&apos;quvchilarga ko&apos;rinadi)</span>
+            </span>
+          </label>
+          {initialLesson && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowQuizModal(true)}
+              className="gap-2 border-teal-500/30 text-teal-700 dark:text-teal-300 hover:bg-teal-500/10"
+            >
+              <HelpCircle className="w-4 h-4" />
+              Kichik test (quiz)
+            </Button>
+          )}
+        </div>
 
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => router.back()}
-            disabled={isSaving}
-            className="min-h-[44px]"
-          >
+        <div className="flex items-center gap-2 ml-auto">
+          <Button type="button" variant="secondary" onClick={() => router.back()} disabled={isSaving}>
             Bekor qilish
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            isLoading={isSaving}
-            className="min-h-[44px] font-semibold"
-          >
-            {initialLesson ? "O'zgarishlarni saqlash" : "Darsni yaratish"}
+          <Button type="submit" variant="primary" isLoading={isSaving} className="font-semibold">
+            {initialLesson ? "Saqlash" : "Darsni yaratish"}
           </Button>
         </div>
       </div>

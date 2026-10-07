@@ -34,14 +34,14 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       <div>
         <Link
           href="/mentor/lessons"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 min-h-[44px]"
+          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 min-h-[32px]"
         >
           <ArrowLeft className="w-4 h-4" />
-          Darslar boshqaruviga qaytish
+          Darslarga qaytish
         </Link>
       </div>
 
