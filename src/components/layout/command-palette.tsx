@@ -19,7 +19,7 @@ interface Command {
 
 const MENTOR_ACTIONS: { href: string; label: string; keywords: string }[] = [
   { href: "/mentor/lessons/new", label: "Yangi dars yaratish", keywords: "dars qoshish lesson" },
-  { href: "/mentor/attendance", label: "Davomat ochish", keywords: "qr kod sessiya" },
+  { href: "/mentor/groups", label: "Davomat ochish", keywords: "qr kod sessiya davomat jurnal" },
   { href: "/mentor/shop", label: "Do'konga mahsulot qo'shish", keywords: "mahsulot sovga" },
 ];
 

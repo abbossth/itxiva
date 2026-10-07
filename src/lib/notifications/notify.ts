@@ -154,7 +154,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       .join("\n"),
     button: p.lessonId
       ? link("Darsni ochish", p.forMentor ? `/mentor/lessons/${p.lessonId}/edit` : `/lessons/${p.lessonId}`)
-      : link(p.forMentor ? "Davomatni ochish" : "Darslarni ochish", p.forMentor ? "/mentor/attendance" : "/lessons"),
+      : link(p.forMentor ? "Davomatni ochish" : "Darslarni ochish", p.forMentor ? "/mentor/groups" : "/lessons"),
   }),
 };
 

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Users, ArrowRight, Trash2, GraduationCap, School, CalendarClock, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Users, Trash2, CalendarClock, Pencil, Play, QrCode, Percent } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -12,16 +13,26 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { createGroupAction, deleteGroupAction, updateGroupAction } from "@/actions/group.actions";
+import { startAttendanceSessionAction, type GroupsAttendanceOverview } from "@/actions/attendance.actions";
 import { ScheduleFields } from "@/components/mentor/schedule-fields";
-import { formatSchedule, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
+import { formatSchedule, hasLessonOn, isLessonNow, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_SCHEDULE: GroupSchedule = { days: ODD_DAYS, startTime: "15:00", endTime: "16:30" };
 
 interface GroupsManagerProps {
   initialGroups: IGroupData[];
+  attendance: GroupsAttendanceOverview;
 }
 
-export function GroupsManager({ initialGroups }: GroupsManagerProps) {
+function percentClass(percent: number) {
+  if (percent >= 85) return "text-emerald-700 dark:text-emerald-400";
+  if (percent >= 60) return "text-amber-700 dark:text-amber-400";
+  return "text-rose-700 dark:text-rose-400";
+}
+
+export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps) {
+  const router = useRouter();
   const [groups, setGroups] = useState<IGroupData[]>(initialGroups);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<IGroupData | null>(null);
@@ -43,6 +54,32 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
   const { toast } = useToast();
 
   const totalStudents = groups.reduce((acc, g) => acc + (g.studentCount || 0), 0);
+
+  // Bugun jadval bo'yicha darsi bor guruhlar, boshlanish vaqti tartibida
+  const todaysGroups = groups
+    .filter((g) => hasLessonOn(g.schedule))
+    .sort((a, b) => (a.schedule?.startTime ?? "").localeCompare(b.schedule?.startTime ?? ""));
+  // Bugungi tasmada ko'rinmaydigan ochiq sessiyalar (jadvaldan tashqari ochilgan)
+  const todayIds = new Set(todaysGroups.map((g) => g._id.toString()));
+  const otherActive = attendance.active.filter((s) => !todayIds.has(s.groupId));
+  const [startingId, setStartingId] = useState<string | null>(null);
+
+  const handleQuickStart = async (groupId: string) => {
+    try {
+      setStartingId(groupId);
+      const res = await startAttendanceSessionAction(groupId, 10);
+      if (res.success && res.data?.sessionId) {
+        toast.success("Davomat sessiyasi ochildi!");
+        router.push(`/mentor/attendance/${res.data.sessionId}`);
+      } else {
+        toast.error(res.message || "Xatolik yuz berdi");
+        setStartingId(null);
+      }
+    } catch {
+      toast.error("Sessiyani boshlab bo'lmadi");
+      setStartingId(null);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,10 +163,10 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            Guruhlar boshqaruvi
+            Guruhlar
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Muhammad al-Xorazmiy nomidagi ixtisoslashtirilgan maktab sinflari
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+            {groups.length} ta guruh · {totalStudents} nafar o&apos;quvchi · davomat har bir guruh ichida
           </p>
         </div>
 
@@ -143,53 +180,99 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
         </Button>
       </div>
 
-      {/* "Bugun" Summary Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-            <School className="w-6 h-6" />
+      {/* Bugungi darslar: davomat shu yerdan bir bosishda boshlanadi */}
+      {(todaysGroups.length > 0 || otherActive.length > 0) && (
+        <section aria-labelledby="today-heading" className="space-y-3">
+          <h2 id="today-heading" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4" />
+            Bugungi darslar
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {todaysGroups.map((g) => {
+              const id = g._id.toString();
+              const session = attendance.today[id] ?? attendance.active.find((s) => s.groupId === id);
+              const isActive = attendance.active.some((s) => s.groupId === id);
+              const live = isLessonNow(g.schedule);
+              return (
+                <div
+                  key={id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border bg-white dark:bg-surface p-4 shadow-xs",
+                    isActive
+                      ? "border-teal-500/60 bg-teal-50 dark:bg-teal-500/10"
+                      : live && !session
+                        ? "border-teal-500/60 ring-2 ring-teal-500/15"
+                        : "border-slate-200/80 dark:border-slate-800/80"
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/mentor/groups/${id}/attendance`}
+                      className="block truncate font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
+                    >
+                      {g.name}
+                    </Link>
+                    <div className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums">
+                      {g.schedule?.startTime}–{g.schedule?.endTime}
+                      {isActive ? (
+                        <span className="ml-1.5 font-sans font-bold text-teal-700 dark:text-teal-300">· davomat ochiq</span>
+                      ) : live ? (
+                        <span className="ml-1.5 font-sans font-bold text-teal-700 dark:text-teal-300">· hozir</span>
+                      ) : session ? (
+                        <span className="ml-1.5 font-sans font-semibold text-emerald-700 dark:text-emerald-400">· davomat olingan</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {session ? (
+                    <Link
+                      href={`/mentor/attendance/${session._id}`}
+                      className={buttonVariants({ variant: isActive ? "primary" : "secondary", size: "sm", className: "min-h-[44px] shrink-0" })}
+                    >
+                      {isActive ? "Davom ettirish" : "Ko'rish"}
+                    </Link>
+                  ) : (
+                    <Button
+                      variant={live ? "primary" : "outline"}
+                      size="sm"
+                      isLoading={startingId === id}
+                      disabled={startingId !== null}
+                      onClick={() => handleQuickStart(id)}
+                      className="gap-1.5 min-h-[44px] shrink-0"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Davomatni boshlash
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+            {otherActive.map((s) => (
+              <div key={s._id} className="flex items-center gap-3 rounded-2xl border border-teal-500/60 bg-teal-50 dark:bg-teal-500/10 p-4 shadow-xs">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-bold text-slate-900 dark:text-slate-100">{s.groupName}</div>
+                  <div className="text-xs font-bold text-teal-700 dark:text-teal-300">Davomat ochiq · {s.present} nafar keldi</div>
+                </div>
+                <Link
+                  href={`/mentor/attendance/${s._id}`}
+                  className={buttonVariants({ variant: "primary", size: "sm", className: "min-h-[44px] shrink-0" })}
+                >
+                  Davom ettirish
+                </Link>
+              </div>
+            ))}
           </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-              {groups.length}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Faol o&apos;quv guruhlari
-            </div>
-          </div>
-        </div>
+        </section>
+      )}
 
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-              {totalStudents}
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Jami o&apos;quvchilar soni
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-            <GraduationCap className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
-              2026-2027
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Joriy o&apos;quv yili
-            </div>
-          </div>
-        </div>
-      </div>
+      {groups.length > 0 && (
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <Users className="w-4 h-4" />
+          Barcha guruhlar
+        </h2>
+      )}
 
       {/* Grid of groups */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {groups.map((group) => (
           <div
             key={group._id.toString()}
@@ -203,9 +286,14 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
                 </span>
               </div>
 
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-                {group.name} guruhi
-              </h2>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                <Link
+                  href={`/mentor/groups/${group._id.toString()}`}
+                  className="hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
+                >
+                  {group.name} guruhi
+                </Link>
+              </h3>
 
               <div className="flex items-center gap-2 mt-3 text-xs text-slate-600 dark:text-slate-300">
                 <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
@@ -220,6 +308,23 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
                   {formatSchedule(group.schedule)}
                 </span>
               </div>
+
+              {(() => {
+                const percent = attendance.monthPercent[group._id.toString()];
+                return (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    <Percent className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <span>
+                      Shu oy davomati:{" "}
+                      {typeof percent === "number" ? (
+                        <strong className={cn("font-mono tabular-nums", percentClass(percent))}>{percent}%</strong>
+                      ) : (
+                        <span className="text-slate-500 dark:text-slate-400">hali olinmagan</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex items-center justify-between pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80">
@@ -244,13 +349,22 @@ export function GroupsManager({ initialGroups }: GroupsManagerProps) {
               </button>
               </div>
 
-              <Link
-                href={`/mentor/groups/${group._id.toString()}`}
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-teal-700 dark:text-teal-300 hover:text-teal-800 dark:hover:text-teal-200 hover:underline min-h-[44px] px-2 py-2"
-              >
-                O&apos;quvchilar va boshqaruv
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/mentor/groups/${group._id.toString()}`}
+                  className={buttonVariants({ variant: "outline", size: "sm", className: "min-h-[44px]" })}
+                >
+                  <Users className="w-4 h-4" />
+                  O&apos;quvchilar
+                </Link>
+                <Link
+                  href={`/mentor/groups/${group._id.toString()}/attendance`}
+                  className={buttonVariants({ variant: "primary", size: "sm", className: "min-h-[44px]" })}
+                >
+                  <QrCode className="w-4 h-4" />
+                  Davomat
+                </Link>
+              </div>
             </div>
           </div>
         ))}

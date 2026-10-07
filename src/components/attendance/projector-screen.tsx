@@ -262,7 +262,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
         <div className="flex items-center gap-3">
           <Link
-            href="/mentor/attendance"
+            href={`/mentor/groups/${initialData.session.groupId}/attendance`}
             className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
             title="Orqaga"
           >

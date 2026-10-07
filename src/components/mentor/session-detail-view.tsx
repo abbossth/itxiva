@@ -91,8 +91,8 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         subtitle={`${weekday}, ${formatTimeUz(detail.session.startTime)}${
           detail.session.endTime ? `–${formatTimeUz(detail.session.endTime)}` : ""
         } · qatnashganga +${detail.session.defaultCoinsReward} coin`}
-        backHref="/mentor/attendance"
-        backLabel="Davomatga qaytish"
+        backHref={detail.group ? `/mentor/groups/${detail.group._id}/attendance` : "/mentor/groups"}
+        backLabel="Guruh davomatiga qaytish"
         actions={
           <Button variant="secondary" onClick={handleExport} className="gap-2">
             <Download className="w-4 h-4" />

@@ -1,22 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
   UserPlus,
   KeyRound,
   ArrowRightLeft,
   Trash2,
   Search,
-  Users,
   Clock,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { IUserData } from "@/lib/db/models/user.model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -106,46 +102,7 @@ export function GroupStudentsView({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      {/* Top back button */}
-      <div>
-        <Link
-          href="/mentor/groups"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 min-h-[44px] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Guruhlar ro&apos;yxatiga qaytish
-        </Link>
-      </div>
-
-      {/* Group Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="teal">{group.grade}-sinf</Badge>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              {group.academicYear}
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            {group.name} guruhi
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-            Jami {students.length} nafar o&apos;quvchi ro&apos;yxatga olingan
-          </p>
-        </div>
-
-        <Button
-          variant="primary"
-          onClick={() => setIsImportOpen(true)}
-          className="gap-2 shrink-0 font-semibold min-h-[44px]"
-        >
-          <UserPlus className="w-4 h-4" />
-          O&apos;quvchilarni import qilish
-        </Button>
-      </div>
-
+    <div className="space-y-6 page-enter">
       {/* Search Input Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -157,8 +114,14 @@ export function GroupStudentsView({
             className="pl-10"
           />
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-          {search ? `${filtered.length} ta natija topildi` : `Jami ${students.length} ta o'quvchi`}
+        <div className="flex items-center justify-between sm:justify-end gap-3">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            {search ? `${filtered.length} ta natija topildi` : `Jami ${students.length} ta o'quvchi`}
+          </span>
+          <Button variant="primary" onClick={() => setIsImportOpen(true)} className="gap-2 shrink-0 font-semibold min-h-[44px]">
+            <UserPlus className="w-4 h-4" />
+            Import qilish
+          </Button>
         </div>
       </div>
 

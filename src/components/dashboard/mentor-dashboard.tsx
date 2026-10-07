@@ -116,7 +116,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
             {data.groups.map((g) => (
               <li key={g._id}>
                 <Link
-                  href={`/mentor/groups/${g._id}`}
+                  href={g.hasLessonToday ? `/mentor/groups/${g._id}/attendance` : `/mentor/groups/${g._id}`}
                   className="flex items-center gap-3 rounded-xl border border-slate-200/80 dark:border-slate-800 p-3 hover:border-teal-500/50 transition-colors min-h-[64px]"
                 >
                   <span className="min-w-0 flex-1">

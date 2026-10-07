@@ -838,6 +838,68 @@ export async function createManualSessionAction(params: {
   return { success: true, data: { sessionId: created._id.toString() } };
 }
 
+export interface GroupsAttendanceOverview {
+  /** Ayni damda ochiq sessiyalar */
+  active: { _id: string; groupId: string; groupName: string; startTime: string; present: number }[];
+  /** guruh ID -> bugungi sessiya (bo'lsa) */
+  today: Record<string, { _id: string; status: "active" | "closed" }>;
+  /** guruh ID -> joriy oydagi davomat foizi (yakunlangan darslar bo'yicha; hali dars bo'lmasa null) */
+  monthPercent: Record<string, number | null>;
+}
+
+/**
+ * Guruhlar sahifasi uchun davomat xulosasi: ochiq sessiyalar, bugungi darslar holati va oylik foiz
+ */
+export async function getGroupsAttendanceOverview(): Promise<GroupsAttendanceOverview> {
+  await requireMentor();
+  await connectToDatabase();
+
+  const todayKey = toDateKey();
+  const monthStart = dateFromKey(`${todayKey.slice(0, 7)}-01`);
+  const sessions = await AttendanceSession.find({
+    $or: [{ status: "active" }, { date: { $gte: monthStart, $lt: dateFromKey(addDaysToKey(todayKey, 1)) } }],
+  })
+    .select("groupId date startTime status summary")
+    .sort({ date: -1 })
+    .populate("groupId", "name")
+    .lean();
+
+  const overview: GroupsAttendanceOverview = { active: [], today: {}, monthPercent: {} };
+  const totals = new Map<string, { attended: number; counted: number }>();
+
+  for (const s of sessions) {
+    const group = s.groupId as unknown as { _id: mongoose.Types.ObjectId; name: string } | null;
+    if (!group) continue;
+    const groupId = group._id.toString();
+    const id = s._id.toString();
+
+    if (s.status === "active") {
+      overview.active.push({
+        _id: id,
+        groupId,
+        groupName: group.name,
+        startTime: new Date(s.startTime).toISOString(),
+        present: s.summary?.totalPresent ?? 0,
+      });
+    }
+    if (toDateKey(s.date) === todayKey && (!overview.today[groupId] || s.status === "active")) {
+      overview.today[groupId] = { _id: id, status: s.status };
+    }
+    // Foiz qoidasi jurnal bilan bir xil: faqat yakunlangan darslar, sababli qoldirilgani hisobga olinmaydi
+    if (s.status === "closed" && new Date(s.date).getTime() >= monthStart.getTime()) {
+      const attended = (s.summary?.totalPresent ?? 0) + (s.summary?.totalLate ?? 0);
+      const t = totals.get(groupId) ?? { attended: 0, counted: 0 };
+      t.attended += attended;
+      t.counted += attended + (s.summary?.totalAbsent ?? 0);
+      totals.set(groupId, t);
+    }
+  }
+  for (const [groupId, t] of totals) {
+    overview.monthPercent[groupId] = t.counted > 0 ? Math.round((t.attended / t.counted) * 100) : null;
+  }
+  return overview;
+}
+
 /**
  * Get all attendance sessions for mentor dashboard
  */

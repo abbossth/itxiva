@@ -1,19 +1,6 @@
-import { requireMentorPage } from "@/lib/auth/guards";
-import { getAttendanceSessionsForMentor } from "@/actions/attendance.actions";
-import { getGroups } from "@/actions/group.actions";
-import { AttendanceSessionsView } from "@/components/mentor/attendance-sessions-view";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Davomat boshqaruvi — ITXiva",
-};
-
-export default async function MentorAttendancePage() {
-  await requireMentorPage();
-
-  const [sessions, groups] = await Promise.all([
-    getAttendanceSessionsForMentor(),
-    getGroups(),
-  ]);
-
-  return <AttendanceSessionsView sessions={sessions} groups={groups} />;
+// Davomat endi guruhlar ichida: eski havola va xatcho'plar Guruhlar sahifasiga olib boradi
+export default function MentorAttendancePage() {
+  redirect("/mentor/groups");
 }

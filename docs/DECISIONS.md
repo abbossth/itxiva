@@ -140,3 +140,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Nima**: guruh jadvali bo'yicha dars boshlanishiga ~1 soat qolganda shu guruh o'quvchilariga va mentorlarga Telegram xabari (`lesson_reminder`). Profilda o'chiriladi, sukut bo'yicha yoniq.
 - **Qachon**: `/api/cron/reminders` har 5 daqiqada chaqiriladi; eslatma dars boshlanishiga 65–10 daqiqa qolgan oraliqda, har guruhga kuniga bir marta ketadi (`Group.lessonReminderSentFor`). Oraliq kechikkan chaqiruvni ham qamrab oladi.
 - **Kim chaqiradi**: GitHub Actions (`.github/workflows/lesson-reminders.yml`, `CRON_SECRET` repo secret'i) — Vercel'ning bepul tarifida cron kuniga bir martadan ortiq ishlamaydi. GitHub jadvali bir necha daqiqaga kechikishi mumkin.
+
+### [2026-10-07] 29-qaror: Davomat guruhlar ichida
+- **Nima**: menyudagi alohida "Davomat jurnali" bo'limi olib tashlandi. Guruh sahifasi ikki tabli: O'quvchilar (`/mentor/groups/[id]`) va Davomat (`/mentor/groups/[id]/attendance` — oylik jurnal, QR bilan boshlash, qo'lda kiritish). Umumiy sarlavha va tablar `groups/[id]/layout.tsx` da.
+- **Guruhlar sahifasi**: tepada "Bugungi darslar" (bir bosishda boshlash / davom ettirish / ko'rish), kartalarda joriy oy davomat foizi (`getGroupsAttendanceOverview`).
+- **URL'lar**: dars sahifalari `/mentor/attendance/[sessionId]` o'zgarmadi (eski havolalar ishlaydi); `/mentor/attendance` Guruhlarga yo'naltiradi.
+- **Menyu**: Sozlamalar va Do'kon ham bitta havola; ichki sahifalari sahifa tepasidagi tablarda (`section-tabs.tsx`).

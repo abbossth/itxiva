@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
-import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAttendanceJournal, AttendanceJournal as JournalData } from "@/actions/attendance.actions";
 import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER } from "@/lib/attendance-status";
-import { UZ_WEEKDAYS_SHORT, getTashkentParts, dateFromKey, toDateKey, formatSchedule } from "@/lib/schedule";
+import { UZ_WEEKDAYS_SHORT, getTashkentParts, dateFromKey, toDateKey } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-import type { IGroupData } from "@/lib/db/models/group.model";
 
 const UZ_MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
 
@@ -33,8 +32,8 @@ function percentClass(percent: number | null) {
   return "text-rose-600 dark:text-rose-400";
 }
 
-export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
-  const [groupId, setGroupId] = useState(groups[0]?._id?.toString() || "");
+/** Bitta guruhning oylik davomat jurnali: o'quvchilar x darslar */
+export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string; onManualEntry?: () => void }) {
   const [monthKey, setMonthKey] = useState(() => toDateKey().slice(0, 7));
   // Yuklangan natija qaysi so'rovga tegishli ekani bilan birga saqlanadi (eski javob yangi tanlovni bosib ketmasligi uchun)
   const [result, setResult] = useState<{ key: string; data: JournalData | null } | null>(null);
@@ -59,29 +58,18 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
 
   const journal = isLoading ? null : result?.data ?? null;
   const [year, month] = monthKey.split("-").map(Number);
-  const group = groups.find((g) => g._id.toString() === groupId);
   const isCurrentMonth = monthKey >= toDateKey().slice(0, 7);
 
-  if (groups.length === 0) {
-    return <EmptyState icon={CalendarDays} title="Hali guruh yaratilmagan" />;
-  }
+  // Guruh o'rtachasi: o'quvchilarning hisobga olingan darslari bo'yicha
+  const totals = (journal?.students ?? []).reduce(
+    (acc, st) => ({ attended: acc.attended + st.attended, total: acc.total + st.total }),
+    { attended: 0, total: 0 }
+  );
+  const groupPercent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : null;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-        <div className="flex-1 max-w-xs space-y-1.5">
-          <label htmlFor="journal-group" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-            Guruh
-          </label>
-          <Select id="journal-group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            {groups.map((g) => (
-              <option key={g._id.toString()} value={g._id.toString()}>
-                {g.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-1">
           <button
             type="button"
@@ -104,9 +92,16 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-      </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-400">Jadval: {formatSchedule(group?.schedule)}</p>
+        {journal && journal.sessions.length > 0 && (
+          <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+            {journal.sessions.length} ta dars · guruh o&apos;rtachasi{" "}
+            <span className={cn("font-mono font-black tabular-nums", percentClass(groupPercent))}>
+              {groupPercent === null ? "—" : `${groupPercent}%`}
+            </span>
+          </div>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="space-y-2" aria-busy="true">
@@ -119,6 +114,13 @@ export function AttendanceJournal({ groups }: { groups: IGroupData[] }) {
           icon={CalendarDays}
           title="Bu oyda davomat olinmagan"
           description="Dars boshlanganda davomat oching yoki o'tgan dars uchun qo'lda davomat kiriting"
+          action={
+            onManualEntry ? (
+              <Button variant="secondary" onClick={onManualEntry}>
+                Qo&apos;lda kiritish
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-3 page-enter">

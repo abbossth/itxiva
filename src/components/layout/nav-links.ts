@@ -38,9 +38,9 @@ export type NavBadges = Partial<Record<NavBadgeKind, number>>;
 
 export const MENTOR_LINKS: NavLink[] = [
   { href: "/", label: "Bosh sahifa", shortLabel: "Bosh", icon: LayoutDashboard, primary: true },
-  { href: "/mentor/groups", label: "Guruhlar", shortLabel: "Guruhlar", icon: Users },
+  // Davomat guruhlar ichida: dars davomati sahifalari (/mentor/attendance/...) ham shu bo'limga kiradi
+  { href: "/mentor/groups", label: "Guruhlar", shortLabel: "Guruhlar", icon: Users, primary: true, match: ["/mentor/attendance"] },
   { href: "/mentor/lessons", label: "Darslar boshqaruvi", shortLabel: "Darslar", icon: BookOpen, primary: true },
-  { href: "/mentor/attendance", label: "Davomat jurnali", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/mentor/homework", label: "Uyga vazifalar", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
