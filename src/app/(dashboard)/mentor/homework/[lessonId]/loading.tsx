@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, ListSkeleton, Skeleton } from "@/components/shared/
 
 export default function MentorHomeworkDetailLoading() {
   return (
-    <div className="space-y-4 max-w-5xl mx-auto" aria-busy="true">
+    <div className="space-y-4" aria-busy="true">
       <PageHeaderSkeleton withBack />
       <Skeleton className="h-14 w-full rounded-2xl" />
       <div className="flex gap-2">

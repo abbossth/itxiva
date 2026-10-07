@@ -70,7 +70,7 @@ export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
     tabs: [
       { href: "/profile", label: "Profil va Telegram", icon: User },
       { href: "/mentor/import", label: "Excel import", icon: FileSpreadsheet },
-      { href: "/mentor/audit", label: "Audit loglar", icon: ShieldCheck },
+      { href: "/mentor/audit", label: "Amallar tarixi", icon: ShieldCheck },
     ],
   },
 ];

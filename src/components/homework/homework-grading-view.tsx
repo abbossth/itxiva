@@ -125,7 +125,7 @@ export function HomeworkGradingView({ roster, initialStudentId }: { roster: Home
   );
 
   return (
-    <div className="space-y-3 max-w-5xl mx-auto pb-12">
+    <div className="space-y-3 pb-12">
       <PageHeader
         icon={ClipboardCheck}
         title={roster.lesson.title}

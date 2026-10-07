@@ -68,7 +68,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
   const suffix = data ? `${data.range.from}_${data.range.to}` : "";
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 pb-12">
       <PageHeader icon={BarChart3} title="Hisobotlar" subtitle={rangeLabel || "Davomat, o'zlashtirish, coinlar va do'kon"} />
 
       {/* Filtrlar: barcha bo'limlarga bir xil ta'sir qiladi */}

@@ -175,7 +175,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
   };
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 pb-12">
       <PageHeader
         icon={ShoppingBag}
         title="Do'kon mahsulotlari"

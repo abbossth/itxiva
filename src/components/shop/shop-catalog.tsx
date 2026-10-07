@@ -53,7 +53,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
   };
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">

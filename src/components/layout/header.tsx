@@ -127,7 +127,7 @@ export function Header({ user }: HeaderProps) {
                 className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px]"
               >
                 <ShieldCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                <span>Xavfsizlik & Audit loglar</span>
+                <span>Amallar tarixi</span>
               </Link>
             )}
           </div>
