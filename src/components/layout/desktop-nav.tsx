@@ -3,8 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { MENTOR_LINKS, STUDENT_LINKS, SIDEBAR_COOKIE, isNavLinkActive, type NavBadges } from "./nav-links";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  MENTOR_LINKS,
+  STUDENT_LINKS,
+  NAV_GROUPS,
+  SIDEBAR_COOKIE,
+  isNavLinkActive,
+  type NavBadges,
+  type NavGroupId,
+  type NavLink,
+} from "./nav-links";
 import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -30,10 +39,132 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
 
   const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
 
-  const toggle = () => {
-    const next = !collapsed;
+  // Mentor qo'lda ochgan/yopgan guruhlar; tegilmagan guruh ichidagi sahifa ochiq bo'lsa o'zi ochiladi
+  const [groupOpen, setGroupOpen] = useState<Partial<Record<NavGroupId, boolean>>>({});
+
+  const setSidebarCollapsed = (next: boolean) => {
     setCollapsed(next);
     document.cookie = `${SIDEBAR_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  };
+  const toggle = () => setSidebarCollapsed(!collapsed);
+
+  // Ketma-ket kelgan bir guruh havolalari bitta ochiladigan bo'limga yig'iladi
+  const sections: ({ link: NavLink } | { group: NavGroupId; items: NavLink[] })[] = [];
+  for (const link of links) {
+    const last = sections[sections.length - 1];
+    if (!link.group) sections.push({ link });
+    else if (last && "group" in last && last.group === link.group) last.items.push(link);
+    else sections.push({ group: link.group, items: [link] });
+  }
+
+  const renderLink = (link: NavLink, nested = false) => {
+    const Icon = link.icon;
+    const isActive = isNavLinkActive(link.href, pathname);
+    const count = link.badge ? badges[link.badge] ?? 0 : 0;
+    const label = nested ? link.groupLabel ?? link.label : link.label;
+
+    return (
+      <Link
+        key={link.href}
+        href={link.href}
+        title={collapsed ? link.label : undefined}
+        aria-label={collapsed ? (count > 0 ? `${link.label} (${count})` : link.label) : undefined}
+        aria-current={isActive ? "page" : undefined}
+        className={cn(
+          "relative flex items-center gap-3 rounded-xl text-sm font-medium transition-colors select-none",
+          "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
+          nested ? "min-h-[40px]" : "min-h-[44px]",
+          collapsed ? "justify-center px-0" : nested ? "px-3 py-2" : "px-3.5 py-2.5",
+          isActive
+            ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+        )}
+      >
+        {isActive && (
+          <span aria-hidden className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-teal-600 dark:bg-teal-400" />
+        )}
+        <Icon
+          className={cn(
+            "shrink-0 transition-colors",
+            nested ? "w-4 h-4" : "w-5 h-5",
+            isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"
+          )}
+        />
+        {!collapsed && <span className="truncate flex-1">{label}</span>}
+        {count > 0 &&
+          (collapsed ? (
+            <span aria-hidden className="absolute top-1.5 right-2.5 h-2 w-2 rounded-full bg-amber-500" />
+          ) : (
+            <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center">
+              {count}
+            </span>
+          ))}
+        {!collapsed && <NavPending />}
+      </Link>
+    );
+  };
+
+  const renderGroup = (id: NavGroupId, items: NavLink[]) => {
+    const { label, icon: Icon } = NAV_GROUPS[id];
+    const hasActive = items.some((l) => isNavLinkActive(l.href, pathname));
+    const isOpen = !collapsed && (groupOpen[id] ?? hasActive);
+    const count = items.reduce((sum, l) => sum + (l.badge ? badges[l.badge] ?? 0 : 0), 0);
+    // Ichidagi faol sahifa ko'rinmay qolganda guruhning o'zi belgilanadi
+    const highlight = hasActive && !isOpen;
+
+    return (
+      <div key={id}>
+        <button
+          type="button"
+          onClick={() => {
+            if (collapsed) {
+              // Yig'ilgan menyuda guruh ichi sig'maydi — menyu yoyilib, guruh ochiladi
+              setSidebarCollapsed(false);
+              setGroupOpen((prev) => ({ ...prev, [id]: true }));
+            } else {
+              setGroupOpen((prev) => ({ ...prev, [id]: !isOpen }));
+            }
+          }}
+          aria-expanded={isOpen}
+          aria-controls={`nav-group-${id}`}
+          title={collapsed ? label : undefined}
+          aria-label={collapsed ? (count > 0 ? `${label} (${count})` : label) : undefined}
+          className={cn(
+            "relative flex w-full items-center gap-3 rounded-xl text-sm font-medium transition-colors select-none min-h-[44px] cursor-pointer",
+            "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
+            collapsed ? "justify-center px-0" : "px-3.5 py-2.5",
+            highlight
+              ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+          )}
+        >
+          <Icon
+            className={cn(
+              "w-5 h-5 shrink-0 transition-colors",
+              highlight ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"
+            )}
+          />
+          {!collapsed && <span className="truncate flex-1 text-left">{label}</span>}
+          {count > 0 &&
+            !isOpen &&
+            (collapsed ? (
+              <span aria-hidden className="absolute top-1.5 right-2.5 h-2 w-2 rounded-full bg-amber-500" />
+            ) : (
+              <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center">
+                {count}
+              </span>
+            ))}
+          {!collapsed && (
+            <ChevronDown aria-hidden className={cn("w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400 transition-transform", isOpen && "rotate-180")} />
+          )}
+        </button>
+        {isOpen && (
+          <div id={`nav-group-${id}`} className="mt-1 ml-6 pl-2 space-y-1 border-l border-slate-200 dark:border-slate-800">
+            {items.map((link) => renderLink(link, true))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -63,49 +194,7 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
           </button>
         </div>
 
-        {links.map((link) => {
-          const Icon = link.icon;
-          const isActive = isNavLinkActive(link.href, pathname);
-          const count = link.badge ? badges[link.badge] ?? 0 : 0;
-
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              title={collapsed ? link.label : undefined}
-              aria-label={collapsed ? (count > 0 ? `${link.label} (${count})` : link.label) : undefined}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "relative flex items-center gap-3 rounded-xl text-sm font-medium transition-colors select-none min-h-[44px]",
-                "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
-                collapsed ? "justify-center px-0" : "px-3.5 py-2.5",
-                isActive
-                  ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-              )}
-            >
-              {isActive && (
-                <span aria-hidden className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-teal-600 dark:bg-teal-400" />
-              )}
-              <Icon
-                className={cn(
-                  "w-5 h-5 shrink-0 transition-colors",
-                  isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"
-                )}
-              />
-              {!collapsed && <span className="truncate flex-1">{link.label}</span>}
-              {count > 0 &&
-                (collapsed ? (
-                  <span aria-hidden className="absolute top-1.5 right-2.5 h-2 w-2 rounded-full bg-amber-500" />
-                ) : (
-                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center">
-                    {count}
-                  </span>
-                ))}
-              {!collapsed && <NavPending />}
-            </Link>
-          );
-        })}
+        {sections.map((section) => ("link" in section ? renderLink(section.link) : renderGroup(section.group, section.items)))}
       </nav>
 
       {/* User profile summary block at bottom of sidebar */}

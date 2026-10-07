@@ -12,6 +12,8 @@ import {
   FileSpreadsheet,
   ClipboardCheck,
   LayoutDashboard,
+  Package,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,7 +29,18 @@ export interface NavLink {
   primary?: boolean;
   /** Son ko'rsatiladigan havola: buyurtmalar yoki uyga vazifalar */
   badge?: NavBadgeKind;
+  /** Desktop sidebar'da shu guruh ichida, `groupLabel` nomi bilan ko'rinadi */
+  group?: NavGroupId;
+  groupLabel?: string;
 }
+
+export type NavGroupId = "shop" | "settings";
+
+/** Sidebar'dagi ochiladigan guruhlar: bo'limlar ko'payib ketmasligi uchun */
+export const NAV_GROUPS: Record<NavGroupId, { label: string; icon: LucideIcon }> = {
+  shop: { label: "Do'kon", icon: ShoppingBag },
+  settings: { label: "Sozlamalar", icon: Settings },
+};
 
 export type NavBadgeKind = "orders" | "homework";
 export type NavBadges = Partial<Record<NavBadgeKind, number>>;
@@ -38,14 +51,14 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/lessons", label: "Darslar boshqaruvi", shortLabel: "Darslar", icon: BookOpen, primary: true },
   { href: "/mentor/attendance", label: "Davomat jurnali", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/mentor/homework", label: "Uyga vazifalar", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
-  { href: "/mentor/orders", label: "Buyurtmalar", shortLabel: "Buyurtma", icon: PackageCheck, badge: "orders" },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
-  { href: "/mentor/shop", label: "Do'kon mahsulotlari", shortLabel: "Do'kon", icon: ShoppingBag },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
-  { href: "/mentor/import", label: "Excel import", shortLabel: "Import", icon: FileSpreadsheet },
-  { href: "/mentor/audit", label: "Audit loglar", shortLabel: "Audit", icon: ShieldCheck },
-  { href: "/profile", label: "Profil va Telegram", shortLabel: "Profil", icon: User },
+  { href: "/mentor/shop", label: "Do'kon mahsulotlari", shortLabel: "Do'kon", icon: Package, group: "shop", groupLabel: "Mahsulotlar" },
+  { href: "/mentor/orders", label: "Buyurtmalar", shortLabel: "Buyurtma", icon: PackageCheck, badge: "orders", group: "shop" },
+  { href: "/profile", label: "Profil va Telegram", shortLabel: "Profil", icon: User, group: "settings" },
+  { href: "/mentor/import", label: "Excel import", shortLabel: "Import", icon: FileSpreadsheet, group: "settings" },
+  { href: "/mentor/audit", label: "Audit loglar", shortLabel: "Audit", icon: ShieldCheck, group: "settings" },
 ];
 
 export const STUDENT_LINKS: NavLink[] = [
