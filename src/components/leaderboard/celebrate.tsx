@@ -11,8 +11,8 @@ const COLORS: Record<number, string[]> = {
 };
 
 /**
- * O'quvchi kuchli uchlikda bo'lsa, reyting sahifasiga har kirganda konfetti otiladi:
- * avval ikki yondan, keyin o'rtadan. Birinchi o'ringa kattaroq salyut.
+ * Reyting sahifasiga har kirganda konfetti otiladi: o'quvchiga — u kuchli uchlikda bo'lsa (o'rniga mos rangda),
+ * mentorga — uchlik ko'rsatilganda (oltin rangda). Avval ikki yondan, keyin o'rtadan.
  */
 export function TopThreeCelebration({ rank }: { rank: number }) {
   useEffect(() => {

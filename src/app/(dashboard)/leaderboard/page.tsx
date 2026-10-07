@@ -195,7 +195,13 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       )}
 
       {me && <MyRankHero me={me} data={data} />}
-      {me && hasAnyCoins && <TopThreeCelebration rank={me.totalCoins > 0 ? me.rank : 0} />}
+      {/* Konfetti: o'quvchi kuchli uchlikda bo'lsa; mentorga esa uchlik ko'rsatilganda har doim (har filtr uchun qaytadan) */}
+      {hasAnyCoins && (
+        <TopThreeCelebration
+          key={`${type}-${groupId ?? ""}-${grade ?? ""}`}
+          rank={session.role === "mentor" ? 1 : me && me.totalCoins > 0 ? me.rank : 0}
+        />
+      )}
 
       {hasAnyCoins ? (
         <section
