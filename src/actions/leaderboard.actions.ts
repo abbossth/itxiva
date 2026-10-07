@@ -3,6 +3,8 @@
 import { connectToDatabase } from "@/lib/db/connect";
 import { User, IUser } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
+import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
+import { groupShortName } from "@/lib/group-name";
 import { requireAuth } from "@/lib/auth/guards";
 import { formatShortName } from "@/lib/utils";
 
@@ -14,6 +16,8 @@ export interface LeaderboardEntry {
   groupName: string;
   grade: number;
   totalCoins: number;
+  /** Oxirgi 7 kunda reytingga qo'shilgan (yoki olingan) coin */
+  weekCoins: number;
   isCurrentUser: boolean;
 }
 
@@ -22,6 +26,10 @@ export interface LeaderboardData {
   currentUserEntry?: LeaderboardEntry | null;
   top3: LeaderboardEntry[];
   totalParticipants: number;
+  /** Shu hafta eng ko'p coin yig'ganlar (faqat musbat natijalar), ko'pi bilan 3 ta */
+  weekStars: LeaderboardEntry[];
+  /** Ro'yxatdagi jami coin */
+  totalCoins: number;
 }
 
 export async function getLeaderboardAction({
@@ -47,7 +55,7 @@ export async function getLeaderboardAction({
 
   const matchingGroups = await Group.find(groupFilter).lean();
   const matchingGroupIds = matchingGroups.map((g) => g._id);
-  const groupMap = new Map(matchingGroups.map((g) => [g._id.toString(), { name: g.name, grade: g.grade }]));
+  const groupMap = new Map(matchingGroups.map((g) => [g._id.toString(), { name: groupShortName(g), grade: g.grade }]));
 
   // Query users
   const userQuery: Record<string, unknown> = {
@@ -57,8 +65,17 @@ export async function getLeaderboardAction({
   };
 
   const students = (await User.find(userQuery)
+    .select("fullName groupId totalCoins")
     .sort({ totalCoins: -1, createdAt: 1 })
     .lean()) as unknown as IUser[];
+
+  // Oxirgi 7 kundagi o'sish: do'kon xaridlari reytingga ta'sir qilmaydi, shuning uchun hisobga olinmaydi
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
+    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $ne: "purchase" } } },
+    { $group: { _id: "$studentId", sum: { $sum: "$amount" } } },
+  ]);
+  const weekMap = new Map(weekRows.map((r) => [String(r._id), r.sum]));
 
   // Compute ranks with tie handling
   let currentRank = 1;
@@ -89,6 +106,7 @@ export async function getLeaderboardAction({
       groupName: grp ? grp.name : "—",
       grade: grp ? grp.grade : 0,
       totalCoins: student.totalCoins || 0,
+      weekCoins: weekMap.get(student._id.toString()) ?? 0,
       isCurrentUser,
     });
   }
@@ -101,5 +119,10 @@ export async function getLeaderboardAction({
     currentUserEntry,
     top3,
     totalParticipants: entries.length,
+    weekStars: entries
+      .filter((e) => e.weekCoins > 0)
+      .sort((a, b) => b.weekCoins - a.weekCoins)
+      .slice(0, 3),
+    totalCoins: entries.reduce((sum, e) => sum + e.totalCoins, 0),
   };
 }

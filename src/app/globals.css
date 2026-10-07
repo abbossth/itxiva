@@ -359,3 +359,47 @@ h1,
   100% { transform: none; opacity: 1; }
 }
 .success-pulse { animation: success-pulse 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+/* Reyting: shohsupa pastdan ko'tariladi, ishtirokchi ustiga "tushadi", chiziqlar chapdan to'ladi */
+@keyframes podium-rise {
+  from { transform: scaleY(0); }
+  to { transform: none; }
+}
+.podium-rise { transform-origin: bottom; animation: podium-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes podium-person {
+  0% { opacity: 0; transform: translateY(-14px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(3px) scale(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+.podium-person { animation: podium-person 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes crown-float {
+  0%, 100% { transform: translate(-50%, 0) rotate(-6deg); }
+  50% { transform: translate(-50%, -5px) rotate(6deg); }
+}
+.crown-float { animation: crown-float 2.6s ease-in-out infinite; }
+
+@keyframes podium-shine {
+  0%, 60% { transform: translateX(0) skewX(-18deg); }
+  100% { transform: translateX(420%) skewX(-18deg); }
+}
+.podium-shine { animation: podium-shine 3.2s ease-in-out 1.2s infinite; }
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+.bar-grow { transform-origin: left; animation: bar-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes rank-row {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: none; }
+}
+.rank-row { animation: rank-row 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes hero-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+.hero-glow { animation: hero-glow 5s ease-in-out infinite; }
