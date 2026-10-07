@@ -160,3 +160,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Darslar sahifasi**: barcha guruhlar bo'yicha "Tekshirish kerak" tasmasi; ixcham dars qatorlarida vazifa holati (topshirdi / topshirmagan / muddat) va "Tekshirish" tugmasi; ikkinchi ko'rinish — "Vazifalar jurnali" (o'quvchilar x vazifali darslar, `getHomeworkJournal`).
 - **Tekshirish**: keng ekranda ro'yxat va javob yonma-yon (modalsiz), tez ball tugmalari, `Ctrl+Enter`, saqlangach keyingi tekshirilmagan javob ochiladi. Tor ekranda modal.
 - **Eslatma**: mentor topshirmaganlarga Telegram eslatmasi yuboradi (`remindMissingHomeworkAction`, bir vazifaga 10 daqiqada bir marta).
+
+### [2026-10-07] 32-qaror: Funksiyalar regioni — Tokio (hnd1)
+- **Muammo**: baza MongoDB Atlas'da Tokioda (AWS ap-northeast-1), Vercel funksiyalari esa sukut bo'yicha Vashingtonda (iad1) ishlardi — har bir baza so'rovi ~153 ms. Bir sahifa 5–15 so'rov qiladi.
+- **Yechim**: `vercel.json` da `regions: ["hnd1"]` — so'rov ~3 ms.
+- **O'lchash**: `/api/cron/diag` (`CRON_SECRET` bilan) funksiya regioni, baza regioni va ping vaqtini qaytaradi.
+- **Keyingi qadam (ixtiyoriy)**: bazani ham, funksiyalarni ham O'zbekistonga yaqinroq regionga (masalan Mumbay yoki Frankfurt) ko'chirish tarmoq kechikishini yana qisqartiradi; bu Atlas'da klasterni ko'chirishni talab qiladi.
