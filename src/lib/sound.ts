@@ -76,7 +76,7 @@ function scheduleFirework(audio: AudioContext, at: number, volume: number): void
   whistle.start(at);
   whistle.stop(at + 0.26);
 
-  // 2. Portlash: past chastotali shovqin + qisqa "gup"
+  // 2. Portlash: past chastotali shovqin
   const boomAt = at + 0.24;
   const boom = audio.createBufferSource();
   boom.buffer = getNoise(audio);
@@ -90,17 +90,6 @@ function scheduleFirework(audio: AudioContext, at: number, volume: number): void
   boom.connect(boomFilter).connect(boomGain).connect(audio.destination);
   boom.start(boomAt);
   boom.stop(boomAt + 0.5);
-
-  const thump = audio.createOscillator();
-  const thumpGain = audio.createGain();
-  thump.type = "sine";
-  thump.frequency.setValueAtTime(140, boomAt);
-  thump.frequency.exponentialRampToValueAtTime(45, boomAt + 0.25);
-  thumpGain.gain.setValueAtTime(0.45 * volume, boomAt);
-  thumpGain.gain.exponentialRampToValueAtTime(0.0001, boomAt + 0.3);
-  thump.connect(thumpGain).connect(audio.destination);
-  thump.start(boomAt);
-  thump.stop(boomAt + 0.32);
 
   // 3. Chirsillash: sochilayotgan uchqunlar
   const crackle = audio.createBufferSource();
