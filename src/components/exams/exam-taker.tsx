@@ -210,7 +210,7 @@ export function ExamTaker({
   }).length;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24 animate-in fade-in">
+    <div className="space-y-4 max-w-4xl mx-auto pb-24 animate-in fade-in">
       {/* Sticky Top Header with Timer and Status */}
       <div className="sticky top-16 z-40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-bg/95 backdrop-blur-lg shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>

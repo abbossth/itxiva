@@ -89,7 +89,7 @@ export default async function MyHomeworkPage() {
   const graded = items.filter((i) => i.state === "graded");
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
+    <div className="space-y-4 max-w-3xl mx-auto pb-12">
       <PageHeader
         icon={ClipboardCheck}
         title="Vazifalarim"

@@ -47,7 +47,7 @@ export function MyOrdersView({ initialOrders }: { initialOrders: ShopOrder[] }) 
   };
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
+    <div className="space-y-4 max-w-3xl mx-auto pb-12">
       <PageHeader
         icon={PackageCheck}
         title="Buyurtmalarim"

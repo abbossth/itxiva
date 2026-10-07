@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/shared/skeletons";
 
 export default function DashboardLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto" aria-busy="true">
+    <div className="space-y-4 max-w-5xl mx-auto" aria-busy="true">
       <div className="space-y-2">
         <Skeleton className="h-9 w-56 rounded-xl" />
         <Skeleton className="h-4 w-72 rounded-lg" />

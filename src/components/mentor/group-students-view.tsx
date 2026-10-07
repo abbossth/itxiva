@@ -102,7 +102,7 @@ export function GroupStudentsView({
   };
 
   return (
-    <div className="space-y-6 page-enter">
+    <div className="space-y-3 page-enter">
       {/* Search Input Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -118,7 +118,7 @@ export function GroupStudentsView({
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             {search ? `${filtered.length} ta natija topildi` : `Jami ${students.length} ta o'quvchi`}
           </span>
-          <Button variant="primary" onClick={() => setIsImportOpen(true)} className="gap-2 shrink-0 font-semibold min-h-[44px]">
+          <Button variant="primary" onClick={() => setIsImportOpen(true)} className="gap-2 shrink-0 font-semibold">
             <UserPlus className="w-4 h-4" />
             Import qilish
           </Button>
@@ -130,12 +130,12 @@ export function GroupStudentsView({
         <table className="w-full text-left text-xs sm:text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">
             <tr>
-              <th className="p-4 font-bold w-12">#</th>
-              <th className="p-4 font-bold">O&apos;quvchi</th>
-              <th className="p-4 font-bold">Login</th>
-              <th className="p-4 font-bold text-center">Coinlar</th>
-              <th className="p-4 font-bold">Oxirgi kirish</th>
-              <th className="p-4 font-bold text-right">Amallar</th>
+              <th className="px-4 py-2.5 font-bold w-12">#</th>
+              <th className="px-4 py-2.5 font-bold">O&apos;quvchi</th>
+              <th className="px-4 py-2.5 font-bold">Login</th>
+              <th className="px-4 py-2.5 font-bold text-center">Coinlar</th>
+              <th className="px-4 py-2.5 font-bold">Oxirgi kirish</th>
+              <th className="px-4 py-2.5 font-bold text-right">Amallar</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-800 dark:text-slate-200">
@@ -151,8 +151,8 @@ export function GroupStudentsView({
                   key={s._id.toString()}
                   className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="p-4 text-slate-500 dark:text-slate-400 font-mono text-xs">{idx + 1}</td>
-                  <td className="p-4">
+                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400 font-mono text-xs">{idx + 1}</td>
+                  <td className="px-4 py-2">
                     <div className="flex items-center gap-3">
                       <Avatar name={s.fullName} size="sm" />
                       <span className="font-semibold text-slate-900 dark:text-slate-100">
@@ -160,21 +160,21 @@ export function GroupStudentsView({
                       </span>
                     </div>
                   </td>
-                  <td className="p-4 font-mono text-teal-600 dark:text-teal-400 text-xs sm:text-sm">
+                  <td className="px-4 py-2 font-mono text-teal-600 dark:text-teal-400 text-xs sm:text-sm">
                     @{s.login}
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="px-4 py-2 text-center">
                     <CoinBadge amount={s.totalCoins || 0} size="sm" animate={false} />
                   </td>
-                  <td className="p-4 text-slate-500 dark:text-slate-400 text-xs">
+                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400 text-xs">
                     {s.lastLoginAt ? formatDateUz(s.lastLoginAt) : "Hali kirmagan"}
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => setSelectedStudentForReset(s)}
-                        className="p-2 min-h-[44px] min-w-[44px] rounded-xl text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer flex items-center justify-center"
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer flex items-center justify-center"
                         aria-label={`${s.fullName} parolini tiklash`}
                         title="Parolni tiklash"
                       >
@@ -183,7 +183,7 @@ export function GroupStudentsView({
                       <button
                         type="button"
                         onClick={() => setStudentToMove(s)}
-                        className="p-2 min-h-[44px] min-w-[44px] rounded-xl text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors cursor-pointer flex items-center justify-center"
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors cursor-pointer flex items-center justify-center"
                         aria-label={`${s.fullName} ni boshqa guruhga ko'chirish`}
                         title="Boshqa guruhga ko'chirish"
                       >
@@ -192,7 +192,7 @@ export function GroupStudentsView({
                       <button
                         type="button"
                         onClick={() => setStudentToDelete(s)}
-                        className="p-2 min-h-[44px] min-w-[44px] rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer flex items-center justify-center"
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer flex items-center justify-center"
                         aria-label={`${s.fullName} ni tizimdan o'chirish`}
                         title="O'quvchini o'chirish"
                       >

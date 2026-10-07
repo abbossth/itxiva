@@ -257,7 +257,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const progressPercent = data.totalStudents > 0 ? Math.round((presentCount / data.totalStudents) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in">
+    <div className="space-y-4 max-w-7xl mx-auto pb-12 animate-in fade-in">
       {/* Top action header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
         <div className="flex items-center gap-3">

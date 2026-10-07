@@ -45,7 +45,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto py-6 animate-in fade-in">
+    <div className="space-y-4 max-w-2xl mx-auto py-6 animate-in fade-in">
       <div>
         <Link
           href="/exams"

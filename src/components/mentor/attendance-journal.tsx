@@ -68,14 +68,14 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
   const groupPercent = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface p-1">
           <button
             type="button"
             onClick={() => setMonthKey(shiftMonth(monthKey, -1))}
             aria-label="Oldingi oy"
-            className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -87,7 +87,7 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
             onClick={() => setMonthKey(shiftMonth(monthKey, 1))}
             disabled={isCurrentMonth}
             aria-label="Keyingi oy"
-            className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -134,7 +134,7 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
-                  <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold p-3 min-w-[160px]">
+                  <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold px-3 py-2 min-w-[160px]">
                     O&apos;quvchi
                   </th>
                   {journal.sessions.map((s) => {
@@ -145,7 +145,7 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
                           href={`/mentor/attendance/${s._id}`}
                           title={s.isDuplicate ? "Bu kunda bir nechta davomat bor — ochib, ortiqchasini o'chiring" : "Dars davomatini ochish"}
                           className={cn(
-                            "flex flex-col items-center justify-center min-w-[44px] min-h-[48px] px-1 transition-colors",
+                            "flex flex-col items-center justify-center min-w-[44px] min-h-[40px] px-1 transition-colors",
                             s.isDuplicate
                               ? "bg-amber-500/20 text-amber-800 dark:text-amber-300 hover:bg-amber-500/30"
                               : "hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300"
@@ -157,24 +157,24 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
                       </th>
                     );
                   })}
-                  <th className="p-3 font-bold text-right min-w-[70px]">Davomat</th>
+                  <th className="px-3 py-2 font-bold text-right min-w-[70px]">Davomat</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {journal.students.map((st, idx) => (
                   <tr key={st.studentId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                    <td className="sticky left-0 z-10 bg-white dark:bg-surface p-3 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
+                    <td className="sticky left-0 z-10 bg-white dark:bg-surface px-3 py-1.5 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
                       <span className="text-slate-500 dark:text-slate-400 font-normal mr-1.5">{idx + 1}.</span>
                       {st.fullName}
                     </td>
                     {journal.sessions.map((s) => {
                       const mark = st.marks[s._id];
                       return (
-                        <td key={s._id} className="p-1 text-center">
+                        <td key={s._id} className="px-1 py-0.5 text-center">
                           <span
                             title={mark ? ATTENDANCE_STATUS_META[mark].label : "Belgilanmagan"}
                             className={cn(
-                              "inline-flex items-center justify-center w-8 h-8 rounded-lg font-bold",
+                              "inline-flex items-center justify-center w-7 h-7 rounded-lg font-bold",
                               mark ? ATTENDANCE_STATUS_META[mark].className : "text-slate-300 dark:text-slate-600"
                             )}
                           >
@@ -184,11 +184,11 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
                         </td>
                       );
                     })}
-                    <td className={cn("p-3 text-right font-black tabular-nums", percentClass(st.percent))}>
-                      {st.percent === null ? "—" : `${st.percent}%`}
-                      <span className="block text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                    <td className={cn("px-3 py-1.5 text-right font-black tabular-nums whitespace-nowrap", percentClass(st.percent))}>
+                      <span className="mr-1.5 text-[10px] font-normal text-slate-500 dark:text-slate-400">
                         {st.attended}/{st.total}
                       </span>
+                      {st.percent === null ? "—" : `${st.percent}%`}
                     </td>
                   </tr>
                 ))}

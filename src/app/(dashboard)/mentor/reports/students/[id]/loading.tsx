@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, StatTilesSkeleton, SectionSkeleton } from "@/compon
 
 export default function StudentReportLoading() {
   return (
-    <div className="space-y-6 max-w-4xl mx-auto" aria-busy="true">
+    <div className="space-y-4 max-w-4xl mx-auto" aria-busy="true">
       <PageHeaderSkeleton withBack />
       <StatTilesSkeleton count={4} className="grid-cols-2 lg:grid-cols-4" />
       <SectionSkeleton rows={2} />

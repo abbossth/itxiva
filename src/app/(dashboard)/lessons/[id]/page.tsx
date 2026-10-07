@@ -39,7 +39,7 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
   const youtubeMaterial = lesson.materials?.find((m) => m.type === "youtube");
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in">
+    <div className="space-y-4 max-w-4xl mx-auto animate-in fade-in">
       {/* Back button */}
       <div>
         <Link

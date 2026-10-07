@@ -158,14 +158,14 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
             Guruhlar
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">
             {groups.length} ta guruh · {totalStudents} nafar o&apos;quvchi · davomat har bir guruh ichida
           </p>
         </div>
@@ -197,7 +197,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                 <div
                   key={id}
                   className={cn(
-                    "flex items-center gap-3 rounded-2xl border bg-white dark:bg-surface p-4 shadow-xs",
+                    "flex items-center gap-3 rounded-2xl border bg-white dark:bg-surface px-4 py-3 shadow-xs",
                     isActive
                       ? "border-teal-500/60 bg-teal-50 dark:bg-teal-500/10"
                       : live && !session
@@ -283,17 +283,17 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
         {groups.map((group) => (
           <div
             key={group._id.toString()}
-            className="group relative flex flex-col justify-between p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all"
+            className="group relative flex flex-col justify-between p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs hover:shadow-md hover:border-teal-500/40 transition-all"
           >
             <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <Badge variant="teal">{group.grade}-sinf</Badge>
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {group.academicYear}
                 </span>
               </div>
 
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 <Link
                   href={`/mentor/groups/${group._id.toString()}`}
                   className="hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
@@ -302,7 +302,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                 </Link>
               </h3>
 
-              <div className="flex items-center gap-2 mt-3 text-xs text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300">
                 <Users className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                 <span>
                   <strong>{group.studentCount || 0}</strong> nafar o&apos;quvchi
@@ -334,7 +334,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
               })()}
             </div>
 
-            <div className="flex items-center justify-between pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center">
               <button
                 type="button"

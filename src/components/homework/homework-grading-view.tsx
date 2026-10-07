@@ -62,7 +62,7 @@ export function HomeworkGradingView({ roster }: { roster: HomeworkRoster }) {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 max-w-5xl mx-auto pb-12">
       <PageHeader
         icon={ClipboardCheck}
         title={roster.lesson.title}

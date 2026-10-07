@@ -162,7 +162,7 @@ export function StudentAttendanceView({
   const attendanceRate = countedLessons > 0 ? Math.round((presentCount / countedLessons) * 100) : null;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="space-y-4 max-w-4xl mx-auto pb-12">
       {/* Header */}
       <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">

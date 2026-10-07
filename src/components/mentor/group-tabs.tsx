@@ -29,7 +29,7 @@ export function GroupTabs({ groupId, activeSessionId }: { groupId: string; activ
               href={tab.href}
               aria-current={tab.isActive ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2 px-3 sm:px-4 min-h-[44px] -mb-px border-b-2 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors",
+                "relative flex items-center gap-2 px-3 sm:px-4 min-h-[40px] -mb-px border-b-2 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors",
                 "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
                 tab.isActive
                   ? "border-teal-600 dark:border-teal-400 text-teal-700 dark:text-teal-300"

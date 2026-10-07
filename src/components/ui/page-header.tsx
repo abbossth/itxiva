@@ -23,12 +23,12 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("space-y-3 pb-4 border-b border-slate-200/80 dark:border-slate-800/80", className)}>
+    <div className={cn("space-y-1 pb-3 border-b border-slate-200/80 dark:border-slate-800/80", className)}>
       {backHref && (
         <div>
           <Link
             href={backHref}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 min-h-[44px] transition-colors"
+            className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 min-h-[36px] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{backLabel}</span>
@@ -36,12 +36,12 @@ export function PageHeader({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
             {Icon && (
-              <div className="p-2 rounded-2xl bg-teal-500/10 text-teal-700 dark:text-teal-300 shrink-0">
-                <Icon className="w-6 h-6" />
+              <div className="p-1.5 rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300 shrink-0">
+                <Icon className="w-5 h-5" />
               </div>
             )}
             <span>{title}</span>

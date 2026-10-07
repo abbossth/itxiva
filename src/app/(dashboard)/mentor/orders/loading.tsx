@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, CardGridSkeleton, Skeleton } from "@/components/sha
 
 export default function MentorOrdersLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto" aria-busy="true">
+    <div className="space-y-4 max-w-5xl mx-auto" aria-busy="true">
       <PageHeaderSkeleton />
       <div className="flex gap-2">
         {[0, 1, 2, 3].map((i) => (

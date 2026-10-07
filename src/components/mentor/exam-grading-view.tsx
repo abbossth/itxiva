@@ -115,7 +115,7 @@ export function ExamGradingView({
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-16 animate-in fade-in">
+    <div className="space-y-4 max-w-4xl mx-auto pb-16 animate-in fade-in">
       {/* Header */}
       <div>
         <Link

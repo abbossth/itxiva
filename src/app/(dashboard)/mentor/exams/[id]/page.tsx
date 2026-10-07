@@ -43,7 +43,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
   const submissions = submissionsRes.data || [];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in pb-16">
+    <div className="space-y-4 max-w-5xl mx-auto animate-in fade-in pb-16">
       <div>
         <Link
           href="/mentor/exams"

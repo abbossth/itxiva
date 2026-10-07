@@ -17,7 +17,7 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
         : "Siz hali guruhga biriktirilmagansiz";
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 max-w-5xl mx-auto pb-12">
       <Greeting name={data.firstName} subtitle={subtitle} />
 
       {data.attendanceOpen && (

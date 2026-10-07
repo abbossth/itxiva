@@ -44,7 +44,7 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
         collapsed ? "w-[76px] p-3" : "w-64 p-4"
       )}
     >
-      <nav aria-label="Asosiy menyu" className="space-y-1">
+      <nav aria-label="Asosiy menyu" className="space-y-0.5">
         <div className={cn("flex items-center mb-1", collapsed ? "justify-center" : "justify-between pl-3")}>
           {!collapsed && (
             <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -76,9 +76,9 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
               aria-label={collapsed ? (count > 0 ? `${link.label} (${count})` : link.label) : undefined}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-3 rounded-xl text-sm font-medium transition-colors select-none min-h-[44px]",
+                "relative flex items-center gap-3 rounded-xl text-sm font-medium transition-colors select-none min-h-[40px]",
                 "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
-                collapsed ? "justify-center px-0" : "px-3.5 py-2.5",
+                collapsed ? "justify-center px-0" : "px-3 py-2",
                 isActive
                   ? "bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"

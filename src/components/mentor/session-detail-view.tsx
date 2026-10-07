@@ -131,7 +131,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   const weekday = UZ_WEEKDAYS[getTashkentParts(detail.session.date).weekday - 1];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="space-y-4 max-w-4xl mx-auto pb-12">
       <PageHeader
         icon={ClipboardCheck}
         title={`${detail.group?.name ?? "Guruh"} — ${formatDateUz(detail.session.date)}`}
@@ -169,10 +169,10 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
       )}
 
       {/* Xulosa */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
+      <div className="px-4 py-3 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-2">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <div className="text-3xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{percent}%</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 tabular-nums">{percent}%</div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
               {roster.length} o&apos;quvchidan {attended} nafari qatnashdi
             </div>
@@ -222,7 +222,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           visible.map((row) => {
             const current = row.status ?? "absent";
             return (
-              <div key={row.studentId} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div key={row.studentId} className="px-3 sm:px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <Avatar name={row.fullName} size="sm" />
                   <div className="min-w-0">

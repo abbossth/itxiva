@@ -19,7 +19,7 @@ export function StudentReportView({ report }: { report: StudentReport }) {
   const lessons = attendance.records.length;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+    <div className="space-y-4 max-w-4xl mx-auto pb-12">
       <PageHeader
         icon={UserRound}
         title={student.fullName}

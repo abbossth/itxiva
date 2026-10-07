@@ -14,7 +14,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
       : "Bugun jadval bo'yicha dars yo'q";
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+    <div className="space-y-4 max-w-5xl mx-auto pb-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Greeting name={data.firstName} subtitle={subtitle} />
         <Link href="/mentor/lessons/new" className={buttonVariants({ variant: "primary", size: "sm" })}>

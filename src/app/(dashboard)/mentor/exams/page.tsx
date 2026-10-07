@@ -14,7 +14,7 @@ export default async function MentorExamsPage() {
   const exams = res.data || [];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in pb-16">
+    <div className="space-y-4 max-w-5xl mx-auto animate-in fade-in pb-16">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">

@@ -37,7 +37,7 @@ export function ProfileView({ user, telegram }: ProfileViewProps) {
 
   return (
     // Mentorda sahifa tepasida bo'lim tablari bor — kontent ular bilan bir chiziqda turadi
-    <div className={`space-y-6 max-w-3xl animate-in fade-in pb-12 ${user.role === "mentor" ? "" : "mx-auto"}`}>
+    <div className={`space-y-4 max-w-3xl animate-in fade-in pb-12 ${user.role === "mentor" ? "" : "mx-auto"}`}>
       {/* Page Title */}
       <div className="border-b border-slate-200/80 dark:border-slate-800/80 pb-4">
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">

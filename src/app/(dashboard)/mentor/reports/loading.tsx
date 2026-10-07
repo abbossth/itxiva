@@ -2,7 +2,7 @@ import { PageHeaderSkeleton, StatTilesSkeleton, SectionSkeleton, Skeleton } from
 
 export default function MentorReportsLoading() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto" aria-busy="true">
+    <div className="space-y-4 max-w-5xl mx-auto" aria-busy="true">
       <PageHeaderSkeleton />
       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
         <Skeleton className="h-12 w-full sm:w-96 rounded-2xl" />

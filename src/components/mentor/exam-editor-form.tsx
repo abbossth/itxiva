@@ -202,7 +202,7 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto pb-16 animate-in fade-in">
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl mx-auto pb-16 animate-in fade-in">
       {error && (
         <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-medium">
           {error}

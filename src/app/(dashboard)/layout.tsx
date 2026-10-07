@@ -45,7 +45,7 @@ export default async function DashboardLayout({
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
         <DesktopNav user={session} badges={badges} defaultCollapsed={sidebarCollapsed} />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 md:pb-8 max-w-5xl w-full">
+        <main className="flex-1 px-4 sm:px-6 pt-4 sm:pt-5 pb-28 md:pb-8 max-w-5xl w-full">
           {session.role === "mentor" && <SectionTabs badges={badges} />}
           {children}
         </main>

@@ -28,7 +28,7 @@ export default async function EditExamPage({ params }: EditExamPageProps) {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in pb-16">
+    <div className="space-y-4 max-w-4xl mx-auto animate-in fade-in pb-16">
       <div>
         <Link
           href="/mentor/exams"

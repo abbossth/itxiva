@@ -73,14 +73,14 @@ export function GroupAttendanceView({ groupId, schedule, activeSession, todaySes
   };
 
   const manualButton = (
-    <Button variant="secondary" onClick={() => setIsManualOpen(true)} className="gap-2 min-h-[44px]">
+    <Button variant="secondary" onClick={() => setIsManualOpen(true)} className="gap-2">
       <PencilLine className="w-4 h-4" />
       Qo&apos;lda kiritish
     </Button>
   );
 
   return (
-    <div className="space-y-5 page-enter">
+    <div className="space-y-3 page-enter">
       {activeSession ? (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-teal-500/50 bg-teal-50 dark:bg-teal-500/10 p-4">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white">
@@ -112,34 +112,33 @@ export function GroupAttendanceView({ groupId, schedule, activeSession, todaySes
               onClick={handleStart}
               isLoading={isStarting}
               disabled={!canStart}
-              className="gap-2 min-h-[44px]"
+              className="gap-2"
             >
               <QrCode className="w-4 h-4" />
               Davomatni boshlash
             </Button>
           )}
           {manualButton}
-          <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 px-1">
+          <span className="text-xs text-slate-600 dark:text-slate-400 px-1">
             {todaySession?.status === "closed"
               ? "Bugungi dars davomati olingan."
               : canStart
                 ? "Dars vaqti — QR va kod ekrani ochiladi."
                 : nextLesson
-                  ? `Davomat faqat dars vaqtida ochiladi. Keyingi dars: ${nextLesson.label}.`
+                  ? `Faqat dars vaqtida ochiladi · keyingi dars: ${nextLesson.label}`
                   : "Guruhga dars jadvali belgilanmagan."}
+          </span>
+          <span className="sm:ml-auto flex flex-wrap items-center gap-x-2.5 text-xs text-slate-600 dark:text-slate-400">
+            <span className="font-semibold">Coin:</span>
+            {ATTENDANCE_STATUS_ORDER.map((st) => (
+              <span key={st}>
+                {ATTENDANCE_STATUS_META[st].label.toLowerCase()}{" "}
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatCoinDelta(ATTENDANCE_COINS[st])}</span>
+              </span>
+            ))}
           </span>
         </div>
       )}
-
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
-        <span className="font-semibold">Coin:</span>
-        {ATTENDANCE_STATUS_ORDER.map((st) => (
-          <span key={st}>
-            {ATTENDANCE_STATUS_META[st].label.toLowerCase()}{" "}
-            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatCoinDelta(ATTENDANCE_COINS[st])}</span>
-          </span>
-        ))}
-      </p>
 
       <AttendanceJournal groupId={groupId} onManualEntry={() => setIsManualOpen(true)} />
 
