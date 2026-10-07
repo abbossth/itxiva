@@ -14,10 +14,11 @@ import {
   exportAttendanceCsvAction,
   finalizeAttendanceSessionAction,
   deleteAttendanceSessionAction,
+  convertAttendanceRulesAction,
   SessionDetail,
   SessionRosterRow,
 } from "@/actions/attendance.actions";
-import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
 import { triggerDownload } from "@/lib/xlsx-client";
 import { cn, formatDateUz, formatTimeUz } from "@/lib/utils";
 import { UZ_WEEKDAYS, getTashkentParts } from "@/lib/schedule";
@@ -32,6 +33,8 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   const [isFinalized, setIsFinalized] = useState(detail.session.isFinalized);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const groupHref = detail.group ? `/mentor/groups/${detail.group._id}/attendance` : "/mentor/groups";
   const [roster, setRoster] = useState<SessionRosterRow[]>(detail.roster);
@@ -98,6 +101,24 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
     }
   };
 
+  const handleConvert = async () => {
+    try {
+      setIsConverting(true);
+      const res = await convertAttendanceRulesAction(detail.session._id);
+      if (res.success) {
+        toast.success(res.message || "Yangi qoidaga o'tkazildi");
+        setIsConvertOpen(false);
+        router.refresh();
+      } else {
+        toast.error(res.message || "O'tkazib bo'lmadi");
+      }
+    } catch {
+      toast.error("O'tkazib bo'lmadi");
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
@@ -153,6 +174,20 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           </>
         }
       />
+
+      {/* Eski qoidada olingan dars */}
+      {detail.session.isLegacyRules && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface px-4 py-3">
+          <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-300">
+            <span className="font-bold text-slate-900 dark:text-slate-100">Bu dars eski coin qoidasida olingan</span> (qatnashganga{" "}
+            {formatCoinDelta(rules.present)}, jarimasiz). Joriy qoida:{" "}
+            {ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${formatCoinDelta(ATTENDANCE_COINS[st])}`).join(", ")}.
+          </div>
+          <Button variant="secondary" onClick={() => setIsConvertOpen(true)} className="shrink-0">
+            Yangi qoidaga o&apos;tkazish
+          </Button>
+        </div>
+      )}
 
       {/* Qo'lda kiritilgan dars: jarima mentor belgilab bo'lgach qo'llanadi */}
       {!isFinalized && (
@@ -272,6 +307,23 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           })
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={isConvertOpen}
+        onClose={() => setIsConvertOpen(false)}
+        onConfirm={handleConvert}
+        title="Yangi coin qoidasiga o'tkazish"
+        description={
+          <>
+            Shu darsdagi har bir o&apos;quvchining coini joriy qoida bo&apos;yicha qayta hisoblanadi: kelganlarniki{" "}
+            {formatCoinDelta(rules.present)} dan {formatCoinDelta(ATTENDANCE_COINS.present)} ga tushadi, kelmaganlardan{" "}
+            {formatCoinDelta(ATTENDANCE_COINS.absent)} olinadi (balans 0 dan pastga tushmaydi). O&apos;quvchilarga xabar yuborilmaydi.
+            Ortga qaytarib bo&apos;lmaydi.
+          </>
+        }
+        confirmText="Ha, o'tkazish"
+        isLoading={isConverting}
+      />
 
       <ConfirmDialog
         isOpen={isDeleteOpen}

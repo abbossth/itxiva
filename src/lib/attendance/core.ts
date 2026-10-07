@@ -5,7 +5,7 @@ import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { coinRulesOf } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, coinRulesOf } from "@/lib/attendance-status";
 import { addDaysToKey, dateFromKey, isValidSchedule, toDateKey } from "@/lib/schedule";
 import { notify } from "@/lib/notifications/notify";
 
@@ -270,4 +270,29 @@ export async function deleteSessionWithCoins(sessionId: string | mongoose.Types.
   await AttendanceRecord.deleteMany({ sessionId: session._id });
   await AttendanceSession.deleteOne({ _id: session._id });
   return { records: records.length, reverted };
+}
+
+/**
+ * Eski qoidada (qatnashganga belgilangan mukofot, jarimasiz) olingan davomatni joriy qoidaga o'tkazadi:
+ * har bir yozuvning coini qayta hisoblanadi (masalan kelgan +10 → +5, kelmagan 0 → −5).
+ * O'quvchilarga xabar yuborilmaydi; o'zgarish coin tarixida ko'rinadi.
+ */
+export async function convertSessionToCurrentRules(sessionId: string | mongoose.Types.ObjectId): Promise<{ changed: number } | null> {
+  const session = await AttendanceSession.findOneAndUpdate(
+    { _id: sessionId, coinRules: null, status: "closed" },
+    { $set: { coinRules: ATTENDANCE_COINS, defaultCoinsReward: ATTENDANCE_COINS.present, finalizedAt: new Date() } },
+    { returnDocument: "after" }
+  );
+  if (!session) return null;
+
+  const records = await AttendanceRecord.find({ sessionId: session._id });
+  let changed = 0;
+  for (const record of records) {
+    const amount = await settleRecordCoins(session, record, {
+      silent: true,
+      description: "Davomat yangi coin qoidasiga o'tkazildi",
+    });
+    if (amount !== 0) changed++;
+  }
+  return { changed };
 }

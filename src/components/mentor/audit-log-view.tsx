@@ -40,6 +40,7 @@ const ACTION_MAP: Record<string, { label: string; variant: "danger" | "success" 
   CLOSE_ATTENDANCE: { label: "Davomat yakunlandi", variant: "warning" },
   FINALIZE_ATTENDANCE: { label: "Qo'lda davomat yakunlandi", variant: "warning" },
   HOMEWORK_REMINDER: { label: "Vazifa eslatmasi yuborildi", variant: "teal" },
+  CONVERT_ATTENDANCE_RULES: { label: "Davomat yangi coin qoidasiga o'tkazildi", variant: "warning" },
   DELETE_ATTENDANCE: { label: "Davomat o'chirildi", variant: "danger" },
   MANUAL_ATTENDANCE: { label: "Qo'lda davomat belgilandi", variant: "teal" },
 };

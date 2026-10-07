@@ -27,6 +27,7 @@ import {
   applyAttendanceStatus,
   closeExpiredSessions,
   closeSession,
+  convertSessionToCurrentRules,
   deleteSessionWithCoins,
   finalizeSession,
   findSessionOnDay,
@@ -527,6 +528,33 @@ export async function deleteAttendanceSessionAction(sessionId: string): Promise<
 }
 
 /**
+ * Eski qoidada olingan davomatni joriy coin qoidasiga o'tkazadi (coinlar qayta hisoblanadi)
+ */
+export async function convertAttendanceRulesAction(sessionId: string): Promise<ActionResult<{ changed: number }>> {
+  const session = await requireMentor();
+  if (!mongoose.isValidObjectId(sessionId)) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+  await connectToDatabase();
+
+  const result = await convertSessionToCurrentRules(sessionId);
+  if (!result) {
+    return { success: false, message: "Bu dars allaqachon joriy qoidada yoki hali yopilmagan" };
+  }
+  await recomputeSummary(sessionId);
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "CONVERT_ATTENDANCE_RULES",
+    details: { sessionId, changed: result.changed },
+  });
+  return {
+    success: true,
+    message: `Yangi qoidaga o'tkazildi: ${result.changed} ta o'quvchining coini qayta hisoblandi`,
+    data: result,
+  };
+}
+
+/**
  * Mentor manually updates a student's attendance record
  */
 export async function manualUpdateAttendanceAction(params: {
@@ -598,6 +626,8 @@ export interface SessionDetail {
     /** false — kelmaganlarga jarima hali qo'llanmagan (qo'lda kiritilgan, yakunlanmagan dars) */
     isFinalized: boolean;
     isManual: boolean;
+    /** Eski coin qoidasida olingan dars — mentor uni joriy qoidaga o'tkazishi mumkin */
+    isLegacyRules: boolean;
   };
   group: { _id: string; name: string; grade: number } | null;
   roster: SessionRosterRow[];
@@ -660,6 +690,7 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
       coinRules: coinRulesOf(attSession),
       isFinalized: isSessionFinalized(attSession),
       isManual: Boolean(attSession.isManual),
+      isLegacyRules: !attSession.coinRules,
     },
     group: group ? { _id: group._id.toString(), name: group.name, grade: group.grade } : null,
     roster: [...rows.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),

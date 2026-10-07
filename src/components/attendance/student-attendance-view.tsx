@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { OTPInput } from "@/components/ui/otp-input";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
 import { useToast } from "@/components/ui/toast";
 import { markAttendanceAction } from "@/actions/attendance.actions";
 import { formatDateUz } from "@/lib/utils";
@@ -358,8 +359,25 @@ export function StudentAttendanceView({
         </div>
       )}
 
+      {/* Coin qoidasi */}
+      <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface px-4 py-3">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Davomat uchun coin</h2>
+        <ul className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {ATTENDANCE_STATUS_ORDER.map((st) => (
+            <li key={st} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${ATTENDANCE_STATUS_META[st].className}`}>
+              <span className="text-xs font-semibold">{ATTENDANCE_STATUS_META[st].label}</span>
+              <span className="font-mono text-sm font-black tabular-nums">{formatCoinDelta(ATTENDANCE_COINS[st])}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+          Darsga kela olmasangiz, sababini mentorga ayting — &quot;sababli&quot; deb belgilansa coin olinmaydi. Balans 0 dan pastga
+          tushmaydi.
+        </p>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
           <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
             {attendanceRate === null ? "—" : `${attendanceRate}%`}
@@ -379,11 +397,11 @@ export function StudentAttendanceView({
         </div>
 
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-          <div className="text-2xl font-black text-amber-500">
-            +{totalCoinsEarned}
+          <div className={`text-2xl font-black ${totalCoinsEarned < 0 ? "text-rose-700 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}`}>
+            {formatCoinDelta(totalCoinsEarned)}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-            Davomatdan yig&apos;ilgan coinlar
+            Davomat bo&apos;yicha jami coin
           </div>
         </div>
       </div>

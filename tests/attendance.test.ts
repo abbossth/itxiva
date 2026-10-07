@@ -144,6 +144,30 @@ describe("davomat: coin qoidasi", () => {
   });
 });
 
+describe("davomat: eski darsni yangi qoidaga o'tkazish", () => {
+  it("kelgan +10 → +5, kelmagan 0 → −5; ikkinchi marta o'tkazib bo'lmaydi", async () => {
+    const { group, mentor, ali, guli } = await setup({ ali: 10, vali: 3, guli: 20 });
+    const old = await AttendanceSession.create({
+      groupId: group._id, mentorId: mentor._id, date: at("16:30", "05"), startTime: at("16:30", "05"),
+      status: "closed", currentCode: "OLDOLD", currentToken: "old-token-2", defaultCoinsReward: 10,
+    });
+    await AttendanceRecord.create({ sessionId: old._id, studentId: ali._id, groupId: group._id, status: "present", method: "code", coinsAwarded: 10 });
+    await AttendanceRecord.create({ sessionId: old._id, studentId: guli._id, groupId: group._id, status: "absent", method: "manual", coinsAwarded: 0 });
+
+    const res = await actions.convertAttendanceRulesAction(old._id.toString());
+    expect(res.data).toEqual({ changed: 2 });
+    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+
+    expect((await actions.convertAttendanceRulesAction(old._id.toString())).success).toBe(false);
+    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+
+    // Endi yangi qoida ishlaydi: kelmagan → sababli jarimani qaytaradi
+    await actions.manualUpdateAttendanceAction({ sessionId: old._id.toString(), studentId: guli._id.toString(), status: "excused" });
+    expect(await coinsOf(guli._id)).toEqual([20, 20]);
+  });
+});
+
 describe("davomat: qo'lda kiritish", () => {
   it("faqat jadvaldagi dars kuniga, kuniga bitta", async () => {
     const { gid } = await setup();

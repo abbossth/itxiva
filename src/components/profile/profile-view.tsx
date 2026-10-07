@@ -153,7 +153,7 @@ export function ProfileView({ user, telegram }: ProfileViewProps) {
                 Bugungi dars davomati
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Proyektordagi 6 xonali kod yoki QR belgi orqali davomatdan o&apos;ting (+10 coin)
+                Proyektordagi 6 xonali kod yoki QR belgi orqali davomatdan o&apos;ting: kelsangiz +5, kechiksangiz +3 coin; sababsiz kelmasangiz −5 coin
               </p>
             </div>
           </div>
