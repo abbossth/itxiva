@@ -17,6 +17,7 @@ import { startAttendanceSessionAction, type GroupsAttendanceOverview } from "@/a
 import { ScheduleFields } from "@/components/mentor/schedule-fields";
 import { formatSchedule, getTashkentParts, hasLessonOn, isLessonNow, isValidSchedule, GroupSchedule, ODD_DAYS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
+import { deriveShortName, groupShortName } from "@/lib/group-name";
 
 const DEFAULT_SCHEDULE: GroupSchedule = { days: ODD_DAYS, startTime: "15:00", endTime: "16:30" };
 
@@ -46,6 +47,8 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
   // Jadvalni tahrirlash oynasi
   const [groupToEdit, setGroupToEdit] = useState<IGroupData | null>(null);
   const [editName, setEditName] = useState("");
+  const [editShortName, setEditShortName] = useState("");
+  const [shortName, setShortName] = useState("");
   const [editSchedule, setEditSchedule] = useState<GroupSchedule>(DEFAULT_SCHEDULE);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,11 +93,12 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
         setErrorMsg("Dars kunlari va vaqtini to'g'ri belgilang");
         return;
       }
-      const res = await createGroupAction({ name, grade, academicYear, isActive: true, schedule });
+      const res = await createGroupAction({ name, shortName, grade, academicYear, isActive: true, schedule });
       if (res.success && res.data) {
         setGroups([...groups, res.data as IGroupData]);
         setIsCreateOpen(false);
         setName("");
+        setShortName("");
         toast.success(`"${name}" guruhi muvaffaqiyatli yaratildi!`);
       } else {
         setErrorMsg(res.message || "Xatolik yuz berdi");
@@ -109,6 +113,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
   const openEdit = (group: IGroupData) => {
     setGroupToEdit(group);
     setEditName(group.name);
+    setEditShortName(group.shortName ?? "");
     setEditSchedule(isValidSchedule(group.schedule) ? group.schedule : DEFAULT_SCHEDULE);
   };
 
@@ -122,7 +127,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
     try {
       setIsSavingEdit(true);
       const id = groupToEdit._id.toString();
-      const res = await updateGroupAction(id, { name: editName.trim(), schedule: editSchedule });
+      const res = await updateGroupAction(id, { name: editName.trim(), shortName: editShortName, schedule: editSchedule });
       if (res.success && res.data) {
         setGroups(groups.map((g) => (g._id.toString() === id ? (res.data as IGroupData) : g)));
         toast.success("Guruh ma'lumotlari saqlandi");
@@ -208,9 +213,10 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/mentor/groups/${id}/attendance`}
-                      className="block truncate font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
+                      className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
                     >
-                      {g.name}
+                      <span className="font-mono">{groupShortName(g)}</span>
+                      <span className="truncate text-xs font-normal text-slate-600 dark:text-slate-400">{g.name}</span>
                     </Link>
                     <div className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums">
                       {g.schedule?.startTime}–{g.schedule?.endTime}
@@ -298,7 +304,8 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                   href={`/mentor/groups/${group._id.toString()}`}
                   className="hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
                 >
-                  {group.name} guruhi
+                  <span className="font-mono text-teal-700 dark:text-teal-300">{groupShortName(group)}</span>
+                  <span className="ml-2 text-sm font-semibold text-slate-600 dark:text-slate-400">{group.name}</span>
                 </Link>
               </h3>
 
@@ -404,6 +411,20 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
               />
             </Field>
 
+            <Field
+              htmlFor="group-short"
+              label="Qisqa nom"
+              hint="Tablar va tor joylarda ko'rinadi. Bo'sh qoldirilsa nomdan olinadi"
+            >
+              <Input
+                id="group-short"
+                value={shortName}
+                onChange={(e) => setShortName(e.target.value)}
+                placeholder={deriveShortName(name) ?? "masalan: 8.2"}
+                maxLength={12}
+              />
+            </Field>
+
             <Field htmlFor="group-grade" label="Sinf darajasi" required>
               <div className="flex items-center gap-4 pt-1">
                 {[8, 9, 10, 11].map((g) => (
@@ -471,6 +492,21 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
                 required
               />
             </Field>
+
+            <Field
+              htmlFor="edit-group-short"
+              label="Qisqa nom"
+              hint="Tablar va tor joylarda ko'rinadi. Bo'sh qoldirilsa nomdan olinadi"
+            >
+              <Input
+                id="edit-group-short"
+                value={editShortName}
+                onChange={(e) => setEditShortName(e.target.value)}
+                placeholder={deriveShortName(editName) ?? "masalan: 8.2"}
+                maxLength={12}
+              />
+            </Field>
+
 
             <ScheduleFields idPrefix="edit-schedule" value={editSchedule} onChange={setEditSchedule} />
 

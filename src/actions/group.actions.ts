@@ -74,6 +74,7 @@ export async function updateGroupAction(id: string, input: Partial<GroupInput>) 
     group.name = input.name;
   }
 
+  if (typeof input.shortName === "string") group.shortName = input.shortName.trim().slice(0, 12);
   if (input.grade) group.grade = input.grade;
   if (input.academicYear) group.academicYear = input.academicYear;
   if (input.isActive !== undefined) group.isActive = input.isActive;

@@ -15,6 +15,7 @@ import { togglePublishLessonAction, deleteLessonAction } from "@/actions/lesson.
 import { HomeworkJournal } from "@/components/mentor/homework-journal";
 import type { HomeworkJournal as JournalData, HomeworkOverviewItem, LessonHomeworkStats } from "@/actions/homework.actions";
 import { describeDue } from "@/lib/homework-status";
+import { groupShortName } from "@/lib/group-name";
 import { cn, formatDateUz } from "@/lib/utils";
 
 interface LessonsManagerProps {
@@ -133,7 +134,7 @@ export function LessonsManager({
                   href={`/mentor/homework/${item.lessonId}`}
                   className="flex items-center gap-2 rounded-xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 px-3 min-h-[44px] hover:border-teal-500/50 transition-colors"
                 >
-                  <Badge variant="teal" className="shrink-0">{item.groupName}</Badge>
+                  <Badge variant="teal" className="shrink-0" title={item.groupName}>{item.groupShortName}</Badge>
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                     <span className="font-normal text-slate-600 dark:text-slate-400">{item.order}-dars · </span>
                     {item.lessonTitle}
@@ -161,14 +162,15 @@ export function LessonsManager({
                 key={id}
                 href={hrefFor(id, currentQuarter)}
                 aria-current={isSelected ? "true" : undefined}
+                title={`${g.name} (${g.grade}-sinf)`}
                 className={cn(
-                  "px-3 rounded-xl text-xs font-bold transition-colors shrink-0 min-h-[40px] flex items-center gap-1.5",
+                  "px-3.5 rounded-xl text-sm font-bold font-mono transition-colors shrink-0 min-h-[40px] flex items-center gap-1.5",
                   isSelected
                     ? "bg-teal-600 text-white"
                     : "bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >
-                {g.name}
+                {groupShortName(g)}
                 {pending > 0 && (
                   <span
                     title={`${pending} ta tekshirilmagan javob`}

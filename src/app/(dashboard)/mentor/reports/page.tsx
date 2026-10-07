@@ -1,3 +1,4 @@
+import { groupShortName } from "@/lib/group-name";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getReportData } from "@/actions/report.actions";
@@ -45,7 +46,7 @@ export default async function MentorReportsPage({ searchParams }: ReportsPagePro
   return (
     <ReportsView
       data={data}
-      groups={groups.map((g) => ({ _id: g._id.toString(), name: g.name }))}
+      groups={groups.map((g) => ({ _id: g._id.toString(), name: `${groupShortName(g)} — ${g.name}` }))}
       period={period}
       groupId={params.group ?? ""}
     />

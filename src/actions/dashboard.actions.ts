@@ -1,5 +1,6 @@
 "use server";
 
+import { groupShortName } from "@/lib/group-name";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
@@ -118,6 +119,7 @@ export interface MentorDashboard {
   groups: {
     _id: string;
     name: string;
+    shortName: string;
     grade: number;
     students: number;
     schedule: string;
@@ -133,7 +135,7 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
   await connectToDatabase();
 
   const [groups, studentCounts, lessonCounts, ungradedByLesson, pendingOrders, orders, activeSessions] = await Promise.all([
-    Group.find({ isActive: true }).select("name grade schedule").sort({ grade: 1, name: 1 }).lean(),
+    Group.find({ isActive: true }).select("name shortName grade schedule").sort({ grade: 1, name: 1 }).lean(),
     User.aggregate<{ _id: mongoose.Types.ObjectId | null; count: number }>([
       { $match: { role: "student" } },
       { $group: { _id: "$groupId", count: { $sum: 1 } } },
@@ -185,6 +187,7 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
         return {
           _id: g._id.toString(),
           name: g.name,
+          shortName: groupShortName(g),
           grade: g.grade,
           students: studentsIn.get(g._id.toString()) ?? 0,
           schedule: formatSchedule(g.schedule),

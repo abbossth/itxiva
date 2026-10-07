@@ -1,5 +1,6 @@
 "use client";
 
+import { groupShortName } from "@/lib/group-name";
 import { useState } from "react";
 import {
   UserPlus,
@@ -304,7 +305,7 @@ export function GroupStudentsView({
                   .filter((g) => g._id.toString() !== group._id.toString())
                   .map((g) => (
                     <option key={g._id.toString()} value={g._id.toString()}>
-                      {g.name} guruhi ({g.grade}-sinf)
+                      {groupShortName(g)} — {g.name}
                     </option>
                   ))}
               </select>

@@ -1,5 +1,6 @@
 "use client";
 
+import { groupShortName } from "@/lib/group-name";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +85,7 @@ export function RankFilters({
                   : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
               )}
             >
-              {g.name} ({g.grade}-sinf)
+              <span title={`${g.name} (${g.grade}-sinf)`} className="font-mono">{groupShortName(g)}</span>
             </button>
           ))}
         </div>

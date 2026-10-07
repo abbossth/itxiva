@@ -4,6 +4,8 @@ import type { GroupSchedule } from "@/lib/schedule";
 export interface IGroupData {
   _id: string | mongoose.Types.ObjectId;
   name: string;
+  /** Qisqa nom ("8.2"). Bo'sh bo'lsa nomdan avtomatik chiqariladi — `groupShortName` */
+  shortName?: string | null;
   grade: number;
   academicYear: string;
   studentCount: number;
@@ -26,6 +28,12 @@ const GroupSchema = new Schema<IGroup>(
       required: true,
       unique: true,
       trim: true,
+    },
+    shortName: {
+      type: String,
+      trim: true,
+      maxlength: 12,
+      default: "",
     },
     grade: {
       type: Number,

@@ -121,7 +121,8 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
                 >
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{g.name}</span>
+                      <span className="font-mono text-sm font-bold text-teal-700 dark:text-teal-300">{g.shortName}</span>
+                      <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{g.name}</span>
                       {g.hasLessonToday && (
                         <Badge variant="teal" className="gap-1">
                           <CalendarClock className="w-3 h-3" />

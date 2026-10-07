@@ -14,6 +14,7 @@ export const groupSchema = z.object({
     .min(2, "Guruh nomi kamida 2 ta belgi bo'lishi kerak")
     .max(20, "Guruh nomi 20 belgidan oshmasligi kerak")
     .trim(),
+  shortName: z.string().trim().max(12, "Qisqa nom 12 belgidan oshmasligi kerak").optional(),
   grade: z.coerce
     .number()
     .refine((val) => [8, 9, 10, 11].includes(val), "Sinf faqat 8, 9, 10 yoki 11 bo'lishi mumkin"),

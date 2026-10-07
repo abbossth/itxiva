@@ -1,5 +1,6 @@
 "use client";
 
+import { groupShortName } from "@/lib/group-name";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -444,7 +445,7 @@ export function LessonEditorForm({
             >
               {groups.map((g) => (
                 <option key={g._id.toString()} value={g._id.toString()}>
-                  {g.name} ({g.grade}-sinf)
+                  {groupShortName(g)} — {g.name}
                 </option>
               ))}
             </select>
@@ -601,7 +602,7 @@ export function LessonEditorForm({
                         onChange={() => toggleExtraGroup(id)}
                         className="w-4 h-4 accent-teal-600 cursor-pointer"
                       />
-                      <span>{g.name}</span>
+                      <span className="font-mono" title={g.name}>{groupShortName(g)}</span>
                       <span className={`text-xs font-normal ${g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`}>
                         {g.grade}-sinf
                       </span>

@@ -7,6 +7,7 @@ import { getGroupsAttendanceOverview } from "@/actions/attendance.actions";
 import { Badge } from "@/components/ui/badge";
 import { GroupTabs } from "@/components/mentor/group-tabs";
 import { formatSchedule, isValidSchedule } from "@/lib/schedule";
+import { groupShortName } from "@/lib/group-name";
 
 interface GroupLayoutProps {
   children: React.ReactNode;
@@ -35,7 +36,10 @@ export default async function GroupLayout({ children, params }: GroupLayoutProps
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{group.name}</h1>
+          <h1 className="truncate text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            <span className="text-teal-700 dark:text-teal-300">{groupShortName(group)}</span>
+            <span className="ml-2 text-sm font-semibold text-slate-600 dark:text-slate-400">{group.name}</span>
+          </h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-600 dark:text-slate-400">
             <Badge variant="teal">{group.grade}-sinf</Badge>
             <span className="inline-flex items-center gap-1">

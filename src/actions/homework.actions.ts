@@ -24,6 +24,7 @@ import {
 import { DEFAULT_HOMEWORK_COINS, type HomeworkState } from "@/lib/homework-status";
 import { notify, notifyMentors, sendNotifications } from "@/lib/notifications/notify";
 import { formatDateTimeUz } from "@/lib/utils";
+import { groupShortName } from "@/lib/group-name";
 import { ActionResult } from "./auth.actions";
 
 const isObjectId = (id: unknown): id is string => typeof id === "string" && mongoose.isValidObjectId(id);
@@ -291,6 +292,7 @@ export interface HomeworkOverviewItem {
   isPublished: boolean;
   groupId: string;
   groupName: string;
+  groupShortName: string;
   dueAt: string | null;
   totalStudents: number;
   submitted: number;
@@ -315,7 +317,7 @@ export async function getHomeworkOverviewForMentor(groupId?: string): Promise<Ho
 
   const groupIds = [...new Set(lessons.map((l) => l.groupId.toString()))];
   const [groups, studentCounts, stats] = await Promise.all([
-    Group.find({ _id: { $in: groupIds } }).select("name").lean(),
+    Group.find({ _id: { $in: groupIds } }).select("name shortName").lean(),
     User.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
       { $match: { role: "student", groupId: { $in: groupIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
       { $group: { _id: "$groupId", count: { $sum: 1 } } },
@@ -327,6 +329,7 @@ export async function getHomeworkOverviewForMentor(groupId?: string): Promise<Ho
   ]);
 
   const groupNames = new Map(groups.map((g) => [g._id.toString(), g.name]));
+  const groupShorts = new Map(groups.map((g) => [g._id.toString(), groupShortName(g)]));
   const totals = new Map(studentCounts.map((c) => [c._id.toString(), c.count]));
   const byLesson = new Map<string, Partial<Record<HomeworkStatus, number>>>();
   for (const s of stats) {
@@ -345,6 +348,7 @@ export async function getHomeworkOverviewForMentor(groupId?: string): Promise<Ho
       isPublished: l.isPublished,
       groupId: gid,
       groupName: groupNames.get(gid) ?? "—",
+      groupShortName: groupShorts.get(gid) ?? "—",
       dueAt: l.homework?.dueAt ? new Date(l.homework.dueAt).toISOString() : null,
       totalStudents: totals.get(gid) ?? 0,
       submitted: (st.submitted ?? 0) + (st.graded ?? 0) + (st.returned ?? 0),

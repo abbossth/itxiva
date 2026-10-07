@@ -1,5 +1,6 @@
 "use client";
 
+import { groupShortName } from "@/lib/group-name";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IGroupData } from "@/lib/db/models/group.model";
@@ -338,7 +339,7 @@ export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
                       : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300"
                   }`}
                 >
-                  {g.name} ({g.grade}-sinf)
+                  {groupShortName(g)} — {g.name}
                 </button>
               );
             })}
