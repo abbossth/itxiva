@@ -3,19 +3,31 @@
 import { useEffect } from "react";
 import { fireConfetti } from "@/lib/confetti";
 
-/** O'quvchi kuchli uchlikka kirgan bo'lsa, kuniga bir marta konfetti bilan tabriklanadi */
+// Medal ranglari: 1-o'rin oltin, 2-o'rin kumush, 3-o'rin bronza (firuza — sayt rangi)
+const COLORS: Record<number, string[]> = {
+  1: ["#fbbf24", "#f59e0b", "#fde68a", "#14b8a6"],
+  2: ["#cbd5e1", "#94a3b8", "#f1f5f9", "#14b8a6"],
+  3: ["#fb923c", "#ea580c", "#fed7aa", "#14b8a6"],
+};
+
+/**
+ * O'quvchi kuchli uchlikda bo'lsa, reyting sahifasiga har kirganda konfetti otiladi:
+ * avval ikki yondan, keyin o'rtadan. Birinchi o'ringa kattaroq salyut.
+ */
 export function TopThreeCelebration({ rank }: { rank: number }) {
   useEffect(() => {
     if (rank < 1 || rank > 3) return;
-    const key = `leaderboard-celebrated:${new Date().toISOString().slice(0, 10)}`;
-    try {
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-    } catch {
-      // saqlab bo'lmasa — har safar tabriklanadi, zarari yo'q
-    }
-    const timer = setTimeout(() => void fireConfetti({ particleCount: 140, spread: 90, origin: { y: 0.35 } }), 900);
-    return () => clearTimeout(timer);
+    const colors = COLORS[rank];
+    const count = rank === 1 ? 110 : 70;
+    const timers = [
+      // Shohsupa ko'tarilib bo'lgach boshlanadi
+      setTimeout(() => {
+        void fireConfetti({ particleCount: count, angle: 60, spread: 70, origin: { x: 0, y: 0.7 }, colors });
+        void fireConfetti({ particleCount: count, angle: 120, spread: 70, origin: { x: 1, y: 0.7 }, colors });
+      }, 900),
+      setTimeout(() => void fireConfetti({ particleCount: count, spread: 110, startVelocity: 38, origin: { y: 0.4 }, colors }), 1500),
+    ];
+    return () => timers.forEach(clearTimeout);
   }, [rank]);
   return null;
 }
