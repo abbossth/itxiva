@@ -63,21 +63,8 @@ function getNoise(audio: AudioContext): AudioBuffer {
 }
 
 function scheduleFirework(audio: AudioContext, at: number, volume: number): void {
-  // 1. Hushtak: yuqoriga ko'tarilayotgan raketa
-  const whistle = audio.createOscillator();
-  const whistleGain = audio.createGain();
-  whistle.type = "sine";
-  whistle.frequency.setValueAtTime(500, at);
-  whistle.frequency.exponentialRampToValueAtTime(1500, at + 0.22);
-  whistleGain.gain.setValueAtTime(0.0001, at);
-  whistleGain.gain.exponentialRampToValueAtTime(0.05 * volume, at + 0.05);
-  whistleGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
-  whistle.connect(whistleGain).connect(audio.destination);
-  whistle.start(at);
-  whistle.stop(at + 0.26);
-
-  // 2. Portlash: past chastotali shovqin
-  const boomAt = at + 0.24;
+  // 1. Portlash: past chastotali shovqin
+  const boomAt = at;
   const boom = audio.createBufferSource();
   boom.buffer = getNoise(audio);
   const boomFilter = audio.createBiquadFilter();
@@ -91,7 +78,7 @@ function scheduleFirework(audio: AudioContext, at: number, volume: number): void
   boom.start(boomAt);
   boom.stop(boomAt + 0.5);
 
-  // 3. Chirsillash: sochilayotgan uchqunlar
+  // 2. Chirsillash: sochilayotgan uchqunlar
   const crackle = audio.createBufferSource();
   crackle.buffer = getNoise(audio);
   const crackleFilter = audio.createBiquadFilter();
@@ -110,7 +97,7 @@ function scheduleFirework(audio: AudioContext, at: number, volume: number): void
 }
 
 /**
- * Salyut ovozi: hushtak, portlash va chirsillash. `delays` — har bir otilishgacha soniyalar.
+ * Salyut ovozi: portlash va chirsillash. `delays` — har bir otilishgacha soniyalar.
  * Brauzer ovozga faqat foydalanuvchi sahifa bilan ishlagandan keyin ruxsat beradi: sahifa to'g'ridan-to'g'ri
  * ochilgan (yoki yangilangan) bo'lsa, ovoz chiqmaydi — kechikib chalinmasligi uchun shunchaki o'tkazib yuboriladi.
  */
