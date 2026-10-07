@@ -89,7 +89,7 @@ const AttendanceSessionSchema = new Schema<IAttendanceSession>(
     },
     rotateIntervalSeconds: {
       type: Number,
-      default: 180,
+      default: 60,
     },
     previousTokens: [
       {

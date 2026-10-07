@@ -125,7 +125,8 @@ export async function startAttendanceSessionAction(
     currentCode: initialCode,
     currentToken: initialToken,
     codeRotatedAt: new Date(),
-    rotateIntervalSeconds: 180,
+    // QR va 6 belgili kod har 60 soniyada yangilanadi (eski kod yana 20 soniya qabul qilinadi)
+    rotateIntervalSeconds: 60,
     previousTokens: [],
     defaultCoinsReward: ATTENDANCE_COINS.present,
     coinRules: ATTENDANCE_COINS,
@@ -150,7 +151,7 @@ export async function startAttendanceSessionAction(
 }
 
 /**
- * Rotate attendance code (called every 180s or on demand)
+ * Rotate attendance code (called every 60s or on demand)
  */
 export async function rotateAttendanceSessionAction(
   sessionId: string

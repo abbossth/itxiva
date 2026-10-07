@@ -122,7 +122,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             codeRotatedAt: new Date(res.data!.codeRotatedAt).toISOString(),
           },
         }));
-        setSecondsLeft(data.session.rotateIntervalSeconds || 180);
+        setSecondsLeft(data.session.rotateIntervalSeconds || 60);
         // Refresh QR image and attendees
         const fresh = await getAttendanceSessionForProjector(sessionId);
         if (fresh) {
@@ -360,7 +360,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                         0,
                         Math.min(
                           100,
-                          (secondsLeft / (data.session.rotateIntervalSeconds || 180)) * 100
+                          (secondsLeft / (data.session.rotateIntervalSeconds || 60)) * 100
                         )
                       )}
                       size={54}

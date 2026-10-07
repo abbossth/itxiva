@@ -249,7 +249,7 @@ export function StudentAttendanceView({
                   Proyektordagi 6 belgili kodni kiriting
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  Kod proyektor ekranida har 3 daqiqada yangilanib turadi. Kodni kiritib tasdiqlang!
+                  Kod proyektor ekranida har 60 soniyada yangilanib turadi. Kodni kiritib tasdiqlang!
                 </p>
               </div>
 
