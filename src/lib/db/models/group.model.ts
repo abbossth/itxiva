@@ -9,6 +9,8 @@ export interface IGroupData {
   studentCount: number;
   isActive: boolean;
   schedule?: GroupSchedule | null;
+  /** Dars eslatmasi yuborilgan oxirgi kun ("YYYY-MM-DD", Toshkent) — bir kunda ikki marta ketmasligi uchun */
+  lessonReminderSentFor?: string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -55,6 +57,7 @@ const GroupSchema = new Schema<IGroup>(
       ),
       default: null,
     },
+    lessonReminderSentFor: { type: String, default: null },
   },
   {
     timestamps: true,

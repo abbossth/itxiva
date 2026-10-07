@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Types } from "mongoose";
 import { NextRequest } from "next/server";
 import { actAs, clearDb, guardsMock, sessionFor, startDb, stopDb } from "./helpers";
 
@@ -207,5 +208,77 @@ describe("telegram: bildirishnoma yuborish", () => {
     await linked("ustoz", 222, "mentor");
     await sendNotifications({ role: "mentor" }, "order_new", { productTitle: "Daftar", price: 50, studentName: "Ali" });
     expect(sent.map((s) => s.chat_id)).toEqual(["222"]);
+  });
+});
+
+describe("telegram: dars eslatmasi", () => {
+  // 2026-10-07 — chorshanba (3). Toshkent 16:30 = 11:30 UTC
+  const at = (time: string) => new Date(`2026-10-07T${time}:00+05:00`);
+
+  async function setup() {
+    const { Group } = await import("@/lib/db/models/group.model");
+    const { Lesson } = await import("@/lib/db/models/lesson.model");
+    const { sendLessonReminders } = await import("@/lib/notifications/scheduled");
+    const group = await Group.create({ name: "9-A", grade: 9, schedule: { days: [1, 3, 5], startTime: "16:30", endTime: "18:00" } });
+    const other = await Group.create({ name: "9-B", grade: 9, schedule: { days: [2, 4, 6], startTime: "16:30", endTime: "18:00" } });
+    const mk = async (login: string, chatId: number, role: "mentor" | "student", groupId?: Types.ObjectId) => {
+      const user = await User.create({ login, fullName: login, role, passwordHash: "x", groupId });
+      await User.updateOne({ _id: user._id }, { $set: { "telegram.chatId": String(chatId), "telegram.linkedAt": new Date() } });
+      return user;
+    };
+    const student = await mk("ali", 111, "student", group._id);
+    await mk("vali", 222, "student", other._id);
+    const mentor = await mk("ustoz", 999, "mentor");
+    return { Group, Lesson, sendLessonReminders, group, student, mentor };
+  }
+
+  it("bir soat qolganda shu guruh o'quvchilariga va mentorga bir marta ketadi", async () => {
+    const { Lesson, sendLessonReminders, group } = await setup();
+    await Lesson.create({ groupId: group._id, quarter: 1, order: 1, title: "CSS Flexbox", date: at("16:30"), isPublished: true });
+
+    // Hali erta (2 soat qolgan)
+    expect(await sendLessonReminders(at("14:30"))).toEqual({ groups: 0, sent: 0 });
+
+    expect(await sendLessonReminders(at("15:30"))).toEqual({ groups: 1, sent: 2 });
+    expect(sent.map((s) => s.chat_id).sort()).toEqual(["111", "999"]);
+
+    const toStudent = sent.find((s) => s.chat_id === "111")!;
+    expect(toStudent.text).toContain("<b>Bir soatdan keyin dars</b>");
+    expect(toStudent.text).toContain("16:30–18:00");
+    expect(toStudent.text).toContain("CSS Flexbox");
+    expect(toStudent.text).not.toContain("9-A");
+    expect(sent.find((s) => s.chat_id === "999")!.text).toContain("9-A");
+
+    // Keyingi chaqiruvlarda takrorlanmaydi
+    expect(await sendLessonReminders(at("15:35"))).toEqual({ groups: 0, sent: 0 });
+    expect(sent).toHaveLength(2);
+  });
+
+  it("kechikkan chaqiruv ham yuboradi, dars boshlangach esa yubormaydi", async () => {
+    const { sendLessonReminders, Group, group } = await setup();
+    expect((await sendLessonReminders(at("15:55"))).groups).toBe(1);
+    expect(sent[0].text).toContain("35 daqiqadan keyin dars");
+
+    await Group.updateOne({ _id: group._id }, { $set: { lessonReminderSentFor: null } });
+    sent.length = 0;
+    expect(await sendLessonReminders(at("16:40"))).toEqual({ groups: 0, sent: 0 });
+  });
+
+  it("profilda o'chirgan foydalanuvchiga bormaydi; sukut bo'yicha yoniq", async () => {
+    const { sendLessonReminders, student, mentor } = await setup();
+    actAs(sessionFor(student));
+    expect((await telegramActions.setNotificationPrefAction({ type: "lesson_reminder", enabled: false })).success).toBe(true);
+
+    expect(await sendLessonReminders(at("15:30"))).toEqual({ groups: 1, sent: 1 });
+    expect(sent.map((s) => s.chat_id)).toEqual(["999"]);
+
+    actAs(sessionFor(mentor));
+    expect((await telegramActions.setNotificationPrefAction({ type: "lesson_reminder", enabled: false })).success).toBe(true);
+  });
+
+  it("nofaol guruh va dars kuni bo'lmagan guruhga yuborilmaydi", async () => {
+    const { sendLessonReminders, Group, group } = await setup();
+    await Group.updateOne({ _id: group._id }, { $set: { isActive: false } });
+    expect(await sendLessonReminders(at("15:30"))).toEqual({ groups: 0, sent: 0 });
   });
 });

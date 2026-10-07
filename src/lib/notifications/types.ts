@@ -13,7 +13,9 @@ export type NotificationType =
   // Mentor
   | "homework_submitted"
   | "order_new"
-  | "exam_finished";
+  | "exam_finished"
+  // Ikkala rol
+  | "lesson_reminder";
 
 export interface NotificationOption {
   type: NotificationType;
@@ -22,6 +24,7 @@ export interface NotificationOption {
 }
 
 export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
+  { type: "lesson_reminder", label: "Dars eslatmasi", description: "Dars boshlanishiga bir soat qolganda" },
   { type: "homework_graded", label: "Vazifa tekshirildi", description: "Baho, izoh yoki qayta ishlashga qaytarilgani" },
   { type: "lesson_new", label: "Yangi dars", description: "Guruhingizga yangi dars nashr etilganda" },
   { type: "material_new", label: "Yangi material", description: "Darsga video, fayl yoki havola qo'shilganda" },
@@ -33,6 +36,7 @@ export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
 ];
 
 export const MENTOR_NOTIFICATIONS: NotificationOption[] = [
+  { type: "lesson_reminder", label: "Dars eslatmasi", description: "Har bir guruh darsi boshlanishiga bir soat qolganda" },
   { type: "homework_submitted", label: "Yangi vazifa javobi", description: "O'quvchi uyga vazifa topshirganda" },
   { type: "order_new", label: "Do'kon so'rovi", description: "O'quvchi do'kondan buyurtma berganda" },
   { type: "exam_finished", label: "Imtihon yakunlandi", description: "Imtihon vaqti tugaganda qisqa statistika" },

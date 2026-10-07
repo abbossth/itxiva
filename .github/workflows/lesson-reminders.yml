@@ -1,0 +1,27 @@
+name: Lesson reminders
+
+# Dars boshlanishidan bir soat oldingi Telegram eslatmalari uchun saytni har 5 daqiqada "uyg'otadi".
+# Qaysi guruhga qachon yuborishni sayt o'zi hal qiladi (/api/cron/reminders).
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: lesson-reminders
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call reminder endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error --max-time 90 --retry 2 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://www.itxiva.uz/api/cron/reminders

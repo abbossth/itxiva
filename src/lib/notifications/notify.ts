@@ -20,6 +20,16 @@ export interface NotificationPayloads {
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
   exam_finished: { examId: string; title: string; submitted: number; total: number; avgPercent: number | null; ungraded: number };
+  lesson_reminder: {
+    minutesLeft: number;
+    startTime: string;
+    endTime: string;
+    /** Mentorga boradigan xabarda guruh nomi ko'rsatiladi */
+    groupName?: string;
+    lessonId?: string;
+    lessonTitle?: string;
+    forMentor?: boolean;
+  };
 }
 
 interface Message {
@@ -132,6 +142,19 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       .filter(Boolean)
       .join("\n"),
     button: link("Natijalarni ko'rish", `/mentor/exams/${p.examId}`),
+  }),
+  lesson_reminder: (p) => ({
+    text: [
+      `🔔 ${b(p.minutesLeft >= 50 ? "Bir soatdan keyin dars" : `${p.minutesLeft} daqiqadan keyin dars`)}`,
+      p.groupName ? `👥 ${escapeHtml(p.groupName)}` : "",
+      `🕒 Bugun ${b(`${p.startTime}–${p.endTime}`)}`,
+      p.lessonTitle ? `📚 ${escapeHtml(p.lessonTitle)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    button: p.lessonId
+      ? link("Darsni ochish", p.forMentor ? `/mentor/lessons/${p.lessonId}/edit` : `/lessons/${p.lessonId}`)
+      : link(p.forMentor ? "Davomatni ochish" : "Darslarni ochish", p.forMentor ? "/mentor/attendance" : "/lessons"),
   }),
 };
 

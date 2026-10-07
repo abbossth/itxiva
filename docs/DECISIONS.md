@@ -135,3 +135,8 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Tezlik**: og'ir kutubxonalar (konfetti, QR skaner, palitra) kerak bo'lganda yuklanadi. Animatsiyalar faqat `transform`/`opacity`, `prefers-reduced-motion` da o'chadi.
 - **Xavfsizlik**: CSP (skript va freymlar faqat o'zimizdan + YouTube), `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` (kamera faqat o'zimizga), HSTS.
 - **Testlar**: `npm test` — vitest + xotiradagi MongoDB (auth, do'kon, vazifa, Telegram).
+
+### [2026-10-07] 28-qaror: Dars eslatmasi (bir soat oldin)
+- **Nima**: guruh jadvali bo'yicha dars boshlanishiga ~1 soat qolganda shu guruh o'quvchilariga va mentorlarga Telegram xabari (`lesson_reminder`). Profilda o'chiriladi, sukut bo'yicha yoniq.
+- **Qachon**: `/api/cron/reminders` har 5 daqiqada chaqiriladi; eslatma dars boshlanishiga 65–10 daqiqa qolgan oraliqda, har guruhga kuniga bir marta ketadi (`Group.lessonReminderSentFor`). Oraliq kechikkan chaqiruvni ham qamrab oladi.
+- **Kim chaqiradi**: GitHub Actions (`.github/workflows/lesson-reminders.yml`, `CRON_SECRET` repo secret'i) — Vercel'ning bepul tarifida cron kuniga bir martadan ortiq ishlamaydi. GitHub jadvali bir necha daqiqaga kechikishi mumkin.

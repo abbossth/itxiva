@@ -1,15 +1,18 @@
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
+import { Group } from "@/lib/db/models/group.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { User } from "@/lib/db/models/user.model";
 import { Exam } from "@/lib/db/models/exam.model";
 import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
 import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { isTelegramConfigured } from "@/lib/telegram/api";
+import { addDaysToKey, dateFromKey, getTashkentParts, isValidSchedule } from "@/lib/schedule";
 import { formatDateTimeUz } from "@/lib/utils";
 import { sendNotifications } from "./notify";
 
-// Vaqtga bog'liq bildirishnomalar: kunlik cron (/api/cron/daily) va imtihon topshirilganda chaqiriladi.
+// Vaqtga bog'liq bildirishnomalar: kunlik cron (/api/cron/daily), har 5 daqiqalik cron (/api/cron/reminders)
+// va imtihon topshirilganda chaqiriladi.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -97,4 +100,67 @@ export async function notifyFinishedExams(examId?: string, now: Date = new Date(
     notified++;
   }
   return notified;
+}
+
+// Eslatma dars boshlanishiga shuncha daqiqa qolganda ketadi. Cron har 5 daqiqada ishlaydi va kechikishi mumkin,
+// shuning uchun aniq bir daqiqa emas, oraliq olinadi: kechikkan chaqiruv ham eslatmani yuboradi.
+const REMINDER_FROM_MIN = 65;
+const REMINDER_UNTIL_MIN = 10;
+
+/**
+ * Darsi taxminan bir soatdan keyin boshlanadigan guruhlar: o'quvchilarga va mentorlarga eslatma.
+ * Har bir guruhga kuniga bir marta ketadi (`lessonReminderSentFor`).
+ */
+export async function sendLessonReminders(now: Date = new Date()): Promise<{ groups: number; sent: number }> {
+  if (!isTelegramConfigured()) return { groups: 0, sent: 0 };
+  await connectToDatabase();
+
+  const { dateKey, weekday } = getTashkentParts(now);
+  const groups = await Group.find({ isActive: true, "schedule.days": weekday, lessonReminderSentFor: { $ne: dateKey } })
+    .select("name schedule")
+    .lean();
+
+  let reminded = 0;
+  let sent = 0;
+  for (const group of groups) {
+    if (!isValidSchedule(group.schedule)) continue;
+    const { startTime, endTime } = group.schedule;
+    const minutesLeft = Math.round((dateFromKey(dateKey, startTime).getTime() - now.getTime()) / 60_000);
+    if (minutesLeft > REMINDER_FROM_MIN || minutesLeft < REMINDER_UNTIL_MIN) continue;
+
+    // Avval belgilanadi: ikki chaqiruv ustma-ust tushsa ham eslatma bir marta ketadi
+    const claimed = await Group.updateOne(
+      { _id: group._id, lessonReminderSentFor: { $ne: dateKey } },
+      { $set: { lessonReminderSentFor: dateKey } }
+    );
+    if (claimed.modifiedCount === 0) continue;
+    reminded++;
+
+    // Shu kunga dars kiritilgan bo'lsa, mavzusi ham ko'rsatiladi (o'quvchiga faqat nashr etilgani)
+    const lessons = await Lesson.find({
+      groupId: group._id,
+      date: { $gte: dateFromKey(dateKey), $lt: dateFromKey(addDaysToKey(dateKey, 1)) },
+    })
+      .select("title isPublished")
+      .sort({ order: 1 })
+      .lean();
+    const published = lessons.find((l) => l.isPublished);
+    const forMentor = published ?? lessons[0];
+    const base = { minutesLeft, startTime, endTime };
+
+    const [toStudents, toMentors] = await Promise.all([
+      sendNotifications({ groupId: group._id }, "lesson_reminder", {
+        ...base,
+        ...(published ? { lessonId: published._id.toString(), lessonTitle: published.title } : {}),
+      }),
+      sendNotifications({ role: "mentor" }, "lesson_reminder", {
+        ...base,
+        groupName: group.name,
+        forMentor: true,
+        ...(forMentor ? { lessonId: forMentor._id.toString(), lessonTitle: forMentor.title } : {}),
+      }),
+    ]);
+    sent += toStudents + toMentors;
+  }
+  return { groups: reminded, sent };
 }

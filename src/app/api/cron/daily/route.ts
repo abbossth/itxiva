@@ -1,5 +1,5 @@
-import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { notifyFinishedExams, sendHomeworkDueReminders } from "@/lib/notifications/scheduled";
 
 // Vercel Cron kuniga bir marta chaqiradi (vercel.json). Vercel so'rovga
@@ -7,17 +7,8 @@ import { notifyFinishedExams, sendHomeworkDueReminders } from "@/lib/notificatio
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  const header = req.headers.get("authorization");
-  if (!secret || !header) return false;
-  const a = Buffer.from(header);
-  const b = Buffer.from(`Bearer ${secret}`);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 401 });
   }
 
