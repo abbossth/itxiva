@@ -797,7 +797,7 @@ export function LessonEditorForm({
       </div>
 
       {/* Uyga vazifa */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
+      <div id="homework" className="scroll-mt-20 p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
@@ -819,7 +819,7 @@ export function LessonEditorForm({
         {!hwEnabled ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Yoqilsa, o&apos;quvchilar dars sahifasida javobini (matn, kod, havola yoki fayl) yuboradi, siz esa
-            &quot;Uyga vazifalar&quot; bo&apos;limida tekshirib baholaysiz.
+            &quot;Darslar&quot; ro&apos;yxatidagi &quot;Tekshirish&quot; tugmasi orqali baholaysiz.
           </p>
         ) : (
           <div className="space-y-4 animate-in fade-in">

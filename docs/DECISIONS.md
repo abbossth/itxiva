@@ -154,3 +154,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Jarima vaqti**: QR sessiya yopilganda; qo'lda kiritilgan darsda mentor "Davomatni yakunlash"ni bosganda (`finalizedAt`).
 - **Avtomatik yopilish**: yopish unutilgan sessiya dars tugaganidan 30 daqiqa o'tgach yoki ertasi kuni yopiladi.
 - **O'chirish**: mentor davomatni o'chira oladi — coinlar qaytariladi, tarix `CoinLedger` da qoladi. Mavjud dublikatlar avtomatik o'chirilmaydi.
+
+### [2026-10-07] 31-qaror: Darslar va uyga vazifalar bitta bo'limda
+- **Menyu**: "Darslar boshqaruvi" va "Uyga vazifalar" → bitta "Darslar" (yonidagi son — tekshirilmagan javoblar). `/mentor/homework` Darslarga yo'naltiradi; tekshirish sahifasi `/mentor/homework/[lessonId]` URL'i o'zgarmadi.
+- **Darslar sahifasi**: barcha guruhlar bo'yicha "Tekshirish kerak" tasmasi; ixcham dars qatorlarida vazifa holati (topshirdi / topshirmagan / muddat) va "Tekshirish" tugmasi; ikkinchi ko'rinish — "Vazifalar jurnali" (o'quvchilar x vazifali darslar, `getHomeworkJournal`).
+- **Tekshirish**: keng ekranda ro'yxat va javob yonma-yon (modalsiz), tez ball tugmalari, `Ctrl+Enter`, saqlangach keyingi tekshirilmagan javob ochiladi. Tor ekranda modal.
+- **Eslatma**: mentor topshirmaganlarga Telegram eslatmasi yuboradi (`remindMissingHomeworkAction`, bir vazifaga 10 daqiqada bir marta).

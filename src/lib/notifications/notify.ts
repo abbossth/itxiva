@@ -13,7 +13,7 @@ export interface NotificationPayloads {
   lesson_new: { lessonId: string; lessonTitle: string; hasHomework?: boolean };
   material_new: { lessonId: string; lessonTitle: string; materialTitle: string };
   exam_new: { kind: "quiz" | "exam"; title: string; href: string; startsAt?: string | null };
-  homework_due: { lessonId: string; lessonTitle: string; dueLabel: string };
+  homework_due: { lessonId: string; lessonTitle: string; dueLabel: string; /** Mentor qo'lda yuborgan eslatma */ fromMentor?: boolean };
   coins_changed: { amount: number; reason: string; balance?: number };
   order_status: { productTitle: string; status: "accepted" | "rejected" | "handed_over"; note?: string; refunded?: number };
   product_new: { title: string; price: number };
@@ -83,7 +83,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     button: link(p.kind === "exam" ? "Imtihonni ko'rish" : "Testni ochish", p.href),
   }),
   homework_due: (p) => ({
-    text: `⏰ ${b("Vazifa muddati yaqin")}\n${escapeHtml(p.lessonTitle)}\n\nMuddat: ${b(p.dueLabel)}`,
+    text: `⏰ ${b(p.fromMentor ? "Uyga vazifani topshirish esingizdan chiqmasin" : "Vazifa muddati yaqin")}\n${escapeHtml(p.lessonTitle)}\n\nMuddat: ${b(p.dueLabel)}`,
     button: link("Vazifani topshirish", `/lessons/${p.lessonId}#homework`),
   }),
   coins_changed: (p) => ({

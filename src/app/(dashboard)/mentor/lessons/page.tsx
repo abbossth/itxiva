@@ -1,6 +1,7 @@
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
+import { getHomeworkJournal, getHomeworkOverviewForMentor, getHomeworkStatsForLessons } from "@/actions/homework.actions";
 import { LessonsManager } from "@/components/mentor/lessons-manager";
 import { EmptyState } from "@/components/shared/empty-state";
 import Link from "next/link";
@@ -8,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 export const metadata = {
-  title: "Darslar boshqaruvi — ITXiva",
+  title: "Darslar — ITXiva",
 };
 
 interface MentorLessonsPageProps {
   searchParams: Promise<{
     groupId?: string;
     quarter?: string;
+    view?: string;
   }>;
 }
 
@@ -41,21 +43,31 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
     );
   }
 
-  const selectedGroupId = resolvedSearchParams.groupId || groups[0]._id.toString();
-  const selectedQuarter = resolvedSearchParams.quarter ? parseInt(resolvedSearchParams.quarter, 10) : 1;
+  const requested = resolvedSearchParams.groupId;
+  const selectedGroupId = groups.some((g) => g._id.toString() === requested) ? requested! : groups[0]._id.toString();
+  const parsedQuarter = parseInt(resolvedSearchParams.quarter ?? "1", 10);
+  const selectedQuarter = parsedQuarter >= 1 && parsedQuarter <= 4 ? parsedQuarter : 1;
+  const view = resolvedSearchParams.view === "journal" ? "journal" : "list";
 
-  const lessons = await getLessonsByGroupAndQuarter({
-    groupId: selectedGroupId,
-    quarter: selectedQuarter,
-  });
+  const [lessons, overview, journal] = await Promise.all([
+    getLessonsByGroupAndQuarter({ groupId: selectedGroupId, quarter: selectedQuarter }),
+    // Barcha guruhlar bo'yicha: tekshirilishi kerak javoblar bir joyda ko'rinadi
+    getHomeworkOverviewForMentor(),
+    view === "journal" ? getHomeworkJournal(selectedGroupId, selectedQuarter) : null,
+  ]);
+  const stats = await getHomeworkStatsForLessons(lessons.map((l) => l._id.toString()));
 
   return (
     <LessonsManager
-      key={`${selectedGroupId}-${selectedQuarter}`}
+      key={`${selectedGroupId}-${selectedQuarter}-${view}`}
       groups={groups}
       initialLessons={lessons}
       selectedGroupId={selectedGroupId}
       selectedQuarter={selectedQuarter}
+      view={view}
+      stats={stats}
+      toCheck={overview.filter((o) => o.ungraded > 0)}
+      journal={journal}
     />
   );
 }

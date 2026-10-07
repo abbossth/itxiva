@@ -40,9 +40,9 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/", label: "Bosh sahifa", shortLabel: "Bosh", icon: LayoutDashboard, primary: true },
   // Davomat guruhlar ichida: dars davomati sahifalari (/mentor/attendance/...) ham shu bo'limga kiradi
   { href: "/mentor/groups", label: "Guruhlar", shortLabel: "Guruhlar", icon: Users, primary: true, match: ["/mentor/attendance"] },
-  { href: "/mentor/lessons", label: "Darslar boshqaruvi", shortLabel: "Darslar", icon: BookOpen, primary: true },
-  { href: "/mentor/homework", label: "Uyga vazifalar", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
-  { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap },
+  // Uyga vazifalar darsning bir qismi: tekshirish sahifalari (/mentor/homework/...) ham shu bo'limga kiradi
+  { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", match: ["/mentor/homework"] },
+  { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
   { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },

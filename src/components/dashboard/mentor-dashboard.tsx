@@ -41,7 +41,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatLink
-          href="/mentor/homework"
+          href="/mentor/lessons"
           label="Tekshirish kerak"
           icon={ClipboardCheck}
           value={data.ungradedHomework}
@@ -61,7 +61,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/homework">
+        <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/lessons">
           {data.homeworkToCheck.length === 0 ? (
             <DashEmpty>Tekshirilmagan javob yo&apos;q.</DashEmpty>
           ) : (

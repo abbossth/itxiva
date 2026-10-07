@@ -5,7 +5,9 @@ import { actAs, clearDb, guardsMock, sessionFor, startDb, stopDb } from "./helpe
 vi.mock("@/lib/auth/guards", () => guardsMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true, remaining: 99, resetInSeconds: 1 }), resetRateLimit: vi.fn() }));
+const sendNotifications = vi.fn(async (recipients: { ids: unknown[] }) => recipients.ids.length);
 vi.mock("@/lib/notifications/notify", () => ({
+  sendNotifications,
   notify: vi.fn(),
   notifyMany: vi.fn(),
   notifyMentors: vi.fn(),
@@ -154,5 +156,65 @@ describe("uyga vazifa: baholash", () => {
     const res = await hw.getHomeworkFileUrlAction({ submissionId, key: "homework/x/y/z.zip" });
     expect(res.success).toBe(false);
     expect(res.message).toMatch(/Ruxsat/);
+  });
+});
+
+describe("uyga vazifa: darslar ro'yxati, jurnal va eslatma", () => {
+  async function seedClass() {
+    const ctx = await seed({ dueAt: new Date(Date.now() - 60_000) });
+    const groupId = ctx.lesson.groupId;
+    const vali = await User.create({ login: "vali", fullName: "Vali", role: "student", groupId, passwordHash: "x" });
+    const guli = await User.create({ login: "guli", fullName: "Guli", role: "student", groupId, passwordHash: "x" });
+    const noHw = await Lesson.create({ groupId, quarter: 1, order: 2, title: "CSS", isPublished: true });
+
+    actAs(sessionFor(ctx.student));
+    await hw.submitHomeworkAction({ lessonId: ctx.lessonId, text: "javob", links: [], files: [] });
+    actAs(sessionFor(vali));
+    await hw.submitHomeworkAction({ lessonId: ctx.lessonId, text: "javob 2", links: [], files: [] });
+    actAs(sessionFor(ctx.mentor));
+    const sub = await HomeworkSubmission.findOne({ studentId: vali._id }).orFail();
+    await hw.gradeHomeworkAction({ submissionId: sub._id.toString(), score: 80, feedback: "", coins: 0 });
+    return { ...ctx, vali, guli, noHw, groupId: groupId.toString() };
+  }
+
+  it("dars bo'yicha sonlar: topshirgan, tekshirilmagan, baholangan", async () => {
+    const { lessonId, noHw } = await seedClass();
+    const stats = await hw.getHomeworkStatsForLessons([lessonId, noHw._id.toString(), "noto'g'ri-id"]);
+    expect(stats[lessonId]).toMatchObject({ totalStudents: 3, submitted: 2, ungraded: 1, graded: 1, returned: 0 });
+    // Vazifasi yo'q dars ro'yxatga kirmaydi
+    expect(stats[noHw._id.toString()]).toBeUndefined();
+  });
+
+  it("jurnal: har bir o'quvchining holati va o'rtacha bali", async () => {
+    const { lessonId, groupId, student, vali, guli } = await seedClass();
+    const journal = await hw.getHomeworkJournal(groupId, 1);
+    expect(journal!.lessons.map((l) => l.title)).toEqual(["HTML"]);
+    const of = (id: unknown) => journal!.students.find((s) => s.studentId === String(id))!;
+    expect(of(student._id).cells[lessonId]).toMatchObject({ state: "submitted", score: null, isLate: true });
+    expect(of(vali._id)).toMatchObject({ done: 1, avgScore: 80 });
+    expect(of(guli._id)).toMatchObject({ cells: {}, done: 0, avgScore: null });
+    expect(await hw.getHomeworkJournal(groupId, 9)).toBeNull();
+  });
+
+  it("eslatma faqat topshirmaganlarga ketadi", async () => {
+    const { lessonId, guli, student } = await seedClass();
+    sendNotifications.mockClear();
+    const res = await hw.remindMissingHomeworkAction(lessonId);
+    expect(res.success).toBe(true);
+    expect(res.data).toEqual({ sent: 1, pending: 1 });
+    const [recipients, type, payload] = sendNotifications.mock.calls[0] as unknown as [{ ids: unknown[] }, string, { fromMentor: boolean }];
+    expect(recipients.ids.map(String)).toEqual([guli._id.toString()]);
+    expect(type).toBe("homework_due");
+    expect(payload.fromMentor).toBe(true);
+
+    // O'quvchi eslatma yubora olmaydi
+    actAs(sessionFor(student));
+    await expect(hw.remindMissingHomeworkAction(lessonId)).rejects.toThrow();
+  });
+
+  it("qoralama dars va hamma topshirgan vazifa uchun eslatma ketmaydi", async () => {
+    const draft = await seed({ published: false });
+    actAs(sessionFor(draft.mentor));
+    expect((await hw.remindMissingHomeworkAction(draft.lessonId)).success).toBe(false);
   });
 });

@@ -22,7 +22,8 @@ import {
   homeworkSubmitSchema,
 } from "@/lib/validations/homework.schema";
 import { DEFAULT_HOMEWORK_COINS, type HomeworkState } from "@/lib/homework-status";
-import { notify, notifyMentors } from "@/lib/notifications/notify";
+import { notify, notifyMentors, sendNotifications } from "@/lib/notifications/notify";
+import { formatDateTimeUz } from "@/lib/utils";
 import { ActionResult } from "./auth.actions";
 
 const isObjectId = (id: unknown): id is string => typeof id === "string" && mongoose.isValidObjectId(id);
@@ -351,6 +352,167 @@ export async function getHomeworkOverviewForMentor(groupId?: string): Promise<Ho
       graded: st.graded ?? 0,
     };
   });
+}
+
+export interface LessonHomeworkStats {
+  totalStudents: number;
+  /** Javob yuborganlar (tekshirilmagan + baholangan + qaytarilgan) */
+  submitted: number;
+  ungraded: number;
+  graded: number;
+  returned: number;
+  dueAt: string | null;
+}
+
+/** Darslar ro'yxati uchun: har bir vazifali darsning topshirish holati (dars ID -> sonlar) */
+export async function getHomeworkStatsForLessons(lessonIds: string[]): Promise<Record<string, LessonHomeworkStats>> {
+  await requireMentor();
+  const ids = lessonIds.filter(isObjectId).slice(0, 300);
+  if (ids.length === 0) return {};
+  await connectToDatabase();
+
+  const lessons = await Lesson.find({ _id: { $in: ids }, "homework.isEnabled": true })
+    .select("groupId homework.dueAt")
+    .lean();
+  if (lessons.length === 0) return {};
+
+  const groupIds = [...new Set(lessons.map((l) => l.groupId.toString()))];
+  const [studentCounts, stats] = await Promise.all([
+    User.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+      { $match: { role: "student", groupId: { $in: groupIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+      { $group: { _id: "$groupId", count: { $sum: 1 } } },
+    ]),
+    HomeworkSubmission.aggregate<{ _id: { lessonId: mongoose.Types.ObjectId; status: HomeworkStatus }; count: number }>([
+      { $match: { lessonId: { $in: lessons.map((l) => l._id) } } },
+      { $group: { _id: { lessonId: "$lessonId", status: "$status" }, count: { $sum: 1 } } },
+    ]),
+  ]);
+  const totals = new Map(studentCounts.map((c) => [c._id.toString(), c.count]));
+  const byLesson = new Map<string, Partial<Record<HomeworkStatus, number>>>();
+  for (const s of stats) {
+    const key = s._id.lessonId.toString();
+    byLesson.set(key, { ...byLesson.get(key), [s._id.status]: s.count });
+  }
+
+  const result: Record<string, LessonHomeworkStats> = {};
+  for (const l of lessons) {
+    const st = byLesson.get(l._id.toString()) ?? {};
+    result[l._id.toString()] = {
+      totalStudents: totals.get(l.groupId.toString()) ?? 0,
+      submitted: (st.submitted ?? 0) + (st.graded ?? 0) + (st.returned ?? 0),
+      ungraded: st.submitted ?? 0,
+      graded: st.graded ?? 0,
+      returned: st.returned ?? 0,
+      dueAt: l.homework?.dueAt ? new Date(l.homework.dueAt).toISOString() : null,
+    };
+  }
+  return result;
+}
+
+export interface HomeworkJournal {
+  lessons: { _id: string; order: number; title: string; dueAt: string | null; isPublished: boolean }[];
+  students: {
+    studentId: string;
+    fullName: string;
+    /** dars ID -> holat (yozuv yo'q bo'lsa — topshirilmagan) */
+    cells: Record<string, { state: HomeworkStatus; score: number | null; isLate: boolean }>;
+    /** Topshirgan vazifalari soni (qaytarilgani hisobga kirmaydi) */
+    done: number;
+    avgScore: number | null;
+  }[];
+}
+
+/** Vazifalar jurnali: guruh o'quvchilari x chorakdagi vazifali darslar */
+export async function getHomeworkJournal(groupId: string, quarter: number): Promise<HomeworkJournal | null> {
+  await requireMentor();
+  if (!isObjectId(groupId) || !Number.isInteger(quarter) || quarter < 1 || quarter > 4) return null;
+  await connectToDatabase();
+
+  const lessons = await Lesson.find({ groupId, quarter, "homework.isEnabled": true })
+    .select("title order isPublished homework.dueAt")
+    .sort({ order: 1 })
+    .lean();
+  const [students, submissions] = await Promise.all([
+    User.find({ groupId, role: "student" }).select("fullName").sort({ fullName: 1 }).lean(),
+    HomeworkSubmission.find({ lessonId: { $in: lessons.map((l) => l._id) } })
+      .select("lessonId studentId status score isLate")
+      .lean(),
+  ]);
+
+  const byStudent = new Map<string, HomeworkJournal["students"][number]["cells"]>();
+  for (const s of submissions) {
+    const key = s.studentId.toString();
+    if (!byStudent.has(key)) byStudent.set(key, {});
+    byStudent.get(key)![s.lessonId.toString()] = { state: s.status, score: s.score ?? null, isLate: Boolean(s.isLate) };
+  }
+
+  return {
+    lessons: lessons.map((l) => ({
+      _id: l._id.toString(),
+      order: l.order,
+      title: l.title,
+      dueAt: l.homework?.dueAt ? new Date(l.homework.dueAt).toISOString() : null,
+      isPublished: l.isPublished,
+    })),
+    students: students.map((st) => {
+      const cells = byStudent.get(st._id.toString()) ?? {};
+      const list = Object.values(cells);
+      const scores = list.filter((c) => c.state === "graded" && c.score !== null).map((c) => c.score as number);
+      return {
+        studentId: st._id.toString(),
+        fullName: st.fullName,
+        cells,
+        done: list.filter((c) => c.state !== "returned").length,
+        avgScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+      };
+    }),
+  };
+}
+
+/** Vazifani hali topshirmagan (yoki qayta ishlashga qaytarilgan) o'quvchilarga Telegram eslatmasi */
+export async function remindMissingHomeworkAction(lessonId: string): Promise<ActionResult<{ sent: number; pending: number }>> {
+  const mentor = await requireMentor();
+  if (!isObjectId(lessonId)) return { success: false, message: "Dars topilmadi" };
+  await connectToDatabase();
+
+  const lesson = await Lesson.findById(lessonId).select("title groupId isPublished homework").lean();
+  if (!lesson?.homework?.isEnabled) return { success: false, message: "Bu darsda uyga vazifa yo'q" };
+  if (!lesson.isPublished) return { success: false, message: "Dars qoralamada — o'quvchilar uni hali ko'rmaydi" };
+
+  const [students, done] = await Promise.all([
+    User.find({ groupId: lesson.groupId, role: "student" }).select("_id").lean(),
+    HomeworkSubmission.find({ lessonId, status: { $in: ["submitted", "graded"] } }).select("studentId").lean(),
+  ]);
+  const doneIds = new Set(done.map((d) => d.studentId.toString()));
+  const pending = students.map((s) => s._id).filter((id) => !doneIds.has(id.toString()));
+  if (pending.length === 0) return { success: false, message: "Hamma topshirgan — eslatma kerak emas" };
+
+  // Bir vazifa bo'yicha eslatma tez-tez yuborilmaydi
+  const rate = checkRateLimit(`hw_remind_${lessonId}`, 1, 10 * 60_000);
+  if (!rate.allowed) {
+    return { success: false, message: `Eslatma hozirgina yuborilgan. ${Math.ceil(rate.resetInSeconds / 60)} daqiqadan keyin qayta yuborish mumkin` };
+  }
+
+  const sent = await sendNotifications({ ids: pending }, "homework_due", {
+    lessonId,
+    lessonTitle: lesson.title,
+    dueLabel: lesson.homework.dueAt ? formatDateTimeUz(lesson.homework.dueAt) : "belgilanmagan",
+    fromMentor: true,
+  });
+  await AuditLog.create({
+    actorId: mentor.userId,
+    action: "HOMEWORK_REMINDER",
+    details: { lessonId, pending: pending.length, sent },
+  });
+
+  return {
+    success: true,
+    message:
+      sent > 0
+        ? `${sent} ta o'quvchiga eslatma yuborildi${sent < pending.length ? ` (${pending.length - sent} tasi Telegram'ni ulamagan)` : ""}`
+        : "Topshirmaganlarning hech biri Telegram'ni ulamagan — eslatma ketmadi",
+    data: { sent, pending: pending.length },
+  };
 }
 
 export interface HomeworkRosterRow {

@@ -9,12 +9,16 @@ export const metadata = {
 
 interface PageProps {
   params: Promise<{ lessonId: string }>;
+  searchParams: Promise<{ student?: string }>;
 }
 
-export default async function MentorHomeworkDetailPage({ params }: PageProps) {
+export default async function MentorHomeworkDetailPage({ params, searchParams }: PageProps) {
   await requireMentorPage();
   const { lessonId } = await params;
   const roster = await getHomeworkRoster(lessonId);
   if (!roster) notFound();
-  return <HomeworkGradingView roster={roster} />;
+  // Jurnaldagi katakdan kelinganda o'sha o'quvchining javobi ochiladi
+  const { student } = await searchParams;
+  const initialStudentId = roster.rows.some((r) => r.studentId === student && r.submission) ? student : undefined;
+  return <HomeworkGradingView roster={roster} initialStudentId={initialStudentId} />;
 }
