@@ -3,13 +3,16 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, Users, CalendarCheck, Percent, Coins, ShoppingBag, PackageCheck } from "lucide-react";
+import { BarChart3, Users, CalendarCheck, Percent, Coins, ShoppingBag, PackageCheck, ClipboardCheck, GraduationCap } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatTile, ReportSection, BarList } from "@/components/reports/report-parts";
+import { StatTile, ReportSection, BarList, ScoreLegend } from "@/components/reports/report-parts";
+import { StudentsTable } from "@/components/reports/students-table";
+import { COIN_TYPE_COLORS, COIN_TYPE_LABELS } from "@/lib/coin-types";
+import { SCORE_TONE, formatPercent, scoreTone } from "@/lib/score-tone";
 import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER } from "@/lib/attendance-status";
 import { ORDER_STATUS_LABELS } from "@/lib/order-status";
 import { downloadCsv } from "@/lib/csv";
@@ -25,24 +28,17 @@ const PERIODS = [
   { id: "custom", label: "Boshqa" },
 ];
 
-const COIN_TYPE_LABELS: Record<string, string> = {
-  attendance: "Davomat",
-  quiz: "Testlar",
-  exam: "Imtihonlar",
-  homework: "Uyga vazifalar",
-  bonus: "Bonus",
-  purchase: "Do'kon xaridlari",
-  adjustment: "Tuzatishlar",
-};
 
 interface ReportsViewProps {
   data: ReportData | null;
   groups: { _id: string; name: string }[];
   period: string;
   groupId: string;
+  /** Sozlamalardagi joriy o'quv yili ("O'quv yili" davri shu yilni ko'rsatadi) */
+  academicYear?: string;
 }
 
-export function ReportsView({ data, groups, period, groupId }: ReportsViewProps) {
+export function ReportsView({ data, groups, period, groupId, academicYear }: ReportsViewProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -94,7 +90,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 )}
               >
-                {p.label}
+                {p.id === "year" && academicYear ? `${academicYear} o'quv yili` : p.label}
               </button>
             ))}
           </div>
@@ -142,18 +138,44 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
           className={cn("space-y-6 transition-opacity duration-200", isPending && "opacity-50 pointer-events-none")}
         >
           {/* Umumiy ko'rsatkichlar */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-            <StatTile icon={Users} label="O'quvchilar" value={data.overview.students} />
-            <StatTile icon={CalendarCheck} label="O'tilgan darslar" value={data.overview.lessonsHeld} hint="Davomati olingan" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatTile
               icon={Percent}
               label="O'rtacha davomat"
-              value={data.overview.attendancePercent === null ? "—" : `${data.overview.attendancePercent}%`}
+              value={formatPercent(data.overview.attendancePercent)}
+              tone={scoreTone(data.overview.attendancePercent)}
+              hint={`${data.overview.lessonsHeld} ta dars bo'yicha`}
             />
+            <StatTile
+              icon={ClipboardCheck}
+              label="Vazifa topshirish"
+              value={formatPercent(data.overview.homeworkPercent)}
+              tone={scoreTone(data.overview.homeworkPercent)}
+              hint="Berilgan vazifalarga nisbatan"
+            />
+            <StatTile
+              icon={GraduationCap}
+              label="Testlar natijasi"
+              value={formatPercent(data.overview.quizAvgPercent)}
+              tone={scoreTone(data.overview.quizAvgPercent)}
+              hint="O'rtacha to'g'ri javoblar"
+            />
+            <StatTile icon={Users} label="O'quvchilar" value={data.overview.students} />
+            <StatTile icon={CalendarCheck} label="O'tilgan darslar" value={data.overview.lessonsHeld} hint="Davomati olingan" />
             <StatTile icon={Coins} label="Berilgan coinlar" value={data.overview.coinsEarned.toLocaleString("ru-RU")} />
             <StatTile icon={ShoppingBag} label="Do'konda sarflangan" value={data.overview.coinsSpent.toLocaleString("ru-RU")} hint="coin" />
-            <StatTile icon={PackageCheck} label="Kutilayotgan buyurtmalar" value={data.overview.pendingOrders} hint="Hozirgi holat" />
+            <StatTile
+              icon={PackageCheck}
+              label="Kutilayotgan buyurtmalar"
+              value={data.overview.pendingOrders}
+              tone={data.overview.pendingOrders > 0 ? "mid" : "none"}
+              hint="Hozirgi holat"
+            />
           </div>
+
+          <ScoreLegend />
+
+          <StudentsTable rows={data.studentsTable} fileSuffix={suffix} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <ReportSection
@@ -168,6 +190,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                score
                 max={100}
                 items={data.attendanceByGroup
                   .filter((g) => g.lessons > 0)
@@ -202,11 +225,12 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                barClassName="bg-rose-500"
                 emptyText="Bu davrda hech kim dars qoldirmagan 🎉"
                 items={data.mostAbsent.map((s) => ({
                   key: s.studentId,
                   label: (
-                    <Link href={`/mentor/reports/students/${s.studentId}`} className="hover:underline">
+                    <Link href={`/mentor/students/${s.studentId}`} className="hover:underline">
                       {s.fullName}
                     </Link>
                   ),
@@ -245,7 +269,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
                         {l.percent ?? 0}
                       </span>
                       <span
-                        className="w-full rounded-t-[4px] bg-teal-600 dark:bg-teal-400 group-hover:bg-teal-700 dark:group-hover:bg-teal-300 transition-colors"
+                        className={cn("w-full rounded-t-[4px] opacity-90 group-hover:opacity-100 transition-opacity", SCORE_TONE[scoreTone(l.percent)].bar)}
                         style={{ height: `${Math.max(3, l.percent ?? 0)}%` }}
                       />
                     </Link>
@@ -271,6 +295,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
             }
           >
             <BarList
+                score
               max={100}
               emptyText="Bu davrda uyga vazifa berilmagan"
               items={data.homeworkByGroup.map((h) => ({
@@ -296,6 +321,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                score
                 max={100}
                 emptyText="Bu davrda test topshirilmagan"
                 items={data.quizzesByGroup
@@ -322,6 +348,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                score
                 max={100}
                 emptyText="Bu davrda imtihon topshirilmagan"
                 items={data.exams.map((e) => ({
@@ -346,11 +373,12 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                barClassName="bg-amber-500"
                 emptyText="Bu davrda coin berilmagan"
                 items={data.topEarners.map((s) => ({
                   key: s.studentId,
                   label: (
-                    <Link href={`/mentor/reports/students/${s.studentId}`} className="hover:underline">
+                    <Link href={`/mentor/students/${s.studentId}`} className="hover:underline">
                       {s.fullName}
                     </Link>
                   ),
@@ -375,19 +403,37 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               {data.coinsByType.length === 0 ? (
                 <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Bu davrda coin harakati yo&apos;q</p>
               ) : (
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {data.coinsByType.map((c) => (
-                      <tr key={c.type}>
-                        <td className="py-2 text-slate-700 dark:text-slate-200">{COIN_TYPE_LABELS[c.type] ?? c.type}</td>
-                        <td className="py-2 text-right font-bold tabular-nums text-slate-900 dark:text-slate-100">
-                          {c.amount > 0 ? "+" : ""}
-                          {c.amount.toLocaleString("ru-RU")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <ul className="space-y-2.5">
+                  {(() => {
+                    const top = Math.max(1, ...data.coinsByType.map((c) => Math.abs(c.amount)));
+                    return [...data.coinsByType]
+                      .sort((x, y) => Math.abs(y.amount) - Math.abs(x.amount))
+                      .map((c) => (
+                        <li key={c.type} className="space-y-1">
+                          <div className="flex items-baseline justify-between gap-3 text-xs">
+                            <span className={cn("px-1.5 py-0.5 rounded-md font-semibold", COIN_TYPE_COLORS[c.type].soft)}>
+                              {COIN_TYPE_LABELS[c.type] ?? c.type}
+                            </span>
+                            <span
+                              className={cn(
+                                "font-bold tabular-nums",
+                                c.amount < 0 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"
+                              )}
+                            >
+                              {c.amount > 0 ? "+" : ""}
+                              {c.amount.toLocaleString("ru-RU")}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className={cn("h-full rounded-full", c.amount < 0 ? "bg-rose-500" : COIN_TYPE_COLORS[c.type].bar)}
+                              style={{ width: `${Math.max(2, (Math.abs(c.amount) / top) * 100)}%` }}
+                            />
+                          </div>
+                        </li>
+                      ));
+                  })()}
+                </ul>
               )}
             </ReportSection>
 
@@ -403,6 +449,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
               }
             >
               <BarList
+                barClassName="bg-violet-500"
                 emptyText="Bu davrda buyurtma bo'lmagan"
                 items={data.topProducts.map((p) => ({
                   key: p.title,
@@ -416,6 +463,7 @@ export function ReportsView({ data, groups, period, groupId }: ReportsViewProps)
 
             <ReportSection title="Do'kon: buyurtmalar holati" description="Tanlangan davrda berilgan buyurtmalar">
               <BarList
+                barClassName="bg-sky-500"
                 emptyText="Bu davrda buyurtma bo'lmagan"
                 items={data.ordersByStatus.map((o) => ({
                   key: o.status,

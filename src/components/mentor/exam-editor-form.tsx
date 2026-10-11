@@ -22,14 +22,16 @@ import { toDateTimeLocalValue } from "@/lib/utils";
 interface ExamEditorFormProps {
   groups: IGroupData[];
   initialExam?: IExamData | null;
+  /** Sozlamalardagi joriy chorak — yangi imtihon shu chorak bilan ochiladi */
+  defaultQuarter?: number;
 }
 
-export function ExamEditorForm({ groups, initialExam }: ExamEditorFormProps) {
+export function ExamEditorForm({ groups, initialExam, defaultQuarter = 1 }: ExamEditorFormProps) {
   const router = useRouter();
 
   const [title, setTitle] = useState(initialExam?.title || "");
   const [description, setDescription] = useState(initialExam?.description || "");
-  const [quarter, setQuarter] = useState<number>(initialExam?.quarter || 1);
+  const [quarter, setQuarter] = useState<number>(initialExam?.quarter || defaultQuarter);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(
     initialExam?.groupIds?.map((g) => g.toString()) || []
   );

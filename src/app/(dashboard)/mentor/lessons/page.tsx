@@ -1,4 +1,5 @@
 import { requireMentorPage } from "@/lib/auth/guards";
+import { getAppSettings, parseQuarter } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getHomeworkJournal, getHomeworkOverviewForMentor, getHomeworkStatsForLessons } from "@/actions/homework.actions";
@@ -45,8 +46,7 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
 
   const requested = resolvedSearchParams.groupId;
   const selectedGroupId = groups.some((g) => g._id.toString() === requested) ? requested! : groups[0]._id.toString();
-  const parsedQuarter = parseInt(resolvedSearchParams.quarter ?? "1", 10);
-  const selectedQuarter = parsedQuarter >= 1 && parsedQuarter <= 4 ? parsedQuarter : 1;
+  const selectedQuarter = parseQuarter(resolvedSearchParams.quarter, (await getAppSettings()).quarter);
   const view = resolvedSearchParams.view === "journal" ? "journal" : "list";
 
   const [lessons, overview, journal] = await Promise.all([

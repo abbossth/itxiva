@@ -40,6 +40,9 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   MANUAL_ATTENDANCE_SESSION: { label: "Davomat qo'lda kiritildi", tone: "teal", category: "attendance" },
   CONVERT_ATTENDANCE_RULES: { label: "Davomat yangi coin qoidasiga o'tkazildi", tone: "warning", category: "attendance" },
   DELETE_ATTENDANCE: { label: "Davomat o'chirildi", tone: "danger", category: "attendance" },
+  UPDATE_SETTINGS: { label: "Platforma sozlamalari o'zgartirildi", tone: "teal", category: "other" },
+  UPDATE_STUDENT_PROFILE: { label: "O'quvchi ma'lumotlari yangilandi", tone: "teal", category: "students" },
+  UPDATE_STUDENT_PHOTO: { label: "O'quvchi rasmi yangilandi", tone: "teal", category: "students" },
   IMPORT_STUDENTS: { label: "O'quvchilar qo'shildi", tone: "success", category: "students" },
   EXCEL_IMPORT: { label: "Excel'dan import qilindi", tone: "success", category: "students" },
   RESET_PASSWORD: { label: "Parol tiklandi", tone: "warning", category: "students" },
@@ -63,6 +66,12 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
 };
 
 /** Havola yasash uchun bazadan topilgan (hali mavjud) obyektlar */
+/** Amal kodi bo'yicha nomi va rangi (noma'lum kod — o'zi ko'rsatiladi) */
+export function describeAudit(action: string): { label: string; tone: AuditTone } {
+  const meta = ACTIONS[action];
+  return meta ? { label: meta.label, tone: meta.tone } : { label: action, tone: "default" };
+}
+
 export interface AuditRefs {
   lessons: Map<string, { title: string; groupId: string; quarter: number }>;
   sessions: Map<string, { groupId: string; dateLabel: string }>;
@@ -153,7 +162,7 @@ export function formatAuditRow(
   else if (lesson && lessonId && !log.action.startsWith("DELETE")) link = { href: `/mentor/lessons/${lessonId}/edit`, label: "Darsni ochish" };
   else if (session && sessionId) link = { href: `/mentor/attendance/${sessionId}`, label: "Davomatni ochish" };
   else if (meta.category === "shop") link = { href: log.action.endsWith("_ORDER") ? "/mentor/orders" : "/mentor/shop", label: log.action.endsWith("_ORDER") ? "Buyurtmalar" : "Mahsulotlar" };
-  else if (log.target && log.target.role === "student") link = { href: `/mentor/reports/students/${log.target._id}`, label: "O'quvchi hisoboti" };
+  else if (log.target && log.target.role === "student") link = { href: `/mentor/students/${log.target._id}`, label: "O'quvchi hisoboti" };
   else if (groupId && refs.groups.has(groupId)) link = { href: `/mentor/groups/${groupId}`, label: "Guruhni ochish" };
   else if (meta.category === "exams" && !log.action.startsWith("DELETE")) link = { href: "/mentor/exams", label: "Imtihonlar" };
 

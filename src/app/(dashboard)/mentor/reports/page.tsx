@@ -1,5 +1,6 @@
 import { groupShortName } from "@/lib/group-name";
 import { requireMentorPage } from "@/lib/auth/guards";
+import { getAppSettings } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { getReportData } from "@/actions/report.actions";
 import { ReportsView } from "@/components/reports/reports-view";
@@ -15,7 +16,7 @@ interface ReportsPageProps {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function resolveRange(period: string, from?: string, to?: string) {
+function resolveRange(period: string, academicYear: string, from?: string, to?: string) {
   const today = toDateKey();
   if (period === "custom" && from && to && DATE_RE.test(from) && DATE_RE.test(to) && from <= to) {
     return { from, to };
@@ -23,9 +24,11 @@ function resolveRange(period: string, from?: string, to?: string) {
   if (period === "week") return { from: addDaysToKey(today, -6), to: today };
   if (period === "quarter") return { from: addDaysToKey(today, -89), to: today };
   if (period === "year") {
-    // O'quv yili 1-sentabrdan boshlanadi
-    const [y, m] = today.split("-").map(Number);
-    return { from: `${m >= 9 ? y : y - 1}-09-01`, to: today };
+    // Sozlamalardagi o'quv yili: 1-sentabrdan 31-avgustgacha (hali tugamagan bo'lsa — bugungacha)
+    const start = Number(academicYear.slice(0, 4));
+    const from = `${start}-09-01`;
+    const end = `${start + 1}-08-31`;
+    return { from, to: today < from ? end : today < end ? today : end };
   }
   return { from: addDaysToKey(today, -29), to: today };
 }
@@ -36,7 +39,8 @@ export default async function MentorReportsPage({ searchParams }: ReportsPagePro
   const period = ["week", "month", "quarter", "year", "custom"].includes(params.period ?? "")
     ? (params.period as string)
     : "month";
-  const range = resolveRange(period, params.from, params.to);
+  const settings = await getAppSettings();
+  const range = resolveRange(period, settings.academicYear, params.from, params.to);
 
   const [groups, data] = await Promise.all([
     getGroups(),
@@ -49,6 +53,7 @@ export default async function MentorReportsPage({ searchParams }: ReportsPagePro
       groups={groups.map((g) => ({ _id: g._id.toString(), name: `${groupShortName(g)} — ${g.name}` }))}
       period={period}
       groupId={params.group ?? ""}
+      academicYear={settings.academicYear}
     />
   );
 }

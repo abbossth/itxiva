@@ -2,6 +2,7 @@
 
 import { groupShortName } from "@/lib/group-name";
 import { useState } from "react";
+import Link from "next/link";
 import {
   UserPlus,
   KeyRound,
@@ -9,6 +10,8 @@ import {
   Trash2,
   Search,
   Clock,
+  ChevronRight,
+  UserRound,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { IUserData } from "@/lib/db/models/user.model";
@@ -30,12 +33,15 @@ interface GroupStudentsViewProps {
   group: IGroupData;
   initialStudents: IUserData[];
   allGroups: IGroupData[];
+  /** Rasmi bor o'quvchilar: id → rasm havolasi */
+  photoUrls?: Record<string, string>;
 }
 
 export function GroupStudentsView({
   group,
   initialStudents,
   allGroups,
+  photoUrls = {},
 }: GroupStudentsViewProps) {
   const [students, setStudents] = useState<IUserData[]>(initialStudents);
   const [search, setSearch] = useState("");
@@ -154,12 +160,16 @@ export function GroupStudentsView({
                 >
                   <td className="px-4 py-2 text-slate-500 dark:text-slate-400 font-mono text-xs">{idx + 1}</td>
                   <td className="px-4 py-2">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={s.fullName} size="sm" />
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    <Link
+                      href={`/mentor/students/${s._id}`}
+                      title="O'quvchi profilini ochish"
+                      className="group/name flex items-center gap-3 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
+                    >
+                      <Avatar src={photoUrls[s._id.toString()]} name={s.fullName} size="sm" />
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 group-hover/name:text-teal-700 dark:group-hover/name:text-teal-300 group-hover/name:underline">
                         {s.fullName}
                       </span>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-4 py-2 font-mono text-teal-600 dark:text-teal-400 text-xs sm:text-sm">
                     @{s.login}
@@ -172,6 +182,14 @@ export function GroupStudentsView({
                   </td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      <Link
+                        href={`/mentor/students/${s._id}`}
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors flex items-center justify-center"
+                        aria-label={`${s.fullName} profili`}
+                        title="Profil: shaxsiy ma'lumotlar, coinlar, davomat"
+                      >
+                        <UserRound className="w-4 h-4" />
+                      </Link>
                       <button
                         type="button"
                         onClick={() => setSelectedStudentForReset(s)}
@@ -222,17 +240,18 @@ export function GroupStudentsView({
             >
               {/* Card top: Avatar, Name, Login, Index */}
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <Avatar name={s.fullName} size="md" />
+                <Link href={`/mentor/students/${s._id}`} className="flex items-center gap-3 min-w-0 min-h-[44px]">
+                  <Avatar src={photoUrls[s._id.toString()]} name={s.fullName} size="md" />
                   <div className="min-w-0">
-                    <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
-                      {s.fullName}
+                    <div className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate flex items-center gap-1">
+                      <span className="truncate">{s.fullName}</span>
+                      <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />
                     </div>
                     <div className="text-xs font-mono text-teal-600 dark:text-teal-400">
                       @{s.login}
                     </div>
                   </div>
-                </div>
+                </Link>
                 <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                   #{idx + 1}
                 </span>

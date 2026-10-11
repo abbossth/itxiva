@@ -29,6 +29,10 @@ export interface ReportData {
     coinsEarned: number;
     coinsSpent: number;
     pendingOrders: number;
+    /** Uyga vazifalarni topshirish ulushi (barcha guruhlar bo'yicha) */
+    homeworkPercent: number | null;
+    /** Testlarning o'rtacha natijasi */
+    quizAvgPercent: number | null;
   };
   attendanceByGroup: {
     groupId: string;
@@ -56,6 +60,21 @@ export interface ReportData {
   exams: { examId: string; title: string; submissions: number; avgPercent: number | null; passPercent: number | null }[];
   coinsByType: { type: CoinTransactionType; amount: number }[];
   topEarners: { studentId: string; fullName: string; groupName: string; earned: number }[];
+  /** Har bir o'quvchi bo'yicha asosiy ko'rsatkichlar (rangli jadval uchun) */
+  studentsTable: {
+    studentId: string;
+    fullName: string;
+    groupName: string;
+    attendancePercent: number | null;
+    absent: number;
+    homeworkSubmitted: number;
+    homeworkExpected: number;
+    homeworkPercent: number | null;
+    homeworkAvg: number | null;
+    quizAvgPercent: number | null;
+    quizCount: number;
+    coinsEarned: number;
+  }[];
   ordersByStatus: { status: OrderStatus; count: number }[];
   topProducts: { title: string; count: number; coins: number }[];
 }
@@ -167,9 +186,14 @@ export async function getReportData(params: {
   ]);
 
   const quizByGroup = new Map<string, { n: number; sum: number }>();
+  const quizByStudent = new Map<string, { n: number; sum: number }>();
   for (const q of quizSubs) {
     const st = studentById.get(q.studentId.toString());
     if (!st?.groupId || q.maxScore <= 0) continue;
+    const sq = quizByStudent.get(q.studentId.toString()) ?? { n: 0, sum: 0 };
+    sq.n++;
+    sq.sum += (q.totalScore / q.maxScore) * 100;
+    quizByStudent.set(q.studentId.toString(), sq);
     const key = st.groupId.toString();
     if (!quizByGroup.has(key)) quizByGroup.set(key, { n: 0, sum: 0 });
     const g = quizByGroup.get(key)!;
@@ -187,7 +211,7 @@ export async function getReportData(params: {
     .select("groupId")
     .lean();
   const homeworkSubs = await HomeworkSubmission.find({ lessonId: { $in: homeworkLessons.map((l) => l._id) } })
-    .select("groupId status score")
+    .select("groupId studentId status score")
     .lean();
   const studentsPerGroup = new Map<string, number>();
   for (const s of students) {
@@ -199,13 +223,20 @@ export async function getReportData(params: {
     return homeworkAgg.get(key)!;
   };
   for (const l of homeworkLessons) homeworkOf(l.groupId.toString()).assigned++;
+  const homeworkByStudent = new Map<string, { submitted: number; graded: number; scoreSum: number }>();
   for (const s of homeworkSubs) {
     const agg = homeworkOf(s.groupId.toString());
     agg.submitted++;
+    const sid = s.studentId.toString();
+    const mine = homeworkByStudent.get(sid) ?? { submitted: 0, graded: 0, scoreSum: 0 };
+    mine.submitted++;
     if (s.status === "graded" && typeof s.score === "number") {
       agg.graded++;
       agg.scoreSum += s.score;
+      mine.graded++;
+      mine.scoreSum += s.score;
     }
+    homeworkByStudent.set(sid, mine);
   }
 
   const examAgg = new Map<string, { n: number; sum: number; graded: number; passed: number }>();
@@ -250,9 +281,24 @@ export async function getReportData(params: {
     return st ? { studentId: sid, fullName: st.fullName, groupName: nameOfGroup(st.groupId) } : null;
   };
 
+  let homeworkExpectedAll = 0;
+  let homeworkSubmittedAll = 0;
+  for (const [gid, h] of homeworkAgg) {
+    homeworkExpectedAll += h.assigned * (studentsPerGroup.get(gid) ?? 0);
+    homeworkSubmittedAll += h.submitted;
+  }
+  let quizN = 0;
+  let quizSum = 0;
+  for (const q of quizByGroup.values()) {
+    quizN += q.n;
+    quizSum += q.sum;
+  }
+
   return {
     range: { from: params.from, to: params.to },
     overview: {
+      homeworkPercent: homeworkExpectedAll > 0 ? Math.min(100, Math.round((homeworkSubmittedAll / homeworkExpectedAll) * 100)) : null,
+      quizAvgPercent: quizN > 0 ? Math.round(quizSum / quizN) : null,
       students: students.length,
       lessonsHeld: sessions.length,
       attendancePercent: pct(attendedAll, totalAll),
@@ -329,6 +375,29 @@ export async function getReportData(params: {
         const row = studentRow(sid);
         return row ? [{ ...row, earned }] : [];
       }),
+    studentsTable: students
+      .map((st) => {
+        const sid = st._id.toString();
+        const att = byStudent.get(sid);
+        const hw = homeworkByStudent.get(sid);
+        const quiz = quizByStudent.get(sid);
+        const expected = st.groupId ? homeworkAgg.get(st.groupId.toString())?.assigned ?? 0 : 0;
+        return {
+          studentId: sid,
+          fullName: st.fullName,
+          groupName: nameOfGroup(st.groupId),
+          attendancePercent: att ? pct(att.attended, att.total) : null,
+          absent: att?.absent ?? 0,
+          homeworkSubmitted: hw?.submitted ?? 0,
+          homeworkExpected: expected,
+          homeworkPercent: expected > 0 ? Math.min(100, Math.round(((hw?.submitted ?? 0) / expected) * 100)) : null,
+          homeworkAvg: hw && hw.graded > 0 ? Math.round(hw.scoreSum / hw.graded) : null,
+          quizAvgPercent: quiz && quiz.n > 0 ? Math.round(quiz.sum / quiz.n) : null,
+          quizCount: quiz?.n ?? 0,
+          coinsEarned: earnedByStudent.get(sid) ?? 0,
+        };
+      })
+      .sort((a, b) => a.fullName.localeCompare(b.fullName)),
     ordersByStatus: [...ordersByStatus.entries()].map(([status, count]) => ({ status, count })),
     topProducts: [...products.entries()]
       .map(([title, v]) => ({ title, ...v }))
@@ -355,7 +424,7 @@ export interface StudentReport {
   quizzes: { title: string; totalScore: number; maxScore: number; status: string; submittedAt: string | null }[];
   homework: { lessonId: string; title: string; status: HomeworkStatus; score: number | null; isLate: boolean; submittedAt: string | null }[];
   exams: { title: string; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
-  ledger: { amount: number; type: CoinTransactionType; description: string; createdAt: string | null }[];
+  ledger: { amount: number; type: CoinTransactionType; description: string; balanceAfter: number | null; createdAt: string | null }[];
   orders: { productTitle: string; price: number; status: OrderStatus; createdAt: string | null }[];
 }
 
@@ -378,7 +447,7 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       .select("examId totalScore maxScore status isPassed submittedAt")
       .sort({ submittedAt: -1 })
       .lean(),
-    CoinLedger.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
+    CoinLedger.find({ studentId }).sort({ createdAt: -1 }).limit(300).lean(),
     Order.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
     HomeworkSubmission.find({ studentId })
       .select("lessonId status score isLate submittedAt")
@@ -446,7 +515,13 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       isPassed: e.isPassed,
       submittedAt: iso(e.submittedAt),
     })),
-    ledger: ledger.map((l) => ({ amount: l.amount, type: l.type, description: l.description, createdAt: iso(l.createdAt) })),
+    ledger: ledger.map((l) => ({
+      amount: l.amount,
+      type: l.type,
+      description: l.description,
+      balanceAfter: typeof l.balanceAfter === "number" ? l.balanceAfter : null,
+      createdAt: iso(l.createdAt),
+    })),
     orders: orders.map((o) => ({ productTitle: o.productTitle, price: o.price, status: o.status, createdAt: iso(o.createdAt) })),
   };
 }

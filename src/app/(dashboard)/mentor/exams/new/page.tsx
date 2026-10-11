@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireMentorPage } from "@/lib/auth/guards";
+import { getAppSettings } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { ExamEditorForm } from "@/components/mentor/exam-editor-form";
 import { ArrowLeft, GraduationCap } from "lucide-react";
@@ -10,7 +11,7 @@ export const metadata = {
 
 export default async function NewExamPage() {
   await requireMentorPage();
-  const groups = await getGroups();
+  const [groups, settings] = await Promise.all([getGroups(), getAppSettings()]);
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto animate-in fade-in pb-16">
@@ -38,7 +39,7 @@ export default async function NewExamPage() {
         </div>
       </div>
 
-      <ExamEditorForm groups={groups} />
+      <ExamEditorForm groups={groups} defaultQuarter={settings.quarter} />
     </div>
   );
 }

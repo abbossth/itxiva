@@ -331,6 +331,23 @@ export async function getMaterialDownloadUrlAction({
   }
 }
 
+/**
+ * Mentor uchun: dars materiali faylini ochish havolasi. Darsga hali saqlanmagan (hozirgina yuklangan)
+ * fayllar uchun ham ishlaydi — muharrirda yuklagan faylini darhol tekshirib ko'rishi mumkin.
+ */
+export async function getMentorMaterialUrlAction(key: unknown): Promise<{ success: boolean; downloadUrl?: string; message?: string }> {
+  await requireMentor();
+  if (typeof key !== "string" || !key.startsWith("materials/") || key.includes("..") || key.length > 400) {
+    return { success: false, message: "Fayl topilmadi" };
+  }
+  try {
+    return { success: true, downloadUrl: await getDownloadPresignedUrl({ key }) };
+  } catch (error) {
+    console.error("Presigned URL error:", error);
+    return { success: false, message: "Faylga kirishda xatolik yuz berdi" };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Bog'langan nusxalar: bitta dars — bir nechta guruh                   */
 /* ------------------------------------------------------------------ */

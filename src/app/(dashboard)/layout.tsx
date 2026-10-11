@@ -9,6 +9,8 @@ import { CommandPaletteTrigger } from "@/components/layout/command-palette-trigg
 import { SIDEBAR_COOKIE } from "@/components/layout/nav-links";
 import { getOrdersBadgeCount } from "@/actions/shop.actions";
 import { getHomeworkBadgeCount } from "@/actions/homework.actions";
+import { getAppSettings } from "@/lib/settings";
+import { accentCss } from "@/lib/theme-accents";
 
 export default async function DashboardLayout({
   children,
@@ -25,12 +27,20 @@ export default async function DashboardLayout({
     redirect("/change-password");
   }
 
-  const [orders, homework, cookieStore] = await Promise.all([getOrdersBadgeCount(), getHomeworkBadgeCount(), cookies()]);
+  const [orders, homework, cookieStore, settings] = await Promise.all([
+    getOrdersBadgeCount(),
+    getHomeworkBadgeCount(),
+    cookies(),
+    getAppSettings(),
+  ]);
+  const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const badges = { orders, homework };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-bg">
+      {/* Mentor tanlagan asosiy rang: qiymatlar faqat koddagi tayyor shkalalardan olinadi */}
+      {accentStyle && <style>{accentStyle}</style>}
       {/* Lokal ishlab chiqishda: bu yerdagi o'zgarishlar (masalan, parol tiklash) itxiva.uz ga ta'sir qilmaydi */}
       {process.env.NODE_ENV !== "production" && (
         <div className="bg-amber-400 text-amber-950 text-xs font-bold text-center px-3 py-1.5">

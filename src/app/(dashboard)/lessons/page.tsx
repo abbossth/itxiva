@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
+import { getAppSettings, parseQuarter } from "@/lib/settings";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getGroupById } from "@/actions/group.actions";
 import { getMyHomeworkStates } from "@/actions/homework.actions";
@@ -24,7 +25,8 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
   }
 
   const resolvedSearchParams = await searchParams;
-  const quarter = resolvedSearchParams.quarter ? parseInt(resolvedSearchParams.quarter, 10) : 1;
+  // Chorak tanlanmagan bo'lsa — mentor sozlamalarda belgilagan joriy chorak
+  const quarter = parseQuarter(resolvedSearchParams.quarter, (await getAppSettings()).quarter);
 
   if (!session.groupId && session.role === "student") {
     return (

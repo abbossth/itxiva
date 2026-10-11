@@ -29,6 +29,9 @@ function safeContentType(contentType: unknown): string {
   return contentType;
 }
 
+const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
 function isValidSize(fileSize: unknown, maxBytes: number): fileSize is number {
   return typeof fileSize === "number" && Number.isInteger(fileSize) && fileSize > 0 && fileSize <= maxBytes;
 }
@@ -44,13 +47,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { filename, contentType, fileSize, examId, questionId, homeworkLessonId } = body as {
+    const { filename, contentType, fileSize, examId, questionId, homeworkLessonId, avatarStudentId } = body as {
       filename?: string;
       contentType?: string;
       fileSize?: number;
       examId?: string;
       questionId?: string;
       homeworkLessonId?: string;
+      avatarStudentId?: string;
     };
 
     if (!filename || typeof filename !== "string" || filename.length > 300) {
@@ -162,6 +166,22 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ uploadUrl, key, contentType: safeType });
+    }
+
+    // Mentor: o'quvchi profilining rasmi (brauzerda WebP ga siqilgan holda keladi)
+    if (avatarStudentId !== undefined) {
+      if (typeof avatarStudentId !== "string" || !mongoose.isValidObjectId(avatarStudentId)) {
+        return NextResponse.json({ error: "O'quvchi topilmadi" }, { status: 404 });
+      }
+      if (typeof contentType !== "string" || !AVATAR_TYPES.includes(contentType)) {
+        return NextResponse.json({ error: "Faqat rasm (JPG, PNG, WebP) yuklash mumkin" }, { status: 400 });
+      }
+      if (!isValidSize(fileSize, AVATAR_MAX_BYTES)) {
+        return NextResponse.json({ error: "Rasm hajmi 5 MB dan oshmasligi kerak" }, { status: 400 });
+      }
+      const key = `avatars/${avatarStudentId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
+      const { uploadUrl } = await getUploadPresignedUrl({ key, contentType, contentLength: fileSize });
+      return NextResponse.json({ uploadUrl, key, contentType });
     }
 
     // Mentor: dars materiallari

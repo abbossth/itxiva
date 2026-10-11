@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroupById, getGroups } from "@/actions/group.actions";
 import { getStudentsByGroup } from "@/actions/student.actions";
+import { getStudentPhotoUrls } from "@/actions/student-profile.actions";
 import { GroupStudentsView } from "@/components/mentor/group-students-view";
 
 export const metadata = {
@@ -26,9 +27,12 @@ export default async function GroupDetailPage({ params }: GroupDetailPageProps) 
     notFound();
   }
 
+  const photoUrls = await getStudentPhotoUrls(students.map((s) => s._id.toString()));
+
   return (
     <GroupStudentsView
       group={group}
+      photoUrls={photoUrls}
       initialStudents={students}
       allGroups={allGroups}
     />

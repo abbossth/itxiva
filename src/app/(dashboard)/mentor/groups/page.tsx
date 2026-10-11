@@ -1,6 +1,7 @@
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getGroups } from "@/actions/group.actions";
 import { getGroupsAttendanceOverview } from "@/actions/attendance.actions";
+import { getAppSettings } from "@/lib/settings";
 import { GroupsManager } from "@/components/mentor/groups-manager";
 
 export const metadata = {
@@ -9,7 +10,7 @@ export const metadata = {
 
 export default async function MentorGroupsPage() {
   await requireMentorPage();
-  const [groups, attendance] = await Promise.all([getGroups(), getGroupsAttendanceOverview()]);
+  const [groups, attendance, settings] = await Promise.all([getGroups(), getGroupsAttendanceOverview(), getAppSettings()]);
 
-  return <GroupsManager initialGroups={groups} attendance={attendance} />;
+  return <GroupsManager initialGroups={groups} attendance={attendance} defaultAcademicYear={settings.academicYear} />;
 }

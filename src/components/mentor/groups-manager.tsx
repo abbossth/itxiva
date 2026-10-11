@@ -24,6 +24,8 @@ const DEFAULT_SCHEDULE: GroupSchedule = { days: ODD_DAYS, startTime: "15:00", en
 interface GroupsManagerProps {
   initialGroups: IGroupData[];
   attendance: GroupsAttendanceOverview;
+  /** Sozlamalardagi joriy o'quv yili — yangi guruh shu yil bilan ochiladi */
+  defaultAcademicYear?: string;
 }
 
 function percentClass(percent: number) {
@@ -32,7 +34,7 @@ function percentClass(percent: number) {
   return "text-rose-700 dark:text-rose-400";
 }
 
-export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps) {
+export function GroupsManager({ initialGroups, attendance, defaultAcademicYear = "2026-2027" }: GroupsManagerProps) {
   const router = useRouter();
   const [groups, setGroups] = useState<IGroupData[]>(initialGroups);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -41,7 +43,7 @@ export function GroupsManager({ initialGroups, attendance }: GroupsManagerProps)
 
   const [name, setName] = useState("");
   const [grade, setGrade] = useState<number>(8);
-  const [academicYear, setAcademicYear] = useState("2026-2027");
+  const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
   const [schedule, setSchedule] = useState<GroupSchedule>(DEFAULT_SCHEDULE);
 
   // Jadvalni tahrirlash oynasi

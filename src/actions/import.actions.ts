@@ -6,6 +6,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
+import { getAppSettings } from "@/lib/settings";
 import { requireMentor } from "@/lib/auth/guards";
 import { hashPassword, generateRandomPassword } from "@/lib/auth/password";
 import { encryptTempPassword } from "@/lib/auth/temp-password";
@@ -221,7 +222,7 @@ export async function applyExcelImportAction(
       const createdGroup = await Group.create({
         name: g.name,
         grade: g.grade,
-        academicYear: "2026-2027",
+        academicYear: (await getAppSettings()).academicYear,
         isActive: true,
         schedule: g.schedule,
       });

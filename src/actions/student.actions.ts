@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User, IUser } from "@/lib/db/models/user.model";
+import { StudentProfile } from "@/lib/db/models/student-profile.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor } from "@/lib/auth/guards";
@@ -255,6 +256,8 @@ export async function deleteStudentAction(userId: string): Promise<{ success: bo
 
   const groupId = user.groupId;
   await User.findByIdAndDelete(userId);
+  // Shaxsiy ma'lumotlar (hujjat raqamlari, rasm havolasi) o'quvchi bilan birga o'chadi
+  await StudentProfile.deleteOne({ studentId: userId });
 
   if (groupId) {
     const count = await User.countDocuments({ groupId, role: "student" });

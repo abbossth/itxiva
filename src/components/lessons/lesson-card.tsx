@@ -66,7 +66,7 @@ export function LessonCard({ lesson, isMentor = false, onTogglePublish, homework
         </div>
 
         <Link
-          href={isMentor ? `/mentor/lessons/${lesson._id}/edit` : `/lessons/${lesson._id}`}
+          href={isMentor ? `/mentor/lessons/${lesson._id}` : `/lessons/${lesson._id}`}
           className="block group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors"
         >
           <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 line-clamp-2">

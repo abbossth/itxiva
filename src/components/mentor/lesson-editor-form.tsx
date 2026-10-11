@@ -1,7 +1,7 @@
 "use client";
 
 import { groupShortName } from "@/lib/group-name";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Video,
@@ -17,14 +17,24 @@ import {
   Link2,
   Unlink,
   Copy,
+  Download,
+  ExternalLink,
+  Eye,
+  Paperclip,
+  Upload,
+  Plus,
+  Check,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { formatDateUz } from "@/lib/utils";
+import { cn, formatDateUz } from "@/lib/utils";
+import { openResolvedUrl, toExternalUrl } from "@/lib/open-tab";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { ILessonData, IMaterial } from "@/lib/db/models/lesson.model";
-import { DEFAULT_HOMEWORK_COINS } from "@/lib/homework-status";
+import { DEFAULT_HOMEWORK_COINS, formatFileSize } from "@/lib/homework-status";
 import { IQuizData } from "@/lib/db/models/quiz.model";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,10 +45,11 @@ import {
   updateLessonAction,
   copyLessonToGroupsAction,
   unlinkLessonAction,
+  getMentorMaterialUrlAction,
   type LinkedLessonInfo,
 } from "@/actions/lesson.actions";
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
-import { compressImageToWebP, uploadFileToStorage } from "@/lib/upload-client";
+import { uploadFileToStorage } from "@/lib/upload-client";
 import { generateHomeworkAction } from "@/actions/ai.actions";
 import { fromTashkentInputValue, getNextLessonAfter, toDateKey, toTashkentInputValue } from "@/lib/schedule";
 import { AiAssistantPanel } from "@/components/mentor/ai-assistant-panel";
@@ -216,114 +227,133 @@ export function LessonEditorForm({
     }
   };
 
-  // Material builder states
-  const [materialType, setMaterialType] = useState<"file" | "youtube" | "link">("youtube");
-  const [matTitle, setMatTitle] = useState("");
+  // Material qo'shish
   const [matUrl, setMatUrl] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Form submitting state
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const youtubeId = materialType === "youtube" ? extractYouTubeId(matUrl) : null;
+  // Havola turi o'zi aniqlanadi: YouTube manzili — video, qolgani — tashqi havola
+  const youtubeId = extractYouTubeId(matUrl);
 
-  // Handle R2 File Upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  /** Bir yoki bir nechta faylni omborga yuklab, materiallar ro'yxatiga qo'shadi (rasmlar WebP ga siqiladi) */
+  const uploadMaterialFiles = async (files: File[]) => {
+    if (files.length === 0 || uploadingFile) return;
+    setUploadingFile(true);
+    setErrorMsg(null);
+    let added = 0;
     try {
-      setUploadingFile(true);
-      setUploadProgress("Fayl tayyorlanmoqda...");
-      setErrorMsg(null);
-
-      let fileToUpload: Blob | File = file;
-      let contentType = file.type || "application/octet-stream";
-
-      // If image, compress to WebP
-      if (file.type.startsWith("image/")) {
-        setUploadProgress("Rasm siqilmoqda (WebP)...");
-        fileToUpload = await compressImageToWebP(file);
-        contentType = "image/webp";
+      for (const [i, file] of files.entries()) {
+        setUploadProgress(files.length > 1 ? `Yuklanmoqda ${i + 1} / ${files.length}...` : "Yuklanmoqda...");
+        try {
+          const uploaded = await uploadFileToStorage(file);
+          setMaterials((prev) => [
+            ...prev,
+            {
+              type: "file",
+              title: file.name,
+              urlOrKey: uploaded.key,
+              mimeType: uploaded.contentType,
+              fileSize: uploaded.size,
+              createdAt: new Date(),
+            },
+          ]);
+          added++;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Fayl yuklashda xatolik yuz berdi";
+          toast.error(`${file.name}: ${msg}`);
+        }
       }
-
-      setUploadProgress("Yuklash uchun serverdan ruxsat olinmoqda...");
-      const presignedRes = await fetch("/api/upload/presigned-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename:
-            contentType === "image/webp" ? file.name.replace(/\.[^/.]+$/, "") + ".webp" : file.name,
-          contentType,
-          fileSize: fileToUpload.size,
-        }),
-      });
-
-      if (!presignedRes.ok) {
-        const data = await presignedRes.json();
-        throw new Error(data.error || "Fayl yuklash uchun ruxsat olinmadi");
-      }
-
-      const { uploadUrl, key } = await presignedRes.json();
-
-      setUploadProgress("Fayl omborga yuklanmoqda...");
-      const uploadRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": contentType,
-        },
-        body: fileToUpload,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Faylni saqlashda xatolik yuz berdi");
-      }
-
-      // Add to materials list
-      const newMaterial: IMaterial = {
-        type: "file",
-        title: matTitle.trim() || file.name,
-        urlOrKey: key,
-        mimeType: contentType,
-        fileSize: fileToUpload.size,
-        createdAt: new Date(),
-      };
-
-      setMaterials([...materials, newMaterial]);
-      setMatTitle("");
-      setUploadProgress(null);
-      toast.success("Fayl muvaffaqiyatli yuklandi");
-      e.target.value = "";
-    } catch (err: unknown) {
-      console.error(err);
-      const msg = err instanceof Error ? err.message : "Fayl yuklashda xatolik yuz berdi";
-      setErrorMsg(msg);
-      toast.error(msg);
-      setUploadProgress(null);
+      if (added > 0) toast.success(added === 1 ? "Fayl yuklandi" : `${added} ta fayl yuklandi`);
     } finally {
+      setUploadProgress(null);
       setUploadingFile(false);
     }
   };
 
   const handleAddLinkOrVideo = () => {
-    if (!matUrl.trim()) return;
-    const newMaterial: IMaterial = {
-      type: materialType,
-      title: matTitle.trim() || (materialType === "youtube" ? "Dars videosi" : "Material havolasi"),
-      urlOrKey: matUrl.trim(),
-      createdAt: new Date(),
-    };
-    setMaterials([...materials, newMaterial]);
-    setMatTitle("");
+    const raw = matUrl.trim();
+    if (!raw) return;
+    const url = toExternalUrl(raw);
+    if (!url) {
+      toast.error("Havola noto'g'ri kiritilgan");
+      return;
+    }
+    let host = "Material havolasi";
+    try {
+      host = new URL(url).hostname.replace(/^www\./, "");
+    } catch {}
+    setMaterials((prev) => [
+      ...prev,
+      { type: youtubeId ? "youtube" : "link", title: youtubeId ? "Dars videosi" : host, urlOrKey: raw, createdAt: new Date() },
+    ]);
     setMatUrl("");
-    toast.success("Material qo'shildi");
+  };
+
+  const renameMaterial = (index: number, value: string) =>
+    setMaterials((prev) => prev.map((m, i) => (i === index ? { ...m, title: value } : m)));
+
+  const [openingKey, setOpeningKey] = useState<string | null>(null);
+
+  // Materialni ochib ko'rish: fayl — vaqtinchalik havola orqali, video va havola — to'g'ridan-to'g'ri
+  const handleOpenMaterial = async (m: IMaterial) => {
+    if (m.type !== "file") {
+      const url = toExternalUrl(m.urlOrKey);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      else toast.error("Havola noto'g'ri kiritilgan");
+      return;
+    }
+    try {
+      setOpeningKey(m.urlOrKey);
+      let message: string | undefined;
+      const opened = await openResolvedUrl(async () => {
+        const res = await getMentorMaterialUrlAction(m.urlOrKey);
+        message = res.message;
+        return res.success ? res.downloadUrl : null;
+      });
+      if (!opened) toast.error(message || "Faylni ochib bo'lmadi");
+    } catch {
+      toast.error("Faylni ochib bo'lmadi");
+    } finally {
+      setOpeningKey(null);
+    }
   };
 
   const handleRemoveMaterial = (index: number) => {
     setMaterials(materials.filter((_, i) => i !== index));
   };
+
+  // Saqlanmagan o'zgarishlar: sahifa yopilishidan oldin ogohlantiriladi
+  const snapshot = JSON.stringify([
+    groupId, quarter, order, title, topic, description, date, isPublished, materials,
+    hwEnabled, hwInstructions, hwAttachments, hwDue, hwCoins, extraGroupIds,
+  ]);
+  const [savedSnapshot] = useState(snapshot);
+  const isDirty = snapshot !== savedSnapshot;
+
+  useEffect(() => {
+    if (!isDirty || isSaving) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, isSaving]);
+
+  // Ctrl/⌘ + S — saqlash
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,7 +379,11 @@ export function LessonEditorForm({
         description,
         date,
         isPublished,
-        materials,
+        // Nomi o'chirib yuborilgan material bo'sh nom bilan saqlanmaydi
+        materials: materials.map((m) => ({
+          ...m,
+          title: m.title.trim() || (m.type === "youtube" ? "Dars videosi" : m.type === "link" ? "Havola" : "Fayl"),
+        })),
         // Vazifa hech qachon yoqilmagan bo'lsa, bo'sh yozuv saqlanmaydi
         homework:
           hwEnabled || initialHomework
@@ -388,7 +422,9 @@ export function LessonEditorForm({
               : "Yangi dars yaratildi"
           );
         }
-        router.push("/mentor/lessons");
+        // Saqlangach dars o'quvchi ko'radigan ko'rinishda ochiladi (u yerdan istalgan payt tahrirlashga qaytish mumkin)
+        const savedId = initialLesson?._id ?? res.data?._id;
+        router.push(savedId ? `/mentor/lessons/${savedId}` : "/mentor/lessons");
         router.refresh();
       } else {
         setErrorMsg(res.message || "Xatolik yuz berdi");
@@ -403,7 +439,14 @@ export function LessonEditorForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-w-4xl mx-auto">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 max-w-3xl mx-auto pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+          {initialLesson ? "Darsni tahrirlash" : "Yangi dars"}
+        </h1>
+        <Badge variant={isPublished ? "success" : "warning"}>{isPublished ? "Nashr etilgan" : "Qoralama"}</Badge>
+      </div>
+
       {errorMsg && (
         <div
           role="alert"
@@ -417,7 +460,7 @@ export function LessonEditorForm({
       <AiAssistantPanel
         enabled={aiEnabled}
         defaultOpen={!initialLesson}
-        grade={groups.find((g) => g._id.toString() === groupId)?.grade}
+        grade={currentGroup?.grade}
         lesson={{ title, topic, description }}
         onApplyDraft={(draft) => {
           setTitle(draft.title);
@@ -428,19 +471,16 @@ export function LessonEditorForm({
         onAttachMaterial={(material) => setMaterials((prev) => [...prev, material])}
       />
 
-      {/* Main Lesson Info Card */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-          {initialLesson ? "Darsni tahrirlash" : "Yangi dars ma'lumotlari"}
-        </h2>
-
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
-          <Field htmlFor="lesson-group" label="O'quv guruhi" required>
+      {/* Dars: sarlavha va konspekt hujjat kabi yoziladi, qolgan sozlamalar bitta ixcham qatorda */}
+      <section className={sectionClass}>
+        <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_minmax(0,1.3fr)] gap-x-3 gap-y-2">
+          <label className="space-y-1">
+            <span className={metaLabel}>Guruh</span>
             <select
               id="lesson-group"
               value={groupId}
               onChange={(e) => handleGroupChange(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-sm min-h-[40px] text-slate-900 dark:text-slate-100"
+              className={metaControl}
               required
             >
               {groups.map((g) => (
@@ -449,14 +489,14 @@ export function LessonEditorForm({
                 </option>
               ))}
             </select>
-          </Field>
-
-          <Field htmlFor="lesson-quarter" label="Chorak" required>
+          </label>
+          <label className="space-y-1">
+            <span className={metaLabel}>Chorak</span>
             <select
               id="lesson-quarter"
               value={quarter}
               onChange={(e) => setQuarter(parseInt(e.target.value, 10))}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 text-sm min-h-[40px] text-slate-900 dark:text-slate-100"
+              className={metaControl}
             >
               {[1, 2, 3, 4].map((q) => (
                 <option key={q} value={q}>
@@ -464,379 +504,282 @@ export function LessonEditorForm({
                 </option>
               ))}
             </select>
-          </Field>
-
-          <Field htmlFor="lesson-order" label="Dars №" required>
-            <Input
+          </label>
+          <label className="space-y-1">
+            <span className={metaLabel}>Dars №</span>
+            <input
               id="lesson-order"
               type="number"
               min={1}
-              value={order}
+              value={Number.isFinite(order) ? order : ""}
               onChange={(e) => setOrder(parseInt(e.target.value, 10))}
+              className={metaControl}
               required
             />
-          </Field>
-          <Field htmlFor="lesson-date" label="Sana">
-            <Input
+          </label>
+          <label className="space-y-1">
+            <span className={metaLabel}>Sana</span>
+            <input
               id="lesson-date"
               type="date"
               value={date}
               onChange={(e) => handleDateChange(e.target.value)}
+              className={metaControl}
             />
-          </Field>
+          </label>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field htmlFor="lesson-title" label="Dars nomi" required>
-            <Input
-              id="lesson-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="masalan: 1-dars. Python asoslari va o'zgaruvchilar"
-              required
-            />
-          </Field>
-          <Field htmlFor="lesson-topic" label="Qisqacha mavzu (kalit so'zlar)">
-            <Input
-              id="lesson-topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="masalan: Data types, variables, input/output"
-            />
-          </Field>
-
-        </div>
-
-        <Field htmlFor="lesson-description" label="Dars konspekti">
-          <textarea
-            id="lesson-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Dars konspekti, asosiy mavzular va o'quvchiga yo'riqnoma..."
-            rows={7}
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+        <div className="pt-2 space-y-1">
+          <input
+            id="lesson-title"
+            aria-label="Dars nomi"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Dars nomi"
+            required
+            maxLength={200}
+            className="w-full bg-transparent text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-hidden"
           />
-        </Field>
-      </div>
-
-      {/* Bitta dars — bir nechta guruh */}
-      {(linkedLessons.length > 0 || otherGroups.length > 0) && (
-        <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <Link2 className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-              Boshqa guruhlar
-            </h2>
-            {linkedLessons.length > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowUnlinkDialog(true)}
-                className="gap-2 min-h-[40px] text-slate-500"
-              >
-                <Unlink className="w-4 h-4" />
-                Bog&apos;lanishni uzish
-              </Button>
-            )}
-          </div>
-
-          <details className="text-xs text-slate-600 dark:text-slate-400">
-            <summary className="cursor-pointer font-semibold text-teal-700 dark:text-teal-300 min-h-[28px] flex items-center">
-              Bitta dars bir nechta guruhda — qanday ishlaydi?
-            </summary>
-            <p className="mt-1 leading-relaxed">
-              Sarlavha, konspekt, materiallar, uyga vazifa matni va test barcha bog&apos;langan guruhlarda{" "}
-              <strong>birga yangilanadi</strong>. Sana, tartib raqami, nashr holati, vazifa muddati hamda
-              o&apos;quvchilarning javob va baholari har guruhda <strong>alohida</strong> qoladi.
-            </p>
-          </details>
-
-          {linkedLessons.length > 0 && (
-            <ul className="space-y-2">
-              {linkedLessons.map((l) => (
-                <li
-                  key={l._id}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
-                >
-                  <span className="flex flex-wrap items-center gap-2 min-w-0">
-                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{l.groupName}</span>
-                    {l.grade !== null && <span className="text-xs text-slate-500 dark:text-slate-400">{l.grade}-sinf</span>}
-                    {l.date && <span className="text-xs text-slate-500 dark:text-slate-400">· {formatDateUz(l.date)}</span>}
-                    <Badge variant={l.isPublished ? "success" : "warning"}>
-                      {l.isPublished ? "Nashr etilgan" : "Qoralama"}
-                    </Badge>
-                  </span>
-                  <Link
-                    href={`/mentor/lessons/${l._id}/edit`}
-                    className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline min-h-[36px] flex items-center"
-                  >
-                    Shu guruhdagi nusxani ochish
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {otherGroups.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                {initialLesson ? "Yana qaysi guruhlarga qo'shilsin?" : "Shu darsni quyidagi guruhlarga ham yaratish"}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {otherGroups.map((g) => {
-                  const id = g._id.toString();
-                  const checked = selectedExtraIds.includes(id);
-                  return (
-                    <label
-                      key={id}
-                      className={`flex items-center gap-2 px-3 rounded-xl border text-sm font-semibold cursor-pointer min-h-[36px] transition-colors ${
-                        checked
-                          ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300"
-                          : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleExtraGroup(id)}
-                        className="w-4 h-4 accent-teal-600 cursor-pointer"
-                      />
-                      <span className="font-mono" title={g.name}>{groupShortName(g)}</span>
-                      <span className={`text-xs font-normal ${g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`}>
-                        {g.grade}-sinf
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              {initialLesson ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleCopyToGroups}
-                    isLoading={isCopying}
-                    disabled={selectedExtraIds.length === 0}
-                    className="gap-2 min-h-[44px]"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Tanlangan guruhlarga qo&apos;shish
-                  </Button>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Darsning saqlangan holati ko&apos;chiriladi; sana har guruhning jadvaliga moslanadi.
-                  </span>
-                </div>
-              ) : (
-                selectedExtraIds.length > 0 && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Dars {selectedExtraIds.length + 1} ta guruhga yaratiladi; sana va vazifa muddati har guruhning
-                    jadvaliga moslanadi.
-                  </p>
-                )
-              )}
-            </div>
-          )}
+          <input
+            id="lesson-topic"
+            aria-label="Qisqacha mavzu"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Qisqacha mavzu — masalan: o'zgaruvchilar, ma'lumot turlari"
+            className="w-full bg-transparent text-sm sm:text-base font-medium text-teal-700 dark:text-teal-300 placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-normal focus:outline-hidden"
+          />
         </div>
-      )}
 
-      {/* Materials Builder Card */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-        <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
-          Dars materiallari ({materials.length})
-        </h2>
+        <textarea
+          id="lesson-description"
+          aria-label="Dars konspekti"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Dars konspekti: asosiy tushunchalar, misollar va o'quvchiga yo'riqnoma..."
+          rows={8}
+          className="w-full [field-sizing:content] min-h-48 resize-y border-t border-slate-100 dark:border-slate-800 bg-transparent pt-3 text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden"
+        />
+      </section>
 
-        {/* List of currently added materials */}
+      {/* Materiallar: faylni tashlash yoki havolani qo'yish kifoya — turi o'zi aniqlanadi */}
+      <section
+        className={cn(sectionClass, isDragging && "ring-2 ring-teal-500 border-teal-500")}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setIsDragging(false);
+          uploadMaterialFiles([...e.dataTransfer.files]);
+        }}
+      >
+        <SectionHeader icon={Paperclip} title="Materiallar" count={materials.length} />
+
         {materials.length > 0 && (
-          <div className="space-y-1.5">
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {materials.map((m, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between pl-3 pr-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
-              >
-                <div className="flex items-center gap-3 truncate pr-2">
-                  {m.type === "youtube" ? (
-                    <Video className="w-4 h-4 text-rose-500 shrink-0" />
-                  ) : m.type === "link" ? (
-                    <LinkIcon className="w-4 h-4 text-blue-500 shrink-0" />
-                  ) : (
-                    <FileText className="w-4 h-4 text-teal-500 shrink-0" />
+              <li key={`${m.urlOrKey}-${idx}`} className="flex items-center gap-2 py-1">
+                <span
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                    m.type === "youtube"
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                      : m.type === "link"
+                      ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                      : "bg-teal-500/10 text-teal-600 dark:text-teal-400"
                   )}
-                  <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                    {m.title}
+                  title={m.type === "youtube" ? "YouTube video" : m.type === "link" ? "Havola" : "Fayl"}
+                >
+                  {m.type === "youtube" ? <Video className="w-4 h-4" /> : m.type === "link" ? <LinkIcon className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <input
+                    aria-label="Material nomi"
+                    value={m.title}
+                    onChange={(e) => renameMaterial(idx, e.target.value)}
+                    placeholder="Material nomi"
+                    maxLength={200}
+                    className="w-full bg-transparent rounded-md px-1.5 py-1 -ml-1.5 text-sm font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-hidden"
+                  />
+                  <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {m.type === "file" ? formatFileSize(m.fileSize) || "Fayl" : m.urlOrKey}
                   </span>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">({m.type})</span>
-                </div>
-
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenMaterial(m)}
+                  disabled={openingKey === m.urlOrKey}
+                  className={iconButton}
+                  aria-label={m.type === "file" ? `${m.title} faylini yuklab olish` : `${m.title} havolasini ochish`}
+                  title={m.type === "file" ? "Yuklab olish" : "Ochish"}
+                >
+                  {openingKey === m.urlOrKey ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : m.type === "file" ? (
+                    <Download className="w-4 h-4" />
+                  ) : (
+                    <ExternalLink className="w-4 h-4" />
+                  )}
+                </button>
                 <button
                   type="button"
                   onClick={() => handleRemoveMaterial(idx)}
-                  className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                  className={cn(iconButton, "hover:text-rose-600 dark:hover:text-rose-400")}
                   aria-label={`${m.title} materialini o'chirish`}
                   title="O'chirish"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
-        {/* Add material interface */}
-        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 space-y-2.5">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["youtube", "file", "link"] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setMaterialType(type)}
-                className={`px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer min-h-[34px] ${
-                  materialType === type
-                    ? "bg-teal-600 text-white shadow-xs"
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                }`}
-              >
-                {type === "youtube" && "YouTube video"}
-                {type === "file" && "Fayl (PDF, ZIP, rasm — 20 MB gacha)"}
-                {type === "link" && "Tashqi havola"}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field htmlFor="mat-title" label="Material sarlavhasi (ixtiyoriy)">
-              <Input
-                id="mat-title"
-                value={matTitle}
-                onChange={(e) => setMatTitle(e.target.value)}
-                placeholder="masalan: Dars taqdimoti (PDF)"
-              />
-            </Field>
-
-            {materialType === "file" ? (
-              <Field htmlFor="file-upload" label="Faylni tanlang">
-                <input
-                  id="file-upload"
-                  type="file"
-                  onChange={handleFileUpload}
-                  disabled={uploadingFile}
-                  accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[40px] flex items-center"
-                />
-              </Field>
-            ) : (
-              <Field
-                htmlFor="mat-url"
-                label={materialType === "youtube" ? "YouTube video havolasi" : "Tashqi veb havola"}
-              >
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="mat-url"
-                    value={matUrl}
-                    onChange={(e) => setMatUrl(e.target.value)}
-                    placeholder={
-                      materialType === "youtube"
-                        ? "https://www.youtube.com/watch?v=..."
-                        : "https://example.com/..."
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleAddLinkOrVideo}
-                    disabled={!matUrl.trim()}
-                    className="shrink-0"
-                  >
-                    Qo&apos;shish
-                  </Button>
-                </div>
-              </Field>
+        <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+          <label
+            className={cn(
+              "flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl border border-dashed text-sm font-semibold cursor-pointer transition-colors",
+              "border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-teal-500 hover:text-teal-700 dark:hover:text-teal-300",
+              uploadingFile && "opacity-60 pointer-events-none"
             )}
+          >
+            {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            <span>{uploadingFile ? uploadProgress || "Yuklanmoqda..." : "Fayl yuklash"}</span>
+            <input
+              id="file-upload"
+              type="file"
+              multiple
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = "";
+                uploadMaterialFiles(files);
+              }}
+              disabled={uploadingFile}
+              accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
+              className="sr-only"
+            />
+          </label>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="mat-url"
+              aria-label="YouTube yoki boshqa havola"
+              value={matUrl}
+              onChange={(e) => setMatUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddLinkOrVideo();
+                }
+              }}
+              placeholder="YouTube yoki boshqa havolani qo'ying..."
+              inputMode="url"
+              className="w-full min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent px-3.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+            />
+            <Button type="button" variant="secondary" onClick={handleAddLinkOrVideo} disabled={!matUrl.trim()} className="shrink-0 gap-1.5">
+              <Plus className="w-4 h-4" />
+              Qo&apos;shish
+            </Button>
           </div>
-
-          {/* YouTube Video Preview Facade */}
-          {youtubeId && (
-            <div className="p-3 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
-              <div className="relative w-28 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`}
-                  alt="YouTube video preview"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                  YouTube video aniqlandi
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                  ID: {youtubeId}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {uploadProgress && (
-            <div className="flex items-center gap-2 text-xs font-medium text-teal-600 dark:text-teal-400">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{uploadProgress}</span>
-            </div>
-          )}
         </div>
-      </div>
+
+        {youtubeId ? (
+          <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`}
+              alt=""
+              className="h-12 w-20 rounded-lg object-cover bg-slate-100 dark:bg-slate-800"
+            />
+            <span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">YouTube video aniqlandi</span> — &quot;Qo&apos;shish&quot;ni bosing yoki Enter
+            </span>
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            Fayllarni shu yerga sudrab tashlash ham mumkin · PDF, Word, PowerPoint, Excel, ZIP, rasm · har biri 100 MB gacha
+          </p>
+        )}
+      </section>
 
       {/* Uyga vazifa */}
-      <div id="homework" className="scroll-mt-20 p-4 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-            Uyga vazifa
-          </h2>
-          <label className="flex items-center gap-2.5 cursor-pointer min-h-[32px]">
-            <input
-              type="checkbox"
-              checked={hwEnabled}
-              onChange={(e) => handleToggleHomework(e.target.checked)}
-              className="w-5 h-5 rounded-md accent-teal-600 cursor-pointer"
-            />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Bu darsga vazifa berish
-            </span>
-          </label>
-        </div>
+      <section id="homework" className={cn(sectionClass, "scroll-mt-20")}>
+        <SectionHeader
+          icon={ClipboardCheck}
+          title="Uyga vazifa"
+          action={<Toggle checked={hwEnabled} onChange={handleToggleHomework} label="Bu darsga vazifa berish" />}
+        />
 
         {!hwEnabled ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Yoqilsa, o&apos;quvchilar dars sahifasida javobini (matn, kod, havola yoki fayl) yuboradi, siz esa
-            &quot;Darslar&quot; ro&apos;yxatidagi &quot;Tekshirish&quot; tugmasi orqali baholaysiz.
+            Yoqilsa, o&apos;quvchilar dars sahifasida javobini (matn, kod, havola yoki fayl) yuboradi, siz esa uni tekshirib baholaysiz.
           </p>
         ) : (
-          <div className="space-y-3 animate-in fade-in">
-            <Field htmlFor="hw-instructions" label="Topshiriq matni" required>
+          <div className="space-y-4 animate-in fade-in">
+            <div className="space-y-2">
               <textarea
                 id="hw-instructions"
+                aria-label="Topshiriq matni"
                 value={hwInstructions}
                 onChange={(e) => setHwInstructions(e.target.value)}
                 rows={4}
                 maxLength={10000}
-                placeholder="1. ...&#10;2. ...&#10;Topshirish: kodni yoki GitHub havolasini yuboring"
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
+                placeholder={"Topshiriq matni:\n1. ...\n2. ...\nTopshirish: kodni yoki GitHub havolasini yuboring"}
+                className="w-full [field-sizing:content] min-h-28 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent p-3 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
               />
-            </Field>
-
-            {aiEnabled && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleGenerateHomework}
-                isLoading={hwGenerating}
-                className="gap-2"
-              >
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                {hwInstructions.trim() ? "AI bilan qayta tuzish" : "AI bilan tuzish"}
-              </Button>
-            )}
+              <div className="flex flex-wrap items-center gap-2">
+                {aiEnabled && (
+                  <Button type="button" variant="secondary" size="sm" onClick={handleGenerateHomework} isLoading={hwGenerating} className="gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    {hwInstructions.trim() ? "AI bilan qayta tuzish" : "AI bilan tuzish"}
+                  </Button>
+                )}
+                <label
+                  className={cn(
+                    "inline-flex items-center gap-2 px-3 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer hover:border-teal-500 hover:text-teal-700 dark:hover:text-teal-300 transition-colors",
+                    hwUploading && "opacity-60 pointer-events-none"
+                  )}
+                >
+                  {hwUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+                  Fayl biriktirish
+                  <input
+                    type="file"
+                    onChange={handleHomeworkFile}
+                    disabled={hwUploading}
+                    accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
+                    aria-label="Vazifaga fayl biriktirish"
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+              {hwAttachments.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {hwAttachments.map((m) => (
+                    <li
+                      key={m.urlOrKey}
+                      className="inline-flex items-center gap-1.5 max-w-full pl-2.5 pr-1 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      <FileText className="w-3.5 h-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
+                      <span className="truncate">{m.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => setHwAttachments((prev) => prev.filter((a) => a.urlOrKey !== m.urlOrKey))}
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                        aria-label={`${m.title} faylini olib tashlash`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <Field
@@ -884,80 +827,160 @@ export function LessonEditorForm({
                 />
               </Field>
             </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Biriktirilgan fayllar <span className="font-normal text-slate-500 dark:text-slate-400">(ixtiyoriy)</span>
-              </p>
-              {hwAttachments.map((m) => (
-                <div
-                  key={m.urlOrKey}
-                  className="flex items-center justify-between gap-2 pl-3 pr-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50"
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <FileText className="w-4 h-4 text-teal-500 shrink-0" />
-                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{m.title}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setHwAttachments((prev) => prev.filter((a) => a.urlOrKey !== m.urlOrKey))}
-                    className="p-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    aria-label={`${m.title} faylini olib tashlash`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-3">
-                <input
-                  type="file"
-                  onChange={handleHomeworkFile}
-                  disabled={hwUploading}
-                  accept=".pdf,.docx,.pptx,.xlsx,.zip,image/*"
-                  aria-label="Vazifaga fayl biriktirish"
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 dark:file:bg-teal-950/40 dark:file:text-teal-300 hover:file:bg-teal-100 cursor-pointer min-h-[40px] flex items-center"
-                />
-                {hwUploading && <Loader2 className="w-4 h-4 shrink-0 animate-spin text-teal-600" />}
-              </div>
-            </div>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Sticky action bar */}
-      <div className="sticky bottom-0 z-30 px-3 py-2 rounded-2xl bg-white/95 dark:bg-bg/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <label className="flex items-center gap-2.5 cursor-pointer min-h-[40px]">
-            <input
-              type="checkbox"
-              id="is-published"
-              checked={isPublished}
-              onChange={(e) => setIsPublished(e.target.checked)}
-              className="w-5 h-5 rounded-md accent-teal-600 cursor-pointer"
-            />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Nashr etilgan <span className="font-normal text-slate-600 dark:text-slate-400">(o&apos;quvchilarga ko&apos;rinadi)</span>
-            </span>
-          </label>
-          {initialLesson && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowQuizModal(true)}
-              className="gap-2 border-teal-500/30 text-teal-700 dark:text-teal-300 hover:bg-teal-500/10"
-            >
-              <HelpCircle className="w-4 h-4" />
-              Kichik test (quiz)
-            </Button>
+      {/* Kichik test */}
+      <section className={sectionClass}>
+        <SectionHeader
+          icon={HelpCircle}
+          title="Kichik test (quiz)"
+          action={
+            initialLesson ? (
+              <Button type="button" variant="secondary" size="sm" onClick={() => setShowQuizModal(true)} className="gap-1.5">
+                {initialQuiz ? "Testni tahrirlash" : "Test tuzish"}
+              </Button>
+            ) : undefined
+          }
+        />
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {!initialLesson
+            ? "Testni dars yaratilgandan keyin qo'shasiz: avval darsni saqlang."
+            : initialQuiz
+            ? `${initialQuiz.questions?.length ?? 0} ta savol · ${initialQuiz.isPublished ? "o'quvchilarga ochiq" : "qoralama"}`
+            : "Bu darsda hali test yo'q."}
+        </p>
+      </section>
+
+      {/* Bitta dars — bir nechta guruh */}
+      {(linkedLessons.length > 0 || otherGroups.length > 0) && (
+        <section className={sectionClass}>
+          <SectionHeader
+            icon={Link2}
+            title="Boshqa guruhlar"
+            count={linkedLessons.length || undefined}
+            action={
+              linkedLessons.length > 0 ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowUnlinkDialog(true)} className="gap-1.5 text-slate-500">
+                  <Unlink className="w-4 h-4" />
+                  Bog&apos;lanishni uzish
+                </Button>
+              ) : undefined
+            }
+          />
+
+          <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            Sarlavha, konspekt, materiallar, vazifa matni va test bog&apos;langan guruhlarda <strong>birga yangilanadi</strong>. Sana, tartib
+            raqami, nashr holati, vazifa muddati va o&apos;quvchilar javoblari har guruhda <strong>alohida</strong> qoladi.
+          </p>
+
+          {linkedLessons.length > 0 && (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {linkedLessons.map((l) => (
+                <li key={l._id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                  <span className="flex flex-wrap items-center gap-2 min-w-0">
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{l.groupName}</span>
+                    {l.grade !== null && <span className="text-xs text-slate-500 dark:text-slate-400">{l.grade}-sinf</span>}
+                    {l.date && <span className="text-xs text-slate-500 dark:text-slate-400">· {formatDateUz(l.date)}</span>}
+                    <Badge variant={l.isPublished ? "success" : "warning"}>{l.isPublished ? "Nashr etilgan" : "Qoralama"}</Badge>
+                  </span>
+                  <Link
+                    href={`/mentor/lessons/${l._id}/edit`}
+                    className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline min-h-[36px] flex items-center"
+                  >
+                    Shu guruhdagi nusxani ochish
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
+
+          {otherGroups.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                {initialLesson ? "Yana qaysi guruhlarga qo'shilsin?" : "Shu darsni quyidagi guruhlarga ham yaratish"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {otherGroups.map((g) => {
+                  const id = g._id.toString();
+                  const checked = selectedExtraIds.includes(id);
+                  return (
+                    <label
+                      key={id}
+                      className={cn(
+                        "flex items-center gap-2 px-3 rounded-xl border text-sm font-semibold cursor-pointer min-h-[40px] transition-colors",
+                        checked
+                          ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300"
+                          : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600"
+                      )}
+                    >
+                      <input type="checkbox" checked={checked} onChange={() => toggleExtraGroup(id)} className="sr-only" />
+                      {checked && <Check className="w-4 h-4" />}
+                      <span className="font-mono" title={g.name}>
+                        {groupShortName(g)}
+                      </span>
+                      <span className={cn("text-xs font-normal", g.grade === currentGroup?.grade ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400")}>
+                        {g.grade}-sinf
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {initialLesson ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleCopyToGroups}
+                    isLoading={isCopying}
+                    disabled={selectedExtraIds.length === 0}
+                    className="gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    Tanlangan guruhlarga qo&apos;shish
+                  </Button>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Darsning saqlangan holati ko&apos;chiriladi; sana har guruhning jadvaliga moslanadi.
+                  </span>
+                </div>
+              ) : (
+                selectedExtraIds.length > 0 && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Dars {selectedExtraIds.length + 1} ta guruhga yaratiladi; sana va vazifa muddati har guruhning jadvaliga moslanadi.
+                  </p>
+                )
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Doim ko'rinib turadigan amallar paneli */}
+      <div className="sticky bottom-20 md:bottom-3 z-30 px-3 py-2 rounded-2xl bg-white/95 dark:bg-surface/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-card flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3 min-h-[44px]">
+          <Toggle checked={isPublished} onChange={setIsPublished} label="Nashr qilish" />
+          <span className="hidden sm:inline text-xs text-slate-500 dark:text-slate-400">
+            {isPublished ? "O'quvchilarga ko'rinadi" : "Faqat sizga ko'rinadi"}
+          </span>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <Button type="button" variant="secondary" onClick={() => router.back()} disabled={isSaving}>
+          {isDirty && <span className="hidden md:inline text-xs text-amber-700 dark:text-amber-400">Saqlanmagan o&apos;zgarishlar</span>}
+          {initialLesson && (
+            <Link
+              href={`/mentor/lessons/${initialLesson._id}`}
+              title="Saqlangan holatini o'quvchi ko'rinishida ochish"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Eye className="w-4 h-4" />
+              Ko&apos;rish
+            </Link>
+          )}
+          <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving}>
             Bekor qilish
           </Button>
-          <Button type="submit" variant="primary" isLoading={isSaving} className="font-semibold">
+          <Button type="submit" variant="primary" isLoading={isSaving} className="font-semibold" title="Ctrl/⌘ + S">
             {initialLesson ? "Saqlash" : "Darsni yaratish"}
           </Button>
         </div>
@@ -989,10 +1012,52 @@ export function LessonEditorForm({
             title,
             topic,
             description,
-            grade: groups.find((g) => g._id.toString() === groupId)?.grade,
+            grade: currentGroup?.grade,
           }}
         />
       )}
     </form>
+  );
+}
+
+const sectionClass =
+  "p-4 sm:p-5 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3 transition-shadow";
+const metaLabel = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400";
+const metaControl =
+  "w-full h-10 rounded-lg border border-transparent bg-slate-100 dark:bg-slate-800/70 px-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100 hover:border-slate-300 dark:hover:border-slate-600 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20";
+const iconButton =
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-60";
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  count,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  count?: number;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 min-h-[36px]">
+      <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <Icon className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+        {title}
+        {count ? <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tabular-nums">{count}</span> : null}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+/** Yoqish/o'chirish tugmasi (switch) */
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+  return (
+    <label className="inline-flex items-center gap-2.5 cursor-pointer select-none min-h-[36px]">
+      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span className="relative h-6 w-11 shrink-0 rounded-full bg-slate-300 dark:bg-slate-700 transition-colors peer-checked:bg-teal-600 peer-focus-visible:ring-2 peer-focus-visible:ring-teal-500 peer-focus-visible:ring-offset-2 dark:peer-focus-visible:ring-offset-slate-900 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-5" />
+      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</span>
+    </label>
   );
 }

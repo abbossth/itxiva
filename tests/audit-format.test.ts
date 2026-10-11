@@ -46,7 +46,7 @@ describe("amallar tarixi: yozuvni o'qiladigan ko'rinishga keltirish", () => {
       refs
     );
     expect(move.facts).toEqual(["8.2 → 9.3"]);
-    expect(move.link?.href).toBe("/mentor/reports/students/u1");
+    expect(move.link?.href).toBe("/mentor/students/u1");
   });
 
   it("noma'lum amal ham xatosiz ko'rsatiladi", () => {

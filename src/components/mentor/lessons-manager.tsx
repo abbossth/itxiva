@@ -269,7 +269,8 @@ export function LessonsManager({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/mentor/lessons/${id}/edit`}
+                        href={`/mentor/lessons/${id}`}
+                        title="Darsni ochish (o'quvchi ko'rinishida)"
                         className="truncate text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
                       >
                         {lesson.title}

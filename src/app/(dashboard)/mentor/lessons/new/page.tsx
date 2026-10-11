@@ -1,4 +1,5 @@
 import { requireMentorPage } from "@/lib/auth/guards";
+import { getAppSettings, parseQuarter } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
 import Link from "next/link";
@@ -24,7 +25,7 @@ export default async function NewLessonPage({ searchParams }: NewLessonPageProps
 
   const groups = await getGroups();
   const defaultGroupId = resolvedSearchParams.groupId;
-  const defaultQuarter = resolvedSearchParams.quarter ? parseInt(resolvedSearchParams.quarter, 10) : 1;
+  const defaultQuarter = parseQuarter(resolvedSearchParams.quarter, (await getAppSettings()).quarter);
 
   return (
     <div className="space-y-2">

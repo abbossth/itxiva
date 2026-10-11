@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Package,
   Settings,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,7 +47,7 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
   { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },
-  { href: "/profile", label: "Sozlamalar", shortLabel: "Sozlama", icon: Settings, match: ["/mentor/import", "/mentor/audit"] },
+  { href: "/profile", label: "Sozlamalar", shortLabel: "Sozlama", icon: Settings, match: ["/mentor/settings", "/mentor/import", "/mentor/audit"] },
 ];
 
 /** Bir bo'limning ichki sahifalari — sahifa tepasida tab sifatida ko'rinadi (SectionTabs) */
@@ -69,6 +70,7 @@ export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
     label: "Sozlamalar",
     tabs: [
       { href: "/profile", label: "Profil va Telegram", icon: User },
+      { href: "/mentor/settings", label: "Platforma", icon: SlidersHorizontal },
       { href: "/mentor/import", label: "Excel import", icon: FileSpreadsheet },
       { href: "/mentor/audit", label: "Amallar tarixi", icon: ShieldCheck },
     ],

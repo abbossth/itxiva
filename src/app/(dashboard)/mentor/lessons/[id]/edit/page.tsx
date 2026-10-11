@@ -37,11 +37,11 @@ export default async function EditLessonPage({ params }: EditLessonPageProps) {
     <div className="space-y-2">
       <div>
         <Link
-          href="/mentor/lessons"
+          href={`/mentor/lessons/${resolvedParams.id}`}
           className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-teal-600 min-h-[32px]"
         >
           <ArrowLeft className="w-4 h-4" />
-          Darslarga qaytish
+          Darsga qaytish
         </Link>
       </div>
 
