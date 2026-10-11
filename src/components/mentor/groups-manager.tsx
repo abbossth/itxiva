@@ -343,7 +343,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
               })()}
             </div>
 
-            <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex flex-wrap items-center justify-between gap-y-2 pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center">
               <button
                 type="button"
@@ -365,7 +365,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
               </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-auto">
                 <Link
                   href={`/mentor/groups/${group._id.toString()}`}
                   className={buttonVariants({ variant: "outline", size: "sm", className: "min-h-[44px]" })}
@@ -388,7 +388,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
 
       {/* Create Group Modal */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>Yangi o&apos;quv guruhi yaratish</DialogTitle>
             <DialogDescription>
@@ -428,11 +428,15 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
             </Field>
 
             <Field htmlFor="group-grade" label="Sinf darajasi" required>
-              <div className="flex items-center gap-4 pt-1">
+              <div className="grid grid-cols-4 gap-2 pt-1">
                 {[8, 9, 10, 11].map((g) => (
                   <label
                     key={g}
-                    className="flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200 cursor-pointer min-h-[44px]"
+                    className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border text-sm cursor-pointer min-h-[44px] transition-colors ${
+                      grade === g
+                        ? "border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300"
+                        : "border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                    }`}
                   >
                     <input
                       type="radio"
@@ -440,7 +444,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
                       value={g}
                       checked={grade === g}
                       onChange={() => setGrade(g)}
-                      className="accent-teal-600 w-4 h-4"
+                      className="sr-only"
                     />
                     <span className="font-semibold">{g}-sinf</span>
                   </label>
@@ -479,7 +483,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
 
       {/* Edit Group (name + schedule) Modal */}
       <Dialog open={Boolean(groupToEdit)} onOpenChange={(open) => !open && setGroupToEdit(null)}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>Guruhni tahrirlash</DialogTitle>
             <DialogDescription>Guruh nomi va dars jadvalini o&apos;zgartiring</DialogDescription>

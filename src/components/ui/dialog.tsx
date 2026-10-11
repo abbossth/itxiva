@@ -67,7 +67,7 @@ export function Dialog({
 
     return (
       <Portal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
           onClick={handleClose}
@@ -75,7 +75,7 @@ export function Dialog({
         />
         <div
           className={cn(
-            "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
+            "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl z-10 max-h-[90dvh] overflow-y-auto animate-in zoom-in-95",
             maxWidths
           )}
           role="dialog"
@@ -111,7 +111,7 @@ export function Dialog({
   return (
     <DialogContext.Provider value={{ isOpen: isActualOpen, onClose: handleClose }}>
       <Portal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
           onClick={handleClose}
@@ -136,7 +136,7 @@ export function DialogContent({
   return (
     <div
       className={cn(
-        "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95",
+        "relative w-full rounded-2xl bg-white dark:bg-surface border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-2xl z-10 max-h-[90dvh] overflow-y-auto animate-in zoom-in-95",
         className
       )}
       role="dialog"

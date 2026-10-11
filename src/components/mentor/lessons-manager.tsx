@@ -129,7 +129,7 @@ export function LessonsManager({
             <Link
               href="/mentor/homework"
               title="Kim qaysi vazifani topshirgani — bitta ro'yxatda"
-              className="ml-auto whitespace-nowrap normal-case tracking-normal font-semibold text-teal-700 dark:text-teal-300 hover:underline"
+              className="ml-auto py-2 -my-2 whitespace-nowrap normal-case tracking-normal font-semibold text-teal-700 dark:text-teal-300 hover:underline"
             >
               Barcha javoblar
             </Link>
@@ -278,7 +278,7 @@ export function LessonsManager({
                       <Link
                         href={`/mentor/lessons/${id}`}
                         title="Darsni ochish (o'quvchi ko'rinishida)"
-                        className="truncate text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
+                        className="truncate py-1 text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300"
                       >
                         {lesson.title}
                       </Link>

@@ -491,7 +491,7 @@ export function ExamTaker({
 
       {/* Confirmation modal before final submit */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="max-w-md p-6 space-y-4">
+        <DialogContent className="max-w-md p-4 sm:p-6 space-y-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               <HelpCircle className="w-5 h-5 text-teal-600 dark:text-teal-400" />

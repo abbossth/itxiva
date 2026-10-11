@@ -214,7 +214,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: ShopOrder[] })
       )}
 
       <Dialog open={Boolean(toReject)} onOpenChange={(open) => !open && setToReject(null)}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>Buyurtmani bekor qilish</DialogTitle>
             <DialogDescription>

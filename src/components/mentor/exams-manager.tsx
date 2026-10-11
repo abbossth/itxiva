@@ -116,19 +116,19 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
     <div className="space-y-6">
       {/* Quarter filter buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(["all", 1, 2, 3, 4] as const).map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => setQuarterFilter(q)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`shrink-0 whitespace-nowrap px-3 min-h-[40px] rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 quarterFilter === q
                   ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
-              {q === "all" ? "Barcha choraklar" : `${q}-chorak`}
+              {q === "all" ? "Barchasi" : `${q}-chorak`}
             </button>
           ))}
         </div>
@@ -323,7 +323,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
 
       {/* Delete Confirmation Modal */}
       <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
-        <DialogContent className="max-w-md p-6 space-y-4">
+        <DialogContent className="max-w-md p-4 sm:p-6 space-y-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-600 text-lg">
               <AlertCircle className="w-5 h-5" />

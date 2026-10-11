@@ -84,7 +84,17 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
               ariaLabel="Joriy chorak"
               value={quarter}
               onChange={setQuarter}
-              options={[1, 2, 3, 4].map((q) => ({ value: q, label: `${q}-chorak` }))}
+              className="flex w-full"
+              options={[1, 2, 3, 4].map((q) => ({
+                value: q,
+                // Juda tor ekranda faqat raqam qoladi
+                label: (
+                  <>
+                    {q}
+                    <span className="hidden min-[380px]:inline">-chorak</span>
+                  </>
+                ),
+              }))}
             />
           </Field>
         </div>

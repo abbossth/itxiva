@@ -304,7 +304,7 @@ export function GroupStudentsView({
 
       {/* Move Student Modal */}
       <Dialog open={Boolean(studentToMove)} onOpenChange={(open) => !open && setStudentToMove(null)}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>O&apos;quvchini ko&apos;chirish</DialogTitle>
             <DialogDescription>

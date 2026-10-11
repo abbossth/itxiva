@@ -85,7 +85,7 @@ export function CredentialsExport({ groupId, groupName }: { groupId: string; gro
       </div>
 
       <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>Login va parollarni yuklab olish</DialogTitle>
             <DialogDescription>

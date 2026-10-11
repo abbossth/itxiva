@@ -16,7 +16,10 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
   return (
     <div className="space-y-4 pb-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <Greeting name={data.firstName} subtitle={subtitle} />
+        {/* Tor ekranda tugma salomlashuv matni ustiga chiqmay, keyingi qatorga tushadi */}
+        <div className="min-w-0 flex-1 basis-52">
+          <Greeting name={data.firstName} subtitle={subtitle} />
+        </div>
         <Link href="/mentor/lessons/new" className={buttonVariants({ variant: "primary", size: "sm" })}>
           <Plus className="w-4 h-4" />
           Yangi dars
@@ -41,7 +44,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatLink
-          href="/mentor/lessons"
+          href="/mentor/homework"
           label="Tekshirish kerak"
           icon={ClipboardCheck}
           value={data.ungradedHomework}
@@ -61,7 +64,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/lessons">
+        <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/homework">
           {data.homeworkToCheck.length === 0 ? (
             <DashEmpty>Tekshirilmagan javob yo&apos;q.</DashEmpty>
           ) : (

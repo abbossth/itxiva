@@ -210,7 +210,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
             <span className="font-mono text-teal-700 dark:text-teal-300">@{student.login}</span>
             {student.groupName && profile.groupId ? (
-              <Link href={`/mentor/groups/${profile.groupId}`} className="font-semibold hover:underline">
+              <Link href={`/mentor/groups/${profile.groupId}`} className="font-semibold hover:underline py-2 -my-2">
                 {student.groupName}
               </Link>
             ) : (
@@ -502,7 +502,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
                   <li key={h.lessonId} className="py-2 flex items-center justify-between gap-3">
                     <Link
                       href={`/mentor/homework/${h.lessonId}`}
-                      className="min-w-0 truncate text-slate-700 dark:text-slate-200 hover:text-teal-600 dark:hover:text-teal-400 hover:underline"
+                      className="min-w-0 truncate py-1.5 text-slate-700 dark:text-slate-200 hover:text-teal-600 dark:hover:text-teal-400 hover:underline"
                     >
                       {h.title}
                     </Link>

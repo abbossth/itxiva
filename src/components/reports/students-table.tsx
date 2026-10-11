@@ -122,14 +122,14 @@ export function StudentsTable({ rows, fileSuffix }: { rows: Row[]; fileSuffix: s
             <thead>
               <tr className="sticky top-0 z-10 bg-white dark:bg-surface text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 shadow-[0_1px_0_0_var(--border)]">
                 <th className="py-2 pr-2 text-left font-bold">
-                  <button type="button" onClick={() => sortBy("fullName")} className="inline-flex items-center gap-1 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100">
+                  <button type="button" onClick={() => sortBy("fullName")} className="inline-flex items-center gap-1 min-h-[36px] uppercase cursor-pointer hover:text-slate-900 dark:hover:text-slate-100">
                     O&apos;quvchi
                     {sortKey === "fullName" && <SortIcon className="w-3 h-3" />}
                   </button>
                 </th>
                 {COLUMNS.map((c) => (
                   <th key={c.key} className="px-2 py-2 text-center font-bold" aria-sort={sortKey === c.key ? (asc ? "ascending" : "descending") : undefined}>
-                    <button type="button" title={c.title} onClick={() => sortBy(c.key)} className="inline-flex items-center gap-1 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100">
+                    <button type="button" title={c.title} onClick={() => sortBy(c.key)} className="inline-flex items-center gap-1 min-h-[36px] uppercase cursor-pointer hover:text-slate-900 dark:hover:text-slate-100">
                       {c.label}
                       {sortKey === c.key && <SortIcon className="w-3 h-3" />}
                     </button>

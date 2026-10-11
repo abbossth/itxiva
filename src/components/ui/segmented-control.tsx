@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string | number>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
+        "inline-flex max-w-full items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
         className
       )}
     >
@@ -45,9 +45,9 @@ export function SegmentedControl<T extends string | number>({
             aria-checked={isSelected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all duration-150 select-none cursor-pointer",
+              "inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl font-semibold transition-all duration-150 select-none cursor-pointer",
               "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
-              size === "sm" ? "px-3 py-1.5 text-xs min-h-[36px]" : "px-4 py-2 text-xs sm:text-sm min-h-[40px]",
+              size === "sm" ? "px-2.5 sm:px-3 py-1.5 text-xs min-h-[36px]" : "px-2.5 sm:px-4 py-2 text-xs sm:text-sm min-h-[40px]",
               isSelected
                 ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs scale-100"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"

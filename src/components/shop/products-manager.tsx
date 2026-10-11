@@ -259,7 +259,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
       )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md p-6 max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="max-w-md p-4 sm:p-6 max-h-[90dvh] overflow-y-auto">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>{editingId ? "Mahsulotni tahrirlash" : "Yangi mahsulot"}</DialogTitle>
             <DialogDescription>Nom, narx va (ixtiyoriy) rasmini kiriting</DialogDescription>

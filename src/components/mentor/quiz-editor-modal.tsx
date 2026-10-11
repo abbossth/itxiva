@@ -159,15 +159,15 @@ export function QuizEditorModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-2 border-b border-slate-100 dark:border-slate-800">
+      <DialogContent className="max-w-2xl max-h-[88dvh] flex flex-col p-0">
+        <DialogHeader className="p-4 sm:p-6 pb-2 sm:pb-2 border-b border-slate-100 dark:border-slate-800">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <HelpCircle className="w-5 h-5 text-teal-600 dark:text-teal-400" />
             <span>Kichik testni sozlash</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {error && (
             <div className="p-3 text-sm rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">
               {error}
@@ -210,11 +210,11 @@ export function QuizEditorModal({
           </div>
 
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Savollar ({questions.length})
               </h3>
-              <div className="flex flex-wrap items-center justify-end gap-1">
+              <div className="flex flex-wrap items-center sm:justify-end gap-1.5">
                 {aiEnabled && lessonContext && (
                   <Button
                     type="button"
@@ -222,7 +222,7 @@ export function QuizEditorModal({
                     variant="primary"
                     onClick={handleGenerate}
                     isLoading={generating}
-                    className="text-xs h-8"
+                    className="text-xs h-9"
                   >
                     <Sparkles className="w-3.5 h-3.5 mr-1" /> AI bilan tuzish
                   </Button>
@@ -232,7 +232,7 @@ export function QuizEditorModal({
                   size="sm"
                   variant="outline"
                   onClick={() => addQuestion("single_choice")}
-                  className="text-xs h-8"
+                  className="text-xs h-9"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" /> Test savol
                 </Button>
@@ -241,7 +241,7 @@ export function QuizEditorModal({
                   size="sm"
                   variant="outline"
                   onClick={() => addQuestion("short_answer")}
-                  className="text-xs h-8"
+                  className="text-xs h-9"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" /> Qisqa javob
                 </Button>
@@ -250,7 +250,7 @@ export function QuizEditorModal({
                   size="sm"
                   variant="outline"
                   onClick={() => addQuestion("open_ended")}
-                  className="text-xs h-8"
+                  className="text-xs h-9"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" /> Ochiq savol
                 </Button>
@@ -262,9 +262,9 @@ export function QuizEditorModal({
                 key={qIdx}
                 className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-3"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1 basis-56">
+                  <span className="shrink-0 whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">
                       {qIdx + 1}-savol
                     </span>
                     <select
@@ -278,7 +278,7 @@ export function QuizEditorModal({
                               : [],
                         })
                       }
-                      className="text-xs px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      className="min-w-0 flex-1 h-9 text-xs px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
                     >
                       <option value="single_choice">Bitta to&apos;g&apos;ri javob</option>
                       <option value="multiple_choice">Bir nechta to&apos;g&apos;ri javob</option>
@@ -296,13 +296,14 @@ export function QuizEditorModal({
                         max="20"
                         value={q.points}
                         onChange={(e) => updateQuestion(qIdx, { points: Number(e.target.value) || 1 })}
-                        className="w-12 px-1.5 py-0.5 text-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                        className="w-14 h-9 px-1.5 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => removeQuestion(qIdx)}
-                      className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500 transition-colors"
+                      aria-label="Savolni o'chirish"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -332,7 +333,8 @@ export function QuizEditorModal({
                           <button
                             type="button"
                             onClick={() => toggleCorrectAnswer(qIdx, opt, q.type === "single_choice")}
-                            className={`p-1 rounded-md border transition-colors ${
+                            aria-label="To'g'ri javob sifatida belgilash"
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
                               isCorrect
                                 ? "bg-emerald-500 border-emerald-500 text-white"
                                 : "border-slate-300 dark:border-slate-600 text-transparent"
@@ -352,12 +354,13 @@ export function QuizEditorModal({
                               );
                               updateQuestion(qIdx, { options: newOpts, correctAnswers: newCorrect });
                             }}
-                            className="flex-1 px-2.5 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                            className="min-w-0 flex-1 h-9 px-2.5 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                           />
                           <button
                             type="button"
                             onClick={() => removeOption(qIdx, optIdx)}
-                            className="p-1 text-slate-500 dark:text-slate-400 hover:text-rose-500"
+                            aria-label="Variantni o'chirish"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -369,7 +372,7 @@ export function QuizEditorModal({
                       variant="ghost"
                       size="sm"
                       onClick={() => addOption(qIdx)}
-                      className="text-xs h-7 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10"
+                      className="text-xs h-9 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10"
                     >
                       <Plus className="w-3 h-3 mr-1" /> Variant qo&apos;shish
                     </Button>

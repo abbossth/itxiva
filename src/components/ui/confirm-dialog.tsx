@@ -55,7 +55,7 @@ export function ConfirmDialog({
         }
       }}
     >
-      <DialogContent key={String(isOpen)} className="max-w-md p-6">
+      <DialogContent key={String(isOpen)} className="max-w-md p-4 sm:p-6">
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-3">
             {danger && (

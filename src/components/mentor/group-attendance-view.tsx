@@ -143,7 +143,7 @@ export function GroupAttendanceView({ groupId, schedule, activeSession, todaySes
       <AttendanceJournal groupId={groupId} onManualEntry={() => setIsManualOpen(true)} />
 
       <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
-        <DialogContent className="max-w-md p-6">
+        <DialogContent className="max-w-md p-4 sm:p-6">
           <DialogHeader className="space-y-1 mb-4">
             <DialogTitle>Davomatni qo&apos;lda kiritish</DialogTitle>
             <DialogDescription>
