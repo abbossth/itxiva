@@ -73,7 +73,7 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
         </Link>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DashCard title="Vazifalar" icon={ClipboardCheck} href="/homework">
           {homework.todo.length === 0 ? (
             <DashEmpty>Topshirilmagan vazifa yo&apos;q. Barakalla!</DashEmpty>

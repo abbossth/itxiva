@@ -520,7 +520,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
             )}
           </ReportSection>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ReportSection title="Testlar (quiz)" description={quizAvg === null ? undefined : `O'rtacha natija: ${quizAvg}%`}>
               {report.quizzes.length === 0 ? (
                 empty("Hali test topshirmagan")

@@ -240,7 +240,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             <Flame className="w-4 h-4 text-orange-500" />
             Hafta yulduzlari — oxirgi 7 kunda eng ko&apos;p o&apos;sganlar
           </h2>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-3">
+          <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {data.weekStars.map((e) => (
               <li
                 key={e.userId}
@@ -268,7 +268,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       )}
 
       {session.role === "student" && (
-        <section aria-label="Coin qanday yig'iladi" className="grid gap-2 sm:grid-cols-3">
+        <section aria-label="Coin qanday yig'iladi" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {[
             { href: "/attendance", icon: QrCode, title: "Darsga keling", text: "Har bir dars uchun +5 coin" },
             { href: "/homework", icon: ClipboardCheck, title: "Vazifani topshiring", text: "Ball qancha yuqori bo'lsa, coin shuncha ko'p" },

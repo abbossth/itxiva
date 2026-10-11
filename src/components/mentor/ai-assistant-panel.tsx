@@ -137,7 +137,7 @@ export function AiAssistantPanel({
       <div className="px-4 pb-4 pt-1 space-y-3">
 
       {/* 1. Dars matni */}
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <Field htmlFor="ai-topic" label="Mavzu" hint="Bo'sh qoldirilsa dars sarlavhasi olinadi">
           <Input
             id="ai-topic"

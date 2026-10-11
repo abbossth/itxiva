@@ -194,7 +194,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
             <CalendarClock className="w-4 h-4" />
             Bugungi darslar
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {todaysGroups.map((g) => {
               const id = g._id.toString();
               const session = attendance.today[id] ?? attendance.active.find((s) => s.groupId === id);
@@ -287,7 +287,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
       )}
 
       {/* Grid of groups */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {groups.map((group) => (
           <div
             key={group._id.toString()}

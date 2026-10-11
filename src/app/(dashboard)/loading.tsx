@@ -12,7 +12,7 @@ export default function DashboardLoading() {
           <Skeleton key={i} className="h-[104px] sm:h-[116px] rounded-2xl" />
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Skeleton className="h-64 rounded-2xl" />
         <Skeleton className="h-64 rounded-2xl" />
       </div>

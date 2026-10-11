@@ -63,7 +63,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
         <StatLink href="/mentor/lessons" label="Darslar" icon={BookOpen} value={data.totals.lessons} hint="jami yaratilgan" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/homework">
           {data.homeworkToCheck.length === 0 ? (
             <DashEmpty>Tekshirilmagan javob yo&apos;q.</DashEmpty>
@@ -115,7 +115,7 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
         {data.groups.length === 0 ? (
           <DashEmpty>Hali guruh yaratilmagan.</DashEmpty>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {data.groups.map((g) => (
               <li key={g._id}>
                 <Link

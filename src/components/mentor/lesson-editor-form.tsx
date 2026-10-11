@@ -642,7 +642,7 @@ export function LessonEditorForm({
           </ul>
         )}
 
-        <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
           <label
             className={cn(
               "flex items-center justify-center gap-2 px-4 min-h-[44px] rounded-xl border border-dashed text-sm font-semibold cursor-pointer transition-colors",
@@ -782,7 +782,7 @@ export function LessonEditorForm({
               )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <Field
                 htmlFor="hw-due"
                 label="Topshirish muddati (Toshkent vaqti)"

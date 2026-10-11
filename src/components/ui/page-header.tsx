@@ -38,13 +38,13 @@ export function PageHeader({
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight flex items-start gap-2.5">
             {Icon && (
               <div className="p-1.5 rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300 shrink-0">
                 <Icon className="w-5 h-5" />
               </div>
             )}
-            <span>{title}</span>
+            <span className="min-w-0 break-words">{title}</span>
           </h1>
           {subtitle && (
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">

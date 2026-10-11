@@ -124,7 +124,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: ShopOrder[] })
       {visible.length === 0 ? (
         <EmptyState icon={PackageCheck} title={activeTab.empty} />
       ) : (
-        <div key={tab} className="grid gap-3 sm:grid-cols-2 page-enter">
+        <div key={tab} className="grid grid-cols-1 gap-3 sm:grid-cols-2 page-enter">
           {visible.map((order) => (
             <div
               key={order._id}

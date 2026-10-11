@@ -175,7 +175,7 @@ export function ReportsView({ data, groups, period, groupId, academicYear }: Rep
 
           <StudentsTable rows={data.studentsTable} fileSuffix={suffix} />
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ReportSection
               title="Guruhlar bo'yicha davomat"
               description="Qatnashganlar ulushi (sababli qoldirilganlar hisobga olinmaydi)"
@@ -306,7 +306,7 @@ export function ReportsView({ data, groups, period, groupId, academicYear }: Rep
             />
           </ReportSection>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ReportSection
               title="Testlar (quiz) natijalari"
               description="Guruhlar bo'yicha o'rtacha natija"

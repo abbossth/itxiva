@@ -239,7 +239,7 @@ export function ExcelImportView() {
       {/* 2. Ko'rib chiqish */}
       {preview && (
         <div className="space-y-6 page-enter">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {preview.groups.map((g) => (
               <div
                 key={g.name}
@@ -322,7 +322,7 @@ export function ExcelImportView() {
               <summary className="cursor-pointer font-semibold min-h-[28px]">
                 Excel&apos;da yo&apos;q, bazada bor {preview.untouched.length} ta o&apos;quvchi (ularga tegilmaydi)
               </summary>
-              <ul className="mt-3 grid gap-1 sm:grid-cols-2">
+              <ul className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {preview.untouched.map((u) => (
                   <li key={u.userId} className="truncate">
                     {u.fullName} <span className="text-slate-500 dark:text-slate-400">@{u.login} · {u.groupName || "guruhsiz"}</span>

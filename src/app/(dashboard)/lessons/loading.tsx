@@ -11,7 +11,7 @@ export default function LessonsLoading() {
         <Skeleton className="h-10 w-64 rounded-2xl" />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <LessonCardSkeleton />
         <LessonCardSkeleton />
         <LessonCardSkeleton />

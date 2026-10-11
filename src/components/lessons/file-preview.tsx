@@ -78,7 +78,7 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
         </div>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {nonVideoMaterials.map((mat, idx) => {
           const Icon = getFileIcon(mat.type, mat.mimeType);
           const isLoading = loadingKey === mat.urlOrKey;

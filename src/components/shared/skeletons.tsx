@@ -165,7 +165,7 @@ export function FormSkeleton({ fields = 5 }: { fields?: number }) {
   return (
     <div className={cn(CARD, "rounded-3xl p-6 space-y-5 max-w-4xl mx-auto")}>
       <Skeleton className="h-6 w-56 rounded-md" />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Skeleton className="h-11 rounded-xl" />
         <Skeleton className="h-11 rounded-xl" />
         <Skeleton className="h-11 rounded-xl" />

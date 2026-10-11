@@ -100,7 +100,7 @@ export function StudentPersonalForm(props: Props) {
 
       <section className={card}>
         <SectionTitle icon={UserRound}>Asosiy ma&apos;lumotlar</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {isMentor && (
             <Field htmlFor="sp-name" label="Ism-familiya" required className="sm:col-span-2">
               <Input id="sp-name" {...text("fullName")} required minLength={2} maxLength={80} autoComplete="off" />
@@ -130,7 +130,7 @@ export function StudentPersonalForm(props: Props) {
 
       <section className={card}>
         <SectionTitle icon={Users}>Ota-onasi</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field htmlFor="sp-father" label="Otasining ism-familiyasi">
             <Input id="sp-father" {...text("fatherName")} maxLength={80} autoComplete="off" />
           </Field>
@@ -148,7 +148,7 @@ export function StudentPersonalForm(props: Props) {
 
       <section className={card}>
         <SectionTitle icon={FileText}>Tug&apos;ilganlik haqidagi guvohnoma</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field htmlFor="sp-bc-number" label="Seriya va raqami">
             <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
           </Field>
@@ -163,7 +163,7 @@ export function StudentPersonalForm(props: Props) {
 
       <section className={card}>
         <SectionTitle icon={IdCard}>Pasport yoki ID-karta</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field htmlFor="sp-pass-number" label="Seriya va raqami">
             <Input id="sp-pass-number" placeholder="AB 1234567" {...text("passportNumber")} maxLength={20} autoComplete="off" className="font-mono" />
           </Field>

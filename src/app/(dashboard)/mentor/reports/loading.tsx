@@ -9,7 +9,7 @@ export default function MentorReportsLoading() {
         <Skeleton className="h-11 w-full sm:w-56 rounded-xl" />
       </div>
       <StatTilesSkeleton />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SectionSkeleton />
         <SectionSkeleton />
       </div>

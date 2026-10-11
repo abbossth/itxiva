@@ -134,7 +134,7 @@ export function LessonsManager({
               Barcha javoblar
             </Link>
           </h2>
-          <ul className="grid gap-1.5 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {toCheck.map((item) => (
               <li key={item.lessonId}>
                 <Link

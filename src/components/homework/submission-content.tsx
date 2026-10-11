@@ -86,7 +86,7 @@ export function SubmissionContent({ submissionId, text, links, files }: Submissi
       )}
 
       {files.length > 0 && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {files.map((file) => {
             const Icon = fileIcon(file);
             const isLoading = loadingKey === file.key;

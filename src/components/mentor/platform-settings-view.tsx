@@ -69,7 +69,7 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field htmlFor="settings-year" label="O'quv yili">
             <Select id="settings-year" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}>
               {yearOptions.map((y) => (
