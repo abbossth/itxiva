@@ -12,20 +12,21 @@ import type { ActionResult } from "./auth.actions";
 /** Joriy o'quv yili, chorak va asosiy rang — barcha foydalanuvchilar uchun */
 export async function updateAppSettingsAction(input: unknown): Promise<ActionResult> {
   const mentor = await requireMentor();
-  const { academicYear, quarter, accent } = (input ?? {}) as Record<string, unknown>;
+  const { academicYear, quarter, accent, studentProfileEdit } = (input ?? {}) as Record<string, unknown>;
 
   if (!isAcademicYear(academicYear)) return { success: false, message: "O'quv yili noto'g'ri (masalan: 2026-2027)" };
   if (typeof quarter !== "number" || !Number.isInteger(quarter) || quarter < 1 || quarter > 4) {
     return { success: false, message: "Chorak 1 dan 4 gacha bo'lishi kerak" };
   }
   if (!isAccentId(accent)) return { success: false, message: "Rang noto'g'ri tanlangan" };
+  if (typeof studentProfileEdit !== "boolean") return { success: false, message: "Sozlama noto'g'ri" };
 
   await connectToDatabase();
-  await AppSettings.updateOne({ key: "global" }, { $set: { academicYear, quarter, accent } }, { upsert: true });
+  await AppSettings.updateOne({ key: "global" }, { $set: { academicYear, quarter, accent, studentProfileEdit } }, { upsert: true });
   await AuditLog.create({
     actorId: mentor.userId,
     action: "UPDATE_SETTINGS",
-    details: { academicYear, quarter, accent },
+    details: { academicYear, quarter, accent, studentProfileEdit },
   });
 
   // Rang va standart chorak barcha sahifalarga ta'sir qiladi

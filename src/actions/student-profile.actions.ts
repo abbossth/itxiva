@@ -6,12 +6,14 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { StudentProfile, type Gender } from "@/lib/db/models/student-profile.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentor, requireStudent } from "@/lib/auth/guards";
+import { getAppSettings } from "@/lib/settings";
 import { decryptField, encryptField } from "@/lib/field-crypto";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
-import { studentProfileSchema, type StudentProfileInput } from "@/lib/validations/student-profile.schema";
+import { ownProfileSchema, studentProfileSchema, type OwnProfileInput, type StudentProfileInput } from "@/lib/validations/student-profile.schema";
 import { getStudentReport, type StudentReport } from "@/actions/report.actions";
 import { describeAudit } from "@/lib/audit-format";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { ActionResult } from "./auth.actions";
 
 /** Faqat sana ("YYYY-MM-DD") sifatida saqlanadigan maydonlar: UTC yarim tunda yoziladi, vaqt zonasiga bog'liq emas */
@@ -37,6 +39,55 @@ export interface StudentProfileData {
   createdAt: string | null;
   mustChangePassword: boolean;
   telegramLinked: boolean;
+}
+
+type ProfileLean = Awaited<ReturnType<typeof loadProfile>>;
+const loadProfile = (studentId: string) => StudentProfile.findOne({ studentId }).lean();
+
+/** Bazadagi hujjatdan forma qiymatlari (mentor izohisiz) */
+function toOwnData(profile: ProfileLean): OwnProfileInput {
+  return {
+    birthDate: toKey(profile?.birthDate),
+    gender: profile?.gender ?? "",
+    phone: profile?.phone ?? "",
+    address: profile?.address ?? "",
+    school: profile?.school ?? "",
+    fatherName: profile?.fatherName ?? "",
+    fatherPhone: profile?.fatherPhone ?? "",
+    motherName: profile?.motherName ?? "",
+    motherPhone: profile?.motherPhone ?? "",
+    birthCertNumber: decryptField(profile?.birthCertNumberEnc),
+    birthCertIssuedAt: toKey(profile?.birthCertIssuedAt),
+    birthCertIssuedBy: profile?.birthCertIssuedBy ?? "",
+    passportNumber: decryptField(profile?.passportNumberEnc),
+    passportIssuedAt: toKey(profile?.passportIssuedAt),
+    passportExpiresAt: toKey(profile?.passportExpiresAt),
+    passportIssuedBy: profile?.passportIssuedBy ?? "",
+    pinfl: decryptField(profile?.pinflEnc),
+  };
+}
+
+/** Forma qiymatlaridan bazaga yoziladigan maydonlar (hujjat raqamlari shifrlanadi) */
+function toStoredFields(d: OwnProfileInput) {
+  return {
+    birthDate: toDate(d.birthDate),
+    gender: (d.gender || null) as Gender | null,
+    phone: d.phone,
+    address: d.address,
+    school: d.school,
+    fatherName: d.fatherName,
+    fatherPhone: d.fatherPhone,
+    motherName: d.motherName,
+    motherPhone: d.motherPhone,
+    birthCertNumberEnc: encryptField(d.birthCertNumber),
+    birthCertIssuedAt: toDate(d.birthCertIssuedAt),
+    birthCertIssuedBy: d.birthCertIssuedBy,
+    passportNumberEnc: encryptField(d.passportNumber),
+    passportIssuedAt: toDate(d.passportIssuedAt),
+    passportExpiresAt: toDate(d.passportExpiresAt),
+    passportIssuedBy: d.passportIssuedBy,
+    pinflEnc: encryptField(d.pinfl),
+  };
 }
 
 async function photoUrlOf(key?: string | null): Promise<string | null> {
@@ -67,29 +118,11 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
     report,
     groupId: user?.groupId ? user.groupId.toString() : null,
     photoUrl: await photoUrlOf(profile?.photoKey),
-    personal: {
-      birthDate: toKey(profile?.birthDate),
-      gender: profile?.gender ?? "",
-      phone: profile?.phone ?? "",
-      address: profile?.address ?? "",
-      school: profile?.school ?? "",
-      fatherName: profile?.fatherName ?? "",
-      fatherPhone: profile?.fatherPhone ?? "",
-      motherName: profile?.motherName ?? "",
-      motherPhone: profile?.motherPhone ?? "",
-      birthCertNumber: decryptField(profile?.birthCertNumberEnc),
-      birthCertIssuedAt: toKey(profile?.birthCertIssuedAt),
-      birthCertIssuedBy: profile?.birthCertIssuedBy ?? "",
-      passportNumber: decryptField(profile?.passportNumberEnc),
-      passportIssuedAt: toKey(profile?.passportIssuedAt),
-      passportExpiresAt: toKey(profile?.passportExpiresAt),
-      passportIssuedBy: profile?.passportIssuedBy ?? "",
-      pinfl: decryptField(profile?.pinflEnc),
-      notes: profile?.notes ?? "",
-    },
+    personal: { ...toOwnData(profile), notes: profile?.notes ?? "" },
     mentorActions: logs.map((l) => {
       const meta = describeAudit(l.action);
-      return { at: new Date(l.createdAt).toISOString(), label: meta.label, detail: "", tone: meta.tone };
+      const bySelf = l.actorId?.toString() === studentId;
+      return { at: new Date(l.createdAt).toISOString(), label: meta.label, detail: bySelf ? "O'quvchining o'zi" : "Mentor amali", tone: meta.tone };
     }),
     createdAt: user?.createdAt ? new Date(user.createdAt).toISOString() : null,
     mustChangePassword: Boolean(user?.mustChangePassword),
@@ -135,26 +168,7 @@ export async function updateStudentProfileAction(studentId: string, input: unkno
   await StudentProfile.updateOne(
     { studentId },
     {
-      $set: {
-        birthDate: toDate(d.birthDate),
-        gender: (d.gender || null) as Gender | null,
-        phone: d.phone,
-        address: d.address,
-        school: d.school,
-        fatherName: d.fatherName,
-        fatherPhone: d.fatherPhone,
-        motherName: d.motherName,
-        motherPhone: d.motherPhone,
-        birthCertNumberEnc: encryptField(d.birthCertNumber),
-        birthCertIssuedAt: toDate(d.birthCertIssuedAt),
-        birthCertIssuedBy: d.birthCertIssuedBy,
-        passportNumberEnc: encryptField(d.passportNumber),
-        passportIssuedAt: toDate(d.passportIssuedAt),
-        passportExpiresAt: toDate(d.passportExpiresAt),
-        passportIssuedBy: d.passportIssuedBy,
-        pinflEnc: encryptField(d.pinfl),
-        notes: d.notes,
-      },
+      $set: { ...toStoredFields(d), notes: d.notes },
     },
     { upsert: true }
   );
@@ -197,5 +211,73 @@ export async function setStudentPhotoAction(studentId: string, key: unknown): Pr
 
   revalidatePath(`/mentor/students/${studentId}`);
   if (user.groupId) revalidatePath(`/mentor/groups/${user.groupId}`);
+  return { success: true, message: key ? "Rasm saqlandi" : "Rasm olib tashlandi", data: { photoUrl: await photoUrlOf(key) } };
+}
+
+/* ------------------------------------------------------------------ */
+/* O'quvchining o'zi                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface OwnProfileData {
+  photoUrl: string | null;
+  personal: OwnProfileInput;
+  /** Mentor sozlamalarda tahrirlashni ochganmi */
+  canEdit: boolean;
+}
+
+/** O'quvchining o'z ma'lumotlari. Mentor izohi (notes) bu yerga hech qachon qo'shilmaydi. */
+export async function getOwnProfile(): Promise<OwnProfileData> {
+  const session = await requireStudent();
+  await connectToDatabase();
+  const [profile, settings] = await Promise.all([loadProfile(session.userId), getAppSettings()]);
+  return { photoUrl: await photoUrlOf(profile?.photoKey), personal: toOwnData(profile), canEdit: settings.studentProfileEdit };
+}
+
+export async function updateOwnProfileAction(input: unknown): Promise<ActionResult> {
+  const session = await requireStudent();
+  // Ruxsat har safar serverda tekshiriladi: mentor yopgan bo'lsa, eski ochiq sahifadan ham saqlab bo'lmaydi
+  if (!(await getAppSettings()).studentProfileEdit) {
+    return { success: false, message: "Ma'lumotlarni tahrirlash mentor tomonidan yopilgan" };
+  }
+  const rate = checkRateLimit(`own_profile_${session.userId}`, 20, 10 * 60 * 1000);
+  if (!rate.allowed) return { success: false, message: "Juda ko'p urinish. Birozdan keyin urinib ko'ring" };
+
+  const parsed = ownProfileSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, message: parsed.error.issues[0]?.message || "Ma'lumotlar noto'g'ri" };
+  }
+
+  await connectToDatabase();
+  await StudentProfile.updateOne({ studentId: session.userId }, { $set: toStoredFields(parsed.data) }, { upsert: true });
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "STUDENT_UPDATE_OWN_PROFILE",
+    targetUserId: session.userId,
+    details: { studentLogin: session.login, fullName: session.fullName },
+  });
+
+  revalidatePath("/profile");
+  revalidatePath(`/mentor/students/${session.userId}`);
+  return { success: true, message: "Ma'lumotlar saqlandi" };
+}
+
+/** O'quvchi o'z rasmini qo'yadi yoki olib tashlaydi (null) */
+export async function setOwnPhotoAction(key: unknown): Promise<ActionResult<{ photoUrl: string | null }>> {
+  const session = await requireStudent();
+  if (key !== null && (typeof key !== "string" || !key.startsWith(`avatars/${session.userId}/`) || key.includes(".."))) {
+    return { success: false, message: "Rasm noto'g'ri" };
+  }
+  await connectToDatabase();
+  await StudentProfile.updateOne({ studentId: session.userId }, { $set: { photoKey: key } }, { upsert: true });
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "STUDENT_UPDATE_OWN_PHOTO",
+    targetUserId: session.userId,
+    details: { studentLogin: session.login, fullName: session.fullName, removed: key === null },
+  });
+
+  revalidatePath("/profile");
+  revalidatePath(`/mentor/students/${session.userId}`);
+  if (session.groupId) revalidatePath(`/mentor/groups/${session.groupId}`);
   return { success: true, message: key ? "Rasm saqlandi" : "Rasm olib tashlandi", data: { photoUrl: await photoUrlOf(key) } };
 }

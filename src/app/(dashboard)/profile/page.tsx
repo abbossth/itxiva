@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { ProfileView } from "@/components/profile/profile-view";
+import { getOwnProfile } from "@/actions/student-profile.actions";
 import { getTelegramStatus } from "@/actions/telegram.actions";
 
 export const metadata = {
@@ -13,9 +14,10 @@ export default async function ProfilePage() {
   const session = await requireAuth();
   await connectToDatabase();
 
-  const [user, telegram] = await Promise.all([
+  const [user, telegram, ownProfile] = await Promise.all([
     User.findById(session.userId).select("fullName login groupId totalCoins spendableBalance celebrationsEnabled").lean(),
     getTelegramStatus(),
+    session.role === "student" ? getOwnProfile() : null,
   ]);
   let groupName: string | undefined;
 
@@ -29,6 +31,7 @@ export default async function ProfilePage() {
   return (
     <ProfileView
       telegram={telegram}
+      ownProfile={ownProfile}
       celebrationsEnabled={user?.celebrationsEnabled !== false}
       user={{
         userId: session.userId,

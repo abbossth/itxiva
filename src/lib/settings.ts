@@ -8,6 +8,8 @@ export interface AppSettingsData {
   academicYear: string;
   quarter: number;
   accent: string;
+  /** O'quvchilar o'z shaxsiy ma'lumotlarini tahrirlay oladi (sukutda yopiq) */
+  studentProfileEdit: boolean;
 }
 
 const YEAR_RE = /^(\d{4})-(\d{4})$/;
@@ -46,5 +48,6 @@ export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
     academicYear: isAcademicYear(doc?.academicYear) ? doc!.academicYear! : currentAcademicYear(),
     quarter: parseQuarter(doc?.quarter, 1),
     accent: isAccentId(doc?.accent) ? doc!.accent! : DEFAULT_ACCENT,
+    studentProfileEdit: doc?.studentProfileEdit === true,
   };
 });

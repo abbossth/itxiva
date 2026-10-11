@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { PasswordForm } from "@/components/auth/password-form";
 import { TelegramSection } from "@/components/profile/telegram-section";
 import { CelebrationSetting } from "@/components/profile/celebration-setting";
+import { OwnPhoto } from "@/components/profile/own-photo";
+import { StudentPersonalForm } from "@/components/students/student-personal-form";
+import type { OwnProfileData } from "@/actions/student-profile.actions";
 import type { TelegramStatus } from "@/actions/telegram.actions";
 
 interface ProfileViewProps {
@@ -23,9 +26,11 @@ interface ProfileViewProps {
   };
   telegram: TelegramStatus;
   celebrationsEnabled: boolean;
+  /** Faqat o'quvchi uchun: rasm va shaxsiy ma'lumotlar */
+  ownProfile?: OwnProfileData | null;
 }
 
-export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileViewProps) {
+export function ProfileView({ user, telegram, celebrationsEnabled, ownProfile }: ProfileViewProps) {
   return (
     // Mentorda sahifa tepasida bo'lim tablari bor — kontent ular bilan bir chiziqda turadi
     <div className={`space-y-4 max-w-3xl animate-in fade-in pb-12 ${user.role === "mentor" ? "" : "mx-auto"}`}>
@@ -43,11 +48,15 @@ export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileView
       {/* User Info Card */}
       <div className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <Avatar
-            name={user.fullName}
-            size="lg"
-            variant={user.role === "mentor" ? "gold" : "primary"}
-          />
+          {ownProfile ? (
+            <OwnPhoto userId={user.userId} fullName={user.fullName} initialUrl={ownProfile.photoUrl} />
+          ) : (
+            <Avatar
+              name={user.fullName}
+              size="lg"
+              variant={user.role === "mentor" ? "gold" : "primary"}
+            />
+          )}
           <div className="space-y-1 min-w-0">
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
               {user.fullName}
@@ -156,6 +165,22 @@ export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileView
             </Button>
           </Link>
         </div>
+      )}
+
+      {ownProfile && (
+        <section aria-labelledby="own-data-heading" className="space-y-3">
+          <h2 id="own-data-heading" className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2 pt-2">
+            <User className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            Shaxsiy ma&apos;lumotlarim
+          </h2>
+          <StudentPersonalForm
+            // Saqlangach yoki mentor ruxsatni o'zgartirgach forma yangi holatda ochiladi
+            key={JSON.stringify(ownProfile.personal) + ownProfile.canEdit}
+            mode="student"
+            personal={ownProfile.personal}
+            locked={!ownProfile.canEdit}
+          />
+        </section>
       )}
 
       <TelegramSection initial={telegram} role={user.role} />

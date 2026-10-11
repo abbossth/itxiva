@@ -41,3 +41,7 @@ export const studentProfileSchema = z.object({
 });
 
 export type StudentProfileInput = z.infer<typeof studentProfileSchema>;
+
+/** O'quvchi o'zi kirita oladigan maydonlar: ism-familiya va mentor izohi bunga kirmaydi */
+export const ownProfileSchema = studentProfileSchema.omit({ fullName: true, notes: true });
+export type OwnProfileInput = z.infer<typeof ownProfileSchema>;

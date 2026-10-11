@@ -10,6 +10,8 @@ export interface IAppSettings extends Document {
   quarter?: number | null;
   /** Asosiy rang nomi — `ACCENTS` (src/lib/theme-accents.ts) */
   accent?: string | null;
+  /** O'quvchilar o'z shaxsiy ma'lumotlarini (telefon, ota-ona, hujjatlar) o'zi kirita oladimi */
+  studentProfileEdit?: boolean;
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>(
@@ -18,6 +20,7 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     academicYear: { type: String, default: null, trim: true },
     quarter: { type: Number, default: null, min: 1, max: 4 },
     accent: { type: String, default: null, trim: true },
+    studentProfileEdit: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

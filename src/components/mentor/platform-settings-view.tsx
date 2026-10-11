@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, Check, Palette, SlidersHorizontal } from "lucide-react";
+import { CalendarRange, Check, Palette, SlidersHorizontal, UserRoundPen } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
+import { Toggle } from "@/components/ui/toggle";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import { updateAppSettingsAction } from "@/actions/settings.actions";
@@ -22,14 +23,19 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
   const [academicYear, setAcademicYear] = useState(settings.academicYear);
   const [quarter, setQuarter] = useState(settings.quarter);
   const [accent, setAccent] = useState(settings.accent);
+  const [studentProfileEdit, setStudentProfileEdit] = useState(settings.studentProfileEdit);
   const [isSaving, setIsSaving] = useState(false);
 
-  const dirty = academicYear !== settings.academicYear || quarter !== settings.quarter || accent !== settings.accent;
+  const dirty =
+    academicYear !== settings.academicYear ||
+    quarter !== settings.quarter ||
+    accent !== settings.accent ||
+    studentProfileEdit !== settings.studentProfileEdit;
 
   const save = async () => {
     try {
       setIsSaving(true);
-      const res = await updateAppSettingsAction({ academicYear, quarter, accent });
+      const res = await updateAppSettingsAction({ academicYear, quarter, accent, studentProfileEdit });
       if (res.success) {
         toast.success(res.message || "Sozlamalar saqlandi");
         router.refresh();
@@ -141,6 +147,25 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
             );
           })()}
         </div>
+      </section>
+
+      <section className={card}>
+        <div>
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <UserRoundPen className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            O&apos;quvchilarning shaxsiy ma&apos;lumotlari
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Ochiq bo&apos;lsa, har bir o&apos;quvchi o&apos;z profilida tug&apos;ilgan sanasi, telefoni, manzili, ota-onasi va hujjat
+            ma&apos;lumotlarini o&apos;zi kiritadi va o&apos;zgartira oladi. Yopiq bo&apos;lsa, ular faqat ko&apos;radi — tahrirlash faqat sizda
+            qoladi. Rasmni o&apos;quvchi har doim o&apos;zi qo&apos;ya oladi; ism-familiyani faqat siz o&apos;zgartirasiz.
+          </p>
+        </div>
+        <Toggle
+          checked={studentProfileEdit}
+          onChange={setStudentProfileEdit}
+          label={studentProfileEdit ? "O'quvchilar o'z ma'lumotlarini tahrirlay oladi" : "Tahrirlash yopiq"}
+        />
       </section>
 
       <div className="flex items-center gap-3">

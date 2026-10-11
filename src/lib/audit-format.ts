@@ -43,6 +43,8 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   UPDATE_SETTINGS: { label: "Platforma sozlamalari o'zgartirildi", tone: "teal", category: "other" },
   UPDATE_STUDENT_PROFILE: { label: "O'quvchi ma'lumotlari yangilandi", tone: "teal", category: "students" },
   UPDATE_STUDENT_PHOTO: { label: "O'quvchi rasmi yangilandi", tone: "teal", category: "students" },
+  STUDENT_UPDATE_OWN_PROFILE: { label: "O'quvchi o'z ma'lumotlarini yangiladi", tone: "teal", category: "students" },
+  STUDENT_UPDATE_OWN_PHOTO: { label: "O'quvchi o'z rasmini yangiladi", tone: "teal", category: "students" },
   IMPORT_STUDENTS: { label: "O'quvchilar qo'shildi", tone: "success", category: "students" },
   EXCEL_IMPORT: { label: "Excel'dan import qilindi", tone: "success", category: "students" },
   RESET_PASSWORD: { label: "Parol tiklandi", tone: "warning", category: "students" },

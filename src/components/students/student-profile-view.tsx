@@ -90,7 +90,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
 
   // Faoliyat tasmasi: o'quvchining o'z harakatlari va mentor amallari bitta ro'yxatda
   const activity = useMemo(() => {
-    const items: StudentActivityItem[] = [...profile.mentorActions.map((a) => ({ ...a, detail: "Mentor amali" }))];
+    const items: StudentActivityItem[] = [...profile.mentorActions];
     for (const r of attendance.records) {
       items.push({
         at: r.date,
@@ -281,7 +281,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
         </TabsList>
 
         <TabsContent value="personal">
-          <StudentPersonalForm studentId={student._id} fullName={student.fullName} personal={personal} />
+          <StudentPersonalForm mode="mentor" studentId={student._id} fullName={student.fullName} personal={personal} />
         </TabsContent>
 
         <TabsContent value="coins" className="space-y-4">

@@ -61,6 +61,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fayl nomi talab qilinadi" }, { status: 400 });
     }
 
+    // Profil rasmi (brauzerda WebP ga siqilgan holda keladi): mentor — istalgan o'quvchiga, o'quvchi — faqat o'ziga
+    if (avatarStudentId !== undefined) {
+      if (typeof avatarStudentId !== "string" || !mongoose.isValidObjectId(avatarStudentId)) {
+        return NextResponse.json({ error: "O'quvchi topilmadi" }, { status: 404 });
+      }
+      if (session.role === "student") {
+        if (avatarStudentId !== session.userId) {
+          return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
+        }
+        const rate = checkRateLimit(`avatar_upload_${session.userId}`, 10, 10 * 60 * 1000);
+        if (!rate.allowed) {
+          return NextResponse.json({ error: "Juda ko'p urinish. Birozdan keyin urinib ko'ring" }, { status: 429 });
+        }
+      }
+      if (typeof contentType !== "string" || !AVATAR_TYPES.includes(contentType)) {
+        return NextResponse.json({ error: "Faqat rasm (JPG, PNG, WebP) yuklash mumkin" }, { status: 400 });
+      }
+      if (!isValidSize(fileSize, AVATAR_MAX_BYTES)) {
+        return NextResponse.json({ error: "Rasm hajmi 5 MB dan oshmasligi kerak" }, { status: 400 });
+      }
+      const key = `avatars/${avatarStudentId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
+      const { uploadUrl } = await getUploadPresignedUrl({ key, contentType, contentLength: fileSize });
+      return NextResponse.json({ uploadUrl, key, contentType });
+    }
+
     // O'quvchi: o'z guruhidagi darsning uyga vazifasi uchun javob fayli
     if (session.role === "student" && homeworkLessonId) {
       if (!mongoose.isValidObjectId(homeworkLessonId)) {
@@ -166,22 +191,6 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({ uploadUrl, key, contentType: safeType });
-    }
-
-    // Mentor: o'quvchi profilining rasmi (brauzerda WebP ga siqilgan holda keladi)
-    if (avatarStudentId !== undefined) {
-      if (typeof avatarStudentId !== "string" || !mongoose.isValidObjectId(avatarStudentId)) {
-        return NextResponse.json({ error: "O'quvchi topilmadi" }, { status: 404 });
-      }
-      if (typeof contentType !== "string" || !AVATAR_TYPES.includes(contentType)) {
-        return NextResponse.json({ error: "Faqat rasm (JPG, PNG, WebP) yuklash mumkin" }, { status: 400 });
-      }
-      if (!isValidSize(fileSize, AVATAR_MAX_BYTES)) {
-        return NextResponse.json({ error: "Rasm hajmi 5 MB dan oshmasligi kerak" }, { status: 400 });
-      }
-      const key = `avatars/${avatarStudentId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
-      const { uploadUrl } = await getUploadPresignedUrl({ key, contentType, contentLength: fileSize });
-      return NextResponse.json({ uploadUrl, key, contentType });
     }
 
     // Mentor: dars materiallari

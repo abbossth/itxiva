@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, IdCard, ShieldCheck, StickyNote, UserRound, Users } from "lucide-react";
+import { FileText, IdCard, Lock, ShieldCheck, StickyNote, UserRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
-import { updateStudentProfileAction, type StudentPersonalData } from "@/actions/student-profile.actions";
+import { updateOwnProfileAction, updateStudentProfileAction, type StudentPersonalData } from "@/actions/student-profile.actions";
+import type { OwnProfileInput } from "@/lib/validations/student-profile.schema";
 
 type FormState = StudentPersonalData & { fullName: string };
 
@@ -34,18 +35,20 @@ function ageOf(birthDate: string): number | null {
   return age >= 0 && age < 120 ? age : null;
 }
 
-export function StudentPersonalForm({
-  studentId,
-  fullName,
-  personal,
-}: {
-  studentId: string;
-  fullName: string;
-  personal: StudentPersonalData;
-}) {
+type Props =
+  // Mentor: istalgan o'quvchi, ism-familiya va izoh bilan
+  | { mode: "mentor"; studentId: string; fullName: string; personal: StudentPersonalData }
+  // O'quvchi: faqat o'zi; `locked` — mentor tahrirlashni yopgan (faqat ko'rish)
+  | { mode: "student"; personal: OwnProfileInput; locked: boolean };
+
+export function StudentPersonalForm(props: Props) {
   const router = useRouter();
   const { toast } = useToast();
-  const initial: FormState = { fullName, ...personal };
+  const isMentor = props.mode === "mentor";
+  const locked = props.mode === "student" && props.locked;
+  const initial: FormState = isMentor
+    ? { fullName: props.fullName, ...props.personal }
+    : { fullName: "", notes: "", ...props.personal };
   const [form, setForm] = useState<FormState>(initial);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -60,7 +63,8 @@ export function StudentPersonalForm({
     e.preventDefault();
     try {
       setIsSaving(true);
-      const res = await updateStudentProfileAction(studentId, form);
+      const res =
+        props.mode === "mentor" ? await updateStudentProfileAction(props.studentId, form) : await updateOwnProfileAction(form);
       if (res.success) {
         toast.success(res.message || "Ma'lumotlar saqlandi");
         router.refresh();
@@ -79,16 +83,29 @@ export function StudentPersonalForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="flex items-start gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300">
-        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-teal-600 dark:text-teal-400" />
-        Bu ma&apos;lumotlarni faqat mentor ko&apos;radi — o&apos;quvchilarga ko&apos;rinmaydi. Hujjat raqamlari bazada shifrlangan holda saqlanadi.
+        {locked ? (
+          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        ) : (
+          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-teal-600 dark:text-teal-400" />
+        )}
+        {isMentor
+          ? "Bu ma'lumotlarni siz va o'quvchining o'zi ko'radi — boshqa o'quvchilarga ko'rinmaydi. Hujjat raqamlari bazada shifrlangan holda saqlanadi."
+          : locked
+          ? "Ma'lumotlarni tahrirlash hozir yopiq. O'zgartirish kerak bo'lsa, mentorga ayting."
+          : "Bu ma'lumotlarni faqat siz va mentor ko'rasiz — boshqa o'quvchilarga ko'rinmaydi. Bilmagan maydonni bo'sh qoldirishingiz mumkin."}
       </p>
+
+      {/* Yopiq bo'lsa barcha maydonlar faqat o'qish uchun */}
+      <fieldset disabled={locked} className="space-y-4 min-w-0 disabled:opacity-90">
 
       <section className={card}>
         <SectionTitle icon={UserRound}>Asosiy ma&apos;lumotlar</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field htmlFor="sp-name" label="Ism-familiya" required className="sm:col-span-2">
-            <Input id="sp-name" {...text("fullName")} required minLength={2} maxLength={80} autoComplete="off" />
-          </Field>
+          {isMentor && (
+            <Field htmlFor="sp-name" label="Ism-familiya" required className="sm:col-span-2">
+              <Input id="sp-name" {...text("fullName")} required minLength={2} maxLength={80} autoComplete="off" />
+            </Field>
+          )}
           <Field htmlFor="sp-birth" label="Tug'ilgan sana" hint={age === null ? undefined : `${age} yosh`}>
             <Input id="sp-birth" type="date" {...text("birthDate")} max={new Date().toISOString().slice(0, 10)} />
           </Field>
@@ -173,8 +190,9 @@ export function StudentPersonalForm({
         </div>
       </section>
 
+      {isMentor && (
       <section className={card}>
-        <SectionTitle icon={StickyNote}>Mentor izohi</SectionTitle>
+        <SectionTitle icon={StickyNote}>Mentor izohi (faqat sizga ko&apos;rinadi)</SectionTitle>
         <Textarea
           aria-label="Mentor izohi"
           rows={3}
@@ -183,7 +201,10 @@ export function StudentPersonalForm({
           maxLength={2000}
         />
       </section>
+      )}
+      </fieldset>
 
+      {!locked && (
       <div className="sticky bottom-20 md:bottom-4 z-10 flex items-center gap-3 p-3 rounded-2xl bg-white/95 dark:bg-surface/95 backdrop-blur border border-slate-200 dark:border-slate-800 shadow-card">
         <Button type="submit" variant="primary" isLoading={isSaving} disabled={!dirty}>
           Saqlash
@@ -199,6 +220,7 @@ export function StudentPersonalForm({
           <span className="text-xs text-slate-500 dark:text-slate-400">Barcha o&apos;zgarishlar saqlangan</span>
         )}
       </div>
+      )}
     </form>
   );
 }
