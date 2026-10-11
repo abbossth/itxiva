@@ -1,11 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
-import { setSessionCookie, clearSessionCookie, getSession } from "@/lib/auth/session";
-import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { setSessionCookie, clearSessionCookie } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/guards";
+import { consumeRateLimit, clearRateLimit, formatWait } from "@/lib/rate-limit-db";
 import { loginSchema, changePasswordSchema } from "@/lib/validations/auth.schema";
 
 export interface ActionResult<T = unknown> {
@@ -13,6 +15,14 @@ export interface ActionResult<T = unknown> {
   message?: string;
   data?: T;
   errors?: Record<string, string[]>;
+}
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+/** So'rov kelgan IP manzil (Vercel `x-forwarded-for` ning birinchi qiymatiga mijoz manzilini yozadi) */
+async function getClientIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
 }
 
 export async function loginAction(
@@ -33,13 +43,24 @@ export async function loginAction(
 
   const { login, password } = parsed.data;
 
-  // Rate limit by login identifier: 5 attempts per 15 minutes
-  const rateLimitKey = `login_${login.toLowerCase()}`;
-  const rateStatus = checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
-  if (!rateStatus.allowed) {
+  // Urinishlar bazada sanaladi (server nusxalari orasida umumiy):
+  //  - bitta qurilmadan bitta loginga 5 ta — parolni taxmin qilishdan himoya;
+  //  - bitta loginga jami 30 ta — turli manzillardan taxmin qilishdan himoya (begona odam o'quvchini 5 ta urinish bilan bloklab qo'ya olmaydi);
+  //  - bitta manzildan jami 100 ta — butun sinf bitta maktab tarmog'idan kirishi mumkin, shuning uchun keng.
+  const loginKey = login.toLowerCase();
+  const ip = await getClientIp();
+  const deviceKey = `login:${loginKey}:${ip}`;
+  const limits = await Promise.all([
+    consumeRateLimit(deviceKey, 5, LOGIN_WINDOW_MS),
+    consumeRateLimit(`login:${loginKey}`, 30, LOGIN_WINDOW_MS),
+    consumeRateLimit(`login-ip:${ip}`, 100, LOGIN_WINDOW_MS),
+  ]);
+  const blocked = limits.filter((l) => !l.allowed);
+  if (blocked.length > 0) {
+    const wait = Math.max(...blocked.map((l) => l.resetInSeconds));
     return {
       success: false,
-      message: `Juda ko'p urinish. Iltimos, ${rateStatus.resetInSeconds} soniyadan keyin qayta urinib ko'ring`,
+      message: `Juda ko'p urinish. Iltimos, ${formatWait(wait)}dan keyin qayta urinib ko'ring`,
     };
   }
 
@@ -47,7 +68,7 @@ export async function loginAction(
 
   // Mentor talabi bilan xato aniq ko'rsatiladi: login topilmadimi yoki parol noto'g'rimi.
   // (Login mavjudligini taxmin qilishdan yuqoridagi urinishlar limiti himoya qiladi.)
-  const user = await User.findOne({ login: login.toLowerCase() });
+  const user = await User.findOne({ login: loginKey });
   if (!user) {
     return {
       success: false,
@@ -63,8 +84,8 @@ export async function loginAction(
     };
   }
 
-  // Reset rate limit on successful credentials
-  resetRateLimit(rateLimitKey);
+  // To'g'ri kirgan qurilmaning hisoblagichi tozalanadi
+  await clearRateLimit(deviceKey);
 
   // Update last login timestamp
   user.lastLoginAt = new Date();
@@ -78,6 +99,7 @@ export async function loginAction(
     role: user.role,
     groupId: user.groupId ? user.groupId.toString() : null,
     mustChangePassword: Boolean(user.mustChangePassword),
+    sessionVersion: user.sessionVersion ?? 0,
   });
 
   if (user.mustChangePassword) {
@@ -102,19 +124,27 @@ export async function loginAction(
   redirect("/");
 }
 
+/**
+ * Parolni almashtirish. Ikki holat:
+ *  - majburiy (vaqtinchalik parol bilan kirilgan): joriy parol so'ralmaydi, tugagach bosh sahifaga o'tiladi;
+ *  - ixtiyoriy (profildan): joriy parol shart — ochiq qolgan qurilmadan hisobni egallab olishning oldini oladi.
+ * Ikkalasida ham boshqa qurilmalardagi sessiyalar bekor bo'ladi.
+ */
 export async function changePasswordAction(
   prevState: unknown,
   formData: FormData
 ): Promise<ActionResult> {
-  const session = await getSession();
+  // Bazada tekshirilgan sessiya: o'chirilgan yoki paroli tiklangan foydalanuvchining eski cookie'si o'tmaydi
+  const session = await getCurrentUser();
   if (!session) {
     redirect("/login");
   }
 
-  const newPassword = formData.get("newPassword") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
-
-  const parsed = changePasswordSchema.safeParse({ newPassword, confirmPassword });
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword") ?? undefined,
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
   if (!parsed.success) {
     return {
       success: false,
@@ -132,14 +162,35 @@ export async function changePasswordAction(
     };
   }
 
-  const hashedPassword = await hashPassword(parsed.data.newPassword);
-  user.passwordHash = hashedPassword;
+  const wasForced = Boolean(user.mustChangePassword);
+  if (!wasForced) {
+    const rate = await consumeRateLimit(`pwd-change:${session.userId}`, 5, LOGIN_WINDOW_MS);
+    if (!rate.allowed) {
+      return {
+        success: false,
+        message: `Juda ko'p urinish. Iltimos, ${formatWait(rate.resetInSeconds)}dan keyin qayta urinib ko'ring`,
+      };
+    }
+    const current = parsed.data.currentPassword;
+    if (!current || !(await verifyPassword(current, user.passwordHash))) {
+      return { success: false, errors: { currentPassword: ["Joriy parol noto'g'ri"] } };
+    }
+  }
+
+  if (await verifyPassword(parsed.data.newPassword, user.passwordHash)) {
+    return { success: false, errors: { newPassword: ["Yangi parol hozirgisidan farq qilishi kerak"] } };
+  }
+
+  user.passwordHash = await hashPassword(parsed.data.newPassword);
   user.mustChangePassword = false;
   // O'quvchi o'z parolini qo'ydi — mentor ko'ra oladigan vaqtinchalik parol endi yaroqsiz
   user.tempPasswordEnc = null;
+  // Eski parol bilan ochilgan boshqa barcha sessiyalar (boshqa qurilmalar) yaroqsiz bo'ladi
+  user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   await user.save();
+  if (!wasForced) await clearRateLimit(`pwd-change:${session.userId}`);
 
-  // Re-issue session cookie with updated mustChangePassword=false
+  // Shu qurilma uchun yangi versiyadagi cookie
   await setSessionCookie({
     userId: user._id.toString(),
     login: user.login,
@@ -147,10 +198,14 @@ export async function changePasswordAction(
     role: user.role,
     groupId: user.groupId ? user.groupId.toString() : null,
     mustChangePassword: false,
+    sessionVersion: user.sessionVersion,
   });
 
-  // Ikkala rol ham bosh sahifaga (dashboard) tushadi
-  redirect("/");
+  if (wasForced) {
+    // Ikkala rol ham bosh sahifaga (dashboard) tushadi
+    redirect("/");
+  }
+  return { success: true, message: "Parol yangilandi. Boshqa qurilmalardagi sessiyalar yopildi." };
 }
 
 export async function logoutAction(): Promise<void> {

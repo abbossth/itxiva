@@ -1,5 +1,6 @@
 "use server";
 
+import mongoose from "mongoose";
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Group, IGroup } from "@/lib/db/models/group.model";
@@ -23,6 +24,7 @@ export async function getGroups() {
 }
 
 export async function getGroupById(id: string) {
+  if (typeof id !== "string" || !mongoose.isValidObjectId(id)) return null;
   await connectToDatabase();
   await requireGroupAccess(id);
 

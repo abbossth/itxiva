@@ -1,5 +1,6 @@
 "use server";
 
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User, IUser } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
@@ -47,10 +48,11 @@ export async function getLeaderboardAction({
 
   // Find groups according to filter
   const groupFilter: Record<string, unknown> = { isActive: true };
-  if (type === "group" && groupId) {
+  // Qiymatlar mijozdan keladi: so'rovga faqat tekshirilgan identifikator va son kiradi
+  if (type === "group" && typeof groupId === "string" && mongoose.isValidObjectId(groupId)) {
     groupFilter._id = groupId;
-  } else if (type === "grade" && grade) {
-    groupFilter.grade = grade;
+  } else if (type === "grade" && Number.isInteger(Number(grade)) && Number(grade) > 0) {
+    groupFilter.grade = Number(grade);
   }
 
   const matchingGroups = await Group.find(groupFilter).lean();

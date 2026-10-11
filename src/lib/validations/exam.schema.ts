@@ -55,8 +55,24 @@ export const examUpsertSchema = z
     }
   );
 
+// Havola mentor sahifasida bosiladigan bo'lib chiqadi — faqat http(s) (javascript: kabi sxemalar o'tmaydi)
+const repoUrlSchema = z
+  .string()
+  .trim()
+  .max(500, "Havola juda uzun")
+  .refine((v) => {
+    try {
+      const u = new URL(v);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "Havola https:// bilan boshlanishi kerak");
+
+const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/i, "Noto'g'ri identifikator");
+
 export const examAnswerItemSchema = z.object({
-  questionId: z.string().min(1),
+  questionId: z.string().min(1).max(64),
   type: z.enum([
     "single_choice",
     "multiple_choice",
@@ -64,21 +80,22 @@ export const examAnswerItemSchema = z.object({
     "project_upload",
     "github_repo",
   ]),
-  value: z.union([z.string(), z.array(z.string())]).optional(),
-  fileKey: z.string().optional(),
-  fileName: z.string().optional(),
-  fileSize: z.number().optional(),
-  repoUrl: z.string().url("To'g'ri GitHub URL kiriting").optional().or(z.literal("")),
+  // Hajm chegaralari: o'quvchi bazaga cheksiz katta javob yoza olmasligi uchun
+  value: z.union([z.string().max(20000, "Javob juda uzun"), z.array(z.string().max(1000)).max(50)]).optional(),
+  fileKey: z.string().max(400).optional(),
+  fileName: z.string().max(300).optional(),
+  fileSize: z.number().nonnegative().optional(),
+  repoUrl: repoUrlSchema.optional().or(z.literal("")),
 });
 
 export const examSaveDraftSchema = z.object({
-  examId: z.string().min(1),
-  answers: z.array(examAnswerItemSchema),
+  examId: objectIdSchema,
+  answers: z.array(examAnswerItemSchema).max(200),
 });
 
 export const examSubmitSchema = z.object({
-  examId: z.string().min(1),
-  answers: z.array(examAnswerItemSchema),
+  examId: objectIdSchema,
+  answers: z.array(examAnswerItemSchema).max(200),
 });
 
 export const examGradeSchema = z.object({

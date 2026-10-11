@@ -140,17 +140,17 @@ export function ExamTaker({
         throw new Error(data?.error || "Fayl yuklashga ruxsat olinmadi");
       }
 
-      const { uploadUrl, key } = await presignedRes.json();
+      const { uploadUrl, key, contentType: signedType } = await presignedRes.json();
 
-      // 2. Upload directly to Cloudflare R2
+      // 2. Upload directly to Cloudflare R2 (aynan server imzolagan fayl turi bilan)
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": contentType },
+        headers: { "Content-Type": signedType || contentType },
         body: file,
       });
 
       if (!uploadRes.ok) {
-        throw new Error("Faylni R2 ga yuklashda xatolik yuz berdi");
+        throw new Error("Faylni saqlashda xatolik yuz berdi. Qaytadan urinib ko'ring");
       }
 
       updateAnswer(questionId, {

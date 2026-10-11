@@ -21,11 +21,19 @@ describe("sessiya tokeni", () => {
     role: "student" as const,
     groupId: "6ac000000000000000000002",
     mustChangePassword: false,
+    sessionVersion: 3,
   };
 
   it("imzolangan token qayta o'qiladi", async () => {
     const token = await signSessionToken(payload);
     expect(await verifySessionToken(token)).toEqual(payload);
+  });
+
+  it("eski (versiyasiz) token 0-versiya deb o'qiladi", async () => {
+    const { sessionVersion: _omit, ...legacy } = payload;
+    void _omit;
+    const token = await signSessionToken(legacy);
+    expect((await verifySessionToken(token))?.sessionVersion).toBe(0);
   });
 
   it("o'zgartirilgan yoki begona token rad etiladi", async () => {

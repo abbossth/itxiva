@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
 
@@ -9,20 +9,32 @@ const OPEN_EVENT = "itxiva:open-palette";
 // Palitraning o'zi faqat birinchi marta ochilganda yuklanadi
 const CommandPalette = dynamic(() => import("./command-palette").then((m) => m.CommandPalette), { ssr: false });
 
+const noopSubscribe = () => () => {};
+
+/** Apple qurilmalarida tezkor tugma ⌘K, qolganlarida Ctrl K (serverda Ctrl K — hydration farqi bo'lmaydi) */
+function useIsApple(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent),
+    () => false
+  );
+}
+
 /** Sarlavhadagi qidiruv tugmasi: palitrani ochadi */
 export function SearchButton() {
+  const shortcut = useIsApple() ? "⌘K" : "Ctrl K";
   return (
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
-      aria-label="Qidirish (Ctrl+K)"
+      aria-label={`Qidirish (${shortcut})`}
       aria-keyshortcuts="Control+K Meta+K"
       className="flex items-center gap-2 min-h-[44px] sm:min-h-[40px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface px-3 text-xs text-slate-500 dark:text-slate-400 hover:border-teal-500/50 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
     >
       <Search className="w-4 h-4 shrink-0" />
       <span className="hidden lg:inline">Qidirish</span>
       <kbd className="hidden lg:inline rounded-md border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-        Ctrl K
+        {shortcut}
       </kbd>
     </button>
   );

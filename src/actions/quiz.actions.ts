@@ -1,5 +1,6 @@
 "use server";
 
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { Quiz, IQuizQuestion, IQuizData } from "@/lib/db/models/quiz.model";
 import { QuizSubmission, IQuizAnswer, IQuizSubmissionData } from "@/lib/db/models/quiz-submission.model";
@@ -29,6 +30,9 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
 }>> {
   try {
     const user = await requireAuth();
+    if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId)) {
+      return { success: false, error: "Dars topilmadi" };
+    }
     await connectDB();
 
     const lesson = await Lesson.findById(lessonId).lean();
@@ -119,6 +123,9 @@ export async function submitQuizAction(
       return { success: false, error: parsed.error.issues[0].message };
     }
 
+    if (!mongoose.isValidObjectId(parsed.data.quizId)) {
+      return { success: false, error: "Test topilmadi yoki faol emas" };
+    }
     await connectDB();
     const quiz = await Quiz.findById(parsed.data.quizId);
     if (!quiz || !quiz.isPublished) {

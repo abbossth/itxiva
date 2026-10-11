@@ -7,7 +7,12 @@ export const materialSchema = z.object({
   urlOrKey: z.string().min(1, "Havola yoki fayl kaliti kiritilishi shart"),
   mimeType: z.string().optional(),
   fileSize: z.number().optional(),
-});
+}).refine(
+  // Havola va video o'quvchi brauzerida ochiladi: http(s) dan boshqa sxema (javascript:, data: ...) qabul qilinmaydi.
+  // Sxemasiz yozilgan manzil ("youtu.be/...") eski darslarda bor — u ruxsat etiladi.
+  (m) => m.type === "file" || !/^\s*(?!https?:)[a-z][a-z0-9+.-]*:/i.test(m.urlOrKey),
+  { message: "Havola http:// yoki https:// bilan boshlanishi kerak", path: ["urlOrKey"] }
+);
 
 export const homeworkSchema = z.object({
   isEnabled: z.boolean().default(false),

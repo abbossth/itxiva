@@ -24,6 +24,8 @@ export interface SessionPayload {
   role: UserRole;
   groupId: string | null;
   mustChangePassword: boolean;
+  /** Foydalanuvchining `sessionVersion` qiymati; bazadagidan farq qilsa sessiya yaroqsiz (yozilmagan — 0) */
+  sessionVersion?: number;
 }
 
 /**
@@ -50,6 +52,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
       role: payload.role as UserRole,
       groupId: (payload.groupId as string) || null,
       mustChangePassword: Boolean(payload.mustChangePassword),
+      sessionVersion: typeof payload.sessionVersion === "number" ? payload.sessionVersion : 0,
     };
   } catch {
     return null;

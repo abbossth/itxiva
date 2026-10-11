@@ -27,6 +27,8 @@ export interface IUser extends Document, Omit<IUserData, "_id"> {
   _id: mongoose.Types.ObjectId;
   passwordHash: string;
   tempPasswordEnc?: string | null;
+  /** Parol o'zgarganda yoki tiklanganda oshadi — eski sessiya cookie'lari shu bilan yaroqsiz bo'ladi */
+  sessionVersion?: number;
   /** Telegram'ni ulash uchun bir martalik token (faqat xeshi saqlanadi) */
   telegramLink?: { tokenHash: string; expiresAt: Date } | null;
 }
@@ -70,6 +72,10 @@ const UserSchema = new Schema<IUser>(
     mustChangePassword: {
       type: Boolean,
       default: true,
+    },
+    sessionVersion: {
+      type: Number,
+      default: 0,
     },
     totalCoins: {
       type: Number,

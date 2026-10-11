@@ -11,7 +11,8 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https:",
+  // Brauzer faqat saytning o'ziga va fayl omboriga (R2 presigned havolalari) so'rov yubora oladi
+  "connect-src 'self' https://*.r2.cloudflarestorage.com",
   "media-src 'self' blob: https:",
   "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
   "worker-src 'self' blob:",
@@ -29,6 +30,8 @@ const securityHeaders = [
   // Kamera faqat QR davomat skaneri uchun kerak
   { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // Boshqa sayt ochgan oyna bu sahifaga (window.opener orqali) murojaat qila olmaydi
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
 const nextConfig: NextConfig = {

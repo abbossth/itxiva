@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FileText, FileArchive, FileImage, ExternalLink, Download, Loader2 } from "lucide-react";
 import { IMaterial } from "@/lib/db/models/lesson.model";
 import { getMaterialDownloadUrlAction } from "@/actions/lesson.actions";
+import { openResolvedUrl, toExternalUrl } from "@/lib/open-tab";
 import { cn } from "@/lib/utils";
 
 interface FilePreviewProps {
@@ -37,22 +38,26 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
 
   const handleDownload = async (material: IMaterial) => {
     if (material.type === "link") {
-      window.open(material.urlOrKey, "_blank", "noopener,noreferrer");
+      const url = toExternalUrl(material.urlOrKey);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      else setErrorMsg("Havola noto'g'ri kiritilgan");
       return;
     }
 
     try {
       setLoadingKey(material.urlOrKey);
       setErrorMsg(null);
-      const res = await getMaterialDownloadUrlAction({
-        lessonId,
-        materialKey: material.urlOrKey,
+      let message: string | undefined;
+      const opened = await openResolvedUrl(async () => {
+        const res = await getMaterialDownloadUrlAction({
+          lessonId,
+          materialKey: material.urlOrKey,
+        });
+        message = res.message;
+        return res.success ? res.downloadUrl : null;
       });
-
-      if (res.success && res.downloadUrl) {
-        window.open(res.downloadUrl, "_blank", "noopener,noreferrer");
-      } else {
-        setErrorMsg(res.message || "Faylni yuklab olishda xatolik yuz berdi");
+      if (!opened) {
+        setErrorMsg(message || "Faylni yuklab olishda xatolik yuz berdi");
       }
     } catch {
       setErrorMsg("Faylni yuklab olishda xatolik yuz berdi");

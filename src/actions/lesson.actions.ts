@@ -23,6 +23,8 @@ export async function getLessonsByGroupAndQuarter({
 }) {
   await connectToDatabase();
   const session = await requireAuth();
+  if (!mongoose.isValidObjectId(groupId) || typeof groupId !== "string") return [];
+  quarter = Number(quarter);
 
   // If student, enforce group ownership and only published lessons
   if (session.role === "student") {
@@ -55,6 +57,7 @@ export async function getLessonsByGroupAndQuarter({
 export async function getLessonById(lessonId: string) {
   await connectToDatabase();
   const session = await requireAuth();
+  if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId)) return null;
 
   const lesson = await Lesson.findById(lessonId).lean();
   if (!lesson) return null;
@@ -294,6 +297,9 @@ export async function getMaterialDownloadUrlAction({
 }): Promise<{ success: boolean; downloadUrl?: string; message?: string }> {
   await connectToDatabase();
   const session = await requireAuth();
+  if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId) || typeof materialKey !== "string") {
+    return { success: false, message: "Dars topilmadi" };
+  }
 
   const lesson = await Lesson.findById(lessonId);
   if (!lesson) {

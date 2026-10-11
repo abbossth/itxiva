@@ -1,5 +1,6 @@
 "use server";
 
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { Exam, IExam, IExamData, IExamQuestion } from "@/lib/db/models/exam.model";
 import {
@@ -34,6 +35,8 @@ export type ActionState<T = unknown> = {
   error?: string;
 };
 
+
+const isObjectId = (id: unknown): id is string => typeof id === "string" && mongoose.isValidObjectId(id);
 
 // Vaqt tugaganidan keyin tarmoq kechikishi uchun beriladigan qo'shimcha muddat
 const SUBMIT_GRACE_MS = 60 * 1000;
@@ -71,7 +74,7 @@ function dropForeignFileKeys(
 ): SubmittedExamAnswers {
   const ownPrefix = `exams/${examId}/${userId}/`;
   return answers.map((a) =>
-    a.fileKey && !a.fileKey.startsWith(ownPrefix)
+    a.fileKey && (!a.fileKey.startsWith(ownPrefix) || a.fileKey.includes(".."))
       ? { ...a, fileKey: undefined, fileName: undefined, fileSize: undefined }
       : a
   );
@@ -305,6 +308,9 @@ export async function getExamForStudent(examId: string): Promise<
 > {
   try {
     const user = await requireStudent();
+    if (!isObjectId(examId)) {
+      return { success: false, error: "Imtihon topilmadi yoki e'lon qilinmagan" };
+    }
     await connectDB();
 
     const exam = await Exam.findById(examId).lean();
@@ -405,6 +411,9 @@ export async function startExamAttemptAction(
 ): Promise<ActionState<{ submissionId: string; startedAt: string; durationMinutes: number }>> {
   try {
     const user = await requireStudent();
+    if (!isObjectId(examId)) {
+      return { success: false, error: "Imtihon topilmadi yoki e'lon qilinmagan" };
+    }
     await connectDB();
 
     const exam = await Exam.findById(examId);
@@ -614,6 +623,9 @@ export async function getExamResultForStudent(examId: string): Promise<
 > {
   try {
     const user = await requireStudent();
+    if (!isObjectId(examId)) {
+      return { success: false, error: "Imtihon topilmadi" };
+    }
     await connectDB();
 
     const exam = await Exam.findById(examId).lean();

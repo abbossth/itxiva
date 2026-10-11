@@ -38,13 +38,16 @@ export const quizUpsertSchema = z.object({
 });
 
 export const quizSubmitSchema = z.object({
-  quizId: z.string().min(1, "Quiz ID kiritilishi shart"),
-  answers: z.array(
-    z.object({
-      questionId: z.string().min(1),
-      value: z.union([z.string(), z.array(z.string())]),
-    })
-  ),
+  quizId: z.string().min(1, "Quiz ID kiritilishi shart").max(64),
+  // Hajm chegaralari: o'quvchi bazaga cheksiz katta javob yoza olmasligi uchun
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().min(1).max(64),
+        value: z.union([z.string().max(10000, "Javob juda uzun"), z.array(z.string().max(1000)).max(50)]),
+      })
+    )
+    .max(200),
 });
 
 export const quizGradeSchema = z.object({

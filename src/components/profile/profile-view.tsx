@@ -1,15 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
 import Link from "next/link";
-import { User, Lock, Eye, EyeOff, Shield, Award, Sparkles, CheckCircle2, QrCode, Camera } from "lucide-react";
+import { User, Lock, Shield, Award, Sparkles, QrCode, Camera } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
-import { changePasswordAction, ActionResult } from "@/actions/auth.actions";
+import { PasswordForm } from "@/components/auth/password-form";
 import { TelegramSection } from "@/components/profile/telegram-section";
 import { CelebrationSetting } from "@/components/profile/celebration-setting";
 import type { TelegramStatus } from "@/actions/telegram.actions";
@@ -28,15 +25,7 @@ interface ProfileViewProps {
   celebrationsEnabled: boolean;
 }
 
-const initialState: ActionResult = {
-  success: false,
-};
-
 export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileViewProps) {
-  const [state, formAction, isPending] = useActionState(changePasswordAction, initialState);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   return (
     // Mentorda sahifa tepasida bo'lim tablari bor — kontent ular bilan bir chiziqda turadi
     <div className={`space-y-4 max-w-3xl animate-in fade-in pb-12 ${user.role === "mentor" ? "" : "mx-auto"}`}>
@@ -182,88 +171,17 @@ export function ProfileView({ user, telegram, celebrationsEnabled }: ProfileView
           </h2>
         </div>
 
-        {state?.success && (
-          <div
-            role="status"
-            className="p-4 rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 text-sm flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span>Parol muvaffaqiyatli yangilandi!</span>
-          </div>
-        )}
+        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
+          Parol almashtirilgach, boshqa qurilmalarda ochiq qolgan sessiyalar avtomatik yopiladi.
+        </p>
 
-        {state?.message && !state.success && (
-          <div
-            role="alert"
-            className="p-4 rounded-2xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-sm"
-          >
-            {state.message}
-          </div>
-        )}
-
-        <form action={formAction} className="space-y-4 max-w-md">
-          <Field
-            htmlFor="new-password"
-            label="Yangi parol"
-            required
-            hint="Kamida 8 ta belgi (harf va raqamlar)"
-            error={state?.errors?.newPassword?.[0]}
-          >
-            <div className="relative">
-              <Input
-                id="new-password"
-                name="newPassword"
-                type={showNewPassword ? "text" : "password"}
-                placeholder="Yangi parolni kiriting"
-                required
-                className="pr-11"
-              />
-              <button
-                type="button"
-                onClick={() => setShowNewPassword((prev) => !prev)}
-                aria-label={showNewPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
-              >
-                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </Field>
-
-          <Field
-            htmlFor="confirm-password"
-            label="Yangi parolni tasdiqlang"
-            required
-            error={state?.errors?.confirmPassword?.[0]}
-          >
-            <div className="relative">
-              <Input
-                id="confirm-password"
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Yangi parolni qayta kiriting"
-                required
-                className="pr-11"
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                aria-label={showConfirmPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-w-[44px] justify-center cursor-pointer"
-              >
-                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </Field>
-
-          <Button
-            type="submit"
-            variant="primary"
-            className="min-h-[44px] font-semibold"
-            isLoading={isPending}
-          >
-            Parolni saqlash
-          </Button>
-        </form>
+        <PasswordForm
+          requireCurrent
+          idPrefix="profile"
+          submitLabel="Parolni saqlash"
+          className="max-w-md"
+          buttonClassName="font-semibold"
+        />
       </div>
     </div>
   );

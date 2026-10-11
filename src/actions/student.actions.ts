@@ -173,6 +173,8 @@ export async function resetPasswordAction(userId: string): Promise<{
   user.passwordHash = await hashPassword(newPassword);
   user.mustChangePassword = true;
   user.tempPasswordEnc = encryptTempPassword(newPassword);
+  // Eski parol bilan ochilgan sessiyalar (masalan, begona qurilmada qolgani) shu zahoti yopiladi
+  user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   await user.save();
 
   await AuditLog.create({

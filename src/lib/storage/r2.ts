@@ -43,10 +43,13 @@ export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 export async function getUploadPresignedUrl({
   key,
   contentType,
+  contentLength,
   skipTypeCheck = false,
 }: {
   key: string;
   contentType: string;
+  /** Fayl hajmi (bayt). Imzoga kiradi — havola bilan boshqa hajmdagi (kattaroq) fayl yuklab bo'lmaydi */
+  contentLength: number;
   skipTypeCheck?: boolean;
 }): Promise<{ uploadUrl: string; key: string }> {
   if (!skipTypeCheck && !ALLOWED_FILE_TYPES.includes(contentType)) {
@@ -58,10 +61,15 @@ export async function getUploadPresignedUrl({
     Bucket: R2_BUCKET,
     Key: key,
     ContentType: contentType,
+    ContentLength: contentLength,
   });
 
-  // Presigned URL valid for 15 minutes (900 seconds)
-  const uploadUrl = await getSignedUrl(client, command, { expiresIn: 900 });
+  // Presigned URL valid for 15 minutes (900 seconds).
+  // content-length sarlavhasi ham imzolanadi: serverda tekshirilgan hajmdan boshqasi rad etiladi.
+  const uploadUrl = await getSignedUrl(client, command, {
+    expiresIn: 900,
+    signableHeaders: new Set(["content-length", "content-type"]),
+  });
   return { uploadUrl, key };
 }
 

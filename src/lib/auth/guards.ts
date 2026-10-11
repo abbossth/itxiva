@@ -17,11 +17,16 @@ export const getCurrentUser = cache(async (): Promise<SessionPayload | null> => 
   if (!session) return null;
 
   await connectToDatabase();
-  const user = await User.findById(session.userId).select("groupId role").lean();
+  const user = await User.findById(session.userId).select("groupId role mustChangePassword sessionVersion").lean();
   // O'chirilgan yoki roli o'zgargan foydalanuvchining eski cookie'si endi yaroqsiz (mentor uchun ham)
   if (!user || user.role !== session.role) return null;
-  if (session.role !== "student") return session;
-  return { ...session, groupId: user.groupId ? user.groupId.toString() : null };
+  // Parol almashtirilgan yoki mentor tiklagan: undan oldin berilgan barcha sessiyalar bekor bo'ladi
+  if ((user.sessionVersion ?? 0) !== (session.sessionVersion ?? 0)) return null;
+
+  // Cookie 14 kun yashaydi — "parolni almashtirish shart" belgisi ham bazadagi holatdan olinadi
+  const mustChangePassword = Boolean(user.mustChangePassword);
+  if (session.role !== "student") return { ...session, mustChangePassword };
+  return { ...session, mustChangePassword, groupId: user.groupId ? user.groupId.toString() : null };
 });
 
 /**
@@ -31,6 +36,10 @@ export async function requireAuth(): Promise<SessionPayload> {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
+  }
+  // Vaqtinchalik parol bilan kirgan foydalanuvchi parolini almashtirmaguncha hech qaysi sahifa va amalga o'tolmaydi
+  if (user.mustChangePassword) {
+    redirect("/change-password");
   }
   return user;
 }

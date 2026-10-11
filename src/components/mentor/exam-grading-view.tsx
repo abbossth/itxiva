@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toExternalUrl } from "@/lib/open-tab";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IExamData } from "@/lib/db/models/exam.model";
@@ -254,7 +255,7 @@ export function ExamGradingView({
                           <span>{ans.repoUrl}</span>
                         </div>
                         <a
-                          href={ans.repoUrl}
+                          href={toExternalUrl(ans.repoUrl) ?? "#"}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs text-teal-600 dark:text-teal-400 font-semibold hover:underline"

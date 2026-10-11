@@ -8,8 +8,7 @@ import { Order, IOrder, IOrderData, OrderStatus } from "@/lib/db/models/order.mo
 import { User } from "@/lib/db/models/user.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { getSession } from "@/lib/auth/session";
-import { requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
+import { getCurrentUser, requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
@@ -339,7 +338,7 @@ export async function getOrdersForMentor(): Promise<ShopOrder[]> {
  * Navigatsiyadagi belgi: mentor uchun yangi buyurtmalar, o'quvchi uchun "Qabul qildim" kutilayotganlari
  */
 export async function getOrdersBadgeCount(): Promise<number> {
-  const session = await getSession();
+  const session = await getCurrentUser();
   if (!session) return 0;
   try {
     await connectToDatabase();

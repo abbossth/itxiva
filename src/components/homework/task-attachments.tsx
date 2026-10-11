@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { getMaterialDownloadUrlAction } from "@/actions/lesson.actions";
+import { openResolvedUrl } from "@/lib/open-tab";
 import type { IMaterial } from "@/lib/db/models/lesson.model";
 import { formatFileSize } from "@/lib/homework-status";
 
@@ -17,12 +18,13 @@ export function TaskAttachments({ lessonId, attachments }: { lessonId: string; a
     try {
       setLoadingKey(material.urlOrKey);
       setErrorMsg(null);
-      const res = await getMaterialDownloadUrlAction({ lessonId, materialKey: material.urlOrKey });
-      if (res.success && res.downloadUrl) {
-        window.open(res.downloadUrl, "_blank", "noopener,noreferrer");
-      } else {
-        setErrorMsg(res.message || "Faylni yuklab olishda xatolik yuz berdi");
-      }
+      let message: string | undefined;
+      const opened = await openResolvedUrl(async () => {
+        const res = await getMaterialDownloadUrlAction({ lessonId, materialKey: material.urlOrKey });
+        message = res.message;
+        return res.success ? res.downloadUrl : null;
+      });
+      if (!opened) setErrorMsg(message || "Faylni yuklab olishda xatolik yuz berdi");
     } catch {
       setErrorMsg("Faylni yuklab olishda xatolik yuz berdi");
     } finally {

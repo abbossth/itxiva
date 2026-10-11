@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, ExternalLink, FileArchive, FileImage, FileText, Loader2 } from "lucide-react";
 import { getHomeworkFileUrlAction } from "@/actions/homework.actions";
+import { openResolvedUrl } from "@/lib/open-tab";
 import type { IHomeworkFile } from "@/lib/db/models/homework-submission.model";
 import { formatFileSize } from "@/lib/homework-status";
 
@@ -38,15 +39,18 @@ export function SubmissionContent({ submissionId, text, links, files }: Submissi
     try {
       setLoadingKey(file.key);
       setErrorMsg(null);
-      const res = await getHomeworkFileUrlAction({ submissionId, key: file.key });
-      if (!res.success || !res.downloadUrl) {
-        setErrorMsg(res.message || "Faylni ochib bo'lmadi");
-        return;
-      }
+      let message: string | undefined;
+      const resolve = async () => {
+        const res = await getHomeworkFileUrlAction({ submissionId, key: file.key });
+        message = res.message;
+        return res.success ? res.downloadUrl : null;
+      };
       if (isImage) {
-        setPreviews((prev) => ({ ...prev, [file.key]: res.downloadUrl! }));
-      } else {
-        window.open(res.downloadUrl, "_blank", "noopener,noreferrer");
+        const url = await resolve();
+        if (url) setPreviews((prev) => ({ ...prev, [file.key]: url }));
+        else setErrorMsg(message || "Faylni ochib bo'lmadi");
+      } else if (!(await openResolvedUrl(resolve))) {
+        setErrorMsg(message || "Faylni ochib bo'lmadi");
       }
     } catch {
       setErrorMsg("Faylni ochib bo'lmadi");

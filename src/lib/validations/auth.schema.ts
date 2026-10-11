@@ -15,7 +15,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().optional(),
+    currentPassword: z.string().max(200).optional(),
     newPassword: z
       .string()
       .min(6, "Yangi parol kamida 6 ta belgidan iborat bo'lishi kerak")

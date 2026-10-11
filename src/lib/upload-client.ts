@@ -84,7 +84,9 @@ export async function uploadFileToStorage(
     const data = await presignedRes.json().catch(() => ({}));
     throw new Error(data.error || "Fayl yuklash uchun ruxsat olinmadi");
   }
-  const { uploadUrl, key } = await presignedRes.json();
+  // Server fayl turini xavfsiz turga almashtirishi mumkin — yuklash aynan imzolangan tur bilan ketishi shart
+  const { uploadUrl, key, contentType: signedType } = await presignedRes.json();
+  contentType = signedType || contentType;
 
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",

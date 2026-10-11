@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { getCurrentUser } from "@/lib/auth/guards";
@@ -13,14 +14,32 @@ function cleanFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
 }
 
+// Fayl kaliti taxmin qilib bo'lmaydigan bo'lishi uchun kriptografik tasodifiy qo'shimcha
 function randomSuffix(): string {
-  return Math.random().toString(36).substring(2, 8);
+  return crypto.randomBytes(9).toString("base64url");
+}
+
+// O'quvchi yuborgan MIME turi omborga yoziladi va faylni ochganda brauzerga qaytadi.
+// Brauzerda bajariladigan turlar (HTML, SVG, skript) oddiy yuklab olinadigan faylga aylantiriladi.
+const ACTIVE_CONTENT_TYPE = /html|xml|svg|javascript|ecmascript/i;
+function safeContentType(contentType: unknown): string {
+  if (typeof contentType !== "string" || !/^[\w.+-]+\/[\w.+-]+$/.test(contentType) || ACTIVE_CONTENT_TYPE.test(contentType)) {
+    return "application/octet-stream";
+  }
+  return contentType;
+}
+
+function isValidSize(fileSize: unknown, maxBytes: number): fileSize is number {
+  return typeof fileSize === "number" && Number.isInteger(fileSize) && fileSize > 0 && fileSize <= maxBytes;
 }
 
 export async function POST(req: NextRequest) {
   const session = await getCurrentUser();
   if (!session) {
     return NextResponse.json({ error: "Tizimga kirilmagan" }, { status: 401 });
+  }
+  if (session.mustChangePassword) {
+    return NextResponse.json({ error: "Avval parolni almashtiring" }, { status: 403 });
   }
 
   try {
@@ -34,7 +53,7 @@ export async function POST(req: NextRequest) {
       homeworkLessonId?: string;
     };
 
-    if (!filename || typeof filename !== "string") {
+    if (!filename || typeof filename !== "string" || filename.length > 300) {
       return NextResponse.json({ error: "Fayl nomi talab qilinadi" }, { status: 400 });
     }
 
@@ -65,8 +84,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `${extension} turidagi fayl qabul qilinmaydi` }, { status: 400 });
       }
 
-      const maxBytes = HOMEWORK_MAX_FILE_MB * 1024 * 1024;
-      if (typeof fileSize !== "number" || fileSize <= 0 || fileSize > maxBytes) {
+      if (!isValidSize(fileSize, HOMEWORK_MAX_FILE_MB * 1024 * 1024)) {
         return NextResponse.json(
           { error: `Fayl hajmi ${HOMEWORK_MAX_FILE_MB} MB dan oshmasligi kerak` },
           { status: 400 }
@@ -74,19 +92,28 @@ export async function POST(req: NextRequest) {
       }
 
       const key = `homework/${homeworkLessonId}/${session.userId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
+      const safeType = safeContentType(contentType);
       const { uploadUrl } = await getUploadPresignedUrl({
         key,
-        contentType: contentType || "application/octet-stream",
+        contentType: safeType,
+        contentLength: fileSize,
         skipTypeCheck: true,
       });
 
-      return NextResponse.json({ uploadUrl, key });
+      return NextResponse.json({ uploadUrl, key, contentType: safeType });
     }
 
     // O'quvchi: faqat o'zi yechayotgan imtihonning "loyiha yuklash" savoli uchun
     if (session.role === "student") {
       if (!examId || !questionId) {
         return NextResponse.json({ error: "Ruxsat berilmagan" }, { status: 403 });
+      }
+      if (!mongoose.isValidObjectId(examId) || typeof questionId !== "string") {
+        return NextResponse.json({ error: "Imtihon topilmadi" }, { status: 404 });
+      }
+      const rate = checkRateLimit(`exam_upload_${session.userId}`, 30, 10 * 60 * 1000);
+      if (!rate.allowed) {
+        return NextResponse.json({ error: "Juda ko'p fayl yuklandi. Birozdan keyin urinib ko'ring" }, { status: 429 });
       }
 
       await connectToDatabase();
@@ -121,18 +148,20 @@ export async function POST(req: NextRequest) {
 
       // Savolda kattaroq chegara qo'yilgan bo'lsa ham, o'quvchi fayli umumiy chegaradan oshmaydi
       const maxMb = Math.min(question.maxFileSizeMb || STUDENT_MAX_UPLOAD_MB, STUDENT_MAX_UPLOAD_MB);
-      if (typeof fileSize !== "number" || fileSize <= 0 || fileSize > maxMb * 1024 * 1024) {
+      if (!isValidSize(fileSize, maxMb * 1024 * 1024)) {
         return NextResponse.json({ error: `Fayl hajmi ${maxMb} MB dan oshmasligi kerak` }, { status: 400 });
       }
 
       const key = `exams/${exam._id}/${session.userId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
+      const safeType = safeContentType(contentType);
       const { uploadUrl } = await getUploadPresignedUrl({
         key,
-        contentType: contentType || "application/octet-stream",
+        contentType: safeType,
+        contentLength: fileSize,
         skipTypeCheck: true,
       });
 
-      return NextResponse.json({ uploadUrl, key });
+      return NextResponse.json({ uploadUrl, key, contentType: safeType });
     }
 
     // Mentor: dars materiallari
@@ -144,7 +173,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Ruxsat etilmagan fayl turi" }, { status: 400 });
     }
 
-    if (fileSize && fileSize > MAX_FILE_SIZE_BYTES) {
+    if (!isValidSize(fileSize, MAX_FILE_SIZE_BYTES)) {
       return NextResponse.json(
         { error: "Fayl hajmi 100 MB dan oshmasligi kerak" },
         { status: 400 }
@@ -157,11 +186,13 @@ export async function POST(req: NextRequest) {
     const { uploadUrl } = await getUploadPresignedUrl({
       key,
       contentType,
+      contentLength: fileSize,
     });
 
     return NextResponse.json({
       uploadUrl,
       key,
+      contentType,
       publicUrl: key,
     });
   } catch (error: unknown) {

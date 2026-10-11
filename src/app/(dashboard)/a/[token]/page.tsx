@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/guards";
 import { QrCheckin } from "@/components/attendance/qr-checkin";
 
 export const metadata = {
@@ -14,9 +14,9 @@ export default async function QrAttendancePage({ params }: QrAttendancePageProps
   const resolvedParams = await params;
   const token = resolvedParams.token;
 
-  const session = await getSession();
+  const session = await getCurrentUser();
   if (!session) {
-    redirect(`/login?next=/a/${token}`);
+    redirect(`/login?next=${encodeURIComponent(`/a/${token}`)}`);
   }
 
   if (session.role === "mentor") {
