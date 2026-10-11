@@ -7,7 +7,7 @@ import { getSession, SessionPayload } from "./session";
 /**
  * Get current authenticated session or null.
  *
- * Sessiya cookie'si 14 kun yashaydi, o'quvchining guruhi esa shu orada o'zgarishi mumkin
+ * Sessiya cookie'si bir necha kun yashaydi, o'quvchining guruhi esa shu orada o'zgarishi mumkin
  * (mentor ko'chirsa yoki Excel import qilinsa). Shuning uchun o'quvchining guruhi har so'rovda
  * bazadan olinadi — aks holda u eski guruhining darslarini ko'rib qolardi.
  * `cache` bitta so'rov davomida bazaga faqat bir marta murojaat qilinishini ta'minlaydi.
@@ -23,7 +23,7 @@ export const getCurrentUser = cache(async (): Promise<SessionPayload | null> => 
   // Parol almashtirilgan yoki mentor tiklagan: undan oldin berilgan barcha sessiyalar bekor bo'ladi
   if ((user.sessionVersion ?? 0) !== (session.sessionVersion ?? 0)) return null;
 
-  // Cookie 14 kun yashaydi — "parolni almashtirish shart" belgisi ham bazadagi holatdan olinadi
+  // Cookie uzoq yashaydi — "parolni almashtirish shart" belgisi ham bazadagi holatdan olinadi
   const mustChangePassword = Boolean(user.mustChangePassword);
   if (session.role !== "student") return { ...session, mustChangePassword };
   return { ...session, mustChangePassword, groupId: user.groupId ? user.groupId.toString() : null };

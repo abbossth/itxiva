@@ -3,7 +3,13 @@ import { cookies } from "next/headers";
 import { UserRole } from "@/lib/db/models/user.model";
 
 const COOKIE_NAME = "itxiva_session";
-const SESSION_DURATION_SECONDS = 14 * 24 * 60 * 60; // 14 days
+// Mentor sessiyasi 14 kun, o'quvchiniki 1 kun yashaydi: o'quvchilar ko'pincha umumiy (sinf, do'st) qurilmadan kiradi
+const MENTOR_SESSION_SECONDS = 14 * 24 * 60 * 60;
+const STUDENT_SESSION_SECONDS = 24 * 60 * 60;
+
+export function sessionDurationSeconds(role: UserRole): number {
+  return role === "student" ? STUDENT_SESSION_SECONDS : MENTOR_SESSION_SECONDS;
+}
 
 function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
@@ -35,7 +41,7 @@ export async function signSessionToken(payload: SessionPayload): Promise<string>
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
+    .setExpirationTime(`${sessionDurationSeconds(payload.role)}s`)
     .sign(getJwtSecret());
 }
 
@@ -45,6 +51,12 @@ export async function signSessionToken(payload: SessionPayload): Promise<string>
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
+    // Muddat berilgan vaqtdan (iat) ham tekshiriladi: avvalroq uzoqroq muddat bilan berilgan
+    // o'quvchi cookie'lari ham kirganidan 1 kun o'tgach yaroqsiz bo'ladi
+    const role = payload.role as UserRole;
+    if (typeof payload.iat !== "number" || Date.now() / 1000 - payload.iat > sessionDurationSeconds(role)) {
+      return null;
+    }
     return {
       userId: payload.userId as string,
       login: payload.login as string,
@@ -70,7 +82,7 @@ export async function setSessionCookie(payload: SessionPayload): Promise<void> {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_DURATION_SECONDS,
+    maxAge: sessionDurationSeconds(payload.role),
   });
 }
 
