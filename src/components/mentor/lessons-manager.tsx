@@ -126,6 +126,9 @@ export function LessonsManager({
           <h2 id="to-check-heading" className="flex items-center gap-2 px-1 pb-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
             <ClipboardCheck className="w-4 h-4" />
             Tekshirish kerak
+            <Link href="/mentor/homework" className="ml-auto normal-case tracking-normal font-semibold text-teal-700 dark:text-teal-300 hover:underline">
+              Barcha javoblar — kim nima topshirgan
+            </Link>
           </h2>
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {toCheck.map((item) => (

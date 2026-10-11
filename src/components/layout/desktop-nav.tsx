@@ -68,9 +68,12 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
           const isActive = isLinkActive(link, pathname);
           const count = link.badge ? badges[link.badge] ?? 0 : 0;
 
+          // Son alohida havola: bosilsa ishlar ro'yxati ochiladi (havola ichida havola bo'lmasligi uchun yonma-yon turadi)
+          const badgeLink = count > 0 && link.badgeHref && !collapsed ? link.badgeHref : null;
+
           return (
+            <div key={link.href} className="relative">
             <Link
-              key={link.href}
               href={link.href}
               title={collapsed ? link.label : undefined}
               aria-label={collapsed ? (count > 0 ? `${link.label} (${count})` : link.label) : undefined}
@@ -98,12 +101,31 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
                 (collapsed ? (
                   <span aria-hidden className="absolute top-1.5 right-2.5 h-2 w-2 rounded-full bg-amber-500" />
                 ) : (
-                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center">
+                  <span
+                    aria-hidden={badgeLink ? true : undefined}
+                    className={cn(
+                      "min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center",
+                      badgeLink && "invisible"
+                    )}
+                  >
                     {count}
                   </span>
                 ))}
               {!collapsed && <NavPending />}
             </Link>
+            {badgeLink && (
+              <Link
+                href={badgeLink}
+                title={`Tekshirilmagan vazifa javoblari: ${count} ta`}
+                aria-label={`Tekshirilmagan vazifa javoblari: ${count} ta — ro'yxatni ochish`}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-8 min-w-8 items-center justify-center px-1.5 rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 group/badge"
+              >
+                <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center group-hover/badge:scale-110 group-hover/badge:bg-amber-400 transition-transform">
+                  {count}
+                </span>
+              </Link>
+            )}
+            </div>
           );
         })}
       </nav>

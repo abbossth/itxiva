@@ -358,6 +358,85 @@ export async function getHomeworkOverviewForMentor(groupId?: string): Promise<Ho
   });
 }
 
+export interface HomeworkInboxItem {
+  submissionId: string;
+  studentId: string;
+  studentName: string;
+  groupId: string;
+  groupName: string;
+  groupShortName: string;
+  lessonId: string;
+  lessonTitle: string;
+  order: number;
+  status: HomeworkStatus;
+  submittedAt: string;
+  isLate: boolean;
+  attempt: number;
+  score: number | null;
+  /** Javob tarkibi: matn bor-yo'qligi, havolalar va fayllar soni */
+  hasText: boolean;
+  links: number;
+  files: number;
+}
+
+/**
+ * Barcha guruhlar bo'yicha javoblar ro'yxati: tekshirilmaganlar (eng eskisi birinchi — navbat tartibida)
+ * va so'nggi baholangan/qaytarilganlar. Navigatsiyadagi son aynan shu ro'yxatdagi tekshirilmaganlar soni.
+ */
+export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]; recent: HomeworkInboxItem[] }> {
+  await requireMentor();
+  await connectToDatabase();
+
+  type Row = SubmissionLean & { lessonId: mongoose.Types.ObjectId; studentId: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId };
+  const [pendingDocs, recentDocs] = await Promise.all([
+    HomeworkSubmission.find({ status: "submitted" }).sort({ submittedAt: 1 }).limit(500).lean<Row[]>(),
+    HomeworkSubmission.find({ status: { $in: ["graded", "returned"] } }).sort({ gradedAt: -1, submittedAt: -1 }).limit(50).lean<Row[]>(),
+  ]);
+  const all = [...pendingDocs, ...recentDocs];
+  if (all.length === 0) return { pending: [], recent: [] };
+
+  const [lessons, students] = await Promise.all([
+    Lesson.find({ _id: { $in: all.map((s) => s.lessonId) } }).select("title order groupId").lean(),
+    User.find({ _id: { $in: all.map((s) => s.studentId) } }).select("fullName").lean(),
+  ]);
+  const groups = await Group.find({ _id: { $in: lessons.map((l) => l.groupId) } }).select("name shortName").lean();
+  const lessonById = new Map(lessons.map((l) => [l._id.toString(), l]));
+  const studentById = new Map(students.map((u) => [u._id.toString(), u.fullName]));
+  const groupById = new Map(groups.map((g) => [g._id.toString(), g]));
+
+  const toItem = (s: Row): HomeworkInboxItem[] => {
+    const lesson = lessonById.get(s.lessonId.toString());
+    const studentName = studentById.get(s.studentId.toString());
+    // O'chirilgan dars yoki o'quvchining javobini ochib bo'lmaydi
+    if (!lesson || !studentName) return [];
+    // Javob dars guruhida ko'rinadi (o'quvchi keyin boshqa guruhga ko'chgan bo'lsa ham)
+    const group = groupById.get(lesson.groupId.toString());
+    return [
+      {
+        submissionId: s._id.toString(),
+        studentId: s.studentId.toString(),
+        studentName,
+        groupId: lesson.groupId.toString(),
+        groupName: group?.name ?? "—",
+        groupShortName: group ? groupShortName(group) : "—",
+        lessonId: lesson._id.toString(),
+        lessonTitle: lesson.title,
+        order: lesson.order,
+        status: s.status,
+        submittedAt: new Date(s.submittedAt).toISOString(),
+        isLate: Boolean(s.isLate),
+        attempt: s.attempt ?? 1,
+        score: s.score ?? null,
+        hasText: Boolean(s.text?.trim()),
+        links: s.links?.length ?? 0,
+        files: s.files?.length ?? 0,
+      },
+    ];
+  };
+
+  return { pending: pendingDocs.flatMap(toItem), recent: recentDocs.flatMap(toItem) };
+}
+
 export interface LessonHomeworkStats {
   totalStudents: number;
   /** Javob yuborganlar (tekshirilmagan + baholangan + qaytarilgan) */

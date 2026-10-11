@@ -30,6 +30,8 @@ export interface NavLink {
   primary?: boolean;
   /** Son ko'rsatiladigan havola: buyurtmalar yoki uyga vazifalar */
   badge?: NavBadgeKind;
+  /** Sondagi ishlar ro'yxati: son bosilganda shu sahifa ochiladi (bo'lim sahifasining o'zi emas) */
+  badgeHref?: string;
   /** Shu bo'limga kiradigan boshqa sahifalar: ular ochiq bo'lganda ham havola faol ko'rinadi */
   match?: string[];
 }
@@ -42,7 +44,7 @@ export const MENTOR_LINKS: NavLink[] = [
   // Davomat guruhlar ichida: dars davomati sahifalari (/mentor/attendance/...) ham shu bo'limga kiradi
   { href: "/mentor/groups", label: "Guruhlar", shortLabel: "Guruhlar", icon: Users, primary: true, match: ["/mentor/attendance"] },
   // Uyga vazifalar darsning bir qismi: tekshirish sahifalari (/mentor/homework/...) ham shu bo'limga kiradi
-  { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", match: ["/mentor/homework"] },
+  { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", badgeHref: "/mentor/homework", match: ["/mentor/homework"] },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
