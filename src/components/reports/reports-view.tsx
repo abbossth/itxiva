@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatTile, ReportSection, BarList, ScoreLegend } from "@/components/reports/report-parts";
+import { StatTile, ReportSection, BarList } from "@/components/reports/report-parts";
 import { StudentsTable } from "@/components/reports/students-table";
 import { COIN_TYPE_COLORS, COIN_TYPE_LABELS } from "@/lib/coin-types";
 import { SCORE_TONE, formatPercent, scoreTone } from "@/lib/score-tone";
@@ -172,8 +172,6 @@ export function ReportsView({ data, groups, period, groupId, academicYear }: Rep
               hint="Hozirgi holat"
             />
           </div>
-
-          <ScoreLegend />
 
           <StudentsTable rows={data.studentsTable} fileSuffix={suffix} />
 

@@ -87,15 +87,15 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
             <div
               key={mat._id?.toString() || idx}
               className={cn(
-                "flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800",
+                "flex items-center justify-between min-w-0 p-3 rounded-xl border border-slate-200 dark:border-slate-800",
                 "bg-slate-50/70 dark:bg-slate-900/50 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors"
               )}
             >
-              <div className="flex items-center gap-3 min-w-0 pr-2">
+              <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
                 <div className="p-2 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 shrink-0">
                   <Icon className="w-5 h-5" />
                 </div>
-                <div className="truncate">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
                     {mat.title}
                   </p>

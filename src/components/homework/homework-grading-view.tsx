@@ -182,7 +182,8 @@ export function HomeworkGradingView({ roster, initialStudentId }: { roster: Home
       </details>
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-2">
+        {/* min-w-0: tor ekranda tablar va uzun ismlar ustunni kengaytirib yubormaydi */}
+        <div className="space-y-2 min-w-0">
           <div role="tablist" className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
             {TABS.map((t) => {
               const count = t.id === "all" ? total : counts[t.id];

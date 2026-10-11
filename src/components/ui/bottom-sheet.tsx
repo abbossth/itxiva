@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Portal } from "./portal";
 
 export interface BottomSheetProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export function BottomSheet({
   if (!isOpen) return null;
 
   return (
+    <Portal>
     <div
       role="dialog"
       aria-modal="true"
@@ -88,5 +90,6 @@ export function BottomSheet({
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

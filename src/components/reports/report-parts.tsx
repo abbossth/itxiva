@@ -45,9 +45,10 @@ export function StatTile({
     <div className={cn("p-4 rounded-2xl border shadow-xs", t.card)}>
       <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
         <Icon className={cn("w-4 h-4 shrink-0", t.icon)} />
-        <span className="truncate">{label}</span>
+        <span className="min-w-0 leading-tight">{label}</span>
         {tone !== "none" && (
-          <span className={cn("ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-bold", SCORE_TONE[tone].soft)}>
+          // Tor ekranda yozuv sig'maydi — daraja kartaning rangidan ko'rinadi
+          <span className={cn("hidden sm:inline ml-auto shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-bold", SCORE_TONE[tone].soft)}>
             {SCORE_TONE[tone].label}
           </span>
         )}

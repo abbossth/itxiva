@@ -124,10 +124,14 @@ export function LessonsManager({
       {toCheck.length > 0 && (
         <section aria-labelledby="to-check-heading" className="rounded-2xl border border-amber-500/40 bg-amber-50/70 dark:bg-amber-500/10 p-3">
           <h2 id="to-check-heading" className="flex items-center gap-2 px-1 pb-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-            <ClipboardCheck className="w-4 h-4" />
-            Tekshirish kerak
-            <Link href="/mentor/homework" className="ml-auto normal-case tracking-normal font-semibold text-teal-700 dark:text-teal-300 hover:underline">
-              Barcha javoblar — kim nima topshirgan
+            <ClipboardCheck className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">Tekshirish kerak</span>
+            <Link
+              href="/mentor/homework"
+              title="Kim qaysi vazifani topshirgani — bitta ro'yxatda"
+              className="ml-auto whitespace-nowrap normal-case tracking-normal font-semibold text-teal-700 dark:text-teal-300 hover:underline"
+            >
+              Barcha javoblar
             </Link>
           </h2>
           <ul className="grid gap-1.5 sm:grid-cols-2">

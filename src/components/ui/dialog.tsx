@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Portal } from "./portal";
 
 interface DialogContextValue {
   isOpen: boolean;
@@ -65,6 +66,7 @@ export function Dialog({
     }[maxWidth];
 
     return (
+      <Portal>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
@@ -101,12 +103,14 @@ export function Dialog({
           <div className="mt-4">{children}</div>
         </div>
       </div>
+      </Portal>
     );
   }
 
   // Otherwise, use Compound Component pattern
   return (
     <DialogContext.Provider value={{ isOpen: isActualOpen, onClose: handleClose }}>
+      <Portal>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
@@ -115,6 +119,7 @@ export function Dialog({
         />
         {children}
       </div>
+      </Portal>
     </DialogContext.Provider>
   );
 }

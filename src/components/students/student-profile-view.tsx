@@ -266,7 +266,9 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
           hint={`${report.quizzes.length} ta test${examAvg === null ? "" : ` · imtihon ${examAvg}%`}`}
         />
         <StatTile icon={Coins} label="Jami coin" value={student.totalCoins} hint="Reyting uchun" />
-        <StatTile icon={Wallet} label="Balans" value={student.spendableBalance} hint="Sarflash mumkin" />
+        <div className="col-span-2 lg:col-span-1">
+          <StatTile icon={Wallet} label="Balans" value={student.spendableBalance} hint="Sarflash mumkin" />
+        </div>
       </div>
 
       <Tabs defaultValue="personal">
@@ -283,10 +285,12 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
         </TabsContent>
 
         <TabsContent value="coins" className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <StatTile icon={Coins} label="Olgan" value={`+${coinStats.earned}`} tone="good" />
             <StatTile icon={Coins} label="Yechilgan / sarflagan" value={coinStats.lost === 0 ? "0" : `−${coinStats.lost}`} tone={coinStats.lost > 0 ? "low" : "none"} />
-            <StatTile icon={Wallet} label="Hozirgi balans" value={student.spendableBalance} />
+            <div className="col-span-2 sm:col-span-1">
+              <StatTile icon={Wallet} label="Hozirgi balans" value={student.spendableBalance} />
+            </div>
           </div>
 
           <ReportSection title="Nima uchun olgan va nimaga ketgan" description="Manbalar bo'yicha (oxirgi 300 ta amal)">
