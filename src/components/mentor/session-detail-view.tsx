@@ -332,9 +332,9 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         title="Davomatni o'chirish"
         description={
           <>
-            <strong>{detail.group?.name}</strong> guruhining {formatDateUz(detail.session.date)} kungi davomati butunlay
-            o&apos;chiriladi. Shu dars uchun berilgan coinlar qaytarib olinadi, olingan jarimalar esa o&apos;quvchilarga
-            qaytariladi. Bu amalni ortga qaytarib bo&apos;lmaydi.
+            <strong>{detail.group?.name}</strong> guruhining {formatDateUz(detail.session.date)} kungi davomati arxivga
+            o&apos;tkaziladi. Shu dars uchun berilgan coinlar qaytarib olinadi, olingan jarimalar esa o&apos;quvchilarga
+            qaytariladi. Sozlamalar → Arxiv bo&apos;limidan tiklasangiz, coinlar ham qayta hisoblanadi.
           </>
         }
         confirmText="Ha, o'chirish"

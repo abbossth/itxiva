@@ -9,6 +9,7 @@ import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireStudent, requireAuth } from "@/lib/auth/guards";
+import { archiveEntity } from "@/lib/archive";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ActionResult } from "./auth.actions";
 import { formatDateUz, formatDateTimeUz } from "@/lib/utils";
@@ -28,7 +29,6 @@ import {
   closeExpiredSessions,
   closeSession,
   convertSessionToCurrentRules,
-  deleteSessionWithCoins,
   finalizeSession,
   findSessionOnDay,
   isSessionFinalized,
@@ -511,7 +511,9 @@ export async function deleteAttendanceSessionAction(sessionId: string): Promise<
   const attSession = await AttendanceSession.findById(sessionId).select("groupId date status").lean();
   if (!attSession) return { success: false, message: "Sessiya topilmadi" };
 
-  const result = await deleteSessionWithCoins(sessionId);
+  // Sessiya yozuvlari bilan arxivga ko'chadi; coinlar qaytariladi, tiklanganda qayta beriladi
+  const archived = await archiveEntity("attendance", sessionId, session.userId);
+  const result = archived ? { records: archived.archive.counts?.[AttendanceRecord.collection.collectionName] ?? 0 } : null;
   await AuditLog.create({
     actorId: session.userId,
     action: "DELETE_ATTENDANCE",
@@ -520,13 +522,12 @@ export async function deleteAttendanceSessionAction(sessionId: string): Promise<
       groupId: attSession.groupId.toString(),
       dateKey: toDateKey(attSession.date),
       records: result?.records ?? 0,
-      coinsReverted: result?.reverted ?? 0,
     },
   });
 
   return {
     success: true,
-    message: "Davomat o'chirildi, coinlar qayta hisoblandi",
+    message: "Davomat arxivga o'tkazildi, coinlar qayta hisoblandi",
     data: { groupId: attSession.groupId.toString() },
   };
 }

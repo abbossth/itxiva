@@ -7,9 +7,9 @@ import { Lesson, ILesson, ILessonData } from "@/lib/db/models/lesson.model";
 import { Group } from "@/lib/db/models/group.model";
 import { Quiz } from "@/lib/db/models/quiz.model";
 import { addDaysToKey, getLessonDatesInRange, getNextLessonAfter, toDateKey, type GroupSchedule } from "@/lib/schedule";
-import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
+import { archiveEntity } from "@/lib/archive";
 import { lessonSchema, homeworkSchema, HomeworkInput, LessonInput } from "@/lib/validations/lesson.schema";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { notifyGroup } from "@/lib/notifications/notify";
@@ -236,12 +236,10 @@ export async function deleteLessonAction(lessonId: string) {
   const mentor = await requireMentor();
   await connectToDatabase();
 
-  const lesson = await Lesson.findByIdAndDelete(lessonId);
+  // Dars testi, vazifa va test javoblari bilan birga arxivga ko'chadi
+  const archived = await archiveEntity("lesson", lessonId, mentor.userId);
+  const lesson = archived?.root as { title?: string; linkId?: unknown } | undefined;
   if (lesson) {
-    await Promise.all([
-      HomeworkSubmission.deleteMany({ lessonId: lesson._id }),
-      Quiz.deleteMany({ lessonId: lesson._id }),
-    ]);
     if (lesson.linkId) {
       const rest = await Lesson.find({ linkId: lesson.linkId }).select("_id").lean();
       if (rest.length === 1) await Lesson.updateOne({ _id: rest[0]._id }, { $set: { linkId: null } });
@@ -256,7 +254,7 @@ export async function deleteLessonAction(lessonId: string) {
 
   revalidatePath("/lessons");
   revalidatePath("/mentor/lessons");
-  return { success: true, message: "Dars o'chirildi" };
+  return { success: true, message: lesson ? "Dars arxivga o'tkazildi" : "Dars topilmadi" };
 }
 
 export async function reorderLessonsAction({

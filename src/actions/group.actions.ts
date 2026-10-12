@@ -6,6 +6,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { Group, IGroup } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
+import { archiveEntity } from "@/lib/archive";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
 import { groupSchema, scheduleSchema, GroupInput } from "@/lib/validations/group.schema";
 
@@ -117,14 +118,15 @@ export async function deleteGroupAction(id: string) {
     };
   }
 
-  const group = await Group.findByIdAndDelete(id);
+  const archived = await archiveEntity("group", id, mentor.userId);
+  if (!archived) return { success: false, message: "Guruh topilmadi" };
 
   await AuditLog.create({
     actorId: mentor.userId,
     action: "DELETE_GROUP",
-    details: { groupId: id, groupName: group?.name },
+    details: { groupId: id, groupName: archived.archive.title },
   });
 
   revalidatePath("/mentor/groups");
-  return { success: true, message: "Guruh o'chirildi" };
+  return { success: true, message: "Guruh arxivga o'tkazildi" };
 }

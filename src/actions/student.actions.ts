@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User, IUser } from "@/lib/db/models/user.model";
-import { StudentProfile } from "@/lib/db/models/student-profile.model";
+import mongoose from "mongoose";
+import { archiveEntity } from "@/lib/archive";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor } from "@/lib/auth/guards";
@@ -249,15 +250,15 @@ export async function deleteStudentAction(userId: string): Promise<{ success: bo
   const mentor = await requireMentor();
   await connectToDatabase();
 
-  const user = await User.findById(userId);
-  if (!user || user.role !== "student") {
+  // O'quvchi va unga tegishli hamma narsa (shaxsiy ma'lumot, davomat, vazifa, test, imtihon, coin tarixi,
+  // buyurtmalar) arxivga ko'chadi — Sozlamalar → Arxiv bo'limidan tiklash mumkin
+  const archived = await archiveEntity("student", userId, mentor.userId);
+  if (!archived) {
     return { success: false, message: "O'quvchi topilmadi" };
   }
+  const user = archived.root as unknown as { _id: mongoose.Types.ObjectId; login: string; fullName: string; groupId?: mongoose.Types.ObjectId | null };
 
   const groupId = user.groupId;
-  await User.findByIdAndDelete(userId);
-  // Shaxsiy ma'lumotlar (hujjat raqamlari, rasm havolasi) o'quvchi bilan birga o'chadi
-  await StudentProfile.deleteOne({ studentId: userId });
 
   if (groupId) {
     const count = await User.countDocuments({ groupId, role: "student" });
@@ -274,7 +275,7 @@ export async function deleteStudentAction(userId: string): Promise<{ success: bo
   revalidatePath("/mentor/groups");
   if (groupId) revalidatePath(`/mentor/groups/${groupId}`);
 
-  return { success: true, message: "O'quvchi o'chirildi" };
+  return { success: true, message: "O'quvchi arxivga o'tkazildi" };
 }
 
 

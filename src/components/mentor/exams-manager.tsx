@@ -332,8 +332,8 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
           </DialogHeader>
 
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Ushbu imtihon va unga tegishli barcha o&apos;quvchilar topshiriqlari bazadan o&apos;chiriladi.
-            Haqiqatan ham o&apos;chirmoqchimisiz?
+            Ushbu imtihon o&apos;quvchilarning barcha urinishlari bilan birga arxivga o&apos;tadi.
+            Sozlamalar → Arxiv bo&apos;limidan istalgan payt tiklash mumkin.
           </p>
 
           <DialogFooter className="gap-2 pt-2">

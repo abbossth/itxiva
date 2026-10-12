@@ -9,6 +9,7 @@ import { User } from "@/lib/db/models/user.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getCurrentUser, requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
+import { archiveEntity } from "@/lib/archive";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
@@ -111,14 +112,15 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
     return { success: true, message: "Mahsulotga buyurtmalar bor — u do'kondan yashirildi" };
   }
 
-  const product = await Product.findByIdAndDelete(productId);
+  const archived = await archiveEntity("product", productId, mentor.userId);
+  if (!archived) return { success: false, message: "Mahsulot topilmadi" };
   await AuditLog.create({
     actorId: mentor.userId,
     action: "DELETE_PRODUCT",
-    details: { productId, title: product?.title },
+    details: { productId, title: archived.archive.title },
   });
   revalidateShop();
-  return { success: true, message: "Mahsulot o'chirildi" };
+  return { success: true, message: "Mahsulot arxivga o'tkazildi" };
 }
 
 /**

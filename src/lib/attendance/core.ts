@@ -273,6 +273,40 @@ export async function deleteSessionWithCoins(sessionId: string | mongoose.Types.
 }
 
 /**
+ * Arxivdan tiklangan sessiya uchun: o'chirilganda qaytarib olingan coinlar o'quvchilarga qayta beriladi
+ * (jarimalar qayta olinadi). Yozuv haqiqatda ko'chgan miqdorni saqlaydi.
+ */
+export async function reapplySessionCoins(
+  sessionId: string | mongoose.Types.ObjectId,
+  studentIds: Array<string | mongoose.Types.ObjectId>
+): Promise<number> {
+  const records = await AttendanceRecord.find({ sessionId, studentId: { $in: studentIds } });
+  let applied = 0;
+  for (const record of records) {
+    const total = record.coinsAwarded ?? 0;
+    const balance = record.balanceDelta ?? total;
+    const moved = await moveCoins(record.studentId, total, balance);
+    if (moved.dTotal !== total || moved.dBalance !== balance) {
+      record.coinsAwarded = moved.dTotal;
+      record.balanceDelta = moved.dBalance;
+      await record.save();
+    }
+    const amount = moved.dTotal || moved.dBalance;
+    if (amount === 0) continue;
+    applied++;
+    await CoinLedger.create({
+      studentId: record.studentId,
+      amount,
+      type: "adjustment",
+      referenceId: record.sessionId,
+      description: "Davomat arxivdan tiklandi — coin qayta hisoblandi",
+      balanceAfter: moved.totalAfter,
+    });
+  }
+  return applied;
+}
+
+/**
  * Eski qoidada (qatnashganga belgilangan mukofot, jarimasiz) olingan davomatni joriy qoidaga o'tkazadi:
  * har bir yozuvning coini qayta hisoblanadi (masalan kelgan +10 → +5, kelmagan 0 → −5).
  * O'quvchilarga xabar yuborilmaydi; o'zgarish coin tarixida ko'rinadi.

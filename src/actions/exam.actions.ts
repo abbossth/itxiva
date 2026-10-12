@@ -11,6 +11,7 @@ import {
   ExamSubmissionStatus,
 } from "@/lib/db/models/exam-submission.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
+import { archiveEntity } from "@/lib/archive";
 import { latestAttempts } from "@/lib/exam-attempts";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import {
@@ -940,12 +941,12 @@ export async function deleteExamAction(examId: string): Promise<ActionState> {
     const user = await requireMentor();
     await connectDB();
 
-    const exam = await Exam.findByIdAndDelete(examId);
-    if (!exam) {
+    // Imtihon barcha urinishlari bilan arxivga ko'chadi
+    const archived = await archiveEntity("exam", examId, user.userId);
+    if (!archived) {
       return { success: false, error: "Imtihon topilmadi" };
     }
-
-    await ExamSubmission.deleteMany({ examId });
+    const exam = archived.root as { title?: string };
 
     await AuditLog.create({
       actorId: user.userId,
@@ -954,7 +955,7 @@ export async function deleteExamAction(examId: string): Promise<ActionState> {
     });
 
     revalidatePath("/mentor/exams");
-    return { success: true, message: "Imtihon o'chirildi" };
+    return { success: true, message: "Imtihon arxivga o'tkazildi" };
   } catch (err: unknown) {
     unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Imtihonni o'chirishda xatolik";

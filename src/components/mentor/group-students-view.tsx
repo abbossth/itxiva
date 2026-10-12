@@ -362,10 +362,11 @@ export function GroupStudentsView({
         description={
           <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
             <p>
-              Haqiqatan ham <strong>{studentToDelete?.fullName}</strong> (@{studentToDelete?.login}) o&apos;quvchisini tizimdan butunlay o&apos;chirmoqchimisiz?
+              Haqiqatan ham <strong>{studentToDelete?.fullName}</strong> (@{studentToDelete?.login}) o&apos;quvchisini o&apos;chirmoqchimisiz?
             </p>
-            <p className="text-rose-600 dark:text-rose-400 font-semibold">
-              Uning barcha topshirgan imtihonlari va to&apos;plagan tangalari tiklab bo&apos;lmaydi.
+            <p>
+              O&apos;quvchi tizimga kira olmay qoladi va reyting hamda hisobotlardan chiqadi. Uning shaxsiy ma&apos;lumotlari,
+              davomati, vazifalari, natijalari va coin tarixi arxivda saqlanadi. Sozlamalar → Arxiv bo&apos;limidan istalgan payt tiklash mumkin.
             </p>
           </div>
         }

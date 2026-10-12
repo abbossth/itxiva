@@ -540,7 +540,7 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
         onConfirm={handleConfirmDelete}
         title="Guruhni o'chirish"
         danger
-        confirmText="Ha, butunlay o'chirish"
+        confirmText="Ha, o'chirish"
         confirmMatchString={groupToDelete?.name}
         isLoading={isDeleting}
         description={
@@ -548,8 +548,9 @@ export function GroupsManager({ initialGroups, attendance, defaultAcademicYear =
             <p>
               Haqiqatan ham <strong>&quot;{groupToDelete?.name}&quot;</strong> guruhini o&apos;chirmoqchimisiz?
             </p>
-            <p className="text-rose-600 dark:text-rose-400 font-semibold">
-              DIQQAT: Guruhdagi barcha o&apos;quvchilar va ularning natijalari bekor qilinishi mumkin.
+            <p>
+              Guruh arxivga o&apos;tadi. Sozlamalar → Arxiv bo&apos;limidan istalgan payt tiklash mumkin. O&apos;quvchisi bor guruhni o&apos;chirib bo&apos;lmaydi —
+              avval ularni boshqa guruhga ko&apos;chiring yoki o&apos;chiring.
             </p>
           </div>
         }

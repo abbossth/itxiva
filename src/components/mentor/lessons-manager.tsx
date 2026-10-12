@@ -397,8 +397,9 @@ export function LessonsManager({
             <p>
               Haqiqatan ham <strong>&quot;{lessonToDelete?.title}&quot;</strong> darsini o&apos;chirmoqchimisiz?
             </p>
-            <p className="text-rose-600 dark:text-rose-400 font-semibold">
-              Darsga biriktirilgan barcha materiallar, testlar va uyga vazifa javoblari o&apos;chiriladi.
+            <p>
+              Dars materiallari, testi va uyga vazifa javoblari bilan birga arxivga o&apos;tadi va o&apos;quvchilarga
+              ko&apos;rinmay qoladi. Sozlamalar → Arxiv bo&apos;limidan istalgan payt tiklash mumkin.
             </p>
           </div>
         }

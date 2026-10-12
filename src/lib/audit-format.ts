@@ -40,6 +40,8 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   MANUAL_ATTENDANCE_SESSION: { label: "Davomat qo'lda kiritildi", tone: "teal", category: "attendance" },
   CONVERT_ATTENDANCE_RULES: { label: "Davomat yangi coin qoidasiga o'tkazildi", tone: "warning", category: "attendance" },
   DELETE_ATTENDANCE: { label: "Davomat o'chirildi", tone: "danger", category: "attendance" },
+  ARCHIVE_RESTORE: { label: "Arxivdan tiklandi", tone: "success", category: "other" },
+  ARCHIVE_PURGE: { label: "Arxivdan butunlay o'chirildi", tone: "danger", category: "other" },
   UPDATE_SETTINGS: { label: "Platforma sozlamalari o'zgartirildi", tone: "teal", category: "other" },
   UPDATE_STUDENT_PROFILE: { label: "O'quvchi ma'lumotlari yangilandi", tone: "teal", category: "students" },
   UPDATE_STUDENT_PHOTO: { label: "O'quvchi rasmi yangilandi", tone: "teal", category: "students" },

@@ -376,8 +376,8 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
         isLoading={isDeleting}
         description={
           <p className="text-xs text-slate-600 dark:text-slate-300">
-            <strong>{toDelete?.title}</strong> do&apos;kondan olib tashlanadi. Agar unga buyurtmalar bo&apos;lsa, tarix
-            saqlanishi uchun mahsulot o&apos;chirilmaydi, faqat yashiriladi.
+            <strong>{toDelete?.title}</strong> do&apos;kondan olib tashlanadi va arxivga o&apos;tadi (Sozlamalar → Arxiv bo&apos;limidan
+            tiklash mumkin). Agar unga buyurtmalar bo&apos;lsa, tarix saqlanishi uchun mahsulot faqat yashiriladi.
           </p>
         }
       />

@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarRange, Check, Palette, SlidersHorizontal, UserRoundPen } from "lucide-react";
+import { Archive as ArchiveIcon, CalendarRange, Check, Palette, SlidersHorizontal, UserRoundPen } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArchiveView } from "@/components/mentor/archive-view";
+import type { ArchiveItem } from "@/actions/archive.actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
 import { updateAppSettingsAction } from "@/actions/settings.actions";
@@ -17,7 +20,18 @@ import { cn } from "@/lib/utils";
 
 const card = "p-4 sm:p-6 rounded-2xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4";
 
-export function PlatformSettingsView({ settings, yearOptions }: { settings: AppSettingsData; yearOptions: string[] }) {
+export function PlatformSettingsView({
+  settings,
+  yearOptions,
+  archive,
+  initialTab = "general",
+}: {
+  settings: AppSettingsData;
+  yearOptions: string[];
+  archive: ArchiveItem[];
+  initialTab?: "general" | "archive";
+}) {
+  const [tab, setTab] = useState<string>(initialTab);
   const router = useRouter();
   const { toast } = useToast();
   const [academicYear, setAcademicYear] = useState(settings.academicYear);
@@ -56,6 +70,19 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
         title="Platforma sozlamalari"
         subtitle="Bu sozlamalar siz va barcha o'quvchilar uchun amal qiladi"
       />
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="w-fit max-w-full">
+          <TabsTrigger value="general">Umumiy</TabsTrigger>
+          <TabsTrigger value="archive">
+            <ArchiveIcon className="w-4 h-4 mr-1.5" />
+            Arxiv{archive.length > 0 ? ` (${archive.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="archive">
+          <ArchiveView items={archive} />
+        </TabsContent>
+        <TabsContent value="general" className="space-y-4">
 
       <section className={card}>
         <div>
@@ -184,6 +211,8 @@ export function PlatformSettingsView({ settings, yearOptions }: { settings: AppS
         </Button>
         {dirty && <span className="text-xs text-amber-700 dark:text-amber-400">Saqlanmagan o&apos;zgarishlar bor</span>}
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
