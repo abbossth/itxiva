@@ -16,6 +16,8 @@ export interface IExamQuestion {
   points: number;
   allowedFileTypes?: string[];
   maxFileSizeMb?: number;
+  /** Ochiq savolni kim tekshiradi: "auto" — namunaviy javob va AI, "manual" — mentor. Yozilmagan bo'lsa — "auto" */
+  grading?: "auto" | "manual";
 }
 
 export interface IExamData {
@@ -82,6 +84,7 @@ const ExamQuestionSchema = new Schema<IExamQuestion>(
       type: Number,
       default: 50,
     },
+    grading: { type: String, enum: ["auto", "manual"], default: "auto" },
   },
   { _id: true }
 );

@@ -10,6 +10,32 @@ export function normalizeText(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** O'tish bali foizda saqlanadi, shuning uchun ball foizga o'girib solishtiriladi */
+export function isPassingScore(score: number, maxScore: number, passingScore: number): boolean {
+  if (maxScore <= 0) return false;
+  return (score / maxScore) * 100 >= passingScore;
+}
+
+/** Ochiq savol avtomatik (namunaviy javob va AI) tekshiriladimi. Mentor "o'zim tekshiraman" demagan bo'lsa — ha */
+export function isAutoOpenQuestion(q: { type: string; grading?: string | null }): boolean {
+  return q.type === "open_ended" && q.grading !== "manual";
+}
+
+/**
+ * Avtomatik ochiq savolga AI'siz baho: bo'sh javob — 0, namunaviy javob bilan bir xil — to'liq ball.
+ * Boshqa hollarda `null` — javobni AI (yoki mentor) ko'rishi kerak.
+ */
+export function gradeOpenInstantly(
+  q: { type: string; grading?: string | null; correctAnswers?: string[]; points: number },
+  value: unknown
+): { isCorrect: boolean; points: number } | null {
+  if (!isAutoOpenQuestion(q)) return null;
+  const answer = typeof value === "string" ? normalizeText(value) : "";
+  if (!answer) return { isCorrect: false, points: 0 };
+  const matches = (q.correctAnswers ?? []).some((sample) => normalizeText(sample) !== "" && normalizeText(sample) === answer);
+  return matches ? { isCorrect: true, points: q.points } : null;
+}
+
 /**
  * Grades quiz submissions automatically where applicable
  */
@@ -41,12 +67,14 @@ export function autoGradeQuiz({
     maxScore += q.points;
 
     if (q.type === "open_ended") {
-      hasOpenEnded = true;
+      const instant = gradeOpenInstantly(q, val);
+      if (instant) totalScore += instant.points;
+      else hasOpenEnded = true;
       gradedAnswers.push({
         questionId: qId,
         value: typeof val === "string" ? val : "",
-        isCorrect: undefined,
-        pointsAwarded: 0,
+        isCorrect: instant?.isCorrect,
+        pointsAwarded: instant?.points ?? 0,
       });
       continue;
     }
@@ -143,6 +171,19 @@ export function autoGradeExam({
     const qId = q._id ? q._id.toString() : "";
     const raw = answerMap.get(qId);
     maxScore += q.points;
+
+    const instant = gradeOpenInstantly(q, raw?.value);
+    if (instant) {
+      autoScore += instant.points;
+      processedAnswers.push({
+        questionId: qId,
+        type: q.type,
+        value: raw?.value,
+        isCorrect: instant.isCorrect,
+        pointsAwarded: instant.points,
+      });
+      continue;
+    }
 
     if (q.type === "open_ended" || q.type === "project_upload" || q.type === "github_repo") {
       requiresManualGrading = true;

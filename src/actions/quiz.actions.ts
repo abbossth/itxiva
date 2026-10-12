@@ -8,7 +8,9 @@ import { Lesson } from "@/lib/db/models/lesson.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireAuth, requireMentor, requireStudent, requireGroupAccess } from "@/lib/auth/guards";
 import { quizUpsertSchema, quizSubmitSchema, quizGradeSchema } from "@/lib/validations/quiz.schema";
-import { autoGradeQuiz } from "@/lib/grading";
+import { autoGradeQuiz, isAutoOpenQuestion } from "@/lib/grading";
+import { aiGradePending, aiGradeQuizSubmission, pendingAiAnswers } from "@/lib/auto-grade";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { notifyGroup } from "@/lib/notifications/notify";
@@ -159,7 +161,7 @@ export async function submitQuizAction(
 
     const status = hasOpenEnded ? "submitted" : "graded";
 
-    await QuizSubmission.create({
+    const created = await QuizSubmission.create({
       quizId: quiz._id,
       lessonId: lesson._id,
       studentId: user.userId,
@@ -170,13 +172,31 @@ export async function submitQuizAction(
       submittedAt: new Date(),
     });
 
+    // Ochiq javoblar javob qaytarilgandan keyin AI bilan tekshiriladi; mentor belgilagan savollar unga qoladi
+    const aiPending = hasOpenEnded && pendingAiAnswers(quiz.questions, answers).length > 0;
+    if (aiPending) {
+      const submissionId = created._id.toString();
+      const lessonId = lesson._id.toString();
+      after(async () => {
+        try {
+          await aiGradeQuizSubmission(submissionId);
+          revalidatePath(`/lessons/${lessonId}`);
+        } catch (error) {
+          console.error("Quiz AI grading error:", error);
+        }
+      });
+    }
+    const needsMentor = quiz.questions.some((q) => q.type === "open_ended" && !isAutoOpenQuestion(q));
+
     revalidatePath(`/lessons/${lesson._id}`);
     revalidatePath(`/mentor/lessons/${lesson._id}`);
 
     return {
       success: true,
       message: hasOpenEnded
-        ? "Javoblaringiz qabul qilindi. Ochiq savollar mentor tomonidan tekshiriladi."
+        ? needsMentor || !aiPending
+          ? "Javoblaringiz qabul qilindi. Ochiq savollar mentor tomonidan tekshiriladi."
+          : "Javoblaringiz qabul qilindi. Ochiq savollar avtomatik tekshirilmoqda — natija bir ozdan keyin chiqadi."
         : `Test yakunlandi! Natijangiz: ${totalScore} / ${maxScore} ball`,
       data: { totalScore, maxScore, status, answers },
     };
@@ -385,11 +405,23 @@ export async function gradeQuizSubmissionAction(data: unknown): Promise<ActionSt
       parsed.data.grades.map((g) => [g.questionId, { points: g.pointsAwarded, feedback: g.mentorFeedback }])
     );
 
+    const quiz = await Quiz.findById(submission.quizId).select("questions").lean();
+    const maxPoints = new Map((quiz?.questions ?? []).map((q) => [String(q._id), q.points]));
+    for (const [questionId, grade] of gradesMap) {
+      const max = maxPoints.get(questionId);
+      if (max !== undefined && grade.points > max) {
+        return { success: false, error: `Ball savolning maksimal balidan (${max}) oshmasligi kerak` };
+      }
+    }
+
     let newTotalScore = 0;
     submission.answers.forEach((ans) => {
       const grade = gradesMap.get(ans.questionId);
       if (grade) {
         ans.pointsAwarded = grade.points;
+        ans.isCorrect = grade.points >= (maxPoints.get(ans.questionId) ?? Infinity);
+        // Mentor ko'rib chiqdi — endi bu AI bahosi emas
+        ans.aiGraded = false;
         if (grade.feedback !== undefined) {
           ans.mentorFeedback = grade.feedback;
         }
@@ -409,10 +441,106 @@ export async function gradeQuizSubmissionAction(data: unknown): Promise<ActionSt
     });
 
     revalidatePath(`/lessons/${submission.lessonId}`);
+    revalidatePath(`/mentor/lessons/${submission.lessonId}`);
     return { success: true, message: "Baho muvaffaqiyatli saqlandi" };
   } catch (err: unknown) {
     unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Baholashda xatolik";
     return { success: false, error: message };
+  }
+}
+
+export interface QuizReviewItem {
+  submissionId: string;
+  studentName: string;
+  status: string;
+  totalScore: number;
+  maxScore: number;
+  /** Faqat ochiq savollarga berilgan javoblar */
+  answers: {
+    questionId: string;
+    prompt: string;
+    sample: string;
+    maxPoints: number;
+    /** Savolni AI tekshiradi (false — mentor) */
+    auto: boolean;
+    value: string;
+    pointsAwarded: number;
+    feedback: string;
+    aiGraded: boolean;
+  }[];
+}
+
+/**
+ * Dars testidagi ochiq javoblar: tekshirish kerak bo'lganlari birinchi, keyin AI baholaganlari
+ * (mentor ularni ko'rib, bahoni o'zgartira oladi)
+ */
+export async function getQuizReviewQueue(lessonId: string): Promise<ActionState<QuizReviewItem[]>> {
+  try {
+    await requireMentor();
+    if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId)) return { success: true, data: [] };
+    await connectDB();
+    const quiz = await Quiz.findOne({ lessonId }).lean();
+    const open = (quiz?.questions ?? []).filter((q) => q.type === "open_ended");
+    if (!quiz || open.length === 0) return { success: true, data: [] };
+
+    const submissions = await QuizSubmission.find({ quizId: quiz._id, status: { $in: ["submitted", "graded"] } })
+      .populate("studentId", "fullName")
+      .sort({ submittedAt: 1 })
+      .lean();
+
+    const data: QuizReviewItem[] = submissions
+      .map((sub) => ({
+        submissionId: sub._id.toString(),
+        studentName: (sub.studentId as unknown as { fullName?: string } | null)?.fullName || "O'chirilgan o'quvchi",
+        status: sub.status,
+        totalScore: sub.totalScore,
+        maxScore: sub.maxScore,
+        answers: open.map((q) => {
+          const a = sub.answers.find((x) => x.questionId === String(q._id));
+          return {
+            questionId: String(q._id),
+            prompt: q.prompt,
+            sample: (q.correctAnswers ?? []).join("\n"),
+            maxPoints: q.points,
+            auto: isAutoOpenQuestion(q),
+            value: typeof a?.value === "string" ? a.value : "",
+            pointsAwarded: a?.pointsAwarded ?? 0,
+            feedback: a?.mentorFeedback ?? "",
+            aiGraded: Boolean(a?.aiGraded),
+          };
+        }),
+      }))
+      .sort((a, b) => Number(a.status !== "submitted") - Number(b.status !== "submitted"));
+
+    return { success: true, data };
+  } catch (err: unknown) {
+    unstable_rethrow(err);
+    return { success: false, error: err instanceof Error ? err.message : "Javoblarni yuklashda xatolik" };
+  }
+}
+
+/** Dars testining hali tekshirilmagan ochiq javoblarini AI bilan qayta tekshiradi */
+export async function runQuizAiGradingAction(lessonId: string): Promise<ActionState<{ checked: number; graded: number }>> {
+  try {
+    await requireMentor();
+    if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId)) return { success: false, error: "Dars topilmadi" };
+    await connectDB();
+    const quiz = await Quiz.findOne({ lessonId }).select("_id").lean();
+    if (!quiz) return { success: false, error: "Test topilmadi" };
+    const data = await aiGradePending("quiz", quiz._id);
+    revalidatePath(`/mentor/lessons/${lessonId}`);
+    revalidatePath(`/lessons/${lessonId}`);
+    return {
+      success: true,
+      data,
+      message:
+        data.checked === 0
+          ? "Tekshirilmagan javob yo'q"
+          : `${data.checked} ta topshiriqdan ${data.graded} tasi to'liq baholandi${data.graded < data.checked ? " — qolganlarini o'zingiz ko'rib chiqing" : ""}`,
+    };
+  } catch (err: unknown) {
+    unstable_rethrow(err);
+    return { success: false, error: err instanceof Error ? err.message : "AI tekshiruvida xatolik" };
   }
 }

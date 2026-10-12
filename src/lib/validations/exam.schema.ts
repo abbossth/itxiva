@@ -15,6 +15,7 @@ export const examQuestionSchema = z.object({
   points: z.coerce.number().min(1, "Ball kamida 1 bo'lishi kerak").default(5),
   allowedFileTypes: z.array(z.string()).optional().default([".zip", ".pdf", ".png", ".jpg"]),
   maxFileSizeMb: z.coerce.number().min(1).max(100).default(50),
+  grading: z.enum(["auto", "manual"]).optional().default("auto"),
 }).superRefine((q, ctx) => {
   if (q.type === "single_choice" || q.type === "multiple_choice") {
     if (q.options.length < 2) {

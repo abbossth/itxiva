@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { OpenQuestionGrading } from "@/components/mentor/open-question-grading";
 import { IQuizData, IQuizQuestion, QuizQuestionType } from "@/lib/db/models/quiz.model";
 import { upsertQuizAction } from "@/actions/quiz.actions";
 import { generateQuizAction, LessonContextInput } from "@/actions/ai.actions";
@@ -272,6 +273,8 @@ export function QuizEditorModal({
                       onChange={(e) =>
                         updateQuestion(qIdx, {
                           type: e.target.value as QuizQuestionType,
+                          // Variantli savolning to'g'ri javobi ochiq savolga namunaviy javob bo'lib o'tib qolmasin
+                          ...(e.target.value === "open_ended" || q.type === "open_ended" ? { correctAnswers: [] } : {}),
                           options:
                             e.target.value === "single_choice" || e.target.value === "multiple_choice"
                               ? q.options?.length ? q.options : ["A", "B"]
@@ -283,7 +286,7 @@ export function QuizEditorModal({
                       <option value="single_choice">Bitta to&apos;g&apos;ri javob</option>
                       <option value="multiple_choice">Bir nechta to&apos;g&apos;ri javob</option>
                       <option value="short_answer">Qisqa matn</option>
-                      <option value="open_ended">Ochiq savol (mentor tekshiradi)</option>
+                      <option value="open_ended">Ochiq savol</option>
                     </select>
                   </div>
 
@@ -397,6 +400,14 @@ export function QuizEditorModal({
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                     />
                   </div>
+                )}
+
+                {q.type === "open_ended" && (
+                  <OpenQuestionGrading
+                    grading={q.grading}
+                    sample={(q.correctAnswers ?? [])[0] ?? ""}
+                    onChange={(patch) => updateQuestion(qIdx, patch)}
+                  />
                 )}
               </div>
             ))}

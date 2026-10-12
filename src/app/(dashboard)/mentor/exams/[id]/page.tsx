@@ -8,6 +8,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AiGradeButton } from "@/components/mentor/ai-grade-button";
 import {
   ArrowLeft,
   Users,
@@ -42,6 +43,8 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
   const exam = examRes.data;
   const submissions = submissionsRes.data || [];
   const studentCount = new Set(submissions.map((s) => s.studentLogin)).size;
+  const needsReview = submissions.filter((s) => s.status === "submitted").length;
+  const hasAutoOpen = exam.questions.some((q) => q.type === "open_ended" && q.grading !== "manual");
 
   return (
     <div className="space-y-4 animate-in fade-in pb-16">
@@ -90,11 +93,12 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
 
       {/* Submissions Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-600" />
             <span>Topshirgan o&apos;quvchilar ({studentCount})</span>
           </h2>
+          {hasAutoOpen && needsReview > 0 && <AiGradeButton kind="exam" id={String(exam._id)} pending={needsReview} />}
         </div>
 
         {submissions.length === 0 ? (

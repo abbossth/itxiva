@@ -5,7 +5,8 @@ import { requireMentorPage } from "@/lib/auth/guards";
 import { getLessonById } from "@/actions/lesson.actions";
 import { getGroupById } from "@/actions/group.actions";
 import { getStudentsByGroup } from "@/actions/student.actions";
-import { getQuizForMentor, getQuizSubmissionsForLesson } from "@/actions/quiz.actions";
+import { getQuizForMentor, getQuizReviewQueue, getQuizSubmissionsForLesson } from "@/actions/quiz.actions";
+import { QuizReviewPanel } from "@/components/mentor/quiz-review-panel";
 import { getHomeworkForStudent, getHomeworkRoster } from "@/actions/homework.actions";
 import { LessonBody } from "@/components/lessons/lesson-body";
 import { HomeworkPanel } from "@/components/homework/homework-panel";
@@ -32,14 +33,16 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
   }
 
   const groupId = lesson.groupId.toString();
-  const [group, students, homework, roster, quizRes, quizSubsRes] = await Promise.all([
+  const [group, students, homework, roster, quizRes, quizSubsRes, quizReviewRes] = await Promise.all([
     getGroupById(groupId),
     getStudentsByGroup(groupId),
     getHomeworkForStudent(id),
     getHomeworkRoster(id),
     getQuizForMentor(id),
     getQuizSubmissionsForLesson(id),
+    getQuizReviewQueue(id),
   ]);
+  const quizReview = quizReviewRes.data ?? [];
   const quiz = quizRes.data ?? null;
   const quizSubs = quizSubsRes.data ?? [];
 
@@ -117,6 +120,8 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
           </div>
         )}
       </div>
+
+      <QuizReviewPanel lessonId={id} items={quizReview} />
 
       {/* O'quvchilar natijalari: faqat mentor ko'radi */}
       <section className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-5 space-y-4 shadow-xs">

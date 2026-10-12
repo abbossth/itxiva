@@ -10,6 +10,8 @@ export interface IQuizQuestion {
   correctAnswers: string[];
   points: number;
   explanation?: string;
+  /** Ochiq savolni kim tekshiradi: "auto" — namunaviy javob va AI, "manual" — mentor. Yozilmagan bo'lsa — "auto" */
+  grading?: "auto" | "manual";
 }
 
 export interface IQuizData {
@@ -58,6 +60,7 @@ const QuizQuestionSchema = new Schema<IQuizQuestion>(
       type: String,
       trim: true,
     },
+    grading: { type: String, enum: ["auto", "manual"], default: "auto" },
   },
   { _id: true }
 );

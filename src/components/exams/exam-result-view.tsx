@@ -224,7 +224,7 @@ export function ExamResultView({ exam, submission, attempts = [] }: ExamResultVi
                 {/* Mentor comment */}
                 {studentAns?.mentorFeedback && (
                   <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                    <span className="font-bold">Mentor izohi:</span>
+                    <span className="font-bold">{studentAns.aiGraded ? "Avtomatik tekshiruv izohi:" : "Mentor izohi:"}</span>
                     <p>{studentAns.mentorFeedback}</p>
                   </div>
                 )}

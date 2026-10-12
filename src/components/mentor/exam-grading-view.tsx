@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
+  Bot,
   Download,
   GitBranch,
   Sparkles,
@@ -268,6 +269,20 @@ export function ExamGradingView({
                     )}
                   </div>
                 </div>
+
+                {q.type === "open_ended" && (q.correctAnswers ?? []).some((a) => a.trim()) && (
+                  <div className="text-xs">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">Namunaviy javob: </span>
+                    <span className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{(q.correctAnswers ?? []).join("\n")}</span>
+                  </div>
+                )}
+
+                {ans?.aiGraded && (
+                  <p className="inline-flex items-center gap-1.5 rounded-lg bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">
+                    <Bot className="w-3.5 h-3.5" />
+                    Ball va izohni AI qo&apos;ygan — to&apos;g&apos;ri kelmasa o&apos;zgartirib, saqlang
+                  </p>
+                )}
 
                 {isAutoGraded && q.correctAnswers && (
                   <div className="text-xs">

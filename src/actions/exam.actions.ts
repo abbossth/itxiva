@@ -20,7 +20,8 @@ import {
   examSaveDraftSchema,
   examGradeSchema,
 } from "@/lib/validations/exam.schema";
-import { autoGradeExam } from "@/lib/grading";
+import { autoGradeExam, isPassingScore } from "@/lib/grading";
+import { aiGradeExamSubmission, aiGradePending, pendingAiAnswers } from "@/lib/auto-grade";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
@@ -59,10 +60,6 @@ function getAttemptDeadline(
 /**
  * passingScore foizda saqlanadi, shuning uchun ball foizga o'girib solishtiriladi
  */
-function isPassingScore(score: number, maxScore: number, passingScore: number): boolean {
-  if (maxScore <= 0) return false;
-  return (score / maxScore) * 100 >= passingScore;
-}
 
 type SubmittedExamAnswers = Parameters<typeof autoGradeExam>[0]["submittedAnswers"];
 
@@ -109,6 +106,18 @@ function finalizeSubmission(
 }
 
 /**
+ * Topshirilgan urinishda AI tekshiradigan ochiq javob bo'lsa, tekshiruvni javob qaytarilgandan keyin ishga tushiradi.
+ * Natija: AI tekshiruvi rejalashtirildimi
+ */
+function scheduleAiGrading(submission: IExamSubmission, exam: IExam): boolean {
+  if (submission.status !== "submitted") return false;
+  if (pendingAiAnswers(exam.questions, submission.toObject().answers).length === 0) return false;
+  const id = submission._id.toString();
+  after(() => aiGradeExamSubmission(id).catch((error) => console.error("Exam AI grading error:", error)));
+  return true;
+}
+
+/**
  * Vaqti tugagan, lekin topshirilmagan urinishlarni oxirgi saqlangan javoblar bilan yakunlaydi
  * (masalan, o'quvchi brauzerni yopib qo'ygan bo'lsa)
  */
@@ -131,6 +140,7 @@ async function finalizeExpiredAttempts(filter: Record<string, unknown>): Promise
     const savedAnswers = submission.toObject().answers as SubmittedExamAnswers;
     finalizeSubmission(submission, exam, savedAnswers, new Date(deadline));
     await submission.save();
+    scheduleAiGrading(submission, exam);
   }
 }
 
@@ -180,6 +190,7 @@ function toStudentSubmission(
           isCorrect: a.isCorrect,
           pointsAwarded: a.pointsAwarded,
           mentorFeedback: a.mentorFeedback,
+          aiGraded: a.aiGraded,
         }))
       : [];
 
@@ -603,6 +614,7 @@ export async function submitExamAction(
     const finalStatus = submission.status;
 
     await submission.save();
+    const aiPending = scheduleAiGrading(submission, exam);
 
     // Hamma topshirib bo'lgan bo'lsa, mentorga statistika darhol ketadi (aks holda — vaqt tugagach, kunlik tekshiruvda)
     after(() => notifyFinishedExams(exam._id.toString()).catch((error) => console.error("Exam notify error:", error)));
@@ -614,6 +626,8 @@ export async function submitExamAction(
       success: true,
       message: isLate
         ? "Imtihon vaqti tugagani uchun oxirgi saqlangan javoblaringiz qabul qilindi."
+        : aiPending
+        ? "Imtihon muvaffaqiyatli topshirildi! Ochiq savollar avtomatik tekshirilmoqda."
         : requiresManualGrading
         ? "Imtihon muvaffaqiyatli topshirildi! Ochiq va amaliy savollar mentor tomonidan tekshiriladi."
         : "Imtihon muvaffaqiyatli topshirildi! Natijalar mentor e'lon qilgach ko'rinadi.",
@@ -1279,6 +1293,8 @@ export async function gradeExamSubmissionAction(data: unknown): Promise<ActionSt
           };
         }
         ans.pointsAwarded = g.points;
+        // Mentor ko'rib chiqdi — endi bu AI bahosi emas
+        ans.aiGraded = false;
         if (g.feedback !== undefined) {
           ans.mentorFeedback = g.feedback;
         }
@@ -1313,5 +1329,30 @@ export async function gradeExamSubmissionAction(data: unknown): Promise<ActionSt
     unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Baholashda xatolik";
     return { success: false, error: message };
+  }
+}
+
+/**
+ * Imtihonning hali tekshirilmagan urinishlaridagi ochiq javoblarni AI bilan qayta tekshiradi
+ * (masalan, topshirish paytida AI band bo'lgan bo'lsa)
+ */
+export async function runExamAiGradingAction(examId: string): Promise<ActionState<{ checked: number; graded: number }>> {
+  try {
+    await requireMentor();
+    if (!isObjectId(examId)) return { success: false, error: "Imtihon topilmadi" };
+    await connectDB();
+    const data = await aiGradePending("exam", examId);
+    revalidatePath(`/mentor/exams/${examId}`);
+    return {
+      success: true,
+      data,
+      message:
+        data.checked === 0
+          ? "Tekshirilmagan urinish yo'q"
+          : `${data.checked} ta urinishdan ${data.graded} tasi to'liq baholandi${data.graded < data.checked ? " — qolganlarini o'zingiz ko'rib chiqing" : ""}`,
+    };
+  } catch (err: unknown) {
+    unstable_rethrow(err);
+    return { success: false, error: err instanceof Error ? err.message : "AI tekshiruvida xatolik" };
   }
 }

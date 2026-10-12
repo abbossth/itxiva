@@ -14,6 +14,8 @@ export interface IExamAnswer {
   isCorrect?: boolean;
   pointsAwarded: number;
   mentorFeedback?: string;
+  /** Ballni AI qo'ygan (mentor keyin o'zgartirishi mumkin) */
+  aiGraded?: boolean;
 }
 
 export interface IExamSubmissionData {
@@ -77,6 +79,7 @@ const ExamAnswerSchema = new Schema<IExamAnswer>(
       type: String,
       trim: true,
     },
+    aiGraded: { type: Boolean },
   },
   { _id: false }
 );

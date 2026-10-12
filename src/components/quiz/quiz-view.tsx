@@ -275,7 +275,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
               {/* Izoh yoki mentor fikri */}
               {subAns?.mentorFeedback && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                  <span className="font-semibold">Mentor fikri:</span>
+                  <span className="font-semibold">{subAns.aiGraded ? "Avtomatik tekshiruv izohi:" : "Mentor fikri:"}</span>
                   <p>{subAns.mentorFeedback}</p>
                 </div>
               )}
