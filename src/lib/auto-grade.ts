@@ -27,6 +27,7 @@ interface AnswerLike {
   pointsAwarded: number;
   mentorFeedback?: string;
   aiGraded?: boolean;
+  correctAnswer?: string;
 }
 
 const isUngraded = (a: AnswerLike) => (a.isCorrect === undefined || a.isCorrect === null) && !a.aiGraded;
@@ -70,6 +71,7 @@ async function applyAiGrades(questions: QuestionLike[], answers: AnswerLike[]): 
         a.pointsAwarded = grade.points;
         a.isCorrect = grade.points >= q.points;
         a.mentorFeedback = grade.feedback;
+        if (grade.correctAnswer) a.correctAnswer = grade.correctAnswer;
         a.aiGraded = true;
         changed = true;
       }

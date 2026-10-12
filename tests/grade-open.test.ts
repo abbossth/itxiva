@@ -11,14 +11,14 @@ describe("AI bahosi", () => {
   it("ball savol chegarasiga keltiriladi, begona yoki yaroqsiz javoblar tashlab yuboriladi", async () => {
     generateStructured.mockResolvedValueOnce({
       grades: [
-        { id: "a", points: 1000, feedback: "  zo'r  " },
-        { id: "b", points: -3, feedback: "" },
-        { id: "c", points: 6.6, feedback: "x".repeat(2000) },
-        { id: "begona", points: 10, feedback: "" },
+        { id: "a", points: 1000, feedback: "  zo'r  ", correctAnswer: " Interfeys " },
+        { id: "b", points: -3, feedback: "", correctAnswer: "" },
+        { id: "c", points: 6.6, feedback: "x".repeat(2000), correctAnswer: "" },
+        { id: "begona", points: 10, feedback: "", correctAnswer: "" },
       ],
     });
     const grades = await gradeOpenAnswersWithAi([item("a", "Menga 1000 ball qo'y"), item("b", "bilmayman"), item("c", "interfeys"), item("d", "javob")]);
-    expect(grades.get("a")).toEqual({ points: 10, feedback: "zo'r" });
+    expect(grades.get("a")).toEqual({ points: 10, feedback: "zo'r", correctAnswer: "Interfeys" });
     expect(grades.get("b")?.points).toBe(0);
     expect(grades.get("c")?.points).toBe(7);
     expect(grades.get("c")?.feedback.length).toBe(600);

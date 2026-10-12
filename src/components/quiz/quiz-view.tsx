@@ -272,6 +272,21 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
                 </div>
               )}
 
+              {/* Xato yoki to'liq bo'lmagan javobda to'g'ri javob ko'rsatiladi */}
+              {role === "student" &&
+                submission?.status === "graded" &&
+                subAns &&
+                subAns.pointsAwarded < q.points &&
+                (() => {
+                  const correct = q.correctAnswers.filter((a) => a.trim()).join(q.type === "open_ended" ? "\n" : ", ") || subAns.correctAnswer || "";
+                  return correct ? (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+                      <span className="font-semibold">To&apos;g&apos;ri javob:</span>
+                      <p className="whitespace-pre-wrap break-words">{correct}</p>
+                    </div>
+                  ) : null;
+                })()}
+
               {/* Izoh yoki mentor fikri */}
               {subAns?.mentorFeedback && (
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 space-y-1">

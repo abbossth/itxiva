@@ -10,6 +10,8 @@ export interface IQuizAnswer {
   mentorFeedback?: string;
   /** Ballni AI qo'ygan (mentor keyin o'zgartirishi mumkin) */
   aiGraded?: boolean;
+  /** AI yozgan namunaviy to'g'ri javob — o'quvchi to'liq ball olmaganda natijada ko'rsatiladi */
+  correctAnswer?: string;
 }
 
 export interface IQuizSubmissionData {
@@ -52,6 +54,7 @@ const QuizAnswerSchema = new Schema<IQuizAnswer>(
       trim: true,
     },
     aiGraded: { type: Boolean },
+    correctAnswer: { type: String, trim: true },
   },
   { _id: false }
 );

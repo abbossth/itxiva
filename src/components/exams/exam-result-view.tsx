@@ -210,16 +210,22 @@ export function ExamResultView({ exam, submission, attempts = [] }: ExamResultVi
                   </div>
                 </div>
 
-                {q.correctAnswers && q.correctAnswers.length > 0 && (
-                  <div>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 block">
-                      To&apos;g&apos;ri javob:
-                    </span>
-                    <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 mt-1 font-medium">
-                      {q.correctAnswers.join(", ")}
+                {/* Mentor namunasi bo'lmasa — avtomatik tekshiruv yozgan to'g'ri javob (to'liq ball olinmaganda) */}
+                {(() => {
+                  const own = (q.correctAnswers ?? []).filter((a) => a.trim());
+                  const correct =
+                    own.length > 0 ? own.join(q.type === "open_ended" ? "\n" : ", ") : !isFullPoints ? studentAns?.correctAnswer || "" : "";
+                  return correct ? (
+                    <div>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 block">
+                        To&apos;g&apos;ri javob:
+                      </span>
+                      <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 mt-1 font-medium whitespace-pre-wrap break-words">
+                        {correct}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null;
+                })()}
 
                 {/* Mentor comment */}
                 {studentAns?.mentorFeedback && (

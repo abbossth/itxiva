@@ -191,6 +191,7 @@ function toStudentSubmission(
           pointsAwarded: a.pointsAwarded,
           mentorFeedback: a.mentorFeedback,
           aiGraded: a.aiGraded,
+          correctAnswer: a.correctAnswer,
         }))
       : [];
 

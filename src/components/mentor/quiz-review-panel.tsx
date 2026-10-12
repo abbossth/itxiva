@@ -79,6 +79,12 @@ function ReviewRow({ item, defaultOpen }: { item: QuizReviewItem; defaultOpen: b
               <div className="rounded-lg bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
                 {a.value || <span className="italic text-slate-500 dark:text-slate-400">Javob berilmagan</span>}
               </div>
+              {!a.sample && a.aiCorrectAnswer && (
+                <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob (AI): </span>
+                  {a.aiCorrectAnswer}
+                </p>
+              )}
               {a.aiGraded && (
                 <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300">
                   <Bot className="w-3.5 h-3.5" />

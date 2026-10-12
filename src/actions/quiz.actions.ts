@@ -468,6 +468,8 @@ export interface QuizReviewItem {
     pointsAwarded: number;
     feedback: string;
     aiGraded: boolean;
+    /** AI yozgan to'g'ri javob — o'quvchi natijada shuni ko'radi (mentor namunasi bo'lmasa) */
+    aiCorrectAnswer: string;
   }[];
 }
 
@@ -508,6 +510,7 @@ export async function getQuizReviewQueue(lessonId: string): Promise<ActionState<
             pointsAwarded: a?.pointsAwarded ?? 0,
             feedback: a?.mentorFeedback ?? "",
             aiGraded: Boolean(a?.aiGraded),
+            aiCorrectAnswer: a?.correctAnswer ?? "",
           };
         }),
       }))

@@ -12,7 +12,7 @@ vi.mock("@/lib/notifications/notify", () => ({ sendNotifications: vi.fn(), notif
 vi.mock("@/lib/notifications/scheduled", () => ({ notifyFinishedExams: vi.fn(async () => {}) }));
 
 type Item = { id: string; maxPoints: number; answer: string };
-const aiGrader = vi.fn(async (items: Item[]) => new Map(items.map((i) => [i.id, { points: Math.ceil(i.maxPoints / 2), feedback: "Qisman to'g'ri" }])));
+const aiGrader = vi.fn(async (items: Item[]) => new Map(items.map((i) => [i.id, { points: Math.ceil(i.maxPoints / 2), feedback: "Qisman to'g'ri", correctAnswer: "To'g'ri javob namunasi" }])));
 vi.mock("@/lib/ai/grade-open", () => ({ gradeOpenAnswersWithAi: (items: Item[]) => aiGrader(items) }));
 
 const { User } = await import("@/lib/db/models/user.model");
@@ -82,7 +82,12 @@ describe("ochiq savollarni avtomatik tekshirish", () => {
     expect(aiGrader).toHaveBeenCalledTimes(1);
     const sub = await saved();
     expect(sub).toMatchObject({ status: "graded", totalScore: 7 });
-    expect(sub!.answers[1]).toMatchObject({ pointsAwarded: 5, aiGraded: true, mentorFeedback: "Qisman to'g'ri", isCorrect: false });
+    expect(sub!.answers[1]).toMatchObject({ pointsAwarded: 5, aiGraded: true, mentorFeedback: "Qisman to'g'ri", isCorrect: false, correctAnswer: "To'g'ri javob namunasi" });
+
+    // O'quvchi natijada to'g'ri javobni ko'radi: variantli savolniki ham, ochiq savolniki ham
+    const view = await quizzes.getQuizForLesson(sub!.lessonId.toString());
+    expect(view.data?.quiz?.questions[0].correctAnswers).toEqual(["4"]);
+    expect(view.data?.submission?.answers[1].correctAnswer).toBe("To'g'ri javob namunasi");
   });
 
   it("\"mentor tekshiradi\" savoli AI'ga yuborilmaydi va mentorni kutadi", async () => {

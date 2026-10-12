@@ -277,6 +277,13 @@ export function ExamGradingView({
                   </div>
                 )}
 
+                {ans?.correctAnswer && !(q.correctAnswers ?? []).some((a) => a.trim()) && (
+                  <div className="text-xs">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob (AI): </span>
+                    <span className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{ans.correctAnswer}</span>
+                  </div>
+                )}
+
                 {ans?.aiGraded && (
                   <p className="inline-flex items-center gap-1.5 rounded-lg bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300">
                     <Bot className="w-3.5 h-3.5" />
