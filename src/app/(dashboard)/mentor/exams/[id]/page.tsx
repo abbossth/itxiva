@@ -41,6 +41,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
 
   const exam = examRes.data;
   const submissions = submissionsRes.data || [];
+  const studentCount = new Set(submissions.map((s) => s.studentLogin)).size;
 
   return (
     <div className="space-y-4 animate-in fade-in pb-16">
@@ -92,7 +93,7 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-600" />
-            <span>Topshirgan o&apos;quvchilar ({submissions.length})</span>
+            <span>Topshirgan o&apos;quvchilar ({studentCount})</span>
           </h2>
         </div>
 
@@ -127,13 +128,21 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
                   return (
                     <tr
                       key={sub._id}
-                      className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors"
+                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors ${
+                        sub.isMain || sub.status === "in_progress" ? "" : "opacity-60"
+                      }`}
                     >
                       <td className="px-4 py-3.5">
                         <div className="font-semibold text-slate-900 dark:text-slate-100">
                           {sub.studentName}
                         </div>
                         <div className="text-xs text-slate-500 dark:text-slate-400">{sub.studentLogin}</div>
+                        {exam.maxAttempts > 1 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            <span>{sub.attemptNumber}-urinish</span>
+                            {sub.isMain ? <Badge variant="teal">Asosiy</Badge> : sub.status !== "in_progress" && <span>· oldingi</span>}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300">
                         {sub.groupName}

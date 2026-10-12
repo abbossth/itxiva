@@ -12,6 +12,7 @@ import {
   Award,
   ArrowRight,
   FileText,
+  RotateCcw,
 } from "lucide-react";
 import { formatDateTimeUz } from "@/lib/utils";
 
@@ -19,9 +20,11 @@ interface ExamCardProps {
   exam: IExamData;
   submission: IExamSubmissionData | null;
   category: "active" | "upcoming" | "past";
+  /** Topshirilgan, lekin yana urinish qolgan (faqat imtihon ochiq paytda) */
+  canRetake?: boolean;
 }
 
-export function ExamCard({ exam, submission, category }: ExamCardProps) {
+export function ExamCard({ exam, submission, category, canRetake = false }: ExamCardProps) {
   const isCompleted = submission && (submission.status === "submitted" || submission.status === "graded");
   const isInProgress = submission && submission.status === "in_progress";
   // Ball faqat mentor natijalarni e'lon qilgach va baholash tugagach ko'rsatiladi
@@ -101,7 +104,22 @@ export function ExamCard({ exam, submission, category }: ExamCardProps) {
         </div>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-2 space-y-2">
+        {category === "active" && isCompleted && canRetake && (
+          <Link
+            href={`/exams/${exam._id}`}
+            className={buttonVariants({
+              variant: "primary",
+              className: "w-full justify-center gap-2 font-semibold",
+            })}
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>
+              Qayta topshirish ({submission.attemptNumber + 1}/{exam.maxAttempts}-urinish)
+            </span>
+          </Link>
+        )}
+
         {category === "active" && !isCompleted && (
           <Link
             href={`/exams/${exam._id}`}

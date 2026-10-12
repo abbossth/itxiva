@@ -1,3 +1,4 @@
+import { latestAttempts } from "@/lib/exam-attempts";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Group } from "@/lib/db/models/group.model";
@@ -76,7 +77,7 @@ export async function notifyFinishedExams(examId?: string, now: Date = new Date(
     const [total, submissions] = await Promise.all([
       User.countDocuments({ role: "student", groupId: { $in: exam.groupIds } }),
       ExamSubmission.find({ examId: exam._id, status: { $in: ["submitted", "graded"] } })
-        .select("studentId totalScore maxScore status")
+        .select("examId studentId attemptNumber totalScore maxScore status")
         .lean(),
     ]);
     const submittedStudents = new Set(submissions.map((s) => s.studentId.toString())).size;
@@ -88,14 +89,16 @@ export async function notifyFinishedExams(examId?: string, now: Date = new Date(
     const claimed = await Exam.updateOne({ _id: exam._id, finishedNotifiedAt: null }, { $set: { finishedNotifiedAt: now } });
     if (claimed.modifiedCount === 0) continue;
 
-    const scored = submissions.filter((s) => s.maxScore > 0);
+    // Har bir o'quvchining oxirgi urinishi hisoblanadi
+    const main = latestAttempts(submissions);
+    const scored = main.filter((s) => s.maxScore > 0);
     await sendNotifications({ role: "mentor" }, "exam_finished", {
       examId: exam._id.toString(),
       title: exam.title,
       submitted: submittedStudents,
       total,
       avgPercent: scored.length > 0 ? Math.round(scored.reduce((sum, s) => sum + (s.totalScore / s.maxScore) * 100, 0) / scored.length) : null,
-      ungraded: submissions.filter((s) => s.status === "submitted").length,
+      ungraded: main.filter((s) => s.status === "submitted").length,
     });
     notified++;
   }

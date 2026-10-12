@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { GraduationCap, Clock, CheckCircle2 } from "lucide-react";
 
 interface ExamsListClientProps {
-  active: Array<{ exam: IExamData; submission: IExamSubmissionData | null }>;
+  active: Array<{ exam: IExamData; submission: IExamSubmissionData | null; canRetake?: boolean }>;
   upcoming: Array<{ exam: IExamData }>;
   past: Array<{ exam: IExamData; submission: IExamSubmissionData | null }>;
 }
@@ -86,12 +86,13 @@ export function ExamsListClient({ active, upcoming, past }: ExamsListClientProps
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {active.map(({ exam, submission }) => (
+              {active.map(({ exam, submission, canRetake }) => (
                 <ExamCard
                   key={exam._id.toString()}
                   exam={exam}
                   submission={submission}
                   category="active"
+                  canRetake={canRetake}
                 />
               ))}
             </div>

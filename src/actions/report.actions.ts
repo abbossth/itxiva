@@ -14,6 +14,7 @@ import { Exam } from "@/lib/db/models/exam.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { Order, OrderStatus } from "@/lib/db/models/order.model";
 import { requireMentor } from "@/lib/auth/guards";
+import { latestAttempts } from "@/lib/exam-attempts";
 import { dateFromKey, addDaysToKey, toDateKey } from "@/lib/schedule";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -181,7 +182,7 @@ export async function getReportData(params: {
       status: { $in: ["submitted", "graded"] },
       ...groupFilter,
     })
-      .select("examId totalScore maxScore isPassed status")
+      .select("examId studentId attemptNumber totalScore maxScore isPassed status")
       .lean(),
   ]);
 
@@ -240,7 +241,8 @@ export async function getReportData(params: {
   }
 
   const examAgg = new Map<string, { n: number; sum: number; graded: number; passed: number }>();
-  for (const e of examSubs) {
+  // Bir necha urinish bo'lsa, faqat oxirgisi hisobga kiradi
+  for (const e of latestAttempts(examSubs)) {
     const key = e.examId.toString();
     if (!examAgg.has(key)) examAgg.set(key, { n: 0, sum: 0, graded: 0, passed: 0 });
     const a = examAgg.get(key)!;
@@ -423,7 +425,7 @@ export interface StudentReport {
   };
   quizzes: { title: string; totalScore: number; maxScore: number; status: string; submittedAt: string | null }[];
   homework: { lessonId: string; title: string; status: HomeworkStatus; score: number | null; isLate: boolean; submittedAt: string | null }[];
-  exams: { title: string; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
+  exams: { title: string; attemptNumber: number; isMain: boolean; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
   ledger: { amount: number; type: CoinTransactionType; description: string; balanceAfter: number | null; createdAt: string | null }[];
   orders: { productTitle: string; price: number; status: OrderStatus; createdAt: string | null }[];
 }
@@ -444,7 +446,7 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
     AttendanceRecord.find({ studentId }).select("sessionId status notes").lean(),
     QuizSubmission.find({ studentId }).select("lessonId totalScore maxScore status submittedAt").sort({ submittedAt: -1 }).lean(),
     ExamSubmission.find({ studentId, status: { $ne: "in_progress" } })
-      .select("examId totalScore maxScore status isPassed submittedAt")
+      .select("examId studentId attemptNumber totalScore maxScore status isPassed submittedAt")
       .sort({ submittedAt: -1 })
       .lean(),
     CoinLedger.find({ studentId }).sort({ createdAt: -1 }).limit(300).lean(),
@@ -466,6 +468,7 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
   const sessionDate = new Map(sessionDocs.map((s) => [s._id.toString(), s.date]));
   const lessonTitle = new Map(lessonDocs.map((l) => [l._id.toString(), l.title]));
   const examTitle = new Map(examDocs.map((e) => [e._id.toString(), e.title]));
+  const mainExamIds = new Set(latestAttempts(examSubs).map((e) => e._id.toString()));
 
   const counts: Record<AttendanceStatus, number> = { present: 0, late: 0, excused: 0, absent: 0 };
   for (const r of records) counts[r.status]++;
@@ -509,6 +512,8 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
     })),
     exams: examSubs.map((e) => ({
       title: examTitle.get(e.examId.toString()) ?? "O'chirilgan imtihon",
+      attemptNumber: e.attemptNumber ?? 1,
+      isMain: mainExamIds.has(e._id.toString()),
       totalScore: e.totalScore,
       maxScore: e.maxScore,
       status: e.status,

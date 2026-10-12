@@ -11,6 +11,7 @@ import {
   ExamSubmissionStatus,
 } from "@/lib/db/models/exam-submission.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
+import { latestAttempts } from "@/lib/exam-attempts";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import {
   examUpsertSchema,
@@ -198,12 +199,23 @@ function toStudentSubmission(
   };
 }
 
+export interface ExamAttemptSummary {
+  attemptNumber: number;
+  totalScore: number;
+  maxScore: number;
+  status: string;
+  isPassed: boolean;
+  submittedAt: string | null;
+  /** Asosiy natija — oxirgi topshirilgan urinish */
+  isMain: boolean;
+}
+
 /**
  * Get all exams relevant to the logged-in student
  */
 export async function getExamsForStudent(): Promise<
   ActionState<{
-    active: Array<{ exam: IExamData; submission: IExamSubmissionData | null }>;
+    active: Array<{ exam: IExamData; submission: IExamSubmissionData | null; canRetake: boolean }>;
     upcoming: Array<{ exam: IExamData }>;
     past: Array<{ exam: IExamData; submission: IExamSubmissionData | null }>;
   }>
@@ -240,7 +252,7 @@ export async function getExamsForStudent(): Promise<
       subMap.set(s.examId.toString(), s);
     }
 
-    const active: Array<{ exam: IExamData; submission: IExamSubmissionData | null }> = [];
+    const active: Array<{ exam: IExamData; submission: IExamSubmissionData | null; canRetake: boolean }> = [];
     const upcoming: Array<{ exam: IExamData }> = [];
     const past: Array<{ exam: IExamData; submission: IExamSubmissionData | null }> = [];
 
@@ -278,7 +290,12 @@ export async function getExamsForStudent(): Promise<
         past.push({ exam: examData, submission: submissionData });
       } else {
         // active window
-        active.push({ exam: examData, submission: submissionData });
+        active.push({
+          exam: examData,
+          submission: submissionData,
+          // Oxirgi urinish topshirilgan va urinish qolgan bo'lsa, qayta ishlash mumkin
+          canRetake: !!sub && sub.status !== "in_progress" && sub.attemptNumber < exam.maxAttempts,
+        });
       }
     }
 
@@ -619,6 +636,7 @@ export async function getExamResultForStudent(examId: string): Promise<
   ActionState<{
     exam: IExamData;
     submission: IExamSubmissionData;
+    attempts: ExamAttemptSummary[];
   }>
 > {
   try {
@@ -647,17 +665,28 @@ export async function getExamResultForStudent(examId: string): Promise<
 
     await finalizeExpiredAttempts({ examId: exam._id, studentId: user.userId });
 
-    const submission = await ExamSubmission.findOne({
+    // Barcha urinishlar saqlanadi; asosiy natija — oxirgi topshirilgani
+    const finished = await ExamSubmission.find({
       examId: exam._id,
       studentId: user.userId,
       status: { $in: ["submitted", "graded"] },
     })
       .sort({ attemptNumber: -1 })
       .lean();
+    const submission = finished[0];
 
     if (!submission) {
       return { success: false, error: "Sizning imtihon topshirig'ingiz topilmadi" };
     }
+    const attempts: ExamAttemptSummary[] = finished.map((s, i) => ({
+      attemptNumber: s.attemptNumber,
+      totalScore: s.totalScore,
+      maxScore: s.maxScore,
+      status: s.status,
+      isPassed: s.isPassed,
+      submittedAt: s.submittedAt ? new Date(s.submittedAt).toISOString() : null,
+      isMain: i === 0,
+    }));
 
     const examData: IExamData = {
       _id: exam._id.toString(),
@@ -690,7 +719,7 @@ export async function getExamResultForStudent(examId: string): Promise<
 
     return {
       success: true,
-      data: { exam: examData, submission: submissionData },
+      data: { exam: examData, submission: submissionData, attempts },
     };
   } catch (err: unknown) {
     unstable_rethrow(err);
@@ -722,7 +751,9 @@ export async function getExamsForMentor(): Promise<
 
     const submissionsCounts = await ExamSubmission.aggregate([
       { $match: { examId: { $in: examIds }, status: { $in: ["submitted", "graded"] } } },
-      { $group: { _id: "$examId", count: { $sum: 1 } } },
+      // Bir o'quvchining bir necha urinishi bitta topshirgan o'quvchi sifatida sanaladi
+      { $group: { _id: { examId: "$examId", studentId: "$studentId" } } },
+      { $group: { _id: "$_id.examId", count: { $sum: 1 } } },
     ]);
 
     const countMap = new Map<string, number>();
@@ -1014,6 +1045,8 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
       studentLogin: string;
       groupName: string;
       attemptNumber: number;
+      /** O'quvchining asosiy (oxirgi topshirilgan) urinishi */
+      isMain: boolean;
       startedAt: string;
       submittedAt?: string;
       status: string;
@@ -1037,7 +1070,7 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
 
     interface PopulatedSubmissionItem {
       _id: unknown;
-      studentId?: { fullName?: string; login?: string };
+      studentId?: { _id?: unknown; fullName?: string; login?: string };
       groupId?: { name?: string };
       attemptNumber: number;
       startedAt: Date;
@@ -1048,8 +1081,23 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
       isPassed: boolean;
     }
 
-    const data = (submissions as unknown as PopulatedSubmissionItem[]).map((s) => ({
+    const rows = submissions as unknown as PopulatedSubmissionItem[];
+    const mainIds = new Set(
+      latestAttempts(
+        rows.map((s) => ({ _id: String(s._id), examId, studentId: String(s.studentId?._id ?? s._id), attemptNumber: s.attemptNumber, status: s.status }))
+      ).map((s) => s._id)
+    );
+    // Bir o'quvchining urinishlari yonma-yon, yangisi tepada
+    rows.sort(
+      (a, b) =>
+        (a.studentId?.fullName || "").localeCompare(b.studentId?.fullName || "") ||
+        String(a.studentId?._id ?? "").localeCompare(String(b.studentId?._id ?? "")) ||
+        b.attemptNumber - a.attemptNumber
+    );
+
+    const data = rows.map((s) => ({
       _id: String(s._id),
+      isMain: mainIds.has(String(s._id)),
       studentName: s.studentId?.fullName || "Noma'lum",
       studentLogin: s.studentId?.login || "-",
       groupName: s.groupId?.name || "Guruh",

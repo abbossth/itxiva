@@ -125,5 +125,5 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
   }
 
   // Agar hali boshlamagan bo'lsa, start ekranini ko'rsatamiz
-  return <ExamStartCard exam={exam} />;
+  return <ExamStartCard exam={exam} attemptNumber={(submission?.attemptNumber ?? 0) + 1} />;
 }

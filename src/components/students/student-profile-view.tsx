@@ -64,7 +64,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
   const homeworkAvg = average(report.homework.filter((h) => h.status === "graded" && h.score !== null).map((h) => h.score as number));
   const quizAvg = average(report.quizzes.flatMap((q) => percentOf(q.totalScore, q.maxScore) ?? []));
   const examAvg = average(
-    report.exams.filter((e) => e.status === "graded").flatMap((e) => percentOf(e.totalScore, e.maxScore) ?? [])
+    report.exams.filter((e) => e.isMain && e.status === "graded").flatMap((e) => percentOf(e.totalScore, e.maxScore) ?? [])
   );
 
   // Coinlar: manba bo'yicha kirim va chiqim
@@ -543,7 +543,15 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
                   {report.exams.map((e, i) => (
                     <li key={i} className="py-2 flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate text-slate-700 dark:text-slate-200">{e.title}</span>
+                      <span className={cn("min-w-0 truncate text-slate-700 dark:text-slate-200", !e.isMain && "opacity-60")}>
+                        {e.title}
+                        {(e.attemptNumber > 1 || !e.isMain) && (
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {" "}
+                            · {e.attemptNumber}-urinish{e.isMain ? "" : " (oldingi)"}
+                          </span>
+                        )}
+                      </span>
                       <span className="shrink-0 flex items-center gap-2">
                         {e.status === "graded" ? (
                           <Badge variant={e.isPassed ? "success" : "danger"}>{e.isPassed ? "O'tdi" : "O'tmadi"}</Badge>

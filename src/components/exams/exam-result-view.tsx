@@ -5,6 +5,8 @@ import { IExamData } from "@/lib/db/models/exam.model";
 import { IExamSubmissionData } from "@/lib/db/models/exam-submission.model";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { ExamAttemptSummary } from "@/actions/exam.actions";
+import { formatDateTimeUz } from "@/lib/utils";
 import {
   Award,
   CheckCircle2,
@@ -18,9 +20,11 @@ import {
 interface ExamResultViewProps {
   exam: IExamData;
   submission: IExamSubmissionData;
+  /** Barcha topshirilgan urinishlar (yangisi birinchi); asosiy natija — oxirgisi */
+  attempts?: ExamAttemptSummary[];
 }
 
-export function ExamResultView({ exam, submission }: ExamResultViewProps) {
+export function ExamResultView({ exam, submission, attempts = [] }: ExamResultViewProps) {
   const percentage = Math.round((submission.totalScore / (submission.maxScore || 1)) * 100);
   const isPending = submission.status !== "graded";
   const isPassed = submission.isPassed;
@@ -106,6 +110,33 @@ export function ExamResultView({ exam, submission }: ExamResultViewProps) {
           </div>
         )}
       </Card>
+
+      {attempts.length > 1 && (
+        <Card className="p-4 sm:p-5 rounded-2xl border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs space-y-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Urinishlaringiz</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Hammasi saqlangan. Asosiy natija — oxirgi urinish; quyidagi tahlil ham shu urinish bo&apos;yicha.
+            </p>
+          </div>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+            {attempts.map((a) => (
+              <li key={a.attemptNumber} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{a.attemptNumber}-urinish</span>
+                  {a.isMain && <Badge variant="teal">Asosiy</Badge>}
+                  {a.submittedAt && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{formatDateTimeUz(a.submittedAt)}</span>
+                  )}
+                </span>
+                <span className="shrink-0 font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {a.status === "graded" ? `${a.totalScore} / ${a.maxScore}` : "Tekshirilmoqda"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Detailed Question Review */}
       <div className="space-y-4">

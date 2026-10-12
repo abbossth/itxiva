@@ -19,9 +19,12 @@ import Link from "next/link";
 
 interface ExamStartCardProps {
   exam: IExamData;
+  /** Nechanchi urinish boshlanadi (1 — birinchi) */
+  attemptNumber?: number;
 }
 
-export function ExamStartCard({ exam }: ExamStartCardProps) {
+export function ExamStartCard({ exam, attemptNumber = 1 }: ExamStartCardProps) {
+  const isRetake = attemptNumber > 1;
   const router = useRouter();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +126,13 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
           </ul>
         </div>
 
+        {isRetake && (
+          <div className="p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-800 dark:text-teal-300 leading-relaxed">
+            Bu sizning <strong>{attemptNumber}-urinishingiz</strong> ({exam.maxAttempts} tadan). Oldingi urinishingiz natijasi
+            saqlanib qoladi, lekin asosiy natija sifatida shu oxirgi urinish hisoblanadi.
+          </div>
+        )}
+
         <Button
           onClick={handleStart}
           isLoading={starting}
@@ -131,7 +141,7 @@ export function ExamStartCard({ exam }: ExamStartCardProps) {
           className="w-full py-4 text-base font-bold gap-2 rounded-2xl shadow-md"
         >
           <Play className="w-5 h-5 fill-current" />
-          <span>Imtihonni boshlash</span>
+          <span>{isRetake ? `${attemptNumber}-urinishni boshlash` : "Imtihonni boshlash"}</span>
         </Button>
       </Card>
     </div>

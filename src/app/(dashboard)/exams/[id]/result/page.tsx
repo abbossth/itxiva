@@ -48,7 +48,7 @@ export default async function ExamResultPage({ params }: ExamResultPageProps) {
     );
   }
 
-  const { exam, submission } = res.data;
+  const { exam, submission, attempts } = res.data;
 
-  return <ExamResultView exam={exam} submission={submission} />;
+  return <ExamResultView exam={exam} submission={submission} attempts={attempts} />;
 }
