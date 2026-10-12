@@ -249,3 +249,24 @@ describe("davomat: o'chirish va avtomatik yopilish", () => {
     expect(await coinsOf(guli._id)).toEqual([15, 15]);
   });
 });
+
+describe("davomat: o'chirilgan o'quvchi", () => {
+  it("davomat paytida o'chirilgan o'quvchining yozuvi ekranni buzmaydi", async () => {
+    const { gid, ali, vali } = await setup();
+    const started = await actions.startAttendanceSessionAction(gid);
+    const sessionId = String(started.data?.sessionId ?? (await AttendanceSession.findOne())!._id);
+    await AttendanceRecord.create([
+      { sessionId, studentId: ali._id, groupId: gid, status: "present", method: "code", markedAt: new Date() },
+      { sessionId, studentId: vali._id, groupId: gid, status: "present", method: "code", markedAt: new Date() },
+    ]);
+    await User.deleteOne({ _id: ali._id });
+
+    const projector = await actions.getAttendanceSessionForProjector(sessionId);
+    expect(projector?.records).toHaveLength(1);
+    expect(projector?.records.every((r: { studentId: unknown }) => r.studentId)).toBe(true);
+    expect(projector?.totalStudents).toBe(2);
+
+    const detail = await actions.getAttendanceSessionDetail(sessionId);
+    expect(detail?.roster.map((r) => r.login).sort()).toEqual(["guli", "vali"]);
+  });
+});

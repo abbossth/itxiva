@@ -216,10 +216,13 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
   );
 
   // Fetch attendees
-  const records = await AttendanceRecord.find({ sessionId })
+  const allRecords = await AttendanceRecord.find({ sessionId })
     .sort({ markedAt: -1 })
     .populate("studentId", "fullName login")
     .lean();
+  // Davomat paytida o'chirilgan o'quvchining yozuvi bazada qoladi, lekin o'quvchisi yo'q (populate null qaytaradi).
+  // Ekran har bir yozuvda ism kutadi — bunday yozuvlar ro'yxatga kiritilmaydi.
+  const records = allRecords.filter((r) => r.studentId);
 
   // Guruhning barcha o'quvchilari: jami soni va hali belgilanmaganlar (kelmaganlar) ro'yxati uchun
   const students = await User.find({ groupId: attSession.groupId, role: "student" })
