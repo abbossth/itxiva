@@ -41,13 +41,14 @@ export function ExamGradingView({
 
   // Map of question grades: points and feedback
   const [grades, setGrades] = useState<
-    Record<string, { pointsAwarded: number; mentorFeedback: string }>
+    Record<string, { pointsAwarded: number; mentorFeedback: string; correctAnswer: string }>
   >(() => {
-    const map: Record<string, { pointsAwarded: number; mentorFeedback: string }> = {};
+    const map: Record<string, { pointsAwarded: number; mentorFeedback: string; correctAnswer: string }> = {};
     submission.answers.forEach((ans) => {
       map[ans.questionId] = {
         pointsAwarded: ans.pointsAwarded || 0,
         mentorFeedback: ans.mentorFeedback || "",
+        correctAnswer: ans.correctAnswer || "",
       };
     });
     return map;
@@ -79,6 +80,17 @@ export function ExamGradingView({
     }));
   };
 
+  const updateCorrectAnswer = (questionId: string, correctAnswer: string) => {
+    setGrades((prev) => ({ ...prev, [questionId]: { ...prev[questionId], correctAnswer } }));
+  };
+
+  // Namunaviy javobi yo'q ochiq savollarda o'quvchi shu yerda yozilgan to'g'ri javobni ko'radi
+  const editableCorrect = new Set(
+    exam.questions
+      .filter((q) => q.type === "open_ended" && !(q.correctAnswers ?? []).some((a) => a.trim()))
+      .map((q) => q._id?.toString() || "")
+  );
+
   const calculatedTotalScore = Object.values(grades).reduce(
     (sum, g) => sum + (Number(g.pointsAwarded) || 0),
     0
@@ -95,6 +107,7 @@ export function ExamGradingView({
         questionId,
         pointsAwarded: g.pointsAwarded,
         mentorFeedback: g.mentorFeedback,
+        ...(editableCorrect.has(questionId) ? { correctAnswer: g.correctAnswer } : {}),
       }));
 
       const res = await gradeExamSubmissionAction({
@@ -181,7 +194,7 @@ export function ExamGradingView({
         {exam.questions.map((q, idx) => {
           const qId = q._id?.toString() || "";
           const ans = submission.answers.find((a) => a.questionId === qId);
-          const currentGrade = grades[qId] || { pointsAwarded: 0, mentorFeedback: "" };
+          const currentGrade = grades[qId] || { pointsAwarded: 0, mentorFeedback: "", correctAnswer: "" };
           const downloadUrl = fileDownloadUrls[qId];
 
           const isAutoGraded = q.type === "single_choice" || q.type === "multiple_choice";
@@ -277,11 +290,17 @@ export function ExamGradingView({
                   </div>
                 )}
 
-                {ans?.correctAnswer && !(q.correctAnswers ?? []).some((a) => a.trim()) && (
-                  <div className="text-xs">
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob (AI): </span>
-                    <span className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{ans.correctAnswer}</span>
-                  </div>
+                {ans && editableCorrect.has(qId) && (
+                  <label className="block space-y-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob
+                    <textarea
+                      rows={2}
+                      value={currentGrade.correctAnswer ?? ""}
+                      onChange={(e) => updateCorrectAnswer(qId, e.target.value)}
+                      placeholder="Bo'sh qoldirsangiz, o'quvchiga to'g'ri javob ko'rsatilmaydi"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 resize-y font-normal"
+                    />
+                  </label>
                 )}
 
                 {ans?.aiGraded && (

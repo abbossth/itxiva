@@ -17,7 +17,7 @@ function ReviewRow({ item, defaultOpen }: { item: QuizReviewItem; defaultOpen: b
   const { toast } = useToast();
   const [open, setOpen] = useState(defaultOpen);
   const [grades, setGrades] = useState(() =>
-    Object.fromEntries(item.answers.map((a) => [a.questionId, { points: a.pointsAwarded, feedback: a.feedback }]))
+    Object.fromEntries(item.answers.map((a) => [a.questionId, { points: a.pointsAwarded, feedback: a.feedback, correctAnswer: a.correctAnswer }]))
   );
   const [isSaving, setIsSaving] = useState(false);
   const pending = item.status === "submitted";
@@ -32,6 +32,8 @@ function ReviewRow({ item, defaultOpen }: { item: QuizReviewItem; defaultOpen: b
           questionId: a.questionId,
           pointsAwarded: grades[a.questionId].points,
           mentorFeedback: grades[a.questionId].feedback,
+          // Savolda namunaviy javob bo'lsa, o'quvchi o'shani ko'radi — bu maydon ishlatilmaydi
+          ...(a.sample ? {} : { correctAnswer: grades[a.questionId].correctAnswer }),
         })),
       });
       if (res.success) {
@@ -79,12 +81,6 @@ function ReviewRow({ item, defaultOpen }: { item: QuizReviewItem; defaultOpen: b
               <div className="rounded-lg bg-white dark:bg-slate-800 p-2.5 text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
                 {a.value || <span className="italic text-slate-500 dark:text-slate-400">Javob berilmagan</span>}
               </div>
-              {!a.sample && a.aiCorrectAnswer && (
-                <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob (AI): </span>
-                  {a.aiCorrectAnswer}
-                </p>
-              )}
               {a.aiGraded && (
                 <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300">
                   <Bot className="w-3.5 h-3.5" />
@@ -118,6 +114,18 @@ function ReviewRow({ item, defaultOpen }: { item: QuizReviewItem; defaultOpen: b
                   className="min-w-0 flex-1 basis-48 h-9 px-3 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                 />
               </div>
+              {!a.sample && (
+                <label className="block space-y-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  O&apos;quvchiga ko&apos;rsatiladigan to&apos;g&apos;ri javob
+                  <textarea
+                    rows={2}
+                    value={grades[a.questionId].correctAnswer}
+                    onChange={(e) => setGrades((g) => ({ ...g, [a.questionId]: { ...g[a.questionId], correctAnswer: e.target.value } }))}
+                    placeholder="Bo'sh qoldirsangiz, o'quvchiga to'g'ri javob ko'rsatilmaydi"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 resize-y font-normal"
+                  />
+                </label>
+              )}
             </div>
           ))}
           <Button variant="primary" size="sm" onClick={save} isLoading={isSaving}>

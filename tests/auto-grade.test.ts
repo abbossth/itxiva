@@ -106,13 +106,20 @@ describe("ochiq savollarni avtomatik tekshirish", () => {
       submissionId: sub!._id.toString(),
       grades: [
         { questionId: ids[1], pointsAwarded: 8 },
-        { questionId: ids[2], pointsAwarded: 10, mentorFeedback: "Aslida to'g'ri" },
+        { questionId: ids[2], pointsAwarded: 9, mentorFeedback: "Deyarli to'g'ri", correctAnswer: "  Mentor tahrirlagan javob " },
       ],
     });
     expect(graded.success).toBe(true);
     sub = await saved();
-    expect(sub).toMatchObject({ status: "graded", totalScore: 20 });
-    expect(sub!.answers[2]).toMatchObject({ aiGraded: false, mentorFeedback: "Aslida to'g'ri" });
+    expect(sub).toMatchObject({ status: "graded", totalScore: 19 });
+    // AI yozgan to'g'ri javob o'rniga mentor yozgani saqlanadi va o'quvchiga shu ko'rinadi
+    expect(sub!.answers[2]).toMatchObject({ aiGraded: false, mentorFeedback: "Deyarli to'g'ri", correctAnswer: "Mentor tahrirlagan javob" });
+
+    // Yuborilmasa — o'zgarmaydi; bo'sh yuborilsa — olib tashlanadi
+    await quizzes.gradeQuizSubmissionAction({ submissionId: sub!._id.toString(), grades: [{ questionId: ids[2], pointsAwarded: 9 }] });
+    expect((await saved())!.answers[2].correctAnswer).toBe("Mentor tahrirlagan javob");
+    await quizzes.gradeQuizSubmissionAction({ submissionId: sub!._id.toString(), grades: [{ questionId: ids[2], pointsAwarded: 9, correctAnswer: " " }] });
+    expect((await saved())!.answers[2].correctAnswer).toBeUndefined();
   });
 
   it("AI ishlamasa javob mentorga qoladi; keyin qayta ishga tushirsa baholanadi", async () => {
@@ -166,5 +173,16 @@ describe("ochiq savollarni avtomatik tekshirish", () => {
       expect(sub!.answers[0]).toMatchObject({ pointsAwarded: 5, aiGraded: true });
       expect(sub).toMatchObject(withProject ? { status: "submitted", totalScore: 5, isPassed: false } : { status: "graded", totalScore: 5, isPassed: true });
     }
+
+    // Mentor imtihonda ham AI yozgan to'g'ri javobni tahrirlay oladi
+    const mentor = await User.create({ login: "mentor", fullName: "Mentor", role: "mentor", passwordHash: "x" });
+    actAs(sessionFor(mentor));
+    const last = await ExamSubmission.findOne({ status: "submitted" }).lean();
+    const res = await exams.gradeExamSubmissionAction({
+      submissionId: last!._id.toString(),
+      grades: [{ questionId: last!.answers[0].questionId, pointsAwarded: 6, correctAnswer: "Mentor yozgan to'g'ri javob" }],
+    });
+    expect(res.success).toBe(true);
+    expect((await ExamSubmission.findById(last!._id).lean())!.answers[0]).toMatchObject({ pointsAwarded: 6, aiGraded: false, correctAnswer: "Mentor yozgan to'g'ri javob" });
   });
 });

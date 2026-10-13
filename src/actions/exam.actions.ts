@@ -1276,7 +1276,7 @@ export async function gradeExamSubmissionAction(data: unknown): Promise<ActionSt
     }
 
     const gradeMap = new Map(
-      parsed.data.grades.map((g) => [g.questionId, { points: g.pointsAwarded, feedback: g.mentorFeedback }])
+      parsed.data.grades.map((g) => [g.questionId, { points: g.pointsAwarded, feedback: g.mentorFeedback, correctAnswer: g.correctAnswer }])
     );
     const questionPoints = new Map(
       exam.questions.map((q) => [q._id ? q._id.toString() : "", q.points])
@@ -1298,6 +1298,9 @@ export async function gradeExamSubmissionAction(data: unknown): Promise<ActionSt
         ans.aiGraded = false;
         if (g.feedback !== undefined) {
           ans.mentorFeedback = g.feedback;
+        }
+        if (g.correctAnswer !== undefined) {
+          ans.correctAnswer = g.correctAnswer.trim() || undefined;
         }
       }
       // Imtihondan o'chirilgan savollar umumiy ballga qo'shilmaydi

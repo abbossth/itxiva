@@ -106,6 +106,8 @@ export const examGradeSchema = z.object({
       questionId: z.string().min(1),
       pointsAwarded: z.coerce.number().min(0),
       mentorFeedback: z.string().optional(),
+      // O'quvchiga ko'rsatiladigan to'g'ri javob (bo'sh satr — olib tashlash)
+      correctAnswer: z.string().max(2000, "To'g'ri javob juda uzun").optional(),
     })
   ),
   mentorGeneralFeedback: z.string().optional(),

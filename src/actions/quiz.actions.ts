@@ -402,7 +402,7 @@ export async function gradeQuizSubmissionAction(data: unknown): Promise<ActionSt
     }
 
     const gradesMap = new Map(
-      parsed.data.grades.map((g) => [g.questionId, { points: g.pointsAwarded, feedback: g.mentorFeedback }])
+      parsed.data.grades.map((g) => [g.questionId, { points: g.pointsAwarded, feedback: g.mentorFeedback, correctAnswer: g.correctAnswer }])
     );
 
     const quiz = await Quiz.findById(submission.quizId).select("questions").lean();
@@ -424,6 +424,9 @@ export async function gradeQuizSubmissionAction(data: unknown): Promise<ActionSt
         ans.aiGraded = false;
         if (grade.feedback !== undefined) {
           ans.mentorFeedback = grade.feedback;
+        }
+        if (grade.correctAnswer !== undefined) {
+          ans.correctAnswer = grade.correctAnswer.trim() || undefined;
         }
       }
       newTotalScore += ans.pointsAwarded;
@@ -468,8 +471,8 @@ export interface QuizReviewItem {
     pointsAwarded: number;
     feedback: string;
     aiGraded: boolean;
-    /** AI yozgan to'g'ri javob — o'quvchi natijada shuni ko'radi (mentor namunasi bo'lmasa) */
-    aiCorrectAnswer: string;
+    /** O'quvchi natijada ko'radigan to'g'ri javob (savolda namuna bo'lmasa): AI yozgan yoki mentor tahrirlagan */
+    correctAnswer: string;
   }[];
 }
 
@@ -510,7 +513,7 @@ export async function getQuizReviewQueue(lessonId: string): Promise<ActionState<
             pointsAwarded: a?.pointsAwarded ?? 0,
             feedback: a?.mentorFeedback ?? "",
             aiGraded: Boolean(a?.aiGraded),
-            aiCorrectAnswer: a?.correctAnswer ?? "",
+            correctAnswer: a?.correctAnswer ?? "",
           };
         }),
       }))
