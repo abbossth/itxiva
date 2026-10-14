@@ -7,9 +7,12 @@ interface PodiumProps {
   top3: LeaderboardEntry[];
 }
 
+/** Joy (chap/o'rta/o'ng) ro'yxatdagi tartibdan, ko'rinish (balandlik, rang, toj) esa o'rindan olinadi —
+ *  teng coinli o'quvchilar bir xil balandlikda turadi */
+const SLOTS = ["order-2", "order-1", "order-3"] as const;
+
 const PLACES = {
   1: {
-    order: "order-2",
     height: "h-32 sm:h-40",
     block: "bg-gradient-to-t from-amber-600 to-amber-400 text-white shadow-lg shadow-amber-500/30",
     ring: "ring-4 ring-amber-400 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
@@ -18,7 +21,6 @@ const PLACES = {
     label: "text-sm sm:text-base",
   },
   2: {
-    order: "order-1",
     height: "h-24 sm:h-28",
     block: "bg-gradient-to-t from-slate-400 to-slate-300 text-slate-900 dark:from-slate-600 dark:to-slate-500 dark:text-white",
     ring: "ring-4 ring-slate-300 dark:ring-slate-500 bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100",
@@ -27,7 +29,6 @@ const PLACES = {
     label: "text-xs sm:text-sm",
   },
   3: {
-    order: "order-3",
     height: "h-16 sm:h-20",
     block: "bg-gradient-to-t from-orange-700 to-orange-500 text-white",
     ring: "ring-4 ring-orange-500/70 bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200",
@@ -42,7 +43,7 @@ function initials(name: string) {
   return (parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2)).toUpperCase();
 }
 
-/** Kuchli uchlik: shohsupa pastdan ko'tariladi, birinchi o'rinda toj */
+/** Kuchli uchlik: shohsupa pastdan ko'tariladi, har bir 1-o'rinda toj */
 export function Podium({ top3 }: PodiumProps) {
   const valid = (top3 || []).filter((e) => e.totalCoins > 0).slice(0, 3);
   if (valid.length === 0) return null;
@@ -50,12 +51,13 @@ export function Podium({ top3 }: PodiumProps) {
   return (
     <div className="flex items-end justify-center gap-2 sm:gap-4 max-w-lg mx-auto pt-8">
       {valid.map((entry, i) => {
-        const place = PLACES[(i + 1) as 1 | 2 | 3];
+        const rank = Math.min(Math.max(entry.rank, 1), 3) as 1 | 2 | 3;
+        const place = PLACES[rank];
         return (
-          <div key={entry.userId} className={cn("flex min-w-0 flex-1 flex-col items-center", place.order)}>
+          <div key={entry.userId} className={cn("flex min-w-0 flex-1 flex-col items-center", SLOTS[i])}>
             <div className="podium-person flex flex-col items-center min-w-0 w-full pb-2" style={{ animationDelay: `calc(${place.delay} + 350ms)` }}>
               <div className="relative">
-                {i === 0 && (
+                {rank === 1 && (
                   <Crown aria-hidden className="crown-float absolute -top-7 left-1/2 w-8 h-8 text-amber-500 fill-amber-400 drop-shadow" />
                 )}
                 <div className={cn("flex items-center justify-center rounded-full font-mono font-black", place.avatar, place.ring)}>
@@ -81,7 +83,7 @@ export function Podium({ top3 }: PodiumProps) {
               className={cn("podium-rise relative w-full overflow-hidden rounded-t-2xl flex items-start justify-center pt-2 font-mono text-3xl sm:text-4xl font-black", place.height, place.block)}
               style={{ animationDelay: place.delay }}
             >
-              {i === 0 && <span aria-hidden className="podium-shine absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent" />}
+              {rank === 1 && <span aria-hidden className="podium-shine absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent" />}
               <span className="relative">{entry.rank}</span>
             </div>
           </div>
