@@ -1,15 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, RefreshCw, X, CheckCircle2, XCircle, CircleDot, CircleDashed, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import {
+  Sparkles,
+  RefreshCw,
+  X,
+  CheckCircle2,
+  XCircle,
+  CircleDot,
+  CircleDashed,
+  HelpCircle,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { suggestHomeworkReviewAction } from "@/actions/ai.actions";
-import type { CheckVerdict, HomeworkReview } from "@/lib/ai/review-homework";
+import { suggestHomeworkReviewAction, type HomeworkReviewResult } from "@/actions/ai.actions";
+import type { CheckVerdict, HomeworkReview, Likelihood } from "@/lib/ai/review-homework";
 import { cn } from "@/lib/utils";
 
 // Bir javob qayta ochilganda AI'ni yana chaqirmaslik uchun: kalit — javob va urinish raqami
-const cache = new Map<string, HomeworkReview>();
+const cache = new Map<string, HomeworkReviewResult>();
 
 const CONFIDENCE: Record<HomeworkReview["confidence"], { label: string; variant: "success" | "warning" | "danger" }> = {
   high: { label: "ishonch yuqori", variant: "success" },
@@ -25,6 +37,104 @@ const VERDICT: Record<CheckVerdict, { icon: typeof CheckCircle2; label: string; 
   unchecked: { icon: HelpCircle, label: "tekshirilmadi", tone: "text-sky-600 dark:text-sky-400" },
 };
 
+const LIKELIHOOD: Record<Likelihood, { label: string; variant: "success" | "warning" | "danger" }> = {
+  low: { label: "past", variant: "success" },
+  medium: { label: "o'rtacha", variant: "warning" },
+  high: { label: "yuqori", variant: "danger" },
+};
+
+// Matn 70% va undan ko'p mos kelsa, AI nima desa ham ko'chirish ehtimoli kamida "o'rtacha" deb ko'rsatiladi
+const STRONG_SIMILARITY = 70;
+
+function copyLevel(review: HomeworkReviewResult): Likelihood {
+  const top = review.similar[0]?.percent ?? 0;
+  if (top >= STRONG_SIMILARITY && review.originality.copyLikelihood === "low") return "medium";
+  return review.originality.copyLikelihood;
+}
+
+const sectionTitle = "text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1";
+
+function OriginalitySection({ review }: { review: HomeworkReviewResult }) {
+  const o = review.originality;
+  const copy = LIKELIHOOD[copyLevel(review)];
+  const ai = LIKELIHOOD[o.aiLikelihood];
+  return (
+    <div className="rounded-lg border border-slate-200/80 dark:border-slate-700/70 bg-white/70 dark:bg-slate-900/40 p-2.5 space-y-2.5">
+      <div className={sectionTitle}>Mustaqil bajarganmi (faqat sizga)</div>
+
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">Boshqa o&apos;quvchidan ko&apos;chirish:</span>
+          <Badge variant={copy.variant}>{copy.label}</Badge>
+        </div>
+        {review.similar.length > 0 ? (
+          <ul className="text-sm space-y-0.5">
+            {review.similar.map((s) => (
+              <li key={`${s.lessonId}-${s.studentId}`} className="flex flex-wrap items-baseline gap-x-2">
+                <Link
+                  href={`/mentor/homework/${s.lessonId}?student=${s.studentId}`}
+                  target="_blank"
+                  className="font-medium text-teal-700 dark:text-teal-400 hover:underline"
+                >
+                  {s.fullName}
+                </Link>
+                {s.groupName && <span className="text-xs text-slate-500 dark:text-slate-400">{s.groupName}</span>}
+                <span
+                  className={cn(
+                    "font-mono text-xs font-bold tabular-nums",
+                    s.percent >= STRONG_SIMILARITY ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"
+                  )}
+                >
+                  {s.percent}% o&apos;xshash
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">Boshqa javoblar orasida o&apos;xshash matn topilmadi.</p>
+        )}
+        {o.copySignals.length > 0 && (
+          <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pl-5 space-y-0.5">
+            {o.copySignals.map((sig, i) => (
+              <li key={i} className="break-words">{sig}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">AI yordamida yozilgan bo&apos;lishi:</span>
+          <Badge variant={ai.variant}>{ai.label}</Badge>
+        </div>
+        {o.aiSignals.length > 0 && (
+          <ul className="text-xs text-slate-600 dark:text-slate-400 list-disc pl-5 space-y-0.5">
+            {o.aiSignals.map((sig, i) => (
+              <li key={i} className="break-words">{sig}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {o.verifyQuestions.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">O&apos;quvchidan og&apos;zaki so&apos;rang:</div>
+          <ul className="text-sm text-slate-700 dark:text-slate-300 list-decimal pl-5 space-y-0.5">
+            {o.verifyQuestions.map((q, i) => (
+              <li key={i} className="break-words">{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+        Bu taxmin, dalil emas: AI yozganini hech bir dastur aniq aniqlay olmaydi. Shubha bo&apos;lsa, o&apos;quvchidan yechimini
+        tushuntirib berishni so&apos;rang.
+      </p>
+    </div>
+  );
+}
+
 export function AiReviewPanel({
   submissionId,
   attempt,
@@ -37,7 +147,7 @@ export function AiReviewPanel({
   onApplyFeedback: (feedback: string) => void;
 }) {
   const cacheKey = `${submissionId}-${attempt}`;
-  const [review, setReview] = useState<HomeworkReview | null>(() => cache.get(cacheKey) ?? null);
+  const [review, setReview] = useState<HomeworkReviewResult | null>(() => cache.get(cacheKey) ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
@@ -86,6 +196,7 @@ export function AiReviewPanel({
 
   const confidence = CONFIDENCE[review.confidence];
   const mistakes = review.checks.filter((c) => c.verdict !== "correct").length;
+  const suspicious = copyLevel(review) !== "low" || review.originality.aiLikelihood !== "low";
   return (
     <section
       aria-label="AI taklifi"
@@ -97,6 +208,17 @@ export function AiReviewPanel({
         <span className="font-mono text-lg font-black tabular-nums text-violet-700 dark:text-violet-300">{review.score}</span>
         <span className="text-xs text-slate-600 dark:text-slate-400">ball</span>
         <Badge variant={confidence.variant}>{confidence.label}</Badge>
+        {suspicious ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 dark:text-rose-400">
+            <ShieldAlert className="w-4 h-4" />
+            mustaqilligi shubhali
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+            <ShieldCheck className="w-4 h-4" />
+            shubha yo&apos;q
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -155,8 +277,10 @@ export function AiReviewPanel({
         </div>
       )}
 
+      <OriginalitySection review={review} />
+
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">
+        <div className={sectionTitle}>
           O&apos;quvchiga izoh (taklif)
         </div>
         <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line break-words">{review.feedback}</p>

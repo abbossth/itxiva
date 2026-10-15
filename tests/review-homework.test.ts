@@ -3,6 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 const generateStructured = vi.fn();
 vi.mock("@/lib/ai/claude", () => ({ generateStructured: (params: unknown) => generateStructured(params) }));
 
+const originality = {
+  aiLikelihood: "low",
+  aiSignals: ["  Imlo xatolari bor  ", ""],
+  copyLikelihood: "high",
+  copySignals: [],
+  verifyQuestions: ["3 KB ni qanday hisobladingiz?", "b", "c", "d"],
+};
+
 const { reviewHomeworkWithAi, buildHomeworkReviewPrompt, composeStudentFeedback } = await import("@/lib/ai/review-homework");
 
 const input = {
@@ -20,17 +28,18 @@ const input = {
 describe("AI uyga vazifa tekshiruvi", () => {
   it("ball 0–100 oralig'ida butun songa keltiriladi, fayllar AI'ga yuboriladi", async () => {
     const check = { task: " 1) ", student: "3 KB = 24 bayt", expected: "3072 bayt", verdict: "wrong", comment: "" };
-    generateStructured.mockResolvedValueOnce({ score: 140.4, feedback: "  Yaxshi  ", checks: [check], confidence: "medium" });
+    generateStructured.mockResolvedValueOnce({ score: 140.4, feedback: "  Yaxshi  ", checks: [check], confidence: "medium", originality });
     const review = await reviewHomeworkWithAi(input);
     expect(review).toEqual({
       score: 100,
       feedback: "Yaxshi\n\nXatolar:\n• 1) «3 KB = 24 bayt» → to'g'risi: 3072 bayt",
       checks: [{ ...check, task: "1)" }],
       confidence: "medium",
+      originality: { ...originality, aiSignals: ["Imlo xatolari bor"], verifyQuestions: ["3 KB ni qanday hisobladingiz?", "b", "c"] },
     });
     expect(generateStructured.mock.calls[0][0].attachments).toEqual([{ mimeType: "image/png", data: "AAAA" }]);
 
-    generateStructured.mockResolvedValueOnce({ score: -5, feedback: "", checks: [], confidence: "low" });
+    generateStructured.mockResolvedValueOnce({ score: -5, feedback: "", checks: [], confidence: "low", originality });
     expect((await reviewHomeworkWithAi(input)).score).toBe(0);
   });
 
@@ -43,6 +52,16 @@ describe("AI uyga vazifa tekshiruvi", () => {
     expect(prompt).toContain("ekran.png");
     expect(prompt).toContain("https://example.com/ish");
     expect(prompt).toContain("loyiha.zip");
+    expect(prompt).toContain("o'xshashi topilmadi");
+
+    const withPeers = buildHomeworkReviewPrompt({
+      ...input,
+      similarAnswers: [{ percent: 91, text: "Akbarbekning javobi" }],
+      previousAnswers: ["avvalgi ish"],
+    });
+    expect(withPeers).toContain("o'xshashligi 91%");
+    expect(withPeers).toContain("Akbarbekning javobi");
+    expect(withPeers).toContain("avvalgi ish");
   });
 
   it("o'quvchi izohiga har bir xato tushuntirishi bilan qo'shiladi, to'g'ri va tekshirilmaganlar qo'shilmaydi", () => {

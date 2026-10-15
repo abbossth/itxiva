@@ -13,6 +13,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { Group } from "@/lib/db/models/group.model";
+import { textSimilarity } from "@/lib/similarity";
 import { quizQuestionSchema } from "@/lib/validations/quiz.schema";
 import type { IQuizQuestion } from "@/lib/db/models/quiz.model";
 import type { IMaterial } from "@/lib/db/models/lesson.model";
@@ -343,9 +344,57 @@ export async function generateHomeworkAction(
 const REVIEW_MAX_FILES = 6;
 const REVIEW_MAX_FILE_BYTES = 5 * 1024 * 1024;
 const REVIEW_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
+// Shu foizdan o'xshash javob mentorga ko'rsatiladi va AI'ga solishtirish uchun beriladi
+const SIMILARITY_SHOW = 0.4;
+
+export interface SimilarSubmission {
+  studentId: string;
+  fullName: string;
+  groupName: string;
+  lessonId: string;
+  percent: number;
+}
+
+export type HomeworkReviewResult = HomeworkReview & { similar: SimilarSubmission[] };
+
+/** Shu vazifaga (boshqa guruhlardagi bog'langan nusxalari bilan) kelgan eng o'xshash javoblar */
+async function findSimilarSubmissions(
+  submission: { _id: mongoose.Types.ObjectId; studentId: string | mongoose.Types.ObjectId; text?: string },
+  lesson: { _id: mongoose.Types.ObjectId; linkId?: unknown },
+  instructions: string
+): Promise<(SimilarSubmission & { text: string })[]> {
+  if (!submission.text?.trim()) return [];
+  const lessonIds = lesson.linkId
+    ? (await Lesson.find({ linkId: lesson.linkId }).select("_id").lean()).map((l) => l._id)
+    : [lesson._id];
+  const others = await HomeworkSubmission.find({
+    lessonId: { $in: lessonIds },
+    _id: { $ne: submission._id },
+    studentId: { $ne: submission.studentId },
+    text: { $ne: "" },
+  })
+    .select("text studentId groupId lessonId")
+    .populate<{ studentId: { _id: mongoose.Types.ObjectId; fullName: string } | null }>("studentId", "fullName")
+    .populate<{ groupId: { name: string } | null }>("groupId", "name")
+    .lean();
+
+  return others
+    .map((o) => ({ o, score: textSimilarity(submission.text ?? "", o.text ?? "", instructions) }))
+    .filter(({ o, score }) => o.studentId && score >= SIMILARITY_SHOW)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ o, score }) => ({
+      studentId: o.studentId!._id.toString(),
+      fullName: o.studentId!.fullName,
+      groupName: o.groupId?.name ?? "",
+      lessonId: o.lessonId.toString(),
+      percent: Math.round(score * 100),
+      text: o.text ?? "",
+    }));
+}
 
 /** Mentorga taxminiy ball va izoh taklif qiladi. Hech narsa saqlanmaydi — bahoni mentor o'zi qo'yadi */
-export async function suggestHomeworkReviewAction(submissionId: string): Promise<ActionResult<HomeworkReview>> {
+export async function suggestHomeworkReviewAction(submissionId: string): Promise<ActionResult<HomeworkReviewResult>> {
   // Bir guruhni ketma-ket tekshirishda limit tez tugamasligi uchun alohida hisob
   const blocked = await guard("ai_review", 60);
   if (blocked) return { success: false, message: blocked };
@@ -355,10 +404,10 @@ export async function suggestHomeworkReviewAction(submissionId: string): Promise
 
   await connectToDatabase();
   const submission = await HomeworkSubmission.findById(submissionId)
-    .select("lessonId text links files attempt")
+    .select("lessonId studentId text links files attempt")
     .lean();
   if (!submission) return { success: false, message: "Javob topilmadi" };
-  const lesson = await Lesson.findById(submission.lessonId).select("title topic groupId homework").lean();
+  const lesson = await Lesson.findById(submission.lessonId).select("title topic groupId homework linkId").lean();
   if (!lesson) return { success: false, message: "Dars topilmadi" };
   const group = await Group.findById(lesson.groupId).select("grade").lean();
 
@@ -404,19 +453,44 @@ export async function suggestHomeworkReviewAction(submissionId: string): Promise
     };
   }
 
+  const instructions = lesson.homework?.instructions ?? "";
+  const [similar, previous] = await Promise.all([
+    findSimilarSubmissions(submission, lesson, instructions),
+    HomeworkSubmission.find({ studentId: submission.studentId, _id: { $ne: submission._id }, text: { $ne: "" } })
+      .sort({ submittedAt: -1 })
+      .limit(3)
+      .select("text")
+      .lean(),
+  ]);
+
   try {
-    const data = await reviewHomeworkWithAi({
+    const review = await reviewHomeworkWithAi({
       lessonTitle: lesson.title,
       lessonTopic: lesson.topic ?? "",
       grade: group?.grade ?? null,
-      instructions: lesson.homework?.instructions ?? "",
+      instructions,
       studentText,
       links: submission.links ?? [],
       attempt: submission.attempt ?? 1,
       files,
       unreadFiles,
+      // AI'ga boshqa o'quvchilarning ismi yuborilmaydi
+      similarAnswers: similar.map((s) => ({ percent: s.percent, text: s.text })),
+      previousAnswers: previous.map((p) => p.text ?? "").filter((t) => t.trim()),
     });
-    return { success: true, data };
+    return {
+      success: true,
+      data: {
+        ...review,
+        similar: similar.map((s) => ({
+          studentId: s.studentId,
+          fullName: s.fullName,
+          groupName: s.groupName,
+          lessonId: s.lessonId,
+          percent: s.percent,
+        })),
+      },
+    };
   } catch (error) {
     return fail(error);
   }
