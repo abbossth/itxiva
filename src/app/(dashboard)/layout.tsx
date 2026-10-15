@@ -10,6 +10,8 @@ import { SIDEBAR_COOKIE } from "@/components/layout/nav-links";
 import { getOrdersBadgeCount } from "@/actions/shop.actions";
 import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 import { getAppSettings } from "@/lib/settings";
+import { getStudentLevelState } from "@/actions/gamification.actions";
+import { LevelUpModal } from "@/components/gamification/level-up-modal";
 import { accentCss } from "@/lib/theme-accents";
 
 export default async function DashboardLayout({
@@ -27,11 +29,12 @@ export default async function DashboardLayout({
     redirect("/change-password");
   }
 
-  const [orders, homework, cookieStore, settings] = await Promise.all([
+  const [orders, homework, cookieStore, settings, levelState] = await Promise.all([
     getOrdersBadgeCount(),
     getHomeworkBadgeCount(),
     cookies(),
     getAppSettings(),
+    getStudentLevelState(),
   ]);
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
@@ -53,7 +56,7 @@ export default async function DashboardLayout({
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        <DesktopNav user={session} badges={badges} defaultCollapsed={sidebarCollapsed} />
+        <DesktopNav user={session} badges={badges} defaultCollapsed={sidebarCollapsed} level={levelState?.summary} />
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-28 md:pb-8">
           {session.role === "mentor" && <SectionTabs badges={badges} />}
@@ -63,6 +66,9 @@ export default async function DashboardLayout({
 
       {/* Mobile Bottom Navigation Bar */}
       <MobileNav role={session.role} badges={badges} />
+
+      {/* Yangi daraja: o'quvchi keyingi kirishida bir marta tabriklanadi */}
+      {levelState?.levelUp && <LevelUpModal key={levelState.levelUp.level} info={levelState.levelUp} />}
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
       <CommandPaletteTrigger role={session.role} />

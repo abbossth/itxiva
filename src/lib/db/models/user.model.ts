@@ -19,6 +19,16 @@ export interface IUserData {
   notificationPrefs?: Record<string, boolean> | null;
   /** Reytingdagi salyut (konfetti, ovoz, titrash). Yozilmagan bo'lsa — yoqilgan */
   celebrationsEnabled?: boolean;
+  /** Tajriba: hech qachon sarflanmaydi; daraja va reyting shu bo'yicha (gamifikatsiya) */
+  xp?: number;
+  /** Joriy daraja (1–10). Daraja bonusi berilganini LevelReward saqlaydi */
+  level?: number;
+  /** Yangi daraja: o'quvchi keyingi kirishida tabrik oynasi bir marta ko'rsatiladi */
+  pendingLevelUp?: number | null;
+  /** Kirish seriyasi (Asia/Tashkent kunlari bo'yicha) */
+  streak?: { current: number; best: number; lastDayKey: string | null } | null;
+  /** Seriya himoyasi: o'tkazib yuborilgan bir kunni avtomatik yopadi */
+  streakShields?: number;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -106,6 +116,15 @@ const UserSchema = new Schema<IUser>(
     },
     notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
     celebrationsEnabled: { type: Boolean, default: true },
+    xp: { type: Number, default: 0, min: 0 },
+    level: { type: Number, default: 1, min: 1 },
+    pendingLevelUp: { type: Number, default: null },
+    streak: {
+      current: { type: Number, default: 0 },
+      best: { type: Number, default: 0 },
+      lastDayKey: { type: String, default: null },
+    },
+    streakShields: { type: Number, default: 0, min: 0 },
   },
   {
     timestamps: true,
@@ -117,6 +136,7 @@ UserSchema.index({ role: 1, isHiddenFromLeaderboard: 1, totalCoins: -1 });
 UserSchema.index({ "telegram.chatId": 1 }, { unique: true, partialFilterExpression: { "telegram.chatId": { $type: "string" } } });
 UserSchema.index({ "telegramLink.tokenHash": 1 }, { sparse: true });
 UserSchema.index({ groupId: 1, role: 1, isHiddenFromLeaderboard: 1, totalCoins: -1 });
+UserSchema.index({ role: 1, isHiddenFromLeaderboard: 1, xp: -1 });
 
 export const User: Model<IUser> =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);

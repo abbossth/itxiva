@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 interface PodiumProps {
   top3: LeaderboardEntry[];
+  /** Reyting o'lchovi: coin yoki XP */
+  unit?: "coin" | "XP";
 }
 
 /** Joy (chap/o'rta/o'ng) ro'yxatdagi tartibdan, ko'rinish (balandlik, rang, toj) esa o'rindan olinadi —
@@ -44,7 +46,7 @@ function initials(name: string) {
 }
 
 /** Kuchli uchlik: shohsupa pastdan ko'tariladi, har bir 1-o'rinda toj */
-export function Podium({ top3 }: PodiumProps) {
+export function Podium({ top3, unit = "coin" }: PodiumProps) {
   const valid = (top3 || []).filter((e) => e.totalCoins > 0).slice(0, 3);
   if (valid.length === 0) return null;
 
@@ -76,7 +78,7 @@ export function Podium({ top3 }: PodiumProps) {
               </span>
               <span className="text-[11px] text-slate-600 dark:text-slate-400">{entry.groupName}</span>
               <span className="mt-0.5 font-mono text-sm sm:text-base font-black tabular-nums text-amber-700 dark:text-amber-400">
-                <CountUp value={entry.totalCoins} /> <span className="text-[10px] font-bold">coin</span>
+                <CountUp value={entry.totalCoins} /> <span className="text-[10px] font-bold">{unit}</span>
               </span>
             </div>
             <div

@@ -166,3 +166,33 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - **Yechim**: `vercel.json` da `regions: ["hnd1"]` — so'rov ~3 ms.
 - **O'lchash**: `/api/cron/diag` (`CRON_SECRET` bilan) funksiya regioni, baza regioni va ping vaqtini qaytaradi.
 - **Keyingi qadam (ixtiyoriy)**: bazani ham, funksiyalarni ham O'zbekistonga yaqinroq regionga (masalan Mumbay yoki Frankfurt) ko'chirish tarmoq kechikishini yana qisqartiradi; bu Atlas'da klasterni ko'chirishni talab qiladi.
+
+---
+
+## Gamifikatsiya (`feature/gamification`, spec: `docs/GAMIFICATION_SPEC.md`)
+
+### [2026-10-16] G1: XP — alohida maydon, `totalCoins` saqlanadi
+- `User.xp` va `CoinLedger.xp` qo'shildi. `totalCoins` (eski reyting) va `spendableBalance` (balans) o'zgarmagan holda ishlashda davom etadi.
+- `gamification.enabled` yoqilganda reyting `xp` bo'yicha (`leaderboard.actions.ts`, `unit: "XP"`), o'chiq bo'lsa — avvalgidek `totalCoins` bo'yicha.
+- XP qoidalari: mukofotda XP = coin; do'kon xaridi XP = 0; davomat jarimasi XP ni kamaytirmaydi; bekor qilingan mukofot (masalan "kelgan" xato belgilangan bo'lsa yoki vazifa bahosi tushirilsa) berilgan XP ni qaytaradi. Davomatda XP = yozuv bergan coinning musbat qismi (`xpDeltaFor`).
+- XP gamifikatsiya o'chiq bo'lsa ham yig'ilaveradi — kalit keyinroq yoqilganda ma'lumot to'g'ri bo'ladi.
+
+### [2026-10-16] G2: Yagona mukofot funksiyasi va idempotentlik
+- `src/lib/gamification/award.ts` → `awardCoins()`: avval kalitli ledger yozuvi yaratiladi (`idempotencyKey`, partial unique index), keyin balans/XP o'zgaradi. Ikkinchi urinish unique index'da to'xtaydi.
+- Balans manfiyga tushmaydi (shartli yangilash), XP noldan pastga tushmaydi (`$max`).
+- Unique indekslar hali qurilmagan bo'lsa (yangi baza, deploydan keyingi birinchi so'rov) takror o'tib ketmasligi uchun `Model.init()` kutiladi.
+- Ko'p yozuvli amallar uchun `withTransaction()` (`src/lib/db/transaction.ts`): Atlas'da tranzaksiya, replica set bo'lmagan bazada (lokal) tranzaksiyasiz — idempotentlik baribir indekslarda.
+
+### [2026-10-16] G3: Darajalar
+- 10 daraja, chegaralar sozlamadan (`AppSettings.gamification.levelThresholds`); noto'g'ri qiymat (o'smaydigan, soni boshqa) standartga qaytadi.
+- Daraja faqat oshadi (XP qaytarilsa ham pasaymaydi). Bonus har daraja uchun bir marta: `LevelReward` (o'quvchi + daraja, unique) + `level:<id>:<daraja>` kaliti. Bir necha daraja birdan oshsa — har biriga bonus. Bonus XP bermaydi (daraja zanjiri bo'lmasin).
+- Tabrik oynasi `User.pendingLevelUp` orqali bir marta ko'rsatiladi; Telegram "level_up".
+
+### [2026-10-16] G4: XP backfill
+- `scripts/backfill-xp.ts` (`npm run backfill:xp -- --dry-run`). XP har safar ledger'dan to'liq qayta hisoblanadi → idempotent.
+- Eski yozuvlar (xp maydoni yo'q): `attendance, homework, quiz, exam, bonus` turlari bo'yicha `amount` (vazifa bahosi tushirilgani ham hisobga olinadi). `adjustment` (davomat jarimalari, do'kon qaytarishlari) va `purchase` kirmaydi.
+- Backfill darajani qo'yadi, lekin daraja bonusini bermaydi va tabrik oynasini ko'rsatmaydi (aks holda barcha o'quvchilarga bir vaqtda yuzlab coin tushardi).
+
+### [2026-10-16] G5: Spec'dagi farazlar va haqiqiy kod
+- Spec "mavjud kunlik kirish coini"ni nazarda tutgan, lekin kodda bunday coin yo'q (kirishda faqat `lastLoginAt` yangilanadi). "Platformaga kiring" kunlik topshirig'i yangi manba bo'ladi: sozlamadagi miqdor (standart 2), Toshkent kuni bo'yicha bir marta (`login:<id>:<kun>` kaliti).
+- Testlar hozirgacha coin bermagan. "Faqat birinchi to'g'ri javob" va "kunlik 20 coin chegarasi" yangi test mukofoti sifatida qo'shiladi (sozlamada: savol uchun coin, kunlik chegara).

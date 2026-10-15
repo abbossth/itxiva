@@ -12,6 +12,8 @@ export interface IAppSettings extends Document {
   accent?: string | null;
   /** O'quvchilar o'z shaxsiy ma'lumotlarini (telefon, ota-ona, hujjatlar) o'zi kirita oladimi */
   studentProfileEdit?: boolean;
+  /** Gamifikatsiya sozlamalari — `parseGamification` (src/lib/gamification/config.ts) bilan o'qiladi */
+  gamification?: Record<string, unknown> | null;
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>(
@@ -21,6 +23,7 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     quarter: { type: Number, default: null, min: 1, max: 4 },
     accent: { type: String, default: null, trim: true },
     studentProfileEdit: { type: Boolean, default: false },
+    gamification: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

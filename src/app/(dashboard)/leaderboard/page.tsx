@@ -50,7 +50,7 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
 
   const message = !ahead
     ? behind
-      ? `Siz peshqadamsiz! Ikkinchi o'rindan ${me.totalCoins - behind.totalCoins} coin oldindasiz — bo'shashmang.`
+      ? `Siz peshqadamsiz! Ikkinchi o'rindan ${me.totalCoins - behind.totalCoins} ${data.unit} oldindasiz — bo'shashmang.`
       : "Siz peshqadamsiz!"
     : gap <= 5
       ? "Bitta dars — va siz bir pog'ona yuqoridasiz!"
@@ -79,7 +79,7 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <CountUp value={me.totalCoins} className="font-mono text-3xl sm:text-4xl font-black tabular-nums" />
-              <span className="text-sm font-bold text-white/90">coin</span>
+              <span className="text-sm font-bold text-white/90">{data.unit}</span>
               {me.weekCoins > 0 && (
                 <span className="rank-pop inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-mono text-xs font-bold">
                   <TrendingUp className="w-3.5 h-3.5" />+{me.weekCoins} bu hafta
@@ -95,7 +95,7 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
               <div className="flex items-center gap-2 text-sm font-bold">
                 <Target className="w-4 h-4 shrink-0" />
                 <span className="truncate">
-                  {ahead.rank}-o&apos;ringa yetish uchun <span className="font-mono">{gap}</span> coin qoldi
+                  {ahead.rank}-o&apos;ringa yetish uchun <span className="font-mono">{gap}</span> {data.unit} qoldi
                 </span>
               </div>
               <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/25">
@@ -159,7 +159,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
             Reyting
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-            {data.totalParticipants} o&apos;quvchi · jami {data.totalCoins.toLocaleString("uz-UZ")} coin yig&apos;ilgan
+            {data.totalParticipants} o&apos;quvchi · jami {data.totalCoins.toLocaleString("uz-UZ")} {data.unit} yig&apos;ilgan
           </p>
         </div>
 
@@ -220,14 +220,14 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
           <h2 className="pt-4 text-center text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-300">
             Kuchli uchlik
           </h2>
-          <Podium top3={data.top3} />
+          <Podium top3={data.top3} unit={data.unit} />
         </section>
       ) : (
         <div className="rounded-3xl border border-dashed border-amber-300/80 dark:border-amber-700/60 bg-amber-50/30 dark:bg-amber-950/20 p-6 text-center space-y-2 max-w-lg mx-auto">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
             <Sparkles className="w-6 h-6" />
           </div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Hali hech kim coin to&apos;plamagan — birinchi bo&apos;ling!</h2>
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Hali hech kim {data.unit} to&apos;plamagan — birinchi bo&apos;ling!</h2>
           <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto">
             Darslarda qatnashing, davomatdan o&apos;ting va vazifalarni topshirib birinchi o&apos;ringa ko&apos;tariling.
           </p>
@@ -296,7 +296,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
           <Users className="w-4 h-4" />
           To&apos;liq ro&apos;yxat
         </h2>
-        <RankTable entries={data.entries} />
+        <RankTable entries={data.entries} unit={data.unit} />
       </section>
     </div>
   );

@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { AppSettings } from "@/lib/db/models/app-settings.model";
 import { DEFAULT_ACCENT, isAccentId } from "@/lib/theme-accents";
 import { toDateKey } from "@/lib/schedule";
+import { parseGamification, type GamificationSettings } from "@/lib/gamification/config";
 
 export interface AppSettingsData {
   academicYear: string;
@@ -10,6 +11,7 @@ export interface AppSettingsData {
   accent: string;
   /** O'quvchilar o'z shaxsiy ma'lumotlarini tahrirlay oladi (sukutda yopiq) */
   studentProfileEdit: boolean;
+  gamification: GamificationSettings;
 }
 
 const YEAR_RE = /^(\d{4})-(\d{4})$/;
@@ -49,5 +51,6 @@ export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
     quarter: parseQuarter(doc?.quarter, 1),
     accent: isAccentId(doc?.accent) ? doc!.accent! : DEFAULT_ACCENT,
     studentProfileEdit: doc?.studentProfileEdit === true,
+    gamification: parseGamification(doc?.gamification),
   };
 });

@@ -9,6 +9,9 @@ import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import type { LevelSummary } from "@/actions/gamification.actions";
+import { formatNumberUz } from "@/lib/utils";
 
 interface DesktopNavProps {
   user: {
@@ -21,9 +24,11 @@ interface DesktopNavProps {
   badges?: NavBadges;
   /** Holat cookie'da saqlanadi va serverda o'qiladi — sahifa ochilganda sidebar "sakramaydi" */
   defaultCollapsed?: boolean;
+  /** O'quvchi darajasi (gamifikatsiya yoqilgan bo'lsa) — menyu pastida mini panel */
+  level?: LevelSummary | null;
 }
 
-export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: DesktopNavProps) {
+export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level = null }: DesktopNavProps) {
   const pathname = usePathname();
   const role = user.role;
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -129,6 +134,29 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false }: Desk
           );
         })}
       </nav>
+
+      {level && (
+        <Link
+          href="/achievements"
+          title={collapsed ? `${level.level}-daraja · ${level.name} · ${level.xp} XP` : undefined}
+          className={cn(
+            "mt-4 flex items-center gap-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+            collapsed ? "justify-center p-1.5" : "p-3"
+          )}
+        >
+          <LevelBadge level={level.level} />
+          {!collapsed && (
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold text-slate-900 dark:text-slate-100">{level.name}</span>
+              <span className="block font-mono text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
+                {formatNumberUz(level.xp)}
+                {level.nextXp !== null ? ` / ${formatNumberUz(level.nextXp)}` : ""} XP
+              </span>
+              <XpBar percent={level.percent} className="mt-1.5" />
+            </span>
+          )}
+        </Link>
+      )}
 
       {/* User profile summary block at bottom of sidebar */}
       <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800/80 mt-4">

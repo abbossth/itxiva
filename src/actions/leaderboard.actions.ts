@@ -8,6 +8,8 @@ import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { groupShortName } from "@/lib/group-name";
 import { requireAuth } from "@/lib/auth/guards";
 import { formatShortName } from "@/lib/utils";
+import { getAppSettings } from "@/lib/settings";
+import { LEGACY_EARNING_TYPES } from "@/lib/gamification/backfill";
 
 export interface LeaderboardEntry {
   rank: number;
@@ -31,6 +33,8 @@ export interface LeaderboardData {
   weekStars: LeaderboardEntry[];
   /** Ro'yxatdagi jami coin */
   totalCoins: number;
+  /** Reyting o'lchovi: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin. `totalCoins`/`weekCoins` shu birlikda */
+  unit: "coin" | "XP";
 }
 
 export async function getLeaderboardAction({
@@ -66,16 +70,31 @@ export async function getLeaderboardAction({
     groupId: { $in: matchingGroupIds },
   };
 
-  const students = (await User.find(userQuery)
-    .select("fullName groupId totalCoins")
-    .sort({ totalCoins: -1, createdAt: 1 })
-    .lean()) as unknown as IUser[];
+  // Gamifikatsiya yoqilgan bo'lsa reyting XP bo'yicha (do'kon xaridi va jarima ta'sir qilmaydi)
+  const xpMode = (await getAppSettings()).gamification.enabled;
+  const field = xpMode ? "xp" : "totalCoins";
+  const students = (
+    (await User.find(userQuery)
+      .select("fullName groupId totalCoins xp")
+      .sort({ [field]: -1, createdAt: 1 })
+      .lean()) as unknown as IUser[]
+  ).map((st) => ({ ...st, totalCoins: (xpMode ? st.xp : st.totalCoins) ?? 0 }));
 
   // Oxirgi 7 kundagi o'sish: do'kon xaridlari reytingga ta'sir qilmaydi, shuning uchun hisobga olinmaydi
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
     { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $ne: "purchase" } } },
-    { $group: { _id: "$studentId", sum: { $sum: "$amount" } } },
+    {
+      $group: {
+        _id: "$studentId",
+        sum: {
+          $sum: xpMode
+            ? // Gamifikatsiyadan oldingi yozuvlarda xp yo'q — daromad turlarida coin bilan teng
+              { $ifNull: ["$xp", { $cond: [{ $in: ["$type", LEGACY_EARNING_TYPES] }, "$amount", 0] }] }
+            : "$amount",
+        },
+      },
+    },
   ]);
   const weekMap = new Map(weekRows.map((r) => [String(r._id), r.sum]));
 
@@ -126,5 +145,6 @@ export async function getLeaderboardAction({
       .sort((a, b) => b.weekCoins - a.weekCoins)
       .slice(0, 3),
     totalCoins: entries.reduce((sum, e) => sum + e.totalCoins, 0),
+    unit: xpMode ? "XP" : "coin",
   };
 }

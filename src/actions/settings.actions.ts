@@ -7,6 +7,7 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor } from "@/lib/auth/guards";
 import { isAcademicYear } from "@/lib/settings";
 import { isAccentId } from "@/lib/theme-accents";
+import { gamificationSettingsSchema } from "@/lib/validations/gamification.schema";
 import type { ActionResult } from "./auth.actions";
 
 /** Joriy o'quv yili, chorak va asosiy rang — barcha foydalanuvchilar uchun */
@@ -32,4 +33,22 @@ export async function updateAppSettingsAction(input: unknown): Promise<ActionRes
   // Rang va standart chorak barcha sahifalarga ta'sir qiladi
   revalidatePath("/", "layout");
   return { success: true, message: "Sozlamalar saqlandi" };
+}
+
+/** Gamifikatsiya: yoqish kaliti, darajalar va coin iqtisodiyoti chegaralari */
+export async function updateGamificationSettingsAction(input: unknown): Promise<ActionResult> {
+  const mentor = await requireMentor();
+  const parsed = gamificationSettingsSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
+
+  await connectToDatabase();
+  await AppSettings.updateOne({ key: "global" }, { $set: { gamification: parsed.data } }, { upsert: true });
+  await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_GAMIFICATION", details: parsed.data });
+
+  // Menyu, reyting va o'quvchi sahifalari shu kalitga bog'liq
+  revalidatePath("/", "layout");
+  return {
+    success: true,
+    message: parsed.data.enabled ? "Gamifikatsiya sozlamalari saqlandi" : "Saqlandi — gamifikatsiya o'chiq",
+  };
 }

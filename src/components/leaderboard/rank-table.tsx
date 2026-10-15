@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 
 interface RankTableProps {
   entries: LeaderboardEntry[];
+  /** Reyting o'lchovi: coin yoki XP */
+  unit?: "coin" | "XP";
 }
 
 const MEDAL: Record<number, string> = {
@@ -14,7 +16,7 @@ const MEDAL: Record<number, string> = {
 };
 
 /** To'liq ro'yxat: har bir qatorda liderga nisbatan o'sish chizig'i va shu haftadagi o'sish */
-export function RankTable({ entries }: RankTableProps) {
+export function RankTable({ entries, unit = "coin" }: RankTableProps) {
   if (entries.length === 0) {
     return (
       <div className="p-8 text-center text-sm text-slate-600 dark:text-slate-400">Bu toifada hali o&apos;quvchilar yo&apos;q</div>
@@ -78,7 +80,7 @@ export function RankTable({ entries }: RankTableProps) {
                   <TrendingUp className="w-3 h-3" />+{entry.weekCoins}
                 </div>
               ) : (
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">coin</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">{unit}</div>
               )}
             </div>
           </li>

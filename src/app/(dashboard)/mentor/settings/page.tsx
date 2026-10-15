@@ -15,7 +15,7 @@ export default async function PlatformSettingsPage({ searchParams }: { searchPar
       settings={settings}
       yearOptions={academicYearOptions(settings.academicYear)}
       archive={archive}
-      initialTab={tab === "archive" ? "archive" : "general"}
+      initialTab={tab === "archive" || tab === "gamification" ? tab : "general"}
     />
   );
 }

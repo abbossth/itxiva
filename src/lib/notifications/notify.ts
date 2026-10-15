@@ -17,6 +17,11 @@ export interface NotificationPayloads {
   coins_changed: { amount: number; reason: string; balance?: number };
   order_status: { productTitle: string; status: "accepted" | "rejected" | "handed_over"; note?: string; refunded?: number };
   product_new: { title: string; price: number };
+  level_up: { level: number; name: string; bonus: number };
+  quest_new: { questId: string; title: string; coinsLabel: string };
+  quest_result: { questId: string; title: string; approved: boolean; coins?: number; xp?: number; reason?: string };
+  weekly_result: { questId: string; title: string; place: number | null; coins?: number };
+  quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
   exam_finished: { examId: string; title: string; submitted: number; total: number; avgPercent: number | null; ungraded: number };
@@ -48,6 +53,43 @@ const b = (v: unknown) => `<b>${escapeHtml(v)}</b>`;
 const clip = (v: string, max = 300) => (v.length > max ? `${v.slice(0, max - 1)}…` : v);
 
 const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Message } = {
+  level_up: (p) => ({
+    text: [`🎉 ${b("Yangi daraja!")}`, `${p.level}-daraja · ${escapeHtml(p.name)}`, p.bonus > 0 ? `\n🪙 Bonus: ${b(`+${p.bonus}`)} coin` : ""]
+      .filter(Boolean)
+      .join("\n"),
+    button: link("Yutuqlarimni ko'rish", "/achievements"),
+  }),
+  quest_new: (p) => ({
+    text: [`🎯 ${b("Yangi topshiriq")}`, escapeHtml(p.title), `\n🪙 ${escapeHtml(p.coinsLabel)}`].join("\n"),
+    button: link("Topshiriqni ochish", `/quests/${p.questId}`),
+  }),
+  quest_result: (p) => ({
+    text: p.approved
+      ? [`✅ ${b("Topshiriq tasdiqlandi")}`, escapeHtml(p.title), `\n🪙 ${b(`+${p.coins ?? 0}`)} coin · +${p.xp ?? 0} XP`].join("\n")
+      : [`↩️ ${b("Topshiriq rad etildi")}`, escapeHtml(p.title), p.reason ? `\n💬 ${escapeHtml(clip(p.reason, 800))}` : "", "\nTuzatib, qayta yuborishingiz mumkin."]
+          .filter(Boolean)
+          .join("\n"),
+    button: link("Topshiriqni ochish", `/quests/${p.questId}`),
+  }),
+  weekly_result: (p) => ({
+    text: [
+      `🏁 ${b("Haftalik masala yakunlandi")}`,
+      escapeHtml(p.title),
+      p.place ? `\n🏆 Siz ${b(`${p.place}-o'rin`)}ni oldingiz${p.coins ? ` · +${p.coins} coin` : ""}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    button: link("Topshiriqlar", "/quests"),
+  }),
+  quest_submitted: (p) => ({
+    text: [
+      `📥 ${b("Topshiriqqa yangi dalil")}`,
+      `${escapeHtml(p.studentName)}${p.groupName ? ` · ${escapeHtml(p.groupName)}` : ""}`,
+      escapeHtml(p.questTitle),
+      `\nNavbatda: ${b(p.pending)} ta`,
+    ].join("\n"),
+    button: link("Tekshirish", "/mentor/quests/review"),
+  }),
   homework_graded: (p) =>
     p.returned
       ? {

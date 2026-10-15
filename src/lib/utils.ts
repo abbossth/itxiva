@@ -107,3 +107,10 @@ export function toDateTimeLocalValue(date: Date | string | number): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Katta sonlar bo'shliq bilan ajratiladi: 1400 → "1 400" */
+export function formatNumberUz(n: number): string {
+  return Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}

@@ -8,6 +8,7 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { ATTENDANCE_COINS, coinRulesOf } from "@/lib/attendance-status";
 import { addDaysToKey, dateFromKey, isValidSchedule, toDateKey } from "@/lib/schedule";
 import { notify } from "@/lib/notifications/notify";
+import { syncLevel } from "@/lib/gamification/award";
 
 // Davomatning coin hisobi va sessiyani yakunlash. Server action'lar va cron shu yerdan foydalanadi
 // (bu fayl "use server" emas — funksiyalarni brauzerdan chaqirib bo'lmaydi).
@@ -47,23 +48,35 @@ function clampDelta(delta: number, balance: number): number {
   return delta < 0 ? Math.max(delta, -Math.max(balance, 0)) : delta;
 }
 
+/**
+ * XP — yozuv bergan coinning faqat musbat qismi: kelgani uchun mukofot XP beradi, jarima XP ni kamaytirmaydi,
+ * mukofot bekor qilinsa (masalan "kelgan" xato belgilangan bo'lsa) — berilgan XP qaytariladi.
+ */
+function xpDeltaFor(prevAwarded: number, nextAwarded: number): number {
+  return Math.max(nextAwarded, 0) - Math.max(prevAwarded, 0);
+}
+
 async function moveCoins(
   studentId: string | mongoose.Types.ObjectId,
   wantTotal: number,
-  wantBalance: number
-): Promise<{ dTotal: number; dBalance: number; totalAfter?: number; balanceAfter?: number }> {
-  if (wantTotal === 0 && wantBalance === 0) return { dTotal: 0, dBalance: 0 };
-  const user = await User.findById(studentId).select("totalCoins spendableBalance").lean();
-  if (!user) return { dTotal: 0, dBalance: 0 };
+  wantBalance: number,
+  /** Yozuvning shu o'zgarishdan oldingi `coinsAwarded` qiymati (XP hisobi uchun) */
+  prevAwarded = 0
+): Promise<{ dTotal: number; dBalance: number; dXp: number; totalAfter?: number; balanceAfter?: number }> {
+  if (wantTotal === 0 && wantBalance === 0) return { dTotal: 0, dBalance: 0, dXp: 0 };
+  const user = await User.findById(studentId).select("totalCoins spendableBalance xp").lean();
+  if (!user) return { dTotal: 0, dBalance: 0, dXp: 0 };
   const dTotal = clampDelta(wantTotal, user.totalCoins ?? 0);
   const dBalance = clampDelta(wantBalance, user.spendableBalance ?? 0);
-  if (dTotal === 0 && dBalance === 0) return { dTotal: 0, dBalance: 0 };
+  const dXp = clampDelta(xpDeltaFor(prevAwarded, prevAwarded + dTotal), user.xp ?? 0);
+  if (dTotal === 0 && dBalance === 0 && dXp === 0) return { dTotal: 0, dBalance: 0, dXp: 0 };
   const updated = await User.findByIdAndUpdate(
     studentId,
-    { $inc: { totalCoins: dTotal, spendableBalance: dBalance } },
+    { $inc: { totalCoins: dTotal, spendableBalance: dBalance, xp: dXp } },
     { returnDocument: "after" }
   );
-  return { dTotal, dBalance, totalAfter: updated?.totalCoins, balanceAfter: updated?.spendableBalance };
+  if (dXp > 0) await syncLevel(studentId);
+  return { dTotal, dBalance, dXp, totalAfter: updated?.totalCoins, balanceAfter: updated?.spendableBalance };
 }
 
 /**
@@ -82,7 +95,7 @@ export async function settleRecordCoins(
   const prevTotal = record.coinsAwarded ?? 0;
   const prevBalance = record.balanceDelta ?? prevTotal;
 
-  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance);
+  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance, prevTotal);
   record.coinsAwarded = prevTotal + moved.dTotal;
   record.balanceDelta = prevBalance + moved.dBalance;
   await record.save();
@@ -92,6 +105,7 @@ export async function settleRecordCoins(
     await CoinLedger.create({
       studentId: record.studentId,
       amount,
+      xp: moved.dXp,
       type: amount > 0 ? "attendance" : "adjustment",
       referenceId: session._id,
       description: opts.description ?? REASONS[record.status],
@@ -253,13 +267,14 @@ export async function deleteSessionWithCoins(sessionId: string | mongoose.Types.
   for (const record of records) {
     const total = record.coinsAwarded ?? 0;
     const balance = record.balanceDelta ?? total;
-    const moved = await moveCoins(record.studentId, -total, -balance);
+    const moved = await moveCoins(record.studentId, -total, -balance, total);
     const amount = moved.dTotal || moved.dBalance;
     if (amount !== 0) {
       reverted++;
       await CoinLedger.create({
         studentId: record.studentId,
         amount,
+        xp: moved.dXp,
         type: "adjustment",
         referenceId: session._id,
         description: "Davomat o'chirildi — coin qayta hisoblandi",
@@ -285,7 +300,7 @@ export async function reapplySessionCoins(
   for (const record of records) {
     const total = record.coinsAwarded ?? 0;
     const balance = record.balanceDelta ?? total;
-    const moved = await moveCoins(record.studentId, total, balance);
+    const moved = await moveCoins(record.studentId, total, balance, 0);
     if (moved.dTotal !== total || moved.dBalance !== balance) {
       record.coinsAwarded = moved.dTotal;
       record.balanceDelta = moved.dBalance;
@@ -297,6 +312,7 @@ export async function reapplySessionCoins(
     await CoinLedger.create({
       studentId: record.studentId,
       amount,
+      xp: moved.dXp,
       type: "adjustment",
       referenceId: record.sessionId,
       description: "Davomat arxivdan tiklandi — coin qayta hisoblandi",

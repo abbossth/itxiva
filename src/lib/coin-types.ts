@@ -8,6 +8,12 @@ export const COIN_TYPE_LABELS: Record<CoinTransactionType, string> = {
   bonus: "Bonus",
   purchase: "Do'kon xaridlari",
   adjustment: "Tuzatishlar",
+  quest: "Topshiriqlar",
+  level: "Daraja bonusi",
+  login: "Kunlik kirish",
+  streak: "Seriya",
+  badge: "Nishonlar",
+  challenge: "Guruh chellenji",
 };
 
 /** Har bir manba uchun alohida rang (grafik va belgilar) */
@@ -19,4 +25,10 @@ export const COIN_TYPE_COLORS: Record<CoinTransactionType, { bar: string; soft: 
   bonus: { bar: "bg-amber-500", soft: "bg-amber-500/20 text-amber-900 dark:text-amber-300" },
   purchase: { bar: "bg-rose-500", soft: "bg-rose-500/15 text-rose-800 dark:text-rose-300" },
   adjustment: { bar: "bg-slate-400", soft: "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200" },
+  quest: { bar: "bg-teal-500", soft: "bg-teal-500/15 text-teal-800 dark:text-teal-300" },
+  level: { bar: "bg-fuchsia-500", soft: "bg-fuchsia-500/15 text-fuchsia-800 dark:text-fuchsia-300" },
+  login: { bar: "bg-cyan-500", soft: "bg-cyan-500/15 text-cyan-800 dark:text-cyan-300" },
+  streak: { bar: "bg-orange-500", soft: "bg-orange-500/15 text-orange-800 dark:text-orange-300" },
+  badge: { bar: "bg-yellow-500", soft: "bg-yellow-500/20 text-yellow-900 dark:text-yellow-300" },
+  challenge: { bar: "bg-lime-500", soft: "bg-lime-500/20 text-lime-900 dark:text-lime-300" },
 };

@@ -12,6 +12,7 @@ import {
   IHomeworkIntegrity,
 } from "@/lib/db/models/homework-submission.model";
 import { PENDING_INTEGRITY, runIntegrityCheck } from "@/lib/homework-integrity";
+import { syncLevel } from "@/lib/gamification/award";
 import { Group } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
@@ -773,13 +774,15 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
   if (delta !== 0) {
     const student = await User.findByIdAndUpdate(
       submission.studentId,
-      { $inc: { totalCoins: delta, spendableBalance: delta } },
+      // XP ham coin bilan birga o'zgaradi: qayta baholashda kamaygan mukofot XP dan ham qaytariladi
+      { $inc: { totalCoins: delta, spendableBalance: delta, xp: delta } },
       { returnDocument: "after" }
     );
     await CoinLedger.create({
       studentId: submission.studentId,
       amount: delta,
       type: "homework",
+      xp: delta,
       referenceId: submission._id,
       description:
         delta > 0
@@ -787,6 +790,7 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
           : `Uyga vazifa bahosi o'zgartirildi: ${lesson?.title ?? "dars"} (${score} ball)`,
       balanceAfter: student?.totalCoins ?? 0,
     });
+    if (delta > 0) await syncLevel(submission.studentId);
   }
 
   await AuditLog.create({
