@@ -207,3 +207,13 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Mukofot chegarasi: mentor bergan mukofot (eng ko'p qiymat yoki 1-o'rin) sozlamadagi `mentorBonusMax` dan oshmaydi.
 - Topshiriq o'chirilmaydi — arxivlanadi (yuborishlar va berilgan coin saqlanadi).
 - Menyu: gamifikatsiya o'chiq bo'lsa "Topshiriqlar", "Yutuqlarim" va mentor tablarining gamifikatsiya qismlari ko'rinmaydi (`navLinksFor`, `mentorSectionsFor`); `/quests` 404 qaytaradi.
+
+### [2026-10-16] G7: Dalil yuborish va tekshiruv navbati
+- Tashqi havola serverda hech qachon ochilmaydi (SSRF): faqat `https` qabul qilinadi, matn sifatida normallashtiriladi (`normalizeProofUrl`: host kichik harf, `www.`, kuzatuv parametrlari, `#`, oxirgi `/` olib tashlanadi; login/parolli va nuqtasiz hostlar rad etiladi). Mentor havolani o'zi yangi oynada ochadi (`rel="noopener noreferrer nofollow"`).
+- Takrorni bloklash ikki bosqichli: yuborishda (reyestr + boshqa kutilayotgan/tasdiqlangan yuborishlar bilan solishtirish) va tasdiqlashda (`CertificateRegistry` unique indekslari — ikki o'quvchi bir vaqtda bir xil dalil yuborsa, faqat birinchisi tasdiqlanadi).
+- "Sana qo'shilgandan keyin" — `User.createdAt` (o'quvchi platformaga qo'shilgan kun) bo'yicha.
+- Tasdiqlash: `withTransaction` ichida shartli `pending → approved`, reyestr yozuvi va ledger (`quest:<submissionId>` kaliti). Testlar replica set'da (`MongoMemoryReplSet`) — parallel uchta tasdiqdan bittasi o'tadi.
+- Haftalik masala: o'rin tasdiqlanish tartibida (shu hafta oldin tasdiqlanganlar soni + 1); 4-dan keyingilar tasdiqlanadi, lekin coin olmaydi.
+- Bekor qilish (revoke): tasdiqlangan ish rad etilgan holatga o'tadi, coin (balans yetgancha) va XP qaytariladi, reyestr yozuvi `revoked: true` bilan qoladi — soxta dalil qayta qabul qilinmaydi. Tasdiq, rad etish va bekor qilish audit jurnaliga yoziladi, o'quvchiga Telegram xabari boradi.
+- Fayllar: `quests/<quest>/<o'quvchi>/...` kaliti, PDF/JPG/PNG/WebP (rasm brauzerda WebP ga siqiladi), 10 MB; faylni faqat egasi va mentor ochadi (10 daqiqalik havola).
+- Tezlik cheklovi: o'quvchi daqiqasiga 3 ta yuborish, 10 daqiqada 20 ta fayl.

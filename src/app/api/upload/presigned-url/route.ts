@@ -9,6 +9,10 @@ import { Lesson } from "@/lib/db/models/lesson.model";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { HOMEWORK_BLOCKED_EXTENSIONS, HOMEWORK_MAX_FILE_MB, STUDENT_MAX_UPLOAD_MB } from "@/lib/homework-status";
 import { getUploadPresignedUrl, ALLOWED_FILE_TYPES, MAX_FILE_SIZE_BYTES } from "@/lib/storage/r2";
+import { Quest } from "@/lib/db/models/quest.model";
+import { getAppSettings } from "@/lib/settings";
+import { loadStudentScope, questOpen, questVisibleTo } from "@/lib/gamification/quests";
+import { QUEST_FILE_MAX_BYTES, QUEST_FILE_TYPES } from "@/lib/gamification/proof";
 
 function cleanFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
@@ -47,7 +51,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { filename, contentType, fileSize, examId, questionId, homeworkLessonId, avatarStudentId } = body as {
+    const { filename, contentType, fileSize, examId, questionId, homeworkLessonId, avatarStudentId, questId } = body as {
+      questId?: string;
       filename?: string;
       contentType?: string;
       fileSize?: number;
@@ -83,6 +88,34 @@ export async function POST(req: NextRequest) {
       }
       const key = `avatars/${avatarStudentId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
       const { uploadUrl } = await getUploadPresignedUrl({ key, contentType, contentLength: fileSize });
+      return NextResponse.json({ uploadUrl, key, contentType });
+    }
+
+    // O'quvchi: topshiriq dalili (sertifikat, natija) — faqat PDF yoki rasm, 10 MB gacha
+    if (session.role === "student" && questId !== undefined) {
+      if (typeof questId !== "string" || !mongoose.isValidObjectId(questId)) {
+        return NextResponse.json({ error: "Topshiriq topilmadi" }, { status: 404 });
+      }
+      const rate = checkRateLimit(`quest_upload_${session.userId}`, 20, 10 * 60 * 1000);
+      if (!rate.allowed) {
+        return NextResponse.json({ error: "Juda ko'p fayl yuklandi. Birozdan keyin urinib ko'ring" }, { status: 429 });
+      }
+      if (!(await getAppSettings()).gamification.enabled) {
+        return NextResponse.json({ error: "Topshiriq topilmadi" }, { status: 404 });
+      }
+      await connectToDatabase();
+      const [quest, scope] = await Promise.all([Quest.findById(questId), loadStudentScope(session.userId)]);
+      if (!quest || !scope || !questOpen(quest) || !questVisibleTo(quest, scope) || !quest.evidence?.file) {
+        return NextResponse.json({ error: "Topshiriq topilmadi" }, { status: 404 });
+      }
+      if (typeof contentType !== "string" || !QUEST_FILE_TYPES.includes(contentType)) {
+        return NextResponse.json({ error: "Faqat PDF, JPG yoki PNG yuklash mumkin" }, { status: 400 });
+      }
+      if (!isValidSize(fileSize, QUEST_FILE_MAX_BYTES)) {
+        return NextResponse.json({ error: "Fayl hajmi 10 MB dan oshmasligi kerak" }, { status: 400 });
+      }
+      const key = `quests/${questId}/${session.userId}/${Date.now()}-${randomSuffix()}-${cleanFilename(filename)}`;
+      const { uploadUrl } = await getUploadPresignedUrl({ key, contentType, contentLength: fileSize, skipTypeCheck: true });
       return NextResponse.json({ uploadUrl, key, contentType });
     }
 

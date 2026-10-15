@@ -48,6 +48,8 @@ export interface IQuestSubmissionData {
   rejectReason?: string;
   reviewedBy?: string | mongoose.Types.ObjectId | null;
   reviewedAt?: Date | string | null;
+  /** Tasdiqlangan mukofot keyin bekor qilingan (masalan, soxta sertifikat aniqlansa) */
+  revokedAt?: Date | string | null;
   submittedAt: Date | string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -96,6 +98,7 @@ const QuestSubmissionSchema = new Schema<IQuestSubmission>(
     rejectReason: { type: String, trim: true, default: "" },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },
+    revokedAt: { type: Date, default: null },
     submittedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

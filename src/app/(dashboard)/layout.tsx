@@ -11,6 +11,7 @@ import { getOrdersBadgeCount } from "@/actions/shop.actions";
 import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 import { getAppSettings } from "@/lib/settings";
 import { getStudentLevelState } from "@/actions/gamification.actions";
+import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
 import { accentCss } from "@/lib/theme-accents";
 
@@ -29,9 +30,10 @@ export default async function DashboardLayout({
     redirect("/change-password");
   }
 
-  const [orders, homework, cookieStore, settings, levelState] = await Promise.all([
+  const [orders, homework, quests, cookieStore, settings, levelState] = await Promise.all([
     getOrdersBadgeCount(),
     getHomeworkBadgeCount(),
+    getQuestsBadgeCount(),
     cookies(),
     getAppSettings(),
     getStudentLevelState(),
@@ -39,7 +41,7 @@ export default async function DashboardLayout({
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const gamification = settings.gamification.enabled;
-  const badges = { orders, homework };
+  const badges = { orders, homework, quests };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-bg">
