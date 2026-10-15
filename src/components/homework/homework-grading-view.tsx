@@ -462,7 +462,8 @@ function GradeForm({
             id="hw-feedback"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            rows={3}
+            // AI xatolar ro'yxatini qo'yganda maydon matnga qarab kattalashadi
+            rows={Math.min(14, Math.max(3, feedback.split("\n").length + 1))}
             maxLength={3000}
             placeholder="Nima yaxshi chiqdi, nimani tuzatish kerak..."
           />

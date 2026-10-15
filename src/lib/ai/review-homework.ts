@@ -50,7 +50,11 @@ const reviewSchema = z.object({
         verdict: z
           .enum(["correct", "partial", "wrong", "missing", "unchecked"])
           .describe("student va expected solishtiriladi. missing — bajarilmagan; unchecked — ko'ra olmagan (havola, o'qilmagan fayl)"),
-        comment: z.string().describe("Mentor uchun bir qisqa jumla; xato bo'lsa — qayerda adashgani. To'g'ri bo'lsa bo'sh satr"),
+        comment: z
+          .string()
+          .describe(
+            "Xato, qisman yoki bajarilmagan bo'lsa — o'quvchiga 'sen' deb murojaat qilib bir-ikki jumla: aynan qayerda adashgani va qanday to'g'ri yechiladi. Masalan: \"0,5 GB ni MB ga o'tkazishda 0,5 ni 1024 ga ko'paytirish kerak edi, sen esa 3 ga ko'paytiribsan.\" To'g'ri bo'lsa bo'sh satr"
+          ),
       })
     )
     .describe("Har bir topshiriq (yoki kichik savol) uchun alohida tekshiruv, tartib bilan"),
@@ -58,7 +62,7 @@ const reviewSchema = z.object({
   feedback: z
     .string()
     .describe(
-      "O'quvchiga yoziladigan izoh, 2–5 jumla: avval nima yaxshi chiqqani, keyin aniq xatolar va ularni qanday tuzatish. Mentor nomidan, iliq ohangda; o'quvchiga boshidan oxirigacha faqat 'sen' deb murojaat qil ('siz' emas)."
+      "O'quvchiga umumiy izoh, 2–3 jumla: nima yaxshi chiqqani va umuman nimaga e'tibor berish kerak. Har bir xatoni bu yerda sanab o'tirma — ular \"checks\"dan alohida ro'yxat bo'lib qo'shiladi. Mentor nomidan, iliq ohangda; faqat 'sen' deb murojaat qil ('siz' emas)."
     ),
   confidence: z
     .enum(["high", "medium", "low"])
@@ -97,6 +101,29 @@ ${studentFiles.length > 0 ? `O'quvchi fayllari (ilova qilingan): ${studentFiles.
   }${input.unreadFiles.length > 0 ? `O'quvchi yuborgan, lekin senga ko'rsatilmagan fayllar: ${input.unreadFiles.join(", ")}\n` : ""}`;
 }
 
+const FEEDBACK_MAX = 3000;
+const clip = (v: string, max: number) => (v.length > max ? `${v.slice(0, max - 1)}…` : v);
+
+/**
+ * O'quvchiga boradigan izoh: AI'ning umumiy izohi + har bir xato, qisman yoki bajarilmagan topshiriq —
+ * o'quvchi nima yozgani, to'g'ri javob va tushuntirish. "Tekshirilmadi" bandlari qo'shilmaydi: ularni mentor o'zi ko'radi.
+ */
+export function composeStudentFeedback(summary: string, checks: HomeworkCheck[]): string {
+  const lines = checks
+    .filter((c) => c.verdict === "wrong" || c.verdict === "partial" || c.verdict === "missing")
+    .map((c) => {
+      const head =
+        c.verdict === "missing"
+          ? `• ${c.task} — bajarilmagan.`
+          : `• ${c.task} ${c.student ? `«${clip(c.student.replace(/\s+/g, " "), 120)}»` : ""}${
+              c.expected ? ` → to'g'risi: ${clip(c.expected.replace(/\s+/g, " "), 160)}` : ""
+            }${c.verdict === "partial" ? " (qisman to'g'ri)" : ""}`;
+      return c.comment ? `${head.trim()}\n  ${c.comment}` : head.trim();
+    });
+  const text = lines.length > 0 ? `${summary.trim()}\n\nXatolar:\n${lines.join("\n")}` : summary.trim();
+  return clip(text, FEEDBACK_MAX);
+}
+
 export async function reviewHomeworkWithAi(input: HomeworkReviewInput): Promise<HomeworkReview> {
   const data = await generateStructured({
     schema: reviewSchema,
@@ -105,16 +132,17 @@ export async function reviewHomeworkWithAi(input: HomeworkReviewInput): Promise<
     effort: "medium",
     maxTokens: 8000,
   });
-  return {
-    score: Number.isFinite(data.score) ? Math.min(100, Math.max(0, Math.round(data.score))) : 0,
-    feedback: data.feedback.trim().slice(0, 3000),
-    checks: data.checks.slice(0, 40).map((c) => ({
+  const checks: HomeworkCheck[] = data.checks.slice(0, 40).map((c) => ({
       task: c.task.trim().slice(0, 60),
       student: c.student.trim().slice(0, 300),
       expected: c.expected.trim().slice(0, 300),
       verdict: c.verdict,
       comment: c.comment.trim().slice(0, 400),
-    })),
+  }));
+  return {
+    score: Number.isFinite(data.score) ? Math.min(100, Math.max(0, Math.round(data.score))) : 0,
+    feedback: composeStudentFeedback(data.feedback, checks),
+    checks,
     confidence: data.confidence,
   };
 }

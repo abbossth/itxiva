@@ -51,7 +51,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
   homework_graded: (p) =>
     p.returned
       ? {
-          text: [`🔁 ${b("Vazifa qayta ishlashga qaytarildi")}`, escapeHtml(p.lessonTitle), p.feedback ? `\n💬 ${escapeHtml(clip(p.feedback))}` : ""]
+          text: [`🔁 ${b("Vazifa qayta ishlashga qaytarildi")}`, escapeHtml(p.lessonTitle), p.feedback ? `\n💬 ${escapeHtml(clip(p.feedback, 1500))}` : ""]
             .filter(Boolean)
             .join("\n"),
           button: link("Vazifani ochish", `/lessons/${p.lessonId}#homework`),
@@ -62,7 +62,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
             escapeHtml(p.lessonTitle),
             `\n📊 Ball: ${b(`${p.score ?? 0} / 100`)}`,
             p.coins ? `🪙 Coin: ${b(`+${p.coins}`)}` : "",
-            p.feedback ? `💬 ${escapeHtml(clip(p.feedback))}` : "",
+            p.feedback ? `💬 ${escapeHtml(clip(p.feedback, 1500))}` : "",
           ]
             .filter(Boolean)
             .join("\n"),
