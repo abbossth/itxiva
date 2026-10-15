@@ -40,20 +40,17 @@ interface ExamsManagerProps {
     groupNames: string[];
     submissionsCount: number;
   }>;
+  /** Platforma sozlamalaridagi joriy chorak — sahifa shu chorak bilan ochiladi */
+  activeQuarter: number;
 }
 
-export function ExamsManager({ initialExams }: ExamsManagerProps) {
+export function ExamsManager({ initialExams, activeQuarter }: ExamsManagerProps) {
   const [exams, setExams] = useState(initialExams);
-  const [quarterFilter, setQuarterFilter] = useState<number | "all">("all");
+  const [quarterFilter, setQuarterFilter] = useState<number>(activeQuarter);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
-  const filteredExams = exams.filter((item) => {
-    if (quarterFilter !== "all" && item.exam.quarter !== quarterFilter) {
-      return false;
-    }
-    return true;
-  });
+  const filteredExams = exams.filter((item) => item.exam.quarter === quarterFilter);
 
   const handleTogglePublish = async (examId: string) => {
     setActionLoading((prev) => ({ ...prev, [examId]: true }));
@@ -117,7 +114,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
       {/* Quarter filter buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(["all", 1, 2, 3, 4] as const).map((q) => (
+          {([1, 2, 3, 4] as const).map((q) => (
             <button
               key={q}
               type="button"
@@ -128,7 +125,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
               }`}
             >
-              {q === "all" ? "Barchasi" : `${q}-chorak`}
+              {q}-chorak
             </button>
           ))}
         </div>
@@ -149,7 +146,7 @@ export function ExamsManager({ initialExams }: ExamsManagerProps) {
             <FileCheck className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200">
-            Imtihonlar mavjud emas
+            {quarterFilter}-chorakda imtihon yo&apos;q
           </h2>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Yangi imtihon yaratish orqali o&apos;quvchilar bilimini choraklar bo&apos;yicha baholang.

@@ -4,6 +4,7 @@ import { getGroups } from "@/actions/group.actions";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getHomeworkJournal, getHomeworkOverviewForMentor, getHomeworkStatsForLessons } from "@/actions/homework.actions";
 import { LessonsManager } from "@/components/mentor/lessons-manager";
+import { pickNearestLessonGroup } from "@/lib/schedule";
 import { EmptyState } from "@/components/shared/empty-state";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,10 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
   }
 
   const requested = resolvedSearchParams.groupId;
-  const selectedGroupId = groups.some((g) => g._id.toString() === requested) ? requested! : groups[0]._id.toString();
+  // Guruh tanlanmagan bo'lsa — darsi eng yaqin vaqtda bo'ladigan (yoki hozir ketayotgan) guruh
+  const selectedGroupId = groups.some((g) => g._id.toString() === requested)
+    ? requested!
+    : (pickNearestLessonGroup(groups) ?? groups[0])._id.toString();
   const selectedQuarter = parseQuarter(resolvedSearchParams.quarter, (await getAppSettings()).quarter);
   const view = resolvedSearchParams.view === "journal" ? "journal" : "list";
 

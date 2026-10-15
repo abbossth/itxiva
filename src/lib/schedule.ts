@@ -220,3 +220,19 @@ export function fromTashkentInputValue(value: string): Date | null {
   const date = dateFromKey(m[1], m[2]);
   return Number.isNaN(date.getTime()) ? null : date;
 }
+
+/**
+ * Darsi eng yaqin bo'lgan guruh: hozir dars ketayotgan guruh birinchi, keyin keyingi darsi eng erta boshlanadigani.
+ * Jadvali yo'q guruhlar oxirida; hech birida jadval bo'lmasa — ro'yxatdagi birinchisi
+ */
+export function pickNearestLessonGroup<T extends { schedule?: Partial<GroupSchedule> | null }>(
+  groups: T[],
+  now: Date = new Date()
+): T | undefined {
+  let best: { group: T; start: number } | undefined;
+  for (const group of groups) {
+    const next = getNextLesson(group.schedule, now);
+    if (next && (!best || next.start.getTime() < best.start)) best = { group, start: next.start.getTime() };
+  }
+  return best?.group ?? groups[0];
+}

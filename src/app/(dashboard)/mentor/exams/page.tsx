@@ -1,6 +1,7 @@
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getExamsForMentor } from "@/actions/exam.actions";
 import { ExamsManager } from "@/components/mentor/exams-manager";
+import { getAppSettings } from "@/lib/settings";
 import { GraduationCap } from "lucide-react";
 
 export const metadata = {
@@ -10,7 +11,7 @@ export const metadata = {
 
 export default async function MentorExamsPage() {
   await requireMentorPage();
-  const res = await getExamsForMentor();
+  const [res, settings] = await Promise.all([getExamsForMentor(), getAppSettings()]);
   const exams = res.data || [];
 
   return (
@@ -31,7 +32,7 @@ export default async function MentorExamsPage() {
         </div>
       </div>
 
-      <ExamsManager initialExams={exams} />
+      <ExamsManager initialExams={exams} activeQuarter={settings.quarter} />
     </div>
   );
 }
