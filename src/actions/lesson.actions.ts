@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import mongoose from "mongoose";
 import { Lesson, ILesson, ILessonData } from "@/lib/db/models/lesson.model";
@@ -13,6 +14,7 @@ import { archiveEntity } from "@/lib/archive";
 import { lessonSchema, homeworkSchema, HomeworkInput, LessonInput } from "@/lib/validations/lesson.schema";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { notifyGroup } from "@/lib/notifications/notify";
+import { trackMaterialView } from "@/lib/gamification/quests";
 
 export async function getLessonsByGroupAndQuarter({
   groupId,
@@ -320,6 +322,12 @@ export async function getMaterialDownloadUrlAction({
     return { success: false, message: "Material topilmadi" };
   }
 
+  // Gamifikatsiya: dars materialini ochish kunlik topshiriqqa sanaladi (vazifa fayllari emas)
+  if (session.role === "student" && lesson.materials.some((m) => m.urlOrKey === materialKey)) {
+    const studentId = session.userId;
+    after(() => trackMaterialView(studentId, materialKey).catch((error) => console.error("Material view error:", error)));
+  }
+
   try {
     const downloadUrl = await getDownloadPresignedUrl({ key: materialKey });
     return { success: true, downloadUrl };
@@ -327,6 +335,22 @@ export async function getMaterialDownloadUrlAction({
     console.error("Presigned URL error:", error);
     return { success: false, message: "Faylga kirishda xatolik yuz berdi" };
   }
+}
+
+/**
+ * O'quvchi darsdagi video yoki havolani ochdi (fayllar `getMaterialDownloadUrlAction` da yoziladi).
+ * Gamifikatsiyaning "material o'qing" topshirig'i uchun; mentor uchun hech narsa qilmaydi.
+ */
+export async function recordMaterialViewAction(input: { lessonId: unknown; materialKey: unknown }): Promise<void> {
+  const session = await requireAuth();
+  if (session.role !== "student") return;
+  const { lessonId, materialKey } = input ?? {};
+  if (typeof lessonId !== "string" || !mongoose.isValidObjectId(lessonId) || typeof materialKey !== "string" || materialKey.length > 2000) return;
+  await connectToDatabase();
+  const lesson = await Lesson.findById(lessonId).select("groupId isPublished materials").lean();
+  if (!lesson || !lesson.isPublished || String(lesson.groupId) !== session.groupId) return;
+  if (!lesson.materials.some((m) => m.urlOrKey === materialKey)) return;
+  await trackMaterialView(session.userId, materialKey);
 }
 
 /**

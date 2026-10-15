@@ -196,3 +196,14 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 ### [2026-10-16] G5: Spec'dagi farazlar va haqiqiy kod
 - Spec "mavjud kunlik kirish coini"ni nazarda tutgan, lekin kodda bunday coin yo'q (kirishda faqat `lastLoginAt` yangilanadi). "Platformaga kiring" kunlik topshirig'i yangi manba bo'ladi: sozlamadagi miqdor (standart 2), Toshkent kuni bo'yicha bir marta (`login:<id>:<kun>` kaliti).
 - Testlar hozirgacha coin bermagan. "Faqat birinchi to'g'ri javob" va "kunlik 20 coin chegarasi" yangi test mukofoti sifatida qo'shiladi (sozlamada: savol uchun coin, kunlik chegara).
+
+### [2026-10-16] G6: Topshiriqlar (quest) modeli
+- Kunlik odatlar ("10 ta test yeching", "Bitta dars materialini o'qing", "Platformaga kiring") dizayndagidek oddiy topshiriqlar: gamifikatsiya yoqilganda bir marta yaratiladi (`ensureSystemQuests`, `isSystem: true`), mentor ularni tahrirlaydi yoki to'xtatadi.
+- Tekshirish turlari: `auto`, `mentor`, `proof`, `competition` (haftalik masala — takrorlanishi har doim haftalik).
+- Davrlar Toshkent bo'yicha: kun, hafta (dushanbadan, ISO hafta), oy. Avtomatik topshiriq bir davrda bir marta: `QuestSubmission` (auto) unique `(questId, studentId, periodKey)` + ledger kaliti `quest:auto:<quest>:<student>:<davr>`.
+- Avtomatik shartlar real vaqtda tekshiriladi: kirishda (kuniga birinchi sahifa ochilishida), test topshirilganda, material ochilganda va Topshiriqlar sahifasi ochilganda. Davomat va guruh chellenji — oy oxirida cron bilan (4-bosqich).
+- Faollik `ActivityEvent` (login / material_view / quiz_answer), unique `(o'quvchi, tur, kun, ref)`: bir savol yoki material bir kunda bir marta sanaladi. Material: fayl — serverda, video va havola — ochilganda alohida action.
+- Test coini: har savol uchun kalit `quiz:<o'quvchi>:<savol>` (birinchi to'g'ri javob). Kunlik chegara ledger'dagi bugungi test coinlaridan hisoblanadi; bir vaqtda kelgan ikki test topshirig'i chegaradan bir oz oshishi mumkin (ehtimoli juda kam, natijasi bir necha coin) — qulf qo'yilmadi. AI keyin tekshiradigan ochiq javoblar coin bermaydi (faqat topshirish paytida avtomatik tekshirilganlar).
+- Mukofot chegarasi: mentor bergan mukofot (eng ko'p qiymat yoki 1-o'rin) sozlamadagi `mentorBonusMax` dan oshmaydi.
+- Topshiriq o'chirilmaydi — arxivlanadi (yuborishlar va berilgan coin saqlanadi).
+- Menyu: gamifikatsiya o'chiq bo'lsa "Topshiriqlar", "Yutuqlarim" va mentor tablarining gamifikatsiya qismlari ko'rinmaydi (`navLinksFor`, `mentorSectionsFor`); `/quests` 404 qaytaradi.

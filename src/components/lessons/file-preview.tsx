@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FileText, FileArchive, FileImage, ExternalLink, Download, Loader2 } from "lucide-react";
 import { IMaterial } from "@/lib/db/models/lesson.model";
-import { getMaterialDownloadUrlAction } from "@/actions/lesson.actions";
+import { getMaterialDownloadUrlAction, recordMaterialViewAction } from "@/actions/lesson.actions";
 import { openResolvedUrl, toExternalUrl } from "@/lib/open-tab";
 import { cn } from "@/lib/utils";
 
@@ -39,8 +39,10 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
   const handleDownload = async (material: IMaterial) => {
     if (material.type === "link") {
       const url = toExternalUrl(material.urlOrKey);
-      if (url) window.open(url, "_blank", "noopener,noreferrer");
-      else setErrorMsg("Havola noto'g'ri kiritilgan");
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        void recordMaterialViewAction({ lessonId, materialKey: material.urlOrKey }).catch(() => {});
+      } else setErrorMsg("Havola noto'g'ri kiritilgan");
       return;
     }
 

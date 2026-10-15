@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { MENTOR_LINKS, STUDENT_LINKS, SIDEBAR_COOKIE, isLinkActive, type NavBadges } from "./nav-links";
+import { SIDEBAR_COOKIE, isLinkActive, navLinksFor, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
@@ -26,14 +26,16 @@ interface DesktopNavProps {
   defaultCollapsed?: boolean;
   /** O'quvchi darajasi (gamifikatsiya yoqilgan bo'lsa) — menyu pastida mini panel */
   level?: LevelSummary | null;
+  /** Gamifikatsiya sahifalari (Topshiriqlar, Yutuqlarim) menyuda ko'rinadimi */
+  gamification?: boolean;
 }
 
-export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level = null }: DesktopNavProps) {
+export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level = null, gamification = false }: DesktopNavProps) {
   const pathname = usePathname();
   const role = user.role;
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
-  const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
+  const links = navLinksFor(role, gamification);
 
   const toggle = () => {
     const next = !collapsed;

@@ -15,6 +15,11 @@ import {
   Package,
   Settings,
   SlidersHorizontal,
+  Target,
+  Medal,
+  ListChecks,
+  Inbox,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,9 +39,11 @@ export interface NavLink {
   badgeHref?: string;
   /** Shu bo'limga kiradigan boshqa sahifalar: ular ochiq bo'lganda ham havola faol ko'rinadi */
   match?: string[];
+  /** Faqat gamifikatsiya yoqilganda ko'rinadi */
+  gamification?: boolean;
 }
 
-export type NavBadgeKind = "orders" | "homework";
+export type NavBadgeKind = "orders" | "homework" | "quests";
 export type NavBadges = Partial<Record<NavBadgeKind, number>>;
 
 export const MENTOR_LINKS: NavLink[] = [
@@ -46,6 +53,7 @@ export const MENTOR_LINKS: NavLink[] = [
   // Uyga vazifalar darsning bir qismi: tekshirish sahifalari (/mentor/homework/...) ham shu bo'limga kiradi
   { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", badgeHref: "/mentor/homework", match: ["/mentor/homework"] },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
+  { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
   { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },
@@ -58,9 +66,25 @@ export interface NavTab {
   label: string;
   icon: LucideIcon;
   badge?: NavBadgeKind;
+  gamification?: boolean;
 }
 
 export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
+  {
+    label: "Topshiriqlar",
+    tabs: [
+      { href: "/mentor/quests", label: "Barcha topshiriqlar", icon: ListChecks, gamification: true },
+      { href: "/mentor/quests/review", label: "Tekshiruv navbati", icon: Inbox, badge: "quests", gamification: true },
+      { href: "/mentor/quests/badges", label: "Marralar va nishonlar", icon: Medal, gamification: true },
+    ],
+  },
+  {
+    label: "Hisobotlar",
+    tabs: [
+      { href: "/mentor/reports", label: "Umumiy", icon: BarChart3, gamification: true },
+      { href: "/mentor/reports/economy", label: "Coin iqtisodiyoti", icon: Coins, gamification: true },
+    ],
+  },
   {
     label: "Do'kon",
     tabs: [
@@ -84,11 +108,23 @@ export const STUDENT_LINKS: NavLink[] = [
   { href: "/lessons", label: "Darslarim", shortLabel: "Darslar", icon: BookOpen, primary: true },
   { href: "/homework", label: "Vazifalarim", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
   { href: "/exams", label: "Imtihonlarim", shortLabel: "Imtihon", icon: GraduationCap },
+  { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true },
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
+  { href: "/achievements", label: "Yutuqlarim", shortLabel: "Yutuqlar", icon: Medal, gamification: true },
   { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User },
 ];
+
+/** Rol bo'yicha menyu havolalari; gamifikatsiya o'chiq bo'lsa uning sahifalari ko'rinmaydi */
+export function navLinksFor(role: "mentor" | "student", gamification: boolean): NavLink[] {
+  return (role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS).filter((l) => gamification || !l.gamification);
+}
+
+/** Mentor bo'limlari (tablar); bo'sh qolgan bo'lim chiqarib tashlanadi */
+export function mentorSectionsFor(gamification: boolean): { label: string; tabs: NavTab[] }[] {
+  return MENTOR_SECTIONS.map((s) => ({ ...s, tabs: s.tabs.filter((t) => gamification || !t.gamification) })).filter((s) => s.tabs.length > 1);
+}
 
 export function isNavLinkActive(href: string, pathname: string): boolean {
   if (href === "/") return pathname === "/";

@@ -4,11 +4,14 @@ import { useState } from "react";
 import Image from "next/image";
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { recordMaterialViewAction } from "@/actions/lesson.actions";
 
 interface YouTubeFacadeProps {
   url: string;
   title?: string;
   className?: string;
+  /** Berilsa: video boshlanganda o'quvchining "material ochish" faolligi yoziladi */
+  trackLessonId?: string;
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -17,8 +20,12 @@ function extractYouTubeId(url: string): string | null {
   return match && match[2].length === 11 ? match[2] : null;
 }
 
-export function YouTubeFacade({ url, title = "YouTube Video", className }: YouTubeFacadeProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
+export function YouTubeFacade({ url, title = "YouTube Video", className, trackLessonId }: YouTubeFacadeProps) {
+  const [isPlaying, setIsPlayingState] = useState(false);
+  const setIsPlaying = (value: boolean) => {
+    setIsPlayingState(value);
+    if (value && trackLessonId) void recordMaterialViewAction({ lessonId: trackLessonId, materialKey: url }).catch(() => {});
+  };
   const videoId = extractYouTubeId(url);
 
   if (!videoId) {

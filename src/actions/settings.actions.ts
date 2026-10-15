@@ -8,6 +8,7 @@ import { requireMentor } from "@/lib/auth/guards";
 import { isAcademicYear } from "@/lib/settings";
 import { isAccentId } from "@/lib/theme-accents";
 import { gamificationSettingsSchema } from "@/lib/validations/gamification.schema";
+import { ensureSystemQuests } from "@/lib/gamification/quests";
 import type { ActionResult } from "./auth.actions";
 
 /** Joriy o'quv yili, chorak va asosiy rang — barcha foydalanuvchilar uchun */
@@ -44,6 +45,8 @@ export async function updateGamificationSettingsAction(input: unknown): Promise<
   await connectToDatabase();
   await AppSettings.updateOne({ key: "global" }, { $set: { gamification: parsed.data } }, { upsert: true });
   await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_GAMIFICATION", details: parsed.data });
+  // Yoqilganda kunlik odatlar (test, material, kirish) topshiriq sifatida paydo bo'ladi
+  if (parsed.data.enabled) await ensureSystemQuests(parsed.data);
 
   // Menyu, reyting va o'quvchi sahifalari shu kalitga bog'liq
   revalidatePath("/", "layout");

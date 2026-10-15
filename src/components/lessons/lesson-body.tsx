@@ -37,7 +37,7 @@ export function LessonBody({ lesson, badges }: { lesson: ILessonData; badges?: R
             <BookOpen className="w-4 h-4 text-red-500" />
             {videos.length > 1 ? video.title || `Dars videosi ${i + 1}` : "Dars videosi"}
           </h2>
-          <YouTubeFacade url={video.urlOrKey} title={video.title || lesson.title} />
+          <YouTubeFacade url={video.urlOrKey} title={video.title || lesson.title} trackLessonId={String(lesson._id)} />
         </div>
       ))}
 

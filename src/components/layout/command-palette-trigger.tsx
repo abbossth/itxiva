@@ -41,7 +41,7 @@ export function SearchButton() {
 }
 
 /** Ctrl+K / ⌘K ni tinglaydi va palitrani ko'rsatadi */
-export function CommandPaletteTrigger({ role }: { role: "mentor" | "student" }) {
+export function CommandPaletteTrigger({ role, gamification = false }: { role: "mentor" | "student"; gamification?: boolean }) {
   const [open, setOpen] = useState(false);
   // Bir marta ochilgandan keyin komponent xotirada qoladi — qayta ochilishi bir zumda
   const [loaded, setLoaded] = useState(false);
@@ -67,5 +67,5 @@ export function CommandPaletteTrigger({ role }: { role: "mentor" | "student" }) 
   }, []);
 
   if (!loaded) return null;
-  return <CommandPalette role={role} open={open} onClose={() => setOpen(false)} />;
+  return <CommandPalette role={role} open={open} onClose={() => setOpen(false)} gamification={gamification} />;
 }

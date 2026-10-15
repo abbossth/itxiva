@@ -6,19 +6,20 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { MENTOR_LINKS, STUDENT_LINKS, isLinkActive, type NavBadges } from "./nav-links";
+import { isLinkActive, navLinksFor, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 
 interface MobileNavProps {
   role: "mentor" | "student";
   badges?: NavBadges;
+  gamification?: boolean;
 }
 
-export function MobileNav({ role, badges = {} }: MobileNavProps) {
+export function MobileNav({ role, badges = {}, gamification = false }: MobileNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const links = role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS;
+  const links = navLinksFor(role, gamification);
   const primaryLinks = links.filter((l) => l.primary);
   const moreLinks = links.filter((l) => !l.primary);
   const isMoreActive = moreLinks.some((l) => isLinkActive(l, pathname));

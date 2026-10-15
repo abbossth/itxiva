@@ -14,6 +14,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { notifyGroup } from "@/lib/notifications/notify";
+import { rewardQuizAnswers } from "@/lib/gamification/quiz-rewards";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -171,6 +172,15 @@ export async function submitQuizAction(
       status,
       submittedAt: new Date(),
     });
+
+    // Gamifikatsiya: javob berilgan savollar kunlik topshiriqqa sanaladi, to'g'ri javoblar coin beradi (javobdan keyin)
+    const answered = answers
+      .filter((a) => (Array.isArray(a.value) ? a.value.length > 0 : String(a.value ?? "").trim() !== ""))
+      .map((a) => ({ questionId: a.questionId, isCorrect: a.isCorrect }));
+    if (answered.length > 0) {
+      const studentId = user.userId;
+      after(() => rewardQuizAnswers(studentId, answered).then(() => undefined).catch((error) => console.error("Quiz reward error:", error)));
+    }
 
     // Ochiq javoblar javob qaytarilgandan keyin AI bilan tekshiriladi; mentor belgilagan savollar unga qoladi
     const aiPending = hasOpenEnded && pendingAiAnswers(quiz.questions, answers).length > 0;

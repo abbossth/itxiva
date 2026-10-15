@@ -38,6 +38,7 @@ export default async function DashboardLayout({
   ]);
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
+  const gamification = settings.gamification.enabled;
   const badges = { orders, homework };
 
   return (
@@ -56,22 +57,28 @@ export default async function DashboardLayout({
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        <DesktopNav user={session} badges={badges} defaultCollapsed={sidebarCollapsed} level={levelState?.summary} />
+        <DesktopNav
+          user={session}
+          badges={badges}
+          defaultCollapsed={sidebarCollapsed}
+          level={levelState?.summary}
+          gamification={gamification}
+        />
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-28 md:pb-8">
-          {session.role === "mentor" && <SectionTabs badges={badges} />}
+          {session.role === "mentor" && <SectionTabs badges={badges} gamification={gamification} />}
           {children}
         </main>
       </div>
 
       {/* Mobile Bottom Navigation Bar */}
-      <MobileNav role={session.role} badges={badges} />
+      <MobileNav role={session.role} badges={badges} gamification={gamification} />
 
       {/* Yangi daraja: o'quvchi keyingi kirishida bir marta tabriklanadi */}
       {levelState?.levelUp && <LevelUpModal key={levelState.levelUp.level} info={levelState.levelUp} />}
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
-      <CommandPaletteTrigger role={session.role} />
+      <CommandPaletteTrigger role={session.role} gamification={gamification} />
     </div>
   );
 }

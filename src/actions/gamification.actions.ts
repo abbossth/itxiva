@@ -5,6 +5,7 @@ import { User } from "@/lib/db/models/user.model";
 import { getCurrentUser, requireStudent } from "@/lib/auth/guards";
 import { getAppSettings } from "@/lib/settings";
 import { buildLevels, levelProgress } from "@/lib/gamification/levels";
+import { dailyCheckIn } from "@/lib/gamification/quests";
 
 export interface LevelSummary {
   level: number;
@@ -36,6 +37,12 @@ export async function getStudentLevelState(): Promise<{ summary: LevelSummary; l
   if (!gamification.enabled) return null;
 
   await connectToDatabase();
+  // Kuniga birinchi ochilishda: seriya va "Platformaga kiring" topshirig'i (keyingi chaqiruvlarda bitta so'rov)
+  try {
+    await dailyCheckIn(session.userId);
+  } catch (error) {
+    console.error("Daily check-in error:", error);
+  }
   const user = await User.findById(session.userId).select("xp spendableBalance pendingLevelUp").lean();
   if (!user) return null;
 

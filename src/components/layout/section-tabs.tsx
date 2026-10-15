@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MENTOR_SECTIONS, isNavLinkActive, type NavBadges } from "./nav-links";
+import { isNavLinkActive, mentorSectionsFor, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 
@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
  * Bir necha sahifadan iborat bo'limlarda (Do'kon, Sozlamalar) sahifa tepasidagi tablar.
  * Sidebar'da bo'lim bitta havola bo'lib turadi, ichki sahifalar shu yerdan almashtiriladi.
  */
-export function SectionTabs({ badges = {} }: { badges?: NavBadges }) {
+export function SectionTabs({ badges = {}, gamification = false }: { badges?: NavBadges; gamification?: boolean }) {
   const pathname = usePathname();
-  const section = MENTOR_SECTIONS.find((s) => s.tabs.some((t) => isNavLinkActive(t.href, pathname)));
+  const section = mentorSectionsFor(gamification).find((s) => s.tabs.some((t) => isNavLinkActive(t.href, pathname)));
   if (!section) return null;
 
   return (

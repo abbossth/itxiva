@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CornerDownLeft, LogOut, Moon, Plus, Search, Sun, type LucideIcon } from "lucide-react";
-import { MENTOR_LINKS, MENTOR_SECTIONS, STUDENT_LINKS } from "./nav-links";
+import { mentorSectionsFor, navLinksFor } from "./nav-links";
 import { logoutAction } from "@/actions/auth.actions";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +35,12 @@ export function CommandPalette({
   role,
   open,
   onClose,
+  gamification = false,
 }: {
   role: "mentor" | "student";
   open: boolean;
   onClose: () => void;
+  gamification?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,9 +51,11 @@ export function CommandPalette({
   const commands = useMemo<Command[]>(() => {
     const go = (href: string) => () => router.push(href);
     // Bo'limlarning ichki sahifalari (tablar) ham alohida topiladi: "Sozlamalar · Excel import"
-    const tabs = MENTOR_SECTIONS.flatMap((s) => s.tabs.map((t) => ({ href: t.href, label: `${s.label} · ${t.label}`, shortLabel: s.label, icon: t.icon })));
+    const tabs = mentorSectionsFor(gamification).flatMap((s) => s.tabs.map((t) => ({ href: t.href, label: `${s.label} · ${t.label}`, shortLabel: s.label, icon: t.icon })));
     const links =
-      role === "mentor" ? [...MENTOR_LINKS.filter((l) => !tabs.some((t) => t.href === l.href)), ...tabs] : STUDENT_LINKS;
+      role === "mentor"
+        ? [...navLinksFor("mentor", gamification).filter((l) => !tabs.some((t) => t.href === l.href)), ...tabs]
+        : navLinksFor("student", gamification);
     const actions = role === "mentor" ? MENTOR_ACTIONS : STUDENT_ACTIONS;
     const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
     return [
