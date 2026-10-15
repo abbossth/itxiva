@@ -145,6 +145,7 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
         deadline={deadline}
         serverTime={serverTime}
         durationMinutes={exam.durationMinutes}
+        watermark={`${user.fullName} · @${user.login}`}
       />
     );
   }

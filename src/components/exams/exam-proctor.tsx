@@ -185,3 +185,135 @@ export function ProctorOverlay({
     </div>
   );
 }
+
+// Ctrl/Cmd bilan bosiladigan, imtihonda yopilgan tugmalar: nusxa, qo'yish, kesish, hammasini belgilash, chop etish, saqlash, manba
+const BLOCKED_SHORTCUT_KEYS = new Set(["c", "x", "v", "a", "p", "s", "u"]);
+// Dasturchi vositalari: F12, Ctrl+Shift+I/J/C, Cmd+Alt+I/J/C
+const DEVTOOLS_KEYS = new Set(["i", "j", "c"]);
+
+/**
+ * Imtihon matnini himoyalash. Brauzer tizim skrinshotini va kengaytmalarni to'liq taqiqlay olmaydi, shuning uchun:
+ * - nusxa olish, qo'yish, belgilash, sudrash, kontekst menyu, chop etish yopiladi;
+ * - skrinshot tugmalari (Cmd+Shift, Win+Shift, PrintScreen) bosilganda savollar darhol yashiriladi;
+ * - oyna fokusni yo'qotsa (skrinshot dasturi, AI yon paneli, boshqa oyna), savollar sahifadan olib tashlanadi —
+ *   kengaytma yoki AI sahifani o'qisa, savollarni topa olmaydi.
+ */
+export function useExamShield({ onBlocked }: { onBlocked: (message: string) => void }) {
+  const [unfocused, setUnfocused] = useState(false);
+  const [screenshotKeys, setScreenshotKeys] = useState(false);
+  // Fayl tanlash oynasi ochilganda ham fokus yo'qoladi — bu holda savollar yashirilmaydi
+  const pickingFile = useRef(false);
+  const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const block = (message: string) => (e: Event) => {
+      e.preventDefault();
+      onBlocked(message);
+    };
+    const onCopy = block("Imtihonda nusxa olish o'chirilgan");
+    const onPaste = block("Imtihonda matn qo'yish o'chirilgan — javobni o'zingiz yozing");
+    const onContext = (e: Event) => e.preventDefault();
+    const onDrag = (e: Event) => e.preventDefault();
+
+    const shieldFor = (ms: number) => {
+      setScreenshotKeys(true);
+      if (releaseTimer.current) clearTimeout(releaseTimer.current);
+      releaseTimer.current = setTimeout(() => setScreenshotKeys(false), ms);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      // macOS: Cmd+Shift+3/4/5; Windows: Win+Shift+S — tizim ushlashidan oldin Cmd/Win+Shift bosilgani ko'rinadi
+      if (e.metaKey && e.shiftKey) shieldFor(3000);
+      if (key === "printscreen") {
+        shieldFor(3000);
+        e.preventDefault();
+      }
+      const mod = e.ctrlKey || e.metaKey;
+      if (key === "f12" || (mod && (e.shiftKey || e.altKey) && DEVTOOLS_KEYS.has(key))) {
+        e.preventDefault();
+        return;
+      }
+      if (mod && !e.shiftKey && !e.altKey && BLOCKED_SHORTCUT_KEYS.has(key)) {
+        e.preventDefault();
+        onBlocked(key === "v" ? "Imtihonda matn qo'yish o'chirilgan — javobni o'zingiz yozing" : "Bu amal imtihon vaqtida o'chirilgan");
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "printscreen") {
+        shieldFor(3000);
+        // Windows'da PrintScreen rasmni buferga yozadi — uni bo'sh matn bilan almashtiramiz
+        navigator.clipboard?.writeText("").catch(() => {});
+      }
+    };
+
+    const onBlur = () => {
+      if (!pickingFile.current) setUnfocused(true);
+    };
+    const onFocus = () => {
+      pickingFile.current = false;
+      setUnfocused(false);
+    };
+
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("cut", onCopy);
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("contextmenu", onContext);
+    document.addEventListener("dragstart", onDrag);
+    document.addEventListener("drop", onDrag);
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("cut", onCopy);
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("contextmenu", onContext);
+      document.removeEventListener("dragstart", onDrag);
+      document.removeEventListener("drop", onDrag);
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+      if (releaseTimer.current) clearTimeout(releaseTimer.current);
+    };
+  }, [onBlocked]);
+
+  /** Fayl tanlash oynasi ochilishidan oldin chaqiriladi */
+  const allowFilePicker = useCallback(() => {
+    pickingFile.current = true;
+  }, []);
+
+  return { hidden: unfocused || screenshotKeys, allowFilePicker };
+}
+
+/** Savollar ustidagi xira yozuv: rasmga olingan savol kimniki ekani ko'rinib turadi */
+export function ExamWatermark({ text }: { text: string }) {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-30 overflow-hidden select-none">
+      <div className="absolute -inset-1/2 flex flex-wrap content-start gap-x-24 gap-y-20 -rotate-[24deg] opacity-[0.07] dark:opacity-[0.08]">
+        {Array.from({ length: 120 }, (_, i) => (
+          <span key={i} className="whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
+            {text}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Oyna faol bo'lmaganda savollar o'rnida ko'rinadi */
+export function ExamShieldNotice() {
+  return (
+    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-10 text-center space-y-2">
+      <div className="inline-flex p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+        <Lock className="w-6 h-6" />
+      </div>
+      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Savollar yashirildi</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Imtihon oynasi faol emas. Davom etish uchun sahifaga bosing.
+      </p>
+    </div>
+  );
+}
