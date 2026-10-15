@@ -101,7 +101,7 @@ export function ExamResultView({ exam, submission, attempts = [] }: ExamResultVi
         </div>
 
         {submission.mentorGeneralFeedback && (
-          <div className="max-w-lg mx-auto p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-sm text-slate-700 dark:text-slate-300 text-left space-y-1">
+          <div className="max-w-lg mx-auto p-4 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-sm text-slate-700 dark:text-slate-300 text-left space-y-1">
             <span className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
               <MessageSquare className="w-3.5 h-3.5" />
               Mentor umumiy fikri:

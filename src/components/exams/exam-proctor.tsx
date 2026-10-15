@@ -292,7 +292,7 @@ export function useExamShield({ onBlocked }: { onBlocked: (message: string) => v
 export function ExamWatermark({ text }: { text: string }) {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-30 overflow-hidden select-none">
-      <div className="absolute -inset-1/2 flex flex-wrap content-start gap-x-24 gap-y-20 -rotate-[24deg] opacity-[0.07] dark:opacity-[0.08]">
+      <div className="absolute -inset-1/2 flex flex-wrap content-start gap-x-24 gap-y-20 -rotate-[24deg] opacity-[0.05] dark:opacity-[0.035]">
         {Array.from({ length: 120 }, (_, i) => (
           <span key={i} className="whitespace-nowrap text-sm font-bold text-slate-900 dark:text-white">
             {text}

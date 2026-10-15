@@ -10,9 +10,11 @@ interface ExamTimerProps {
   serverTime: string;
   durationMinutes: number;
   onTimeExpired: () => void;
+  /** Panel kengligini to'liq egallaydi (o'ng paneldagi ko'rinish) */
+  block?: boolean;
 }
 
-export function ExamTimer({ deadline, serverTime, durationMinutes, onTimeExpired }: ExamTimerProps) {
+export function ExamTimer({ deadline, serverTime, durationMinutes, onTimeExpired, block = false }: ExamTimerProps) {
   const [timeLeftMs, setTimeLeftMs] = useState<number>(() =>
     Math.max(0, new Date(deadline).getTime() - new Date(serverTime).getTime())
   );
@@ -57,7 +59,7 @@ export function ExamTimer({ deadline, serverTime, durationMinutes, onTimeExpired
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border transition-all ${
+      className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border transition-all ${block ? "w-full" : ""} ${
         isUrgent
           ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse"
           : isWarning
@@ -83,7 +85,9 @@ export function ExamTimer({ deadline, serverTime, durationMinutes, onTimeExpired
       </div>
 
       {/* Mini progress bar */}
-      <div className="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden ml-2 hidden sm:block">
+      <div
+        className={`h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden ml-2 ${block ? "flex-1" : "w-16 hidden sm:block"}`}
+      >
         <div
           className={`h-full transition-all duration-1000 ${
             isUrgent ? "bg-rose-500" : isWarning ? "bg-amber-500" : "bg-teal-500"
