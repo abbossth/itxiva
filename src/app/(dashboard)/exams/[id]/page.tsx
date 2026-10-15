@@ -6,7 +6,8 @@ import { ExamTaker } from "@/components/exams/exam-taker";
 import { ExamStartCard } from "@/components/exams/exam-start-card";
 import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Lock, ArrowLeft, CheckCircle2, ShieldAlert } from "lucide-react";
+import { MAX_EXAM_VIOLATIONS } from "@/lib/exam-proctoring";
 
 export const metadata = {
   title: "Imtihon — ITXiva",
@@ -61,6 +62,30 @@ export default async function ExamDetailPage({ params }: ExamDetailPageProps) {
             href="/exams"
             className={buttonVariants({ variant: "outline", className: "w-full" })}
           >
+            <ArrowLeft className="w-4 h-4 mr-2" /> Imtihonlarga qaytish
+          </Link>
+        </Card>
+      </div>
+    );
+  }
+
+  // Qoidabuzarlik sababli yopilgan: natija e'lon qilinganmi-yo'qmi, o'quvchi sababini bilishi kerak
+  if (submission?.lockedForViolations) {
+    return (
+      <div className="max-w-md mx-auto py-12 text-center space-y-4">
+        <Card className="p-8 rounded-3xl space-y-4 border-rose-500/30">
+          <div className="inline-flex p-4 rounded-3xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Imtihon yopildi</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Siz {MAX_EXAM_VIOLATIONS} marta imtihon oynasidan chiqdingiz (to&apos;liq ekrandan yoki boshqa oynaga). Shu sababli
+            imtihon yopildi va <strong className="text-rose-600 dark:text-rose-400">0 ball</strong> qo&apos;yildi.
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Agar bu xato bo&apos;lsa, mentoringizga murojaat qiling — u imtihonni qayta ochib berishi mumkin.
+          </p>
+          <Link href="/exams" className={buttonVariants({ variant: "outline", className: "w-full" })}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Imtihonlarga qaytish
           </Link>
         </Card>

@@ -7,6 +7,7 @@ import { IExamData } from "@/lib/db/models/exam.model";
 import { IExamSubmissionData, IExamAnswer } from "@/lib/db/models/exam-submission.model";
 import { saveExamDraftAction, submitExamAction } from "@/actions/exam.actions";
 import { ExamTimer } from "./exam-timer";
+import { ProctorOverlay, useExamProctoring } from "./exam-proctor";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -60,6 +61,20 @@ export function ExamTaker({
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+
+  const isSubmittingRef = useRef(false);
+  const getAnswers = useCallback(() => Object.values(answersRef.current), []);
+  const onLocked = useCallback(() => {
+    // Server urinishni yopdi: sahifa yangilanib, yopilgan imtihon kartasi ko'rsatiladi
+    setTimeout(() => router.refresh(), 2500);
+  }, [router]);
+  const proctor = useExamProctoring({
+    examId: exam._id.toString(),
+    initialViolations: initialSubmission.violations ?? 0,
+    getAnswers,
+    isSubmittingRef,
+    onLocked,
+  });
 
   // Auto-save logic
   const performSaveDraft = useCallback(async () => {
@@ -176,7 +191,6 @@ export function ExamTaker({
   };
 
   // Handle final submission (manual or automatic when time expires)
-  const isSubmittingRef = useRef(false);
   const handleSubmitExam = async () => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -195,6 +209,8 @@ export function ExamTaker({
         setIsSubmitting(false);
         isSubmittingRef.current = false;
       } else {
+        // O'quvchining o'zi topshirdi — to'liq ekrandan chiqish ogohlantirish hisoblanmaydi (isSubmittingRef)
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         router.push("/exams");
         router.refresh();
       }
@@ -217,6 +233,15 @@ export function ExamTaker({
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-24 animate-in fade-in">
+      {proctor.blocked && !isSubmitting && (
+        <ProctorOverlay
+          violations={proctor.violations}
+          warning={proctor.warning}
+          locked={proctor.locked}
+          fullscreenSupported={proctor.fullscreenSupported}
+          onResume={proctor.resume}
+        />
+      )}
       {/* Sticky Top Header with Timer and Status */}
       <div className="sticky top-16 z-40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-bg/95 backdrop-blur-lg shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>

@@ -14,8 +14,10 @@ import {
   Play,
   ArrowLeft,
   FileCheck,
+  Maximize,
 } from "lucide-react";
 import Link from "next/link";
+import { MAX_EXAM_VIOLATIONS } from "@/lib/exam-proctoring";
 
 interface ExamStartCardProps {
   exam: IExamData;
@@ -32,6 +34,10 @@ export function ExamStartCard({ exam, attemptNumber = 1 }: ExamStartCardProps) {
   const handleStart = async () => {
     setError(null);
     setStarting(true);
+    // To'liq ekran faqat foydalanuvchi bosgan zahoti so'ralishi mumkin — shuning uchun server javobini kutmasdan
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
 
     try {
       const res = await startExamAttemptAction(exam._id.toString());
@@ -126,6 +132,26 @@ export function ExamStartCard({ exam, attemptNumber = 1 }: ExamStartCardProps) {
           </ul>
         </div>
 
+        <div className="space-y-2 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-800 dark:text-rose-300">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <Maximize className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+            <span>Imtihon to&apos;liq ekran rejimida o&apos;tadi</span>
+          </div>
+          <ul className="list-disc pl-5 space-y-1 leading-relaxed">
+            <li>Boshlash tugmasini bosganingizda ekran avtomatik ravishda to&apos;liq rejimga o&apos;tadi.</li>
+            <li>
+              To&apos;liq ekrandan chiqsangiz (Esc), boshqa tab, oyna yoki ilovaga o&apos;tsangiz — ogohlantirish olasiz.
+            </li>
+            <li>
+              <strong>
+                {MAX_EXAM_VIOLATIONS} ta ogohlantirishdan keyin imtihon avtomatik yopiladi va sizga 0 ball qo&apos;yiladi.
+              </strong>{" "}
+              Uni faqat mentor qayta ochib berishi mumkin.
+            </li>
+            <li>Imtihon davomida telefon bildirishnomalari va boshqa dasturlarni yopib qo&apos;ying.</li>
+          </ul>
+        </div>
+
         {isRetake && (
           <div className="p-4 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-800 dark:text-teal-300 leading-relaxed">
             Bu sizning <strong>{attemptNumber}-urinishingiz</strong> ({exam.maxAttempts} tadan). Oldingi urinishingiz natijasi
@@ -141,7 +167,9 @@ export function ExamStartCard({ exam, attemptNumber = 1 }: ExamStartCardProps) {
           className="w-full py-4 text-base font-bold gap-2 rounded-2xl shadow-md"
         >
           <Play className="w-5 h-5 fill-current" />
-          <span>{isRetake ? `${attemptNumber}-urinishni boshlash` : "Imtihonni boshlash"}</span>
+          <span>
+            {isRetake ? `${attemptNumber}-urinishni boshlash` : "Imtihonni boshlash"} (to&apos;liq ekranda)
+          </span>
         </Button>
       </Card>
     </div>

@@ -94,3 +94,51 @@ describe("imtihon: bir necha urinish", () => {
     expect((await exams.startExamAttemptAction(examId)).success).toBe(false);
   });
 });
+
+describe("imtihon: to'liq ekran nazorati", () => {
+  it("3-ogohlantirishda urinish yopiladi, 0 ball qo'yiladi va qayta urinib bo'lmaydi; mentor ochib beradi", async () => {
+    const { mentor, student, examId, answer } = await seed(2);
+    actAs(sessionFor(student));
+    expect((await exams.startExamAttemptAction(examId)).success).toBe(true);
+
+    const violate = (kind: string) => exams.recordExamViolationAction({ ...answer("4"), kind });
+    expect((await violate("fullscreen_exit")).data).toEqual({ violations: 1, locked: false });
+    expect((await violate("tab_hidden")).data).toEqual({ violations: 2, locked: false });
+    expect((await violate("fullscreen_exit")).data).toEqual({ violations: 3, locked: true });
+
+    // To'g'ri javob saqlangan bo'lsa ham ball 0; javoblar mentor ko'rishi uchun qoladi
+    const locked = await ExamSubmission.findOne({ examId }).lean();
+    expect(locked).toMatchObject({ status: "graded", totalScore: 0, maxScore: 10, isPassed: false, lockedForViolations: true });
+    expect(locked?.answers[0]).toMatchObject({ value: "4", pointsAwarded: 0 });
+
+    const page = await exams.getExamForStudent(examId);
+    expect(page.data?.submission?.lockedForViolations).toBe(true);
+    expect(page.data?.canRetake).toBe(false);
+    expect((await exams.startExamAttemptAction(examId)).success).toBe(false);
+    // Yopilgandan keyin yangi hodisa hech narsani o'zgartirmaydi
+    expect((await violate("tab_hidden")).success).toBe(false);
+
+    // O'quvchi o'zini ochib bera olmaydi
+    expect((await exams.unlockExamSubmissionAction(locked!._id.toString())).success).toBe(false);
+
+    actAs(sessionFor(mentor));
+    expect((await exams.unlockExamSubmissionAction(locked!._id.toString())).success).toBe(true);
+    const reopened = await ExamSubmission.findOne({ examId }).lean();
+    expect(reopened).toMatchObject({ status: "in_progress", violations: 0, lockedForViolations: false });
+    expect(reopened?.violationLog?.map((v) => v.kind)).toEqual(["fullscreen_exit", "tab_hidden", "fullscreen_exit", "unlocked"]);
+
+    // O'quvchi o'sha urinishni davom ettirib topshiradi
+    actAs(sessionFor(student));
+    expect((await exams.submitExamAction(answer("4"))).success).toBe(true);
+    expect((await ExamSubmission.findOne({ examId }).lean())?.totalScore).toBe(10);
+  });
+
+  it("noto'g'ri hodisa turi va faol urinishsiz hodisa rad etiladi", async () => {
+    const { student, examId, answer } = await seed(1);
+    actAs(sessionFor(student));
+    expect((await exams.recordExamViolationAction({ ...answer("4"), kind: "fullscreen_exit" })).success).toBe(false);
+    await exams.startExamAttemptAction(examId);
+    expect((await exams.recordExamViolationAction({ ...answer("4"), kind: "unlocked" })).success).toBe(false);
+    expect((await ExamSubmission.findOne({ examId }).lean())?.violations).toBe(0);
+  });
+});

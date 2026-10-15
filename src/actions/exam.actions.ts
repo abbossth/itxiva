@@ -30,6 +30,7 @@ import { notifyMany } from "@/lib/notifications/notify";
 import { User } from "@/lib/db/models/user.model";
 import { after } from "next/server";
 import { notifyFinishedExams } from "@/lib/notifications/scheduled";
+import { MAX_EXAM_VIOLATIONS, shiftedStartForUnlock } from "@/lib/exam-proctoring";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -162,6 +163,8 @@ function toStudentSubmission(
     maxScore: number;
     isPassed: boolean;
     mentorGeneralFeedback?: string;
+    violations?: number;
+    lockedForViolations?: boolean;
   },
   isResultsPublished: boolean
 ): IExamSubmissionData {
@@ -209,6 +212,8 @@ function toStudentSubmission(
     maxScore: sub.maxScore,
     isPassed: canSeeResults ? sub.isPassed : false,
     mentorGeneralFeedback: canSeeResults ? sub.mentorGeneralFeedback : undefined,
+    violations: sub.violations ?? 0,
+    lockedForViolations: Boolean(sub.lockedForViolations),
   };
 }
 
@@ -421,6 +426,7 @@ export async function getExamForStudent(examId: string): Promise<
         canRetake:
           !!latestSubmission &&
           latestSubmission.status !== "in_progress" &&
+          !latestSubmission.lockedForViolations &&
           latestSubmission.attemptNumber < exam.maxAttempts &&
           now <= endTime,
         serverTime: now.toISOString(),
@@ -485,6 +491,13 @@ export async function startExamAttemptAction(
           startedAt: new Date(activeSub.startedAt).toISOString(),
           durationMinutes: exam.durationMinutes,
         },
+      };
+    }
+
+    if (existing.some((s) => s.lockedForViolations)) {
+      return {
+        success: false,
+        error: "Imtihon qoidabuzarlik sababli yopilgan. Qayta topshirish uchun mentorga murojaat qiling",
       };
     }
 
@@ -641,6 +654,136 @@ export async function submitExamAction(
   } catch (err: unknown) {
     unstable_rethrow(err);
     const message = err instanceof Error ? err.message : "Imtihonni topshirishda xatolik";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * O'quvchi to'liq ekrandan chiqdi yoki boshqa oynaga o'tdi. Ogohlantirishlarni server sanaydi:
+ * chegaraga yetganda urinish yopiladi va 0 ball qo'yiladi (javoblar mentor ko'rishi uchun saqlanadi)
+ */
+export async function recordExamViolationAction(
+  data: unknown
+): Promise<ActionState<{ violations: number; locked: boolean }>> {
+  try {
+    const user = await requireStudent();
+    const parsed = examSaveDraftSchema.safeParse(data);
+    const kind = (data as { kind?: unknown } | null)?.kind;
+    if (!parsed.success || (kind !== "fullscreen_exit" && kind !== "tab_hidden")) {
+      return { success: false, error: "Noto'g'ri so'rov" };
+    }
+
+    await connectDB();
+    const exam = await Exam.findById(parsed.data.examId);
+    if (!exam) return { success: false, error: "Imtihon topilmadi" };
+    const now = new Date();
+
+    // $inc bilan: bir vaqtda kelgan ikki hodisa ham alohida sanaladi
+    const submission = await ExamSubmission.findOneAndUpdate(
+      { examId: exam._id, studentId: user.userId, status: "in_progress" },
+      {
+        $inc: { violations: 1 },
+        $push: { violationLog: { kind, at: now } },
+        $set: { answers: dropForeignFileKeys(parsed.data.answers, exam._id.toString(), user.userId) },
+      },
+      { returnDocument: "after" }
+    );
+    if (!submission) return { success: false, error: "Faol imtihon topilmadi" };
+
+    const violations = submission.violations ?? 0;
+    if (violations < MAX_EXAM_VIOLATIONS) {
+      return { success: true, data: { violations, locked: false } };
+    }
+
+    const maxScore = exam.questions.reduce((sum, q) => sum + (q.points || 0), 0);
+    const locked = await ExamSubmission.findOneAndUpdate(
+      { _id: submission._id, status: "in_progress" },
+      {
+        $set: {
+          status: "graded",
+          totalScore: 0,
+          maxScore,
+          isPassed: false,
+          submittedAt: now,
+          lockedForViolations: true,
+          lockedAt: now,
+          "answers.$[].pointsAwarded": 0,
+        },
+      },
+      { returnDocument: "after" }
+    );
+    if (locked) {
+      await AuditLog.create({
+        actorId: user.userId,
+        targetUserId: user.userId,
+        action: "EXAM_LOCKED",
+        details: { examId: exam._id, submissionId: submission._id, examTitle: exam.title, violations },
+      });
+      after(() => notifyFinishedExams(exam._id.toString()).catch((error) => console.error("Exam notify error:", error)));
+      revalidatePath(`/exams/${exam._id}`);
+      revalidatePath(`/mentor/exams/${exam._id}`);
+    }
+    return { success: true, data: { violations, locked: true } };
+  } catch (err: unknown) {
+    unstable_rethrow(err);
+    const message = err instanceof Error ? err.message : "Xatolik yuz berdi";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Mentor qoidabuzarlik sababli yopilgan urinishni ochib beradi: o'quvchi yopilgan joyidan, qolgan vaqti bilan davom etadi
+ */
+export async function unlockExamSubmissionAction(submissionId: string): Promise<ActionState> {
+  try {
+    const mentor = await requireMentor();
+    if (!isObjectId(submissionId)) return { success: false, error: "Urinish topilmadi" };
+    await connectDB();
+
+    const submission = await ExamSubmission.findOne({ _id: submissionId, lockedForViolations: true });
+    if (!submission) return { success: false, error: "Bloklangan urinish topilmadi" };
+    const exam = await Exam.findById(submission.examId);
+    if (!exam) return { success: false, error: "Imtihon topilmadi" };
+
+    const now = new Date();
+    const startedAt = shiftedStartForUnlock(submission.startedAt, submission.lockedAt, now);
+    if (getAttemptDeadline(startedAt, exam) <= now.getTime()) {
+      return {
+        success: false,
+        error: "Imtihon vaqti tugagan. Ochib berish uchun avval imtihonning tugash vaqtini uzaytiring",
+      };
+    }
+
+    await ExamSubmission.updateOne(
+      { _id: submission._id, lockedForViolations: true },
+      {
+        $set: {
+          status: "in_progress",
+          startedAt,
+          totalScore: 0,
+          isPassed: false,
+          violations: 0,
+          lockedForViolations: false,
+          lockedAt: null,
+        },
+        $unset: { submittedAt: 1 },
+        $push: { violationLog: { kind: "unlocked", at: now } },
+      }
+    );
+
+    await AuditLog.create({
+      actorId: mentor.userId,
+      targetUserId: submission.studentId,
+      action: "EXAM_UNLOCKED",
+      details: { examId: exam._id, submissionId: submission._id, examTitle: exam.title },
+    });
+
+    revalidatePath(`/exams/${exam._id}`);
+    revalidatePath(`/mentor/exams/${exam._id}`);
+    return { success: true, message: "Imtihon ochildi: o'quvchi qolgan vaqti bilan davom etishi mumkin" };
+  } catch (err: unknown) {
+    unstable_rethrow(err);
+    const message = err instanceof Error ? err.message : "Xatolik yuz berdi";
     return { success: false, error: message };
   }
 }
@@ -1069,6 +1212,8 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
       totalScore: number;
       maxScore: number;
       isPassed: boolean;
+      violations: number;
+      lockedForViolations: boolean;
     }>
   >
 > {
@@ -1095,6 +1240,8 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
       totalScore: number;
       maxScore: number;
       isPassed: boolean;
+      violations?: number;
+      lockedForViolations?: boolean;
     }
 
     const rows = submissions as unknown as PopulatedSubmissionItem[];
@@ -1124,6 +1271,8 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
       totalScore: s.totalScore,
       maxScore: s.maxScore,
       isPassed: s.isPassed,
+      violations: s.violations ?? 0,
+      lockedForViolations: Boolean(s.lockedForViolations),
     }));
 
     return { success: true, data };

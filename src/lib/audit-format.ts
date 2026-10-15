@@ -30,6 +30,8 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   UNLINK_LESSON: { label: "Dars bog'lanishi uzildi", tone: "warning", category: "lessons" },
   UPSERT_QUIZ: { label: "Test saqlandi", tone: "teal", category: "exams" },
   GRADE_QUIZ: { label: "Test baholandi", tone: "teal", category: "exams" },
+  EXAM_LOCKED: { label: "Imtihon qoidabuzarlik sababli yopildi", tone: "danger", category: "exams" },
+  EXAM_UNLOCKED: { label: "Imtihon blokdan ochildi", tone: "warning", category: "exams" },
   GRADE_HOMEWORK: { label: "Vazifa baholandi", tone: "success", category: "homework" },
   RETURN_HOMEWORK: { label: "Vazifa qayta ishlashga qaytarildi", tone: "warning", category: "homework" },
   HOMEWORK_REMINDER: { label: "Vazifa eslatmasi yuborildi", tone: "teal", category: "homework" },

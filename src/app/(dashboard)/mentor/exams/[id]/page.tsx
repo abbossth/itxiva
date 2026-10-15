@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AiGradeButton } from "@/components/mentor/ai-grade-button";
+import { ExamUnlockButton } from "@/components/mentor/exam-unlock-button";
+import { MAX_EXAM_VIOLATIONS } from "@/lib/exam-proctoring";
 import {
   ArrowLeft,
   Users,
@@ -16,6 +18,7 @@ import {
   FileCheck,
   Edit,
   ExternalLink,
+  ShieldAlert,
 } from "lucide-react";
 import { formatDateTimeUz } from "@/lib/utils";
 
@@ -157,7 +160,12 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
                           : "Topshirilmagan"}
                       </td>
                       <td className="px-4 py-3.5">
-                        {isGraded ? (
+                        {sub.lockedForViolations ? (
+                          <Badge variant="rose" className="text-xs flex items-center gap-1 w-fit">
+                            <ShieldAlert className="w-3 h-3" />
+                            <span>Bloklangan</span>
+                          </Badge>
+                        ) : isGraded ? (
                           <Badge variant={sub.isPassed ? "teal" : "rose"} className="text-xs">
                             {sub.isPassed ? "O'tdi" : "Yetmadi"}
                           </Badge>
@@ -171,18 +179,28 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
                             Yechmoqda
                           </Badge>
                         )}
+                        {(sub.violations > 0 || sub.lockedForViolations) && (
+                          <div className="mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                            {sub.lockedForViolations
+                              ? `${MAX_EXAM_VIOLATIONS} ta ogohlantirish — 0 ball`
+                              : `${sub.violations}/${MAX_EXAM_VIOLATIONS} ogohlantirish`}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 font-bold font-mono text-slate-900 dark:text-slate-100">
                         {sub.totalScore} / {sub.maxScore}
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <Link
-                          href={`/mentor/exams/${exam._id}/submissions/${sub._id}`}
-                          className={buttonVariants({ variant: "outline", size: "sm", className: "h-8 text-xs" })}
-                        >
-                          <span>Baholash</span>
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </Link>
+                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                          {sub.lockedForViolations && <ExamUnlockButton submissionId={sub._id} studentName={sub.studentName} />}
+                          <Link
+                            href={`/mentor/exams/${exam._id}/submissions/${sub._id}`}
+                            className={buttonVariants({ variant: "outline", size: "sm", className: "h-8 text-xs" })}
+                          >
+                            <span>Baholash</span>
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   );

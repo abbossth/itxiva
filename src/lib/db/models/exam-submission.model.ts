@@ -20,6 +20,14 @@ export interface IExamAnswer {
   correctAnswer?: string;
 }
 
+/** fullscreen_exit — to'liq ekrandan chiqdi; tab_hidden — boshqa tab yoki ilovaga o'tdi; unlocked — mentor blokdan ochdi */
+export type ExamViolationKind = "fullscreen_exit" | "tab_hidden" | "unlocked";
+
+export interface IExamViolation {
+  kind: ExamViolationKind;
+  at: Date | string;
+}
+
 export interface IExamSubmissionData {
   _id: string | mongoose.Types.ObjectId;
   examId: string | mongoose.Types.ObjectId;
@@ -34,6 +42,12 @@ export interface IExamSubmissionData {
   maxScore: number;
   isPassed: boolean;
   mentorGeneralFeedback?: string;
+  /** Joriy ogohlantirishlar soni (mentor ochib berganda nolga tushadi) */
+  violations?: number;
+  violationLog?: IExamViolation[];
+  /** Ogohlantirishlar chegarasidan oshgani uchun yopilgan: 0 ball, qayta urinib bo'lmaydi */
+  lockedForViolations?: boolean;
+  lockedAt?: Date | string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -145,6 +159,21 @@ const ExamSubmissionSchema = new Schema<IExamSubmission>(
       type: String,
       trim: true,
     },
+    violations: { type: Number, default: 0 },
+    violationLog: {
+      type: [
+        new Schema<IExamViolation>(
+          {
+            kind: { type: String, enum: ["fullscreen_exit", "tab_hidden", "unlocked"], required: true },
+            at: { type: Date, required: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+    lockedForViolations: { type: Boolean, default: false },
+    lockedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
