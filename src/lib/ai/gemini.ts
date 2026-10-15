@@ -52,11 +52,14 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   schema,
   system,
   prompt,
+  attachments = [],
   maxTokens,
 }: {
   schema: Schema;
   system: string;
   prompt: string;
+  /** Rasm yoki PDF (base64) — matndan oldin yuboriladi */
+  attachments?: { mimeType: string; data: string }[];
   maxTokens: number;
 }): Promise<z.infer<Schema>> {
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -68,6 +71,7 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
       {
         role: "user",
         parts: [
+          ...attachments.map((a) => ({ inlineData: { mimeType: a.mimeType, data: a.data } })),
           {
             text: withSchema
               ? prompt

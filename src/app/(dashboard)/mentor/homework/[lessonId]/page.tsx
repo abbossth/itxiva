@@ -20,5 +20,11 @@ export default async function MentorHomeworkDetailPage({ params, searchParams }:
   // Jurnaldagi katakdan kelinganda o'sha o'quvchining javobi ochiladi
   const { student } = await searchParams;
   const initialStudentId = roster.rows.some((r) => r.studentId === student && r.submission) ? student : undefined;
-  return <HomeworkGradingView roster={roster} initialStudentId={initialStudentId} />;
+  return (
+    <HomeworkGradingView
+      roster={roster}
+      initialStudentId={initialStudentId}
+      aiEnabled={Boolean(process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)}
+    />
+  );
 }

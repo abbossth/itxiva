@@ -119,3 +119,12 @@ export async function uploadBuffer({
     })
   );
 }
+
+/**
+ * Fayl mazmunini serverga yuklab oladi (masalan, AI o'qishi uchun)
+ */
+export async function downloadBuffer(key: string): Promise<Buffer> {
+  const res = await getS3Client().send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }));
+  if (!res.Body) throw new Error("Fayl bo'sh");
+  return Buffer.from(await res.Body.transformToByteArray());
+}

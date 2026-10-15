@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { SubmissionContent } from "@/components/homework/submission-content";
 import { TaskAttachments } from "@/components/homework/task-attachments";
+import { AiReviewPanel } from "@/components/homework/ai-review-panel";
 import {
   gradeHomeworkAction,
   returnHomeworkAction,
@@ -53,7 +54,15 @@ function subscribeDesktop(onChange: () => void) {
   return () => mq.removeEventListener("change", onChange);
 }
 
-export function HomeworkGradingView({ roster, initialStudentId }: { roster: HomeworkRoster; initialStudentId?: string }) {
+export function HomeworkGradingView({
+  roster,
+  initialStudentId,
+  aiEnabled = false,
+}: {
+  roster: HomeworkRoster;
+  initialStudentId?: string;
+  aiEnabled?: boolean;
+}) {
   const { toast } = useToast();
   // Keng ekranda javob ro'yxat yonida ochiladi, tor ekranda — modal oynada
   const isDesktop = useSyncExternalStore(
@@ -113,6 +122,7 @@ export function HomeworkGradingView({ roster, initialStudentId }: { roster: Home
       key={`${selected.submission._id}-${selected.submission.attempt}-${selected.state}`}
       row={selected}
       coinsReward={roster.task.coinsReward}
+      aiEnabled={aiEnabled}
       onDone={() => goToNext(selected.studentId)}
     />
   ) : null;
@@ -283,10 +293,12 @@ export function HomeworkGradingView({ roster, initialStudentId }: { roster: Home
 function GradeForm({
   row,
   coinsReward,
+  aiEnabled,
   onDone,
 }: {
   row: HomeworkRosterRow;
   coinsReward: number;
+  aiEnabled: boolean;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -384,6 +396,14 @@ function GradeForm({
       />
 
       <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+        {aiEnabled && (
+          <AiReviewPanel
+            submissionId={submission._id}
+            attempt={submission.attempt}
+            onApplyScore={(n) => handleScore(String(n))}
+            onApplyFeedback={setFeedback}
+          />
+        )}
         <div role="group" aria-label="Tez baholash" className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 mr-1">Tez ball:</span>
           {QUICK_SCORES.map((q) => (

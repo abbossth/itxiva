@@ -44,9 +44,19 @@ Yozish qoidalari:
 - Faktlar va kod namunalari to'g'ri bo'lsin; ishonching komil bo'lmagan narsani yozma.
 - Mentor bergan mavzudan chetga chiqma.`;
 
+/** So'rovga qo'shiladigan rasm yoki PDF (base64) */
+export interface AiAttachment {
+  mimeType: string;
+  data: string;
+}
+
+/** AI o'qiy oladigan fayl turlari */
+export const AI_READABLE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+
 interface GenerateParams<Schema extends z.ZodType> {
   schema: Schema;
   prompt: string;
+  attachments?: AiAttachment[];
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
 }
@@ -69,6 +79,7 @@ export async function generateStructured<Schema extends z.ZodType>(
         schema: params.schema,
         system: SYSTEM_PROMPT,
         prompt: params.prompt,
+        attachments: params.attachments,
         maxTokens: params.maxTokens ?? 16000,
       });
     } catch (error) {
@@ -100,9 +111,21 @@ export async function generateStructured<Schema extends z.ZodType>(
 async function generateWithClaude<Schema extends z.ZodType>({
   schema,
   prompt,
+  attachments = [],
   effort = "medium",
   maxTokens = 16000,
 }: GenerateParams<Schema>): Promise<z.infer<Schema>> {
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [
+    ...attachments.map((a): Anthropic.Beta.BetaContentBlockParam =>
+      a.mimeType === "application/pdf"
+        ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data } }
+        : {
+            type: "image",
+            source: { type: "base64", media_type: a.mimeType as "image/png", data: a.data },
+          }
+    ),
+    { type: "text", text: prompt },
+  ];
   try {
     const response = await getClient().beta.messages.parse({
       model: MODEL,
@@ -112,7 +135,7 @@ async function generateWithClaude<Schema extends z.ZodType>({
       fallbacks: "default",
       system: SYSTEM_PROMPT,
       output_config: { effort, format: zodOutputFormat(schema) },
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content }],
     });
 
     if (response.stop_reason === "refusal") {
