@@ -22,6 +22,7 @@ import { CoinBadge } from "@/components/ui/coin-badge";
 import { useToast } from "@/components/ui/toast";
 import { SubmissionContent } from "@/components/homework/submission-content";
 import { TaskAttachments } from "@/components/homework/task-attachments";
+import { IntegrityReport } from "@/components/homework/integrity-report";
 import {
   submitHomeworkAction,
   HomeworkSubmissionView,
@@ -256,6 +257,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
             links={submission.links}
             files={submission.files}
           />
+          <IntegrityReport integrity={submission.integrity} submissionId={submission._id} />
         </div>
       )}
 

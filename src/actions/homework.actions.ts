@@ -2,13 +2,16 @@
 
 import mongoose from "mongoose";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { connectToDatabase } from "@/lib/db/connect";
 import { Lesson, IHomework, IMaterial } from "@/lib/db/models/lesson.model";
 import {
   HomeworkSubmission,
   HomeworkStatus,
   IHomeworkFile,
+  IHomeworkIntegrity,
 } from "@/lib/db/models/homework-submission.model";
+import { PENDING_INTEGRITY, runIntegrityCheck } from "@/lib/homework-integrity";
 import { Group } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
@@ -36,6 +39,24 @@ export interface HomeworkTask {
   coinsReward: number;
 }
 
+export interface IntegrityMatchView {
+  percent: number;
+  /** Faqat mentorga: o'quvchiga boshqa o'quvchining ismi ko'rsatilmaydi */
+  studentId?: string;
+  fullName?: string;
+  groupName?: string;
+  lessonId?: string;
+}
+
+export interface IntegrityView {
+  status: IHomeworkIntegrity["status"];
+  similarity: number;
+  matches: IntegrityMatchView[];
+  aiScore: number | null;
+  aiSignals: string[];
+  checkedAt: string | null;
+}
+
 export interface HomeworkSubmissionView {
   _id: string;
   text: string;
@@ -49,6 +70,8 @@ export interface HomeworkSubmissionView {
   feedback: string;
   coinsAwarded: number;
   gradedAt: string | null;
+  /** null — hali tekshirilmagan (tekshiruv qo'shilishidan oldingi javob) */
+  integrity: IntegrityView | null;
 }
 
 interface SubmissionLean {
@@ -64,9 +87,32 @@ interface SubmissionLean {
   feedback?: string;
   coinsAwarded?: number;
   gradedAt?: Date | null;
+  integrity?: IHomeworkIntegrity | null;
 }
 
-function toSubmissionView(s: SubmissionLean): HomeworkSubmissionView {
+function toIntegrityView(i: IHomeworkIntegrity | null | undefined, forMentor: boolean): IntegrityView | null {
+  if (!i) return null;
+  return {
+    status: i.status,
+    similarity: i.similarity ?? 0,
+    matches: (i.matches ?? []).map((m) =>
+      forMentor
+        ? {
+            percent: m.percent,
+            studentId: m.studentId.toString(),
+            fullName: m.fullName,
+            groupName: m.groupName,
+            lessonId: m.lessonId.toString(),
+          }
+        : { percent: m.percent }
+    ),
+    aiScore: i.aiScore ?? null,
+    aiSignals: i.aiSignals ?? [],
+    checkedAt: i.checkedAt ? new Date(i.checkedAt).toISOString() : null,
+  };
+}
+
+function toSubmissionView(s: SubmissionLean, forMentor: boolean): HomeworkSubmissionView {
   return {
     _id: s._id.toString(),
     text: s.text ?? "",
@@ -80,6 +126,7 @@ function toSubmissionView(s: SubmissionLean): HomeworkSubmissionView {
     feedback: s.feedback ?? "",
     coinsAwarded: s.coinsAwarded ?? 0,
     gradedAt: s.gradedAt ? new Date(s.gradedAt).toISOString() : null,
+    integrity: toIntegrityView(s.integrity, forMentor),
   };
 }
 
@@ -122,7 +169,7 @@ export async function getHomeworkForStudent(
       ? await HomeworkSubmission.findOne({ lessonId, studentId: session.userId }).lean<SubmissionLean>()
       : null;
 
-  return { task: toTask(lesson.homework), submission: submission ? toSubmissionView(submission) : null };
+  return { task: toTask(lesson.homework), submission: submission ? toSubmissionView(submission, false) : null };
 }
 
 export async function submitHomeworkAction(input: unknown): Promise<ActionResult> {
@@ -166,6 +213,7 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
   const dueAt = lesson.homework.dueAt ? new Date(lesson.homework.dueAt) : null;
   const isLate = Boolean(dueAt && now.getTime() > dueAt.getTime());
 
+  let submissionId: string;
   if (existing) {
     existing.text = text;
     existing.links = links;
@@ -174,10 +222,12 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     existing.submittedAt = now;
     existing.isLate = isLate;
     existing.attempt = (existing.attempt ?? 1) + 1;
+    existing.integrity = { ...PENDING_INTEGRITY };
     await existing.save();
+    submissionId = existing._id.toString();
   } else {
     try {
-      await HomeworkSubmission.create({
+      const created = await HomeworkSubmission.create({
         lessonId,
         groupId: lesson.groupId,
         studentId: session.userId,
@@ -187,7 +237,9 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
         status: "submitted",
         submittedAt: now,
         isLate,
+        integrity: { ...PENDING_INTEGRITY },
       });
+      submissionId = created._id.toString();
     } catch (err) {
       // Ikki marta tez bosilganda unikal indeks ikkinchisini rad etadi
       if ((err as { code?: number }).code === 11000) {
@@ -205,6 +257,16 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     groupName: group?.name,
     isLate,
     resubmitted: Boolean(existing),
+  });
+
+  // Plagiat va AI tekshiruvi javobdan keyin fonda ishlaydi — o'quvchi kutib qolmaydi
+  after(async () => {
+    try {
+      await runIntegrityCheck(submissionId);
+      revalidateHomework(lessonId);
+    } catch (error) {
+      console.error("Homework integrity check error:", error);
+    }
   });
 
   revalidateHomework(lessonId);
@@ -377,6 +439,8 @@ export interface HomeworkInboxItem {
   hasText: boolean;
   links: number;
   files: number;
+  /** Plagiat/AI tekshiruvi; null — tekshirilmagan */
+  integrity: IntegrityView | null;
 }
 
 /**
@@ -430,6 +494,7 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
         hasText: Boolean(s.text?.trim()),
         links: s.links?.length ?? 0,
         files: s.files?.length ?? 0,
+        integrity: toIntegrityView(s.integrity, true),
       },
     ];
   };
@@ -648,7 +713,7 @@ export async function getHomeworkRoster(lessonId: string): Promise<HomeworkRoste
       fullName: s.studentId.fullName,
       login: s.studentId.login,
       state: s.status,
-      submission: toSubmissionView(s),
+      submission: toSubmissionView(s, true),
     });
   }
 
@@ -832,4 +897,26 @@ export async function getHomeworkBadgeCount(): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+/** Mentor: javobni plagiat va AI bo'yicha (qayta) tekshiradi */
+export async function checkHomeworkIntegrityAction(submissionId: string): Promise<ActionResult<IntegrityView>> {
+  const mentor = await requireMentor();
+  if (!isObjectId(submissionId)) return { success: false, message: "Javob topilmadi" };
+  const rate = checkRateLimit(`hw_integrity_${mentor.userId}`, 60, 10 * 60 * 1000);
+  if (!rate.allowed) return { success: false, message: `Juda ko'p so'rov. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring` };
+
+  await connectToDatabase();
+  const exists = await HomeworkSubmission.exists({ _id: submissionId });
+  if (!exists) return { success: false, message: "Javob topilmadi" };
+  try {
+    await runIntegrityCheck(submissionId);
+  } catch (error) {
+    console.error("Homework integrity check error:", error);
+    return { success: false, message: "Tekshiruvda xatolik yuz berdi. Keyinroq urinib ko'ring" };
+  }
+  const updated = await HomeworkSubmission.findById(submissionId).select("integrity lessonId").lean();
+  if (updated) revalidateHomework(updated.lessonId.toString());
+  const view = toIntegrityView(updated?.integrity, true);
+  return view ? { success: true, data: view } : { success: false, message: "Tekshiruv natijasi saqlanmadi" };
 }

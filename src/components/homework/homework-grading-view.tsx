@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { BellRing, ClipboardCheck, Clock, ChevronRight, RotateCcw, Check } from "lucide-react";
+import { BellRing, ClipboardCheck, Clock, ChevronRight, RotateCcw, Check, ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,11 @@ import { useToast } from "@/components/ui/toast";
 import { SubmissionContent } from "@/components/homework/submission-content";
 import { TaskAttachments } from "@/components/homework/task-attachments";
 import { AiReviewPanel } from "@/components/homework/ai-review-panel";
+import { IntegrityChips, IntegrityReport } from "@/components/homework/integrity-report";
 import {
   gradeHomeworkAction,
   returnHomeworkAction,
+  checkHomeworkIntegrityAction,
   remindMissingHomeworkAction,
   HomeworkRoster,
   HomeworkRosterRow,
@@ -88,6 +90,29 @@ export function HomeworkGradingView({
   const [tab, setTab] = useState<TabId>("all");
   const [selectedId, setSelectedId] = useState<string | null>(initialStudentId ?? null);
   const [isReminding, setIsReminding] = useState(false);
+  const router = useRouter();
+  // Tekshiruv qo'shilishidan oldin yuborilgan javoblar: mentor ularni bir bosishda tekshiradi
+  const unchecked = rows.filter((r) => r.submission && !r.submission.integrity);
+  const [checkProgress, setCheckProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const handleCheckAll = async () => {
+    const queue = unchecked.map((r) => r.submission!._id);
+    let failed = 0;
+    setCheckProgress({ done: 0, total: queue.length });
+    for (let i = 0; i < queue.length; i++) {
+      try {
+        const res = await checkHomeworkIntegrityAction(queue[i]);
+        if (!res.success) failed += 1;
+      } catch {
+        failed += 1;
+      }
+      setCheckProgress({ done: i + 1, total: queue.length });
+    }
+    setCheckProgress(null);
+    router.refresh();
+    if (failed > 0) toast.error(`${failed} ta javobni tekshirib bo'lmadi`);
+    else toast.success("Barcha javoblar tekshirildi");
+  };
 
   const visible = tab === "all" ? rows : rows.filter((r) => r.state === tab);
   // Keng ekranda hech kim tanlanmagan bo'lsa, birinchi tekshirilmagan javob o'zi ochiladi
@@ -150,6 +175,20 @@ export function HomeworkGradingView({
           <div className="flex flex-wrap items-center gap-2">
             {!roster.lesson.isPublished && <Badge variant="warning">Dars qoralamada</Badge>}
             <CoinBadge amount={roster.task.coinsReward} size="sm" animate={false} />
+            {(unchecked.length > 0 || checkProgress) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleCheckAll}
+                isLoading={Boolean(checkProgress)}
+                className="gap-1.5"
+              >
+                {!checkProgress && <ShieldCheck className="w-4 h-4" />}
+                {checkProgress
+                  ? `Tekshirilmoqda ${checkProgress.done}/${checkProgress.total}`
+                  : `Plagiat va AI: hammasini tekshirish (${unchecked.length})`}
+              </Button>
+            )}
             {pendingCount > 0 && (
               <Button variant="secondary" size="sm" onClick={handleRemind} isLoading={isReminding} className="gap-1.5">
                 <BellRing className="w-4 h-4" />
@@ -245,6 +284,7 @@ export function HomeworkGradingView({
                           {row.submission ? formatDateTimeUz(row.submission.submittedAt) : `@${row.login}`}
                           {row.submission?.isLate && <span className="ml-1 font-semibold text-rose-700 dark:text-rose-400">· kechikkan</span>}
                         </span>
+                        {row.submission?.integrity && <IntegrityChips integrity={row.submission.integrity} className="mt-0.5" />}
                       </span>
                       <span className="shrink-0">
                         {row.state === "graded" && row.submission ? (
@@ -394,6 +434,8 @@ function GradeForm({
         links={submission.links}
         files={submission.files}
       />
+
+      <IntegrityReport integrity={submission.integrity} submissionId={submission._id} mentor />
 
       <div className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-3">
         {aiEnabled && (

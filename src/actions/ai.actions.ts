@@ -13,7 +13,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { Group } from "@/lib/db/models/group.model";
-import { textSimilarity } from "@/lib/similarity";
+import { findSimilarSubmissions } from "@/lib/homework-integrity";
 import { quizQuestionSchema } from "@/lib/validations/quiz.schema";
 import type { IQuizQuestion } from "@/lib/db/models/quiz.model";
 import type { IMaterial } from "@/lib/db/models/lesson.model";
@@ -344,8 +344,6 @@ export async function generateHomeworkAction(
 const REVIEW_MAX_FILES = 6;
 const REVIEW_MAX_FILE_BYTES = 5 * 1024 * 1024;
 const REVIEW_MAX_TOTAL_BYTES = 15 * 1024 * 1024;
-// Shu foizdan o'xshash javob mentorga ko'rsatiladi va AI'ga solishtirish uchun beriladi
-const SIMILARITY_SHOW = 0.4;
 
 export interface SimilarSubmission {
   studentId: string;
@@ -356,42 +354,6 @@ export interface SimilarSubmission {
 }
 
 export type HomeworkReviewResult = HomeworkReview & { similar: SimilarSubmission[] };
-
-/** Shu vazifaga (boshqa guruhlardagi bog'langan nusxalari bilan) kelgan eng o'xshash javoblar */
-async function findSimilarSubmissions(
-  submission: { _id: mongoose.Types.ObjectId; studentId: string | mongoose.Types.ObjectId; text?: string },
-  lesson: { _id: mongoose.Types.ObjectId; linkId?: unknown },
-  instructions: string
-): Promise<(SimilarSubmission & { text: string })[]> {
-  if (!submission.text?.trim()) return [];
-  const lessonIds = lesson.linkId
-    ? (await Lesson.find({ linkId: lesson.linkId }).select("_id").lean()).map((l) => l._id)
-    : [lesson._id];
-  const others = await HomeworkSubmission.find({
-    lessonId: { $in: lessonIds },
-    _id: { $ne: submission._id },
-    studentId: { $ne: submission.studentId },
-    text: { $ne: "" },
-  })
-    .select("text studentId groupId lessonId")
-    .populate<{ studentId: { _id: mongoose.Types.ObjectId; fullName: string } | null }>("studentId", "fullName")
-    .populate<{ groupId: { name: string } | null }>("groupId", "name")
-    .lean();
-
-  return others
-    .map((o) => ({ o, score: textSimilarity(submission.text ?? "", o.text ?? "", instructions) }))
-    .filter(({ o, score }) => o.studentId && score >= SIMILARITY_SHOW)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map(({ o, score }) => ({
-      studentId: o.studentId!._id.toString(),
-      fullName: o.studentId!.fullName,
-      groupName: o.groupId?.name ?? "",
-      lessonId: o.lessonId.toString(),
-      percent: Math.round(score * 100),
-      text: o.text ?? "",
-    }));
-}
 
 /** Mentorga taxminiy ball va izoh taklif qiladi. Hech narsa saqlanmaydi — bahoni mentor o'zi qo'yadi */
 export async function suggestHomeworkReviewAction(submissionId: string): Promise<ActionResult<HomeworkReviewResult>> {
@@ -483,10 +445,10 @@ export async function suggestHomeworkReviewAction(submissionId: string): Promise
       data: {
         ...review,
         similar: similar.map((s) => ({
-          studentId: s.studentId,
+          studentId: s.studentId.toString(),
           fullName: s.fullName,
           groupName: s.groupName,
-          lessonId: s.lessonId,
+          lessonId: s.lessonId.toString(),
           percent: s.percent,
         })),
       },

@@ -11,6 +11,31 @@ export interface IHomeworkFile {
   size?: number;
 }
 
+export interface IIntegrityMatch {
+  submissionId: string | mongoose.Types.ObjectId;
+  studentId: string | mongoose.Types.ObjectId;
+  /** Tekshiruv paytidagi ism va guruh (keyin o'zgarsa ham hisobot o'qiladi) */
+  fullName: string;
+  groupName: string;
+  lessonId: string | mongoose.Types.ObjectId;
+  percent: number;
+}
+
+/**
+ * Javob yuborilganda avtomatik tekshiruv: boshqa javoblarga o'xshashlik (plagiat) va AI yozganlik ehtimoli.
+ * pending — tekshirilmoqda; done — tayyor; failed — AI qismi ishlamadi (o'xshashlik baribir hisoblangan)
+ */
+export interface IHomeworkIntegrity {
+  status: "pending" | "done" | "failed";
+  /** 0–100: eng o'xshash javob bilan moslik */
+  similarity: number;
+  matches: IIntegrityMatch[];
+  /** 0–100: AI yordamida yozilgan bo'lish ehtimoli; null — aniqlab bo'lmaydi (matn yo'q yoki juda qisqa) */
+  aiScore: number | null;
+  aiSignals: string[];
+  checkedAt: Date | string | null;
+}
+
 export interface IHomeworkSubmissionData {
   _id: string | mongoose.Types.ObjectId;
   lessonId: string | mongoose.Types.ObjectId;
@@ -28,6 +53,7 @@ export interface IHomeworkSubmissionData {
   coinsAwarded: number;
   gradedAt?: Date | string | null;
   gradedBy?: string | mongoose.Types.ObjectId | null;
+  integrity?: IHomeworkIntegrity | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -42,6 +68,30 @@ const HomeworkFileSchema = new Schema<IHomeworkFile>(
     name: { type: String, required: true, trim: true },
     mimeType: { type: String, trim: true },
     size: { type: Number },
+  },
+  { _id: false }
+);
+
+const IntegrityMatchSchema = new Schema<IIntegrityMatch>(
+  {
+    submissionId: { type: Schema.Types.ObjectId, ref: "HomeworkSubmission", required: true },
+    studentId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    fullName: { type: String, default: "" },
+    groupName: { type: String, default: "" },
+    lessonId: { type: Schema.Types.ObjectId, ref: "Lesson", required: true },
+    percent: { type: Number, required: true, min: 0, max: 100 },
+  },
+  { _id: false }
+);
+
+const IntegritySchema = new Schema<IHomeworkIntegrity>(
+  {
+    status: { type: String, enum: ["pending", "done", "failed"], default: "pending" },
+    similarity: { type: Number, default: 0, min: 0, max: 100 },
+    matches: [IntegrityMatchSchema],
+    aiScore: { type: Number, default: null, min: 0, max: 100 },
+    aiSignals: [{ type: String }],
+    checkedAt: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -68,6 +118,7 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
     coinsAwarded: { type: Number, default: 0 },
     gradedAt: { type: Date, default: null },
     gradedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    integrity: { type: IntegritySchema, default: null },
   },
   { timestamps: true }
 );

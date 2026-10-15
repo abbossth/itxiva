@@ -11,6 +11,7 @@ import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS } from "@/lib/homework-stat
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 import type { HomeworkInboxItem } from "@/actions/homework.actions";
+import { IntegrityChips } from "@/components/homework/integrity-report";
 
 type Tab = "pending" | "recent";
 
@@ -150,6 +151,7 @@ export function HomeworkInbox({
                     </Badge>
                     {r.isLate && <Badge variant="danger">Kechikkan</Badge>}
                     {r.attempt > 1 && <Badge variant="secondary">{r.attempt}-urinish</Badge>}
+                    <IntegrityChips integrity={r.integrity} />
                   </span>
                   <span className="block truncate text-sm text-slate-700 dark:text-slate-300">
                     <span className="text-slate-500 dark:text-slate-400">{r.order}-dars · </span>

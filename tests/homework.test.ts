@@ -4,6 +4,15 @@ import { actAs, clearDb, guardsMock, sessionFor, startDb, stopDb } from "./helpe
 
 vi.mock("@/lib/auth/guards", () => guardsMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// Fonda ishlaydigan plagiat/AI tekshiruvi: testda kutib olinadi
+const afterJobs: Promise<unknown>[] = [];
+vi.mock("next/server", () => ({ after: (job: () => unknown) => void afterJobs.push(Promise.resolve(job())) }));
+const flushAfter = async () => {
+  await Promise.all(afterJobs.splice(0));
+};
+const estimateAiWriting = vi.fn<(params: unknown) => Promise<{ score: number | null; signals: string[] }>>(async () => ({ score: 75, signals: ["Markdown: **Xulosa**"] }));
+vi.mock("@/lib/ai/detect-ai", () => ({ estimateAiWriting: (p: unknown) => estimateAiWriting(p) }));
+vi.stubEnv("GEMINI_API_KEY", "test");
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true, remaining: 99, resetInSeconds: 1 }), resetRateLimit: vi.fn() }));
 const sendNotifications = vi.fn(async (recipients: { ids: unknown[] }) => recipients.ids.length);
 vi.mock("@/lib/notifications/notify", () => ({
@@ -216,5 +225,85 @@ describe("uyga vazifa: darslar ro'yxati, jurnal va eslatma", () => {
     const draft = await seed({ published: false });
     actAs(sessionFor(draft.mentor));
     expect((await hw.remindMissingHomeworkAction(draft.lessonId)).success).toBe(false);
+  });
+});
+
+describe("uyga vazifa: plagiat va AI tekshiruvi", () => {
+  const answer = `1) 3 KB = 24 bayt chunki kilobaytda sakkiz bit bor deb hisobladim
+2) 2 GB = 2024 MB
+3) 0,5GB = 1/2=1024 * 3 = 3072GB qilib chiqdi`;
+
+  it("ko'chirilgan javob ikkala tomonda ham belgilanadi; o'quvchiga boshqaning ismi ko'rinmaydi", async () => {
+    const { student, lessonId, lesson } = await seed();
+    const copier = await User.create({
+      login: "vali", fullName: "Vali", role: "student", groupId: lesson.groupId, passwordHash: "x", totalCoins: 0, spendableBalance: 0,
+    });
+
+    actAs(sessionFor(student));
+    expect((await hw.submitHomeworkAction({ lessonId, text: answer, links: [], files: [] })).success).toBe(true);
+    expect((await HomeworkSubmission.findOne({ studentId: student._id }).lean())?.integrity?.status).toBe("pending");
+    await flushAfter();
+
+    actAs(sessionFor(copier));
+    await hw.submitHomeworkAction({ lessonId, text: answer.toUpperCase(), links: [], files: [] });
+    await flushAfter();
+
+    const copied = await HomeworkSubmission.findOne({ studentId: copier._id }).lean();
+    expect(copied?.integrity).toMatchObject({ status: "done", aiScore: 75, aiSignals: ["Markdown: **Xulosa**"] });
+    expect(copied?.integrity?.similarity).toBeGreaterThanOrEqual(90);
+    expect(copied?.integrity?.matches[0]).toMatchObject({ fullName: "ali" });
+
+    // Birinchi yuborgan o'quvchining hisobotiga ham ko'chirgan qo'shiladi
+    const source = await HomeworkSubmission.findOne({ studentId: student._id }).lean();
+    expect(source?.integrity?.similarity).toBeGreaterThanOrEqual(90);
+    expect(source?.integrity?.matches[0]).toMatchObject({ fullName: "Vali" });
+
+    const own = await hw.getHomeworkForStudent(lessonId);
+    expect(own?.submission?.integrity?.matches[0]).toEqual({ percent: source!.integrity!.similarity });
+
+    // Qayta yuborilgan, endi o'xshamaydigan javob ikkinchi tomondan ham olib tashlanadi
+    await hw.submitHomeworkAction({
+      lessonId,
+      text: "Men hammasini qaytadan o'zim yechdim: uch kilobayt uch ming yetmish ikki baytga teng bo'ladi, ikki gigabayt esa 2048 megabayt.",
+      links: [],
+      files: [],
+    });
+    await flushAfter();
+    expect((await HomeworkSubmission.findOne({ studentId: copier._id }).lean())?.integrity).toMatchObject({ similarity: 0, matches: [] });
+  });
+
+  it("bir xil fayl (nomi boshqa bo'lsa ham) plagiat deb topiladi; matnsiz javobda AI tekshirilmaydi", async () => {
+    const { student, lessonId, lesson } = await seed();
+    const copier = await User.create({
+      login: "vali", fullName: "Vali", role: "student", groupId: lesson.groupId, passwordHash: "x", totalCoins: 0, spendableBalance: 0,
+    });
+    const file = (owner: { _id: { toString(): string } }, name: string) => ({
+      key: `homework/${lessonId}/${owner._id.toString()}/${name}`, name, mimeType: "image/png", size: 48213,
+    });
+    actAs(sessionFor(student));
+    await hw.submitHomeworkAction({ lessonId, text: "", links: [], files: [file(student, "ekran.png")] });
+    actAs(sessionFor(copier));
+    await hw.submitHomeworkAction({ lessonId, text: "", links: [], files: [file(copier, "rasm.png")] });
+    await flushAfter();
+    estimateAiWriting.mockClear();
+
+    const copied = await HomeworkSubmission.findOne({ studentId: copier._id }).lean();
+    expect(copied?.integrity).toMatchObject({ status: "done", similarity: 100, aiScore: null });
+    expect(estimateAiWriting).not.toHaveBeenCalled();
+  });
+
+  it("mentor tekshiruvsiz eski javobni tekshiradi; o'quvchi bu amalni chaqira olmaydi", async () => {
+    const { mentor, student, lesson } = await seed();
+    const old = await HomeworkSubmission.create({
+      lessonId: lesson._id, groupId: lesson.groupId, studentId: student._id, text: answer, status: "submitted",
+    });
+    expect(old.integrity).toBeNull();
+
+    actAs(sessionFor(student));
+    await expect(hw.checkHomeworkIntegrityAction(old._id.toString())).rejects.toThrow();
+
+    actAs(sessionFor(mentor));
+    const res = await hw.checkHomeworkIntegrityAction(old._id.toString());
+    expect(res).toMatchObject({ success: true, data: { status: "done", similarity: 0, aiScore: 75 } });
   });
 });
