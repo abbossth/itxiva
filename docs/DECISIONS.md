@@ -232,3 +232,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Maqsadli reja: davomat (oxirgi 30 kundagi haqiqiy darslar soni / guruhlar × "kelgan" coini), kunlik kirish (~20 kun), kunlik topshiriqlar (~10 kun × "10 ta test" mukofoti), qolgani — asosiy topshiriq va marralar. Slayder `monthlyCoinTarget` ni saqlaydi.
 - Inflyatsiyaga qarshi: testdan kunlik chegara, mentor bonusining maksimumi, daraja bonusi shu sahifada ham o'zgartiriladi; "faqat birinchi to'g'ri javob" va "xarid reytingni tushirmaydi" — doimiy qoidalar (o'chirib bo'lmaydi).
 - Do'konda `Product.kind`: `item` (sovg'a), `privilege` (imtiyoz — oddiy buyurtma oqimi), `streak_shield` (seriya himoyasi — xarid qilinishi bilan beriladi, buyurtma "olingan" holatda, mentorga xabar yubormaydi, o'quvchida ko'pi bilan 2 ta). Gamifikatsiya o'chiq bo'lsa seriya himoyasi o'quvchiga ko'rinmaydi va sotilmaydi.
+
+### [2026-10-16] G10: Sayqal va dizayndan og'ishlar
+- "Yutuqlarim" (`/achievements`): profil ramkasi darajaga qarab (1–3 kulrang, 4–6 asosiy rang, 7–9 oltin, 10 binafsha). "O'qish yo'li" — mavzular emas, choraklar bo'yicha darslar (tugatilgan = vazifa topshirilgan yoki test yechilgan), chunki darslarda alohida mavzu/kurs tuzilmasi yo'q.
+- Mobil pastki panel: dizaynda "Bosh · Darslar · Topshiriqlar · Reyting · Profil". Davomat (darsda QR skanerlash) panelda qoldirildi; gamifikatsiya yoqilganda "Topshiriqlar" panelga chiqadi, "Vazifalarim" esa "Yana" ichiga o'tadi (soni "Yana" tugmasida ko'rinadi).
+- Mockupdagi `#4F46E5` o'rniga platformaning asosiy rangi (`teal-*` klasslari CSS o'zgaruvchilari orqali).
+- Animatsiyalar `prefers-reduced-motion` ni hurmat qiladi (konfetti, count-up, progress). Yangi sahifalar uchun skeleton (`loading.tsx`).
+- Yangi muhit o'zgaruvchilari yo'q (mavjud `CRON_SECRET` ishlatiladi); `vercel.json` o'zgarmadi.

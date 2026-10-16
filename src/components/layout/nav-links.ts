@@ -41,6 +41,8 @@ export interface NavLink {
   match?: string[];
   /** Faqat gamifikatsiya yoqilganda ko'rinadi */
   gamification?: boolean;
+  /** Gamifikatsiya yoqilganda mobil pastki paneldagi o'rni (`primary` o'rniga) */
+  primaryWithGamification?: boolean;
 }
 
 export type NavBadgeKind = "orders" | "homework" | "quests";
@@ -106,9 +108,9 @@ export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
 export const STUDENT_LINKS: NavLink[] = [
   { href: "/", label: "Bosh sahifa", shortLabel: "Bosh", icon: LayoutDashboard, primary: true },
   { href: "/lessons", label: "Darslarim", shortLabel: "Darslar", icon: BookOpen, primary: true },
-  { href: "/homework", label: "Vazifalarim", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, badge: "homework" },
+  { href: "/homework", label: "Vazifalarim", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, primaryWithGamification: false, badge: "homework" },
   { href: "/exams", label: "Imtihonlarim", shortLabel: "Imtihon", icon: GraduationCap },
-  { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true },
+  { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true, primaryWithGamification: true },
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
@@ -118,7 +120,9 @@ export const STUDENT_LINKS: NavLink[] = [
 
 /** Rol bo'yicha menyu havolalari; gamifikatsiya o'chiq bo'lsa uning sahifalari ko'rinmaydi */
 export function navLinksFor(role: "mentor" | "student", gamification: boolean): NavLink[] {
-  return (role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS).filter((l) => gamification || !l.gamification);
+  return (role === "mentor" ? MENTOR_LINKS : STUDENT_LINKS)
+    .filter((l) => gamification || !l.gamification)
+    .map((l) => (gamification && l.primaryWithGamification !== undefined ? { ...l, primary: l.primaryWithGamification } : l));
 }
 
 /** Mentor bo'limlari (tablar); bo'sh qolgan bo'lim chiqarib tashlanadi */

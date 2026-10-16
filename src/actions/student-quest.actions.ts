@@ -17,6 +17,9 @@ import { addDaysToKey } from "@/lib/schedule";
 import { LEGACY_EARNING_TYPES } from "@/lib/gamification/backfill";
 import type { LevelSummary } from "./gamification.actions";
 import { Group } from "@/lib/db/models/group.model";
+import { Lesson } from "@/lib/db/models/lesson.model";
+import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
+import { QuizSubmission } from "@/lib/db/models/quiz-submission.model";
 import { StudentBadge } from "@/lib/db/models/student-badge.model";
 import { badgeMetrics, groupMonthAttendance } from "@/lib/gamification/achievements";
 import { BADGES, nextTier, type BadgeId, type BadgeTier } from "@/lib/gamification/badges";
@@ -246,5 +249,112 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
     },
     milestones,
     challenge,
+  };
+}
+
+// ---------- Yutuqlarim (03/07) ----------
+
+export interface AchievementsData {
+  profile: { fullName: string; groupName: string; grade: number | null; joinedAt: string | null };
+  level: LevelSummary;
+  streak: number;
+  badgesOwned: number;
+  badgesTotal: number;
+  levelUpBonus: number;
+  levels: { level: number; name: string; minXp: number; state: "passed" | "current" | "future" }[];
+  badges: { id: BadgeId; title: string; description: string; value: number; tier: BadgeTier | null; next: { tier: BadgeTier; threshold: number } | null }[];
+  path: { quarter: number; total: number; done: number; state: "done" | "current" | "future"; nextLesson: string | null }[];
+  submissions: { _id: string; questId: string; title: string; detail: string; date: string; status: "pending" | "approved" | "rejected"; coins: number; reason: string; revoked: boolean }[];
+}
+
+const TIER_RANK: Record<BadgeTier, number> = { bronze: 1, silver: 2, gold: 3 };
+
+export async function getAchievementsData(): Promise<AchievementsData | null> {
+  const session = await requireStudent();
+  const settings = await getAppSettings();
+  const { gamification } = settings;
+  if (!gamification.enabled) return null;
+  await connectToDatabase();
+  const user = await User.findById(session.userId).select("fullName groupId createdAt xp spendableBalance streak streakShields").lean();
+  if (!user) return null;
+  const group = user.groupId ? await Group.findById(user.groupId).select("name shortName grade").lean() : null;
+
+  const levels = buildLevels(gamification.levelThresholds);
+  const p = levelProgress(user.xp ?? 0, levels);
+
+  const [metrics, owned, subs] = await Promise.all([
+    badgeMetrics(user._id),
+    StudentBadge.find({ studentId: user._id }).select("badge tier").lean(),
+    QuestSubmission.find({ studentId: user._id, auto: false }).sort({ submittedAt: -1 }).limit(20).lean(),
+  ]);
+  const quests = await Quest.find({ _id: { $in: [...new Set(subs.map((s) => String(s.questId)))] } }).select("title").lean();
+  const questTitle = new Map(quests.map((q) => [String(q._id), q.title]));
+
+  // O'qish yo'li: guruhning nashr etilgan darslari choraklar bo'yicha; tugatilgan — vazifa topshirilgan yoki test yechilgan
+  const lessons = user.groupId
+    ? await Lesson.find({ groupId: user.groupId, isPublished: true }).select("title quarter order").sort({ quarter: 1, order: 1 }).lean()
+    : [];
+  const lessonIds = lessons.map((l) => l._id);
+  const [hw, quiz] = await Promise.all([
+    HomeworkSubmission.distinct("lessonId", { studentId: user._id, lessonId: { $in: lessonIds }, status: { $in: ["submitted", "graded"] } }),
+    QuizSubmission.distinct("lessonId", { studentId: user._id, lessonId: { $in: lessonIds } }),
+  ]);
+  const doneSet = new Set([...hw, ...quiz].map(String));
+  const path = [1, 2, 3, 4]
+    .map((quarter) => {
+      const qLessons = lessons.filter((l) => l.quarter === quarter);
+      const done = qLessons.filter((l) => doneSet.has(String(l._id))).length;
+      const state: "done" | "current" | "future" =
+        quarter === settings.quarter ? "current" : quarter < settings.quarter ? "done" : "future";
+      return {
+        quarter,
+        total: qLessons.length,
+        done,
+        state,
+        nextLesson: qLessons.find((l) => !doneSet.has(String(l._id)))?.title ?? null,
+      };
+    })
+    .filter((q) => q.total > 0 || q.state !== "done");
+
+  return {
+    profile: {
+      fullName: user.fullName,
+      groupName: group ? groupShortName(group) : "",
+      grade: group?.grade ?? null,
+      joinedAt: user.createdAt ? new Date(user.createdAt).toISOString() : null,
+    },
+    level: {
+      level: p.current.level,
+      name: p.current.name,
+      xp: p.xp,
+      nextXp: p.next?.minXp ?? null,
+      nextName: p.next?.name ?? null,
+      percent: p.percent,
+      toNext: p.toNext,
+      balance: user.spendableBalance ?? 0,
+    },
+    streak: effectiveStreak(user.streak, dayKey(), user.streakShields ?? 0),
+    badgesOwned: owned.length,
+    badgesTotal: BADGES.reduce((s, b) => s + b.tiers.length, 0),
+    levelUpBonus: gamification.levelUpBonus,
+    levels: levels.map((l) => ({ ...l, state: l.level < p.current.level ? "passed" : l.level === p.current.level ? "current" : "future" })),
+    badges: BADGES.map((b) => {
+      const tiers = owned.filter((o) => o.badge === b.id).map((o) => o.tier as BadgeTier);
+      const top = tiers.sort((x, y) => TIER_RANK[y] - TIER_RANK[x])[0] ?? null;
+      const n = nextTier(b, metrics[b.id]);
+      return { id: b.id, title: b.title, description: b.description, value: metrics[b.id], tier: top, next: n ? { tier: n.tier, threshold: n.threshold } : null };
+    }),
+    path,
+    submissions: subs.map((s) => ({
+      _id: String(s._id),
+      questId: String(s.questId),
+      title: questTitle.get(String(s.questId)) ?? "Topshiriq",
+      detail: [s.evidence?.platform, s.evidence?.courseName].filter(Boolean).join(" · "),
+      date: new Date(s.submittedAt).toISOString(),
+      status: s.status,
+      coins: s.coins ?? 0,
+      reason: s.rejectReason ?? "",
+      revoked: Boolean(s.revokedAt),
+    })),
   };
 }

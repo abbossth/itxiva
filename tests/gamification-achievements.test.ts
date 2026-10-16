@@ -47,6 +47,16 @@ describe("seriyani ko'rsatish", () => {
     expect(effectiveStreak(null, "2026-10-17", 0)).toBe(0);
   });
 
+  it("kun Toshkent yarim tunida almashadi (UTC+5): 23:59 — o'sha kun, 00:01 — keyingi kun", async () => {
+    const { dayKey } = await import("@/lib/gamification/periods");
+    const { stepStreak } = await import("@/lib/gamification/streak");
+    expect(dayKey(new Date("2026-10-16T18:59:00Z"))).toBe("2026-10-16");
+    expect(dayKey(new Date("2026-10-16T19:01:00Z"))).toBe("2026-10-17");
+    // 23:59 da kirgan, 00:01 da yana kirgan — ketma-ket ikki kun
+    const first = stepStreak(null, dayKey(new Date("2026-10-16T18:59:00Z")), 0).next;
+    expect(stepStreak(first, dayKey(new Date("2026-10-16T19:01:00Z")), 0).next.current).toBe(2);
+  });
+
   it("hafta kaliti Toshkent bo'yicha: yakshanba 23:30 va dushanba 00:10 turli haftalar", () => {
     expect(weekKey(new Date("2026-10-18T23:30:00+05:00"))).toBe("2026-W42");
     expect(weekKey(new Date("2026-10-19T00:10:00+05:00"))).toBe("2026-W43");
