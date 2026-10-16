@@ -19,6 +19,8 @@ export interface IUserData {
   notificationPrefs?: Record<string, boolean> | null;
   /** Reytingdagi salyut (konfetti, ovoz, titrash). Yozilmagan bo'lsa — yoqilgan */
   celebrationsEnabled?: boolean;
+  /** Mukofot tabrigi ko'rsatilgan oxirgi coin/XP yozuvi vaqti; null — hali boshlanmagan */
+  rewardsSeenAt?: Date | null;
   /** Tajriba: hech qachon sarflanmaydi; daraja va reyting shu bo'yicha (gamifikatsiya) */
   xp?: number;
   /** Joriy daraja (1–10). Daraja bonusi berilganini LevelReward saqlaydi */
@@ -116,6 +118,7 @@ const UserSchema = new Schema<IUser>(
     },
     notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
     celebrationsEnabled: { type: Boolean, default: true },
+    rewardsSeenAt: { type: Date, default: null },
     xp: { type: Number, default: 0, min: 0 },
     level: { type: Number, default: 1, min: 1 },
     pendingLevelUp: { type: Number, default: null },

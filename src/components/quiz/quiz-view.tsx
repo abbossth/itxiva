@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IQuizData } from "@/lib/db/models/quiz.model";
 import { IQuizSubmissionData, QuizSubmissionStatus } from "@/lib/db/models/quiz-submission.model";
 import { submitQuizAction } from "@/actions/quiz.actions";
+import { requestRewardCheck } from "@/lib/rewards-client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,8 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
         });
         // To'g'ri javoblar va tushuntirishlarni serverdan qayta yuklash
         router.refresh();
+        // To'g'ri javoblar uchun coin javobdan keyin yoziladi — mukofot oynasi shuni kutadi
+        requestRewardCheck();
       }
     } catch {
       setError("Server bilan aloqada xatolik");

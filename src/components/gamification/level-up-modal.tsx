@@ -9,6 +9,7 @@ import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { acknowledgeLevelUpAction, type LevelUpInfo } from "@/actions/gamification.actions";
 import { fireConfetti } from "@/lib/confetti";
 import { formatNumberUz } from "@/lib/utils";
+import { LEVEL_UP_CLOSED_EVENT } from "@/lib/rewards-client";
 
 /** Yangi darajaga chiqqanda bir marta ko'rsatiladigan tabrik oynasi */
 export function LevelUpModal({ info }: { info: LevelUpInfo }) {
@@ -29,6 +30,8 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
     setOpen(false);
     // Ko'rildi deb belgilanadi; xato bo'lsa keyingi kirishda yana ko'rinadi — bu zararsiz
     void acknowledgeLevelUpAction().catch(() => {});
+    // Kutib turgan coin/XP tabrigi endi ko'rsatilishi mumkin
+    window.dispatchEvent(new Event(LEVEL_UP_CLOSED_EVENT));
     if (goTo) router.push(goTo);
   };
 

@@ -123,3 +123,41 @@ export function playFireworksSound(delays: number[] = [0], volume = 1): void {
     })
     .catch(() => clearTimeout(timer));
 }
+
+function tone(audio: AudioContext, type: OscillatorType, frequency: number, startAt: number, duration: number, peak: number): void {
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = type;
+  osc.frequency.value = frequency;
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(startAt);
+  osc.stop(startAt + duration + 0.05);
+}
+
+/**
+ * Mukofot ovozi: o'yindagidek tanga "ting"i va yuqoriga ko'tariluvchi arpeggio.
+ * Brauzer ruxsat bermagan bo'lsa (sahifa hali bosilmagan) — jim o'tkazib yuboriladi.
+ */
+export function playRewardSound(volume = 1): void {
+  const audio = getContext();
+  if (!audio) return;
+  const play = () => {
+    const t = audio.currentTime;
+    tone(audio, "square", 987.8, t, 0.09, 0.08 * volume);
+    tone(audio, "square", 1318.5, t + 0.08, 0.4, 0.08 * volume);
+    [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tone(audio, "triangle", f, t + 0.5 + i * 0.075, 0.3, 0.2 * volume));
+  };
+  if (audio.state === "running") {
+    play();
+    return;
+  }
+  audio
+    .resume()
+    .then(() => {
+      if (audio.state === "running") play();
+    })
+    .catch(() => {});
+}

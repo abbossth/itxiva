@@ -11,7 +11,17 @@ import { getAppSettings } from "@/lib/settings";
 import { decryptField, encryptField } from "@/lib/field-crypto";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { ownProfileSchema, studentProfileSchema, type OwnProfileInput, type StudentProfileInput } from "@/lib/validations/student-profile.schema";
-import { getStudentReport, type StudentReport } from "@/actions/report.actions";
+import { getMyReport, getStudentReport, type StudentReport } from "@/actions/report.actions";
+import { Group } from "@/lib/db/models/group.model";
+import { Quest } from "@/lib/db/models/quest.model";
+import { QuestSubmission } from "@/lib/db/models/quest-submission.model";
+import { StudentBadge } from "@/lib/db/models/student-badge.model";
+import { BADGE_COUNT } from "@/lib/gamification/badges";
+import { buildLevels, levelProgress } from "@/lib/gamification/levels";
+import { effectiveStreak } from "@/lib/gamification/streak";
+import { dayKey, monthKey } from "@/lib/gamification/periods";
+import { groupMonthAttendance } from "@/lib/gamification/achievements";
+import { formatSchedule, getNextLesson } from "@/lib/schedule";
 import { describeAudit } from "@/lib/audit-format";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { ActionResult } from "./auth.actions";
@@ -280,4 +290,136 @@ export async function setOwnPhotoAction(key: unknown): Promise<ActionResult<{ ph
   revalidatePath(`/mentor/students/${session.userId}`);
   if (session.groupId) revalidatePath(`/mentor/groups/${session.groupId}`);
   return { success: true, message: key ? "Rasm saqlandi" : "Rasm olib tashlandi", data: { photoUrl: await photoUrlOf(key) } };
+}
+
+export interface MyGroupInfo {
+  name: string;
+  grade: number;
+  academicYear: string;
+  schedule: string;
+  nextLesson: { label: string; isNow: boolean } | null;
+  students: number;
+  /** Joriy oyda guruh davomati, % */
+  monthAttendance: number | null;
+  /** Reytingdagi o'rnim (yashirilgan o'quvchilarsiz) */
+  myRank: number | null;
+  /** Guruh reytingining boshi: o'quvchining o'zi har doim belgilanadi */
+  top: { name: string; value: number; rank: number; isMe: boolean }[];
+}
+
+export interface MyProfileData {
+  report: StudentReport;
+  photoUrl: string | null;
+  personal: OwnProfileInput;
+  canEdit: boolean;
+  createdAt: string | null;
+  group: MyGroupInfo | null;
+  /** Reyting o'lchovi: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin */
+  unit: "XP" | "coin";
+  gamification: {
+    level: number;
+    levelName: string;
+    xp: number;
+    percent: number;
+    toNext: number;
+    nextName: string | null;
+    streak: number;
+    bestStreak: number;
+    shields: number;
+    badges: number;
+    badgeTotal: number;
+  } | null;
+  quests: { title: string; status: "pending" | "approved" | "rejected"; coins: number; at: string }[];
+}
+
+/** O'quvchining o'z profili: o'zi, guruhi, natijalari va tarixlari */
+export async function getMyProfile(): Promise<MyProfileData | null> {
+  const session = await requireStudent();
+  const report = await getMyReport();
+  if (!report) return null;
+  await connectToDatabase();
+
+  const [user, profile, settings] = await Promise.all([
+    User.findById(session.userId).select("groupId createdAt xp streak streakShields isHiddenFromLeaderboard").lean(),
+    loadProfile(session.userId),
+    getAppSettings(),
+  ]);
+  const xpMode = settings.gamification.enabled;
+  const field = xpMode ? "xp" : "totalCoins";
+  const groupId = user?.groupId ?? null;
+
+  const [group, classmates, monthMap, badges, submissions] = await Promise.all([
+    groupId ? Group.findById(groupId).select("name grade academicYear schedule").lean() : null,
+    groupId
+      ? User.find({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true } })
+          .select(`fullName ${field}`)
+          .sort({ [field]: -1, fullName: 1 })
+          .lean()
+      : [],
+    groupId ? groupMonthAttendance(monthKey(), [groupId]) : new Map<string, number>(),
+    xpMode ? StudentBadge.countDocuments({ studentId: session.userId }) : 0,
+    QuestSubmission.find({ studentId: session.userId })
+      .select("questId status coins submittedAt reviewedAt createdAt")
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean(),
+  ]);
+  const questTitles = new Map(
+    (await Quest.find({ _id: { $in: submissions.map((q) => q.questId) } }).select("title").lean()).map((q) => [String(q._id), q.title])
+  );
+
+  // Teng ko'rsatkichdagilar bir xil o'rinda (reyting sahifasidagidek)
+  const valueOf = (u: (typeof classmates)[number]) => Math.max(0, Math.round((xpMode ? u.xp : u.totalCoins) ?? 0));
+  const ranked = classmates.map((u, i) => ({ u, value: valueOf(u), rank: i + 1 }));
+  for (let i = 1; i < ranked.length; i++) if (ranked[i].value === ranked[i - 1].value) ranked[i].rank = ranked[i - 1].rank;
+  const me = ranked.find((r) => String(r.u._id) === session.userId) ?? null;
+  const top = ranked.slice(0, 3);
+  if (me && !top.includes(me)) top.push(me);
+
+  const next = group ? getNextLesson(group.schedule) : null;
+  const levels = buildLevels(settings.gamification.levelThresholds);
+  const p = levelProgress(user?.xp ?? 0, levels);
+
+  return {
+    report,
+    photoUrl: await photoUrlOf(profile?.photoKey),
+    personal: toOwnData(profile),
+    canEdit: settings.studentProfileEdit,
+    createdAt: user?.createdAt ? new Date(user.createdAt).toISOString() : null,
+    unit: xpMode ? "XP" : "coin",
+    group: group
+      ? {
+          name: group.name,
+          grade: group.grade,
+          academicYear: group.academicYear,
+          schedule: formatSchedule(group.schedule),
+          nextLesson: next ? { label: next.label, isNow: next.isNow } : null,
+          students: classmates.length,
+          monthAttendance: monthMap.get(String(group._id)) ?? null,
+          myRank: me?.rank ?? null,
+          top: top.map((r) => ({ name: r.u.fullName, value: r.value, rank: r.rank, isMe: r === me })),
+        }
+      : null,
+    gamification: xpMode
+      ? {
+          level: p.current.level,
+          levelName: p.current.name,
+          xp: p.xp,
+          percent: p.percent,
+          toNext: p.toNext,
+          nextName: p.next?.name ?? null,
+          streak: effectiveStreak(user?.streak, dayKey(), user?.streakShields ?? 0),
+          bestStreak: user?.streak?.best ?? 0,
+          shields: user?.streakShields ?? 0,
+          badges,
+          badgeTotal: BADGE_COUNT,
+        }
+      : null,
+    quests: submissions.map((q) => ({
+      title: questTitles.get(String(q.questId)) ?? "Topshiriq",
+      status: q.status,
+      coins: q.coins ?? 0,
+      at: new Date(q.reviewedAt ?? q.submittedAt ?? q.createdAt ?? Date.now()).toISOString(),
+    })),
+  };
 }

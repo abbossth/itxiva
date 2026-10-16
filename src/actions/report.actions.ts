@@ -13,7 +13,7 @@ import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
 import { Exam } from "@/lib/db/models/exam.model";
 import { Lesson } from "@/lib/db/models/lesson.model";
 import { Order, OrderStatus } from "@/lib/db/models/order.model";
-import { requireMentor } from "@/lib/auth/guards";
+import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { latestAttempts } from "@/lib/exam-attempts";
 import { dateFromKey, addDaysToKey, toDateKey } from "@/lib/schedule";
 
@@ -428,21 +428,39 @@ export interface StudentReport {
   homework: { lessonId: string; title: string; status: HomeworkStatus; score: number | null; isLate: boolean; submittedAt: string | null }[];
   exams: { title: string; attemptNumber: number; isMain: boolean; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
   ledger: { amount: number; type: CoinTransactionType; description: string; balanceAfter: number | null; createdAt: string | null }[];
+  /** XP harakati (gamifikatsiyadan keyingi yozuvlar; "xp_align" — oldingi coinlardan boshlang'ich XP) */
+  xpHistory: { xp: number; type: CoinTransactionType; description: string; createdAt: string | null }[];
   orders: { productTitle: string; price: number; status: OrderStatus; createdAt: string | null }[];
 }
 
 const iso = (d?: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
-/** Bitta o'quvchi bo'yicha to'liq hisobot */
+/** Bitta o'quvchi bo'yicha to'liq hisobot (mentor uchun) */
 export async function getStudentReport(studentId: string): Promise<StudentReport | null> {
   await requireMentor();
-  if (!mongoose.isValidObjectId(studentId)) return null;
+  if (typeof studentId !== "string" || !mongoose.isValidObjectId(studentId)) return null;
+  return loadStudentReport(studentId);
+}
+
+/** O'quvchining o'z hisoboti (profil sahifasi): faqat o'ziniki */
+export async function getMyReport(): Promise<StudentReport | null> {
+  const session = await requireStudent();
+  const report = await loadStudentReport(session.userId);
+  if (!report) return null;
+  // Mentorning davomatga yozgan izohlari o'quvchiga ko'rsatilmaydi
+  return {
+    ...report,
+    attendance: { ...report.attendance, records: report.attendance.records.map((r) => ({ ...r, notes: "" })) },
+  };
+}
+
+async function loadStudentReport(studentId: string): Promise<StudentReport | null> {
   await connectToDatabase();
 
   const student = await User.findOne({ _id: studentId, role: "student" }).select("-passwordHash").lean();
   if (!student) return null;
 
-  const [group, records, quizSubs, examSubs, ledger, orders, homeworkSubs] = await Promise.all([
+  const [group, records, quizSubs, examSubs, ledger, orders, homeworkSubs, xpRows] = await Promise.all([
     student.groupId ? Group.findById(student.groupId).select("name").lean() : null,
     AttendanceRecord.find({ studentId }).select("sessionId status notes").lean(),
     QuizSubmission.find({ studentId }).select("lessonId totalScore maxScore status submittedAt").sort({ submittedAt: -1 }).lean(),
@@ -456,6 +474,11 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       .select("lessonId status score isLate submittedAt")
       .sort({ submittedAt: -1 })
       .limit(100)
+      .lean(),
+    CoinLedger.find({ studentId, xp: { $exists: true, $ne: 0 } })
+      .select("xp type description createdAt")
+      .sort({ createdAt: -1 })
+      .limit(300)
       .lean(),
   ]);
 
@@ -526,6 +549,12 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       type: l.type,
       description: l.description,
       balanceAfter: typeof l.balanceAfter === "number" ? l.balanceAfter : null,
+      createdAt: iso(l.createdAt),
+    })),
+    xpHistory: xpRows.map((l) => ({
+      xp: l.xp ?? 0,
+      type: l.type,
+      description: l.type === "xp_align" ? "Boshlang'ich XP: gamifikatsiyagacha yig'ilgan coinlar" : l.description,
       createdAt: iso(l.createdAt),
     })),
     orders: orders.map((o) => ({ productTitle: o.productTitle, price: o.price, status: o.status, createdAt: iso(o.createdAt) })),

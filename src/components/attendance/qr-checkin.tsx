@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { fireConfetti } from "@/lib/confetti";
+import { requestRewardCheck } from "@/lib/rewards-client";
 import { CheckCircle2, AlertCircle, Loader2, ArrowRight, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CoinBadge } from "@/components/ui/coin-badge";
@@ -28,9 +28,8 @@ export function QrCheckin({ token }: QrCheckinProps) {
         if (res.success) {
           setStatus("success");
           setMessage(res.message || "Davomat muvaffaqiyatli belgilandi!");
-          setCoinsEarned(res.data?.coinsEarned || 10);
-
-          fireConfetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
+          setCoinsEarned(res.data?.coinsEarned ?? 0);
+          requestRewardCheck();
         } else {
           setStatus("error");
           setMessage(res.message || "Davomatdan o'tib bo'lmadi");

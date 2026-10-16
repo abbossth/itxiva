@@ -1,9 +1,10 @@
+import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
-import { Group } from "@/lib/db/models/group.model";
 import { ProfileView } from "@/components/profile/profile-view";
-import { getOwnProfile } from "@/actions/student-profile.actions";
+import { MyProfileView } from "@/components/profile/my-profile-view";
+import { getMyProfile } from "@/actions/student-profile.actions";
 import { getTelegramStatus } from "@/actions/telegram.actions";
 
 export const metadata = {
@@ -14,34 +15,28 @@ export default async function ProfilePage() {
   const session = await requireAuth();
   await connectToDatabase();
 
-  const [user, telegram, ownProfile] = await Promise.all([
-    User.findById(session.userId).select("fullName login groupId totalCoins spendableBalance celebrationsEnabled").lean(),
+  const [user, telegram] = await Promise.all([
+    User.findById(session.userId).select("fullName login celebrationsEnabled").lean(),
     getTelegramStatus(),
-    session.role === "student" ? getOwnProfile() : null,
   ]);
-  let groupName: string | undefined;
+  const fullName = user?.fullName || session.fullName;
+  const login = user?.login || session.login;
+  const celebrationsEnabled = user?.celebrationsEnabled !== false;
 
-  if (user?.groupId) {
-    const group = await Group.findById(user.groupId).lean();
-    if (group) {
-      groupName = group.name;
-    }
+  if (session.role === "student") {
+    const data = await getMyProfile();
+    if (!data) notFound();
+    return (
+      <MyProfileView
+        data={data}
+        userId={session.userId}
+        fullName={fullName}
+        login={login}
+        telegram={telegram}
+        celebrationsEnabled={celebrationsEnabled}
+      />
+    );
   }
 
-  return (
-    <ProfileView
-      telegram={telegram}
-      ownProfile={ownProfile}
-      celebrationsEnabled={user?.celebrationsEnabled !== false}
-      user={{
-        userId: session.userId,
-        fullName: user?.fullName || session.fullName,
-        login: user?.login || session.login,
-        role: session.role,
-        groupName,
-        totalCoins: user?.totalCoins || 0,
-        spendableBalance: user?.spendableBalance || 0,
-      }}
-    />
-  );
+  return <ProfileView telegram={telegram} celebrationsEnabled={celebrationsEnabled} user={{ fullName, login }} />;
 }

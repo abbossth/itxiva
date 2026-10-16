@@ -403,3 +403,55 @@ h1,
   50% { opacity: 0.6; transform: scale(1.08); }
 }
 .hero-glow { animation: hero-glow 5s ease-in-out infinite; }
+
+/* Mukofot oynasi (coin/XP olinganda): karta sakrab chiqadi, tanga aylanadi, nurlar sekin buriladi */
+@keyframes reward-pop {
+  0% { opacity: 0; transform: translateY(24px) scale(0.7); }
+  55% { opacity: 1; transform: translateY(-6px) scale(1.04); }
+  75% { transform: translateY(2px) scale(0.99); }
+  100% { opacity: 1; transform: none; }
+}
+.reward-pop { animation: reward-pop 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes reward-rays { to { transform: rotate(360deg); } }
+.reward-rays { animation: reward-rays 14s linear infinite; }
+
+@keyframes reward-coin {
+  0% { transform: translateY(-40px) scale(0.3) rotateY(0deg); opacity: 0; }
+  45% { transform: translateY(6px) scale(1.12) rotateY(540deg); opacity: 1; }
+  70% { transform: translateY(-4px) scale(0.97) rotateY(680deg); }
+  100% { transform: none; }
+}
+@keyframes reward-coin-idle {
+  0%, 100% { transform: translateY(0) rotateY(0deg); }
+  50% { transform: translateY(-6px) rotateY(180deg); }
+}
+.reward-coin {
+  animation: reward-coin 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards, reward-coin-idle 3.2s ease-in-out 1.3s infinite;
+  transform-style: preserve-3d;
+}
+
+@keyframes reward-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(90deg); }
+}
+.reward-twinkle { animation: reward-twinkle 1.8s ease-in-out infinite; }
+
+@keyframes reward-number {
+  0% { opacity: 0; transform: scale(2.2); filter: blur(6px); }
+  60% { opacity: 1; transform: scale(0.92); filter: none; }
+  100% { opacity: 1; transform: none; }
+}
+.reward-number { animation: reward-number 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.45s backwards; }
+
+@keyframes reward-item {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+.reward-item { animation: reward-item 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+@keyframes reward-shine {
+  0%, 55% { transform: translateX(-120%) skewX(-20deg); }
+  100% { transform: translateX(320%) skewX(-20deg); }
+}
+.reward-shine { animation: reward-shine 2.6s ease-in-out 1s infinite; }

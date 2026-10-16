@@ -13,6 +13,7 @@ import { getAppSettings } from "@/lib/settings";
 import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
+import { RewardCelebration } from "@/components/gamification/reward-celebration";
 import { accentCss } from "@/lib/theme-accents";
 
 export default async function DashboardLayout({
@@ -78,6 +79,9 @@ export default async function DashboardLayout({
 
       {/* Yangi daraja: o'quvchi keyingi kirishida bir marta tabriklanadi */}
       {levelState?.levelUp && <LevelUpModal key={levelState.levelUp.level} info={levelState.levelUp} />}
+
+      {/* Coin yoki XP olinganda: o'yindagidek tabrik (daraja oynasidan keyin) */}
+      {session.role === "student" && <RewardCelebration waitForLevelUp={Boolean(levelState?.levelUp)} />}
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
       <CommandPaletteTrigger role={session.role} gamification={gamification} />

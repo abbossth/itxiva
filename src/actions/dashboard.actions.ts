@@ -12,6 +12,7 @@ import { AttendanceRecord } from "@/lib/db/models/attendance-record.model";
 import { HomeworkSubmission, HomeworkStatus } from "@/lib/db/models/homework-submission.model";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { formatSchedule, getNextLesson, hasLessonOn } from "@/lib/schedule";
+import { getAppSettings } from "@/lib/settings";
 import type { HomeworkState } from "@/lib/homework-status";
 
 export interface StudentDashboard {
@@ -37,9 +38,15 @@ export async function getStudentDashboard(): Promise<StudentDashboard> {
   const session = await requireStudent();
   await connectToDatabase();
 
-  const me = await User.findById(session.userId).select("fullName groupId totalCoins spendableBalance").lean();
+  const [me, settings] = await Promise.all([
+    User.findById(session.userId).select("fullName groupId totalCoins spendableBalance xp").lean(),
+    getAppSettings(),
+  ]);
   const groupId = me?.groupId ?? null;
   const totalCoins = me?.totalCoins ?? 0;
+  // O'rin reyting sahifasi bilan bir xil o'lchovda: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin
+  const rankField = settings.gamification.enabled ? "xp" : "totalCoins";
+  const myValue = (settings.gamification.enabled ? me?.xp : me?.totalCoins) ?? 0;
 
   const [group, activeSession, homeworkLessons, recentLessons, ahead, groupSize, ordersToConfirm] = await Promise.all([
     groupId ? Group.findById(groupId).select("name schedule").lean() : null,
@@ -55,7 +62,7 @@ export async function getStudentDashboard(): Promise<StudentDashboard> {
       ? Lesson.find({ groupId, isPublished: true }).select("title order quarter date").sort({ date: -1, order: -1 }).limit(3).lean()
       : [],
     groupId
-      ? User.countDocuments({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true }, totalCoins: { $gt: totalCoins } })
+      ? User.countDocuments({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true }, [rankField]: { $gt: myValue } })
       : 0,
     groupId ? User.countDocuments({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true } }) : 0,
     Order.countDocuments({ studentId: session.userId, status: "handed_over" }),

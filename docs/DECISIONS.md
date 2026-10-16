@@ -246,3 +246,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - XP kamayishi ham mumkin (jarimasi ko'p o'quvchilarda) — eski reytingdagi tartib aynan saqlanishi uchun. Saqlangan daraja pasaytirilmaydi; daraja bonusi va tabrik oynasi berilmaydi.
 - `xp_align` yozuvi haftalik XP, hisobotlar va o'quvchi coin tarixiga kirmaydi.
 - Bundan keyin XP va coin reytingi biroz ajralishi mumkin: jarima coinni kamaytiradi, XP ni emas (G1 qoidasi).
+
+### [2026-10-16] G12: O'quvchi profili va mukofot tabrigi
+- Profil (o'quvchi): men (rasm daraja ramkasi bilan, daraja va XP), ko'rsatkichlar (XP, jami coin, balans, seriya, guruhdagi o'rin), "Guruhim" (jadval, keyingi dars, oylik davomat, reyting boshi va o'zim), "Natijalarim", tablar: amallar tarixi, coin tarixi, XP tarixi, baholar, davomat; sozlamalar pastda. Avvalgi qotirib yozilgan (soxta) nishonlar bloki olib tashlandi.
+- Hisobot mentor va o'quvchi uchun bitta funksiyadan (`loadStudentReport`); o'quvchi faqat o'zinikini oladi, mentorning davomat izohlari unga berilmaydi. Bloklar `report-blocks.tsx` da umumiy.
+- Mukofot tabrigi: `User.rewardsSeenAt` dan keyingi musbat coin/XP yozuvlari (xarid, jarima/qaytarish, XP tenglashtirish va daraja bonusidan tashqari) bitta oynada jamlanadi. Birinchi ochilishda hisob boshlanadi (eski tarix ko'rsatilmaydi). Sahifa ochilganda/almashganda (15 soniyada bir martadan ko'p emas), oynaga qaytilganda va davomat/testdan keyin tekshiriladi; daraja oynasi bo'lsa, undan keyin chiqadi. Tasdiqlash `$max` bilan, kelajak sanasi qabul qilinmaydi.
+- Konfetti, ovoz va titrash profildagi "Salyut va ovoz" sozlamasiga bo'ysunadi; "harakatni kamaytirish" yoqilgan qurilmada animatsiyalarsiz ko'rsatiladi. Gamifikatsiya o'chiq bo'lsa faqat coin ko'rsatiladi.
+- Bosh sahifadagi o'rin endi reyting sahifasi bilan bir xil o'lchovda (gamifikatsiya yoqilgan bo'lsa XP).

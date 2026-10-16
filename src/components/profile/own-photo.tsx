@@ -7,9 +7,21 @@ import { Avatar } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/toast";
 import { setOwnPhotoAction } from "@/actions/student-profile.actions";
 import { uploadFileToStorage } from "@/lib/upload-client";
+import { cn } from "@/lib/utils";
 
 /** O'quvchining profil rasmi: kamera tugmasi orqali qo'yadi yoki almashtiradi */
-export function OwnPhoto({ userId, fullName, initialUrl }: { userId: string; fullName: string; initialUrl: string | null }) {
+export function OwnPhoto({
+  userId,
+  fullName,
+  initialUrl,
+  avatarClassName,
+}: {
+  userId: string;
+  fullName: string;
+  initialUrl: string | null;
+  /** Masalan, daraja ramkasi */
+  avatarClassName?: string;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,7 +71,7 @@ export function OwnPhoto({ userId, fullName, initialUrl }: { userId: string; ful
 
   return (
     <div className="relative shrink-0">
-      <Avatar src={url} name={fullName} size="xl" className="w-20 h-20 text-2xl rounded-3xl" />
+      <Avatar src={url} name={fullName} size="xl" className={cn("w-20 h-20 text-2xl rounded-3xl", avatarClassName)} />
       <button
         type="button"
         onClick={() => fileRef.current?.click()}

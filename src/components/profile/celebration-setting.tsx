@@ -36,10 +36,10 @@ export function CelebrationSetting({ initialEnabled }: { initialEnabled: boolean
       </span>
       <span className="min-w-0 flex-1">
         <span id="celebration-label" className="block text-sm font-bold text-slate-900 dark:text-slate-100">
-          Reytingda salyut
+          Salyut va ovoz
         </span>
         <span className="block text-xs text-slate-600 dark:text-slate-400">
-          Kuchli uchlik ko&apos;rsatilganda konfetti, ovoz va titrash. O&apos;chirilsa, reyting jim ochiladi.
+          Coin yoki XP olganda va reytingda kuchli uchlikda konfetti, ovoz va titrash. O&apos;chirilsa, tabrik jim ko&apos;rsatiladi.
         </span>
       </span>
       <button

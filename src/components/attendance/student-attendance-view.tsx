@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { fireConfetti } from "@/lib/confetti";
+import { requestRewardCheck } from "@/lib/rewards-client";
 import {
   QrCode,
   CheckCircle2,
@@ -75,9 +75,6 @@ export function StudentAttendanceView({
   const [successInfo, setSuccessInfo] = useState<{ coinsEarned: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Trigger celebration confetti
-  const triggerConfetti = () => fireConfetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
-
   // Submit via 6-digit code
   const handleSubmitCode = async (submitCode?: string) => {
     const targetCode = (submitCode || code).trim();
@@ -96,7 +93,8 @@ export function StudentAttendanceView({
         const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "Davomat muvaffaqiyatli belgilandi!");
-        triggerConfetti();
+        // Katta mukofot oynasi (coin va XP) shu yerda chiqadi
+        requestRewardCheck();
         // Statistika va tarix serverdan qayta olinadi — yangi yozuv darhol ko'rinadi
         router.refresh();
       } else {
@@ -140,7 +138,8 @@ export function StudentAttendanceView({
         const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "QR Davomat muvaffaqiyatli belgilandi!");
-        triggerConfetti();
+        // Katta mukofot oynasi (coin va XP) shu yerda chiqadi
+        requestRewardCheck();
         // Statistika va tarix serverdan qayta olinadi — yangi yozuv darhol ko'rinadi
         router.refresh();
       } else {
