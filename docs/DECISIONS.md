@@ -225,3 +225,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Cron: Vercel Hobby kuniga 1 marta — mavjud `/api/cron/daily` gamifikatsiyani ham chaqiradi; `/api/cron/gamification` qo'lda ishga tushirish uchun (xuddi shu `CRON_SECRET`). `vercel.json` o'zgarmadi.
 - Yakunlar har kuni o'tgan hafta/oy uchun ishga tushadi va idempotent: haftalik natija `Quest.resultsAnnounced` bilan bir marta e'lon qilinadi; guruh chellenji va "to'liq davomat" — `m:<oy>` davr kaliti bilan bir marta to'lanadi. Cron bir kun ishlamasa ham natija yo'qolmaydi.
 - Guruh chellenji: oy davomati = (kelgan + kechikkan) / barcha davomat yozuvlari. Sahifada joriy oyning shu kungacha bo'lgan foizi ko'rsatiladi.
+
+### [2026-10-16] G9: Coin iqtisodiyoti va do'kon
+- `/mentor/reports/economy` (Hisobotlar → Coin iqtisodiyoti): 7/30/90 kunlik davr; "berilgan coin" — musbat yozuvlar, `purchase` va `adjustment` (davomat jarimalari, do'kon qaytarishlari) dan tashqari. O'quvchi boshiga oylik = berilgan / guruhli o'quvchilar × 30/davr.
+- Qizil ogohlantirish: eng arzon (seriya himoyasidan tashqari) mahsulotga o'rtacha o'quvchi 3 oydan ko'p yig'sa (yoki daromad 0 bo'lsa).
+- Maqsadli reja: davomat (oxirgi 30 kundagi haqiqiy darslar soni / guruhlar × "kelgan" coini), kunlik kirish (~20 kun), kunlik topshiriqlar (~10 kun × "10 ta test" mukofoti), qolgani — asosiy topshiriq va marralar. Slayder `monthlyCoinTarget` ni saqlaydi.
+- Inflyatsiyaga qarshi: testdan kunlik chegara, mentor bonusining maksimumi, daraja bonusi shu sahifada ham o'zgartiriladi; "faqat birinchi to'g'ri javob" va "xarid reytingni tushirmaydi" — doimiy qoidalar (o'chirib bo'lmaydi).
+- Do'konda `Product.kind`: `item` (sovg'a), `privilege` (imtiyoz — oddiy buyurtma oqimi), `streak_shield` (seriya himoyasi — xarid qilinishi bilan beriladi, buyurtma "olingan" holatda, mentorga xabar yubormaydi, o'quvchida ko'pi bilan 2 ta). Gamifikatsiya o'chiq bo'lsa seriya himoyasi o'quvchiga ko'rinmaydi va sotilmaydi.

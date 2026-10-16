@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { ProductImage } from "@/components/shop/product-image";
 import { saveProductAction, deleteProductAction, ShopProduct } from "@/actions/shop.actions";
@@ -23,6 +24,7 @@ interface FormState {
   description: string;
   price: string;
   category: string;
+  kind: "item" | "privilege" | "streak_shield";
   stock: string; // bo'sh — cheklanmagan
   isActive: boolean;
   imageKey: string | null;
@@ -34,6 +36,7 @@ const EMPTY_FORM: FormState = {
   description: "",
   price: "50",
   category: "",
+  kind: "item",
   stock: "",
   isActive: true,
   imageKey: null,
@@ -67,6 +70,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
       description: p.description || "",
       price: String(p.price),
       category: p.category || "",
+      kind: p.kind ?? "item",
       stock: p.stock === null ? "" : String(p.stock),
       isActive: p.isActive,
       imageKey: p.imageKey || null,
@@ -106,6 +110,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
           description: form.description,
           price: Number(form.price),
           category: form.category,
+          kind: form.kind,
           stock: form.stock.trim() === "" ? null : Number(form.stock),
           isActive: form.isActive,
           imageKey: form.imageKey,
@@ -138,6 +143,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
         description: p.description,
         price: p.price,
         category: p.category,
+        kind: p.kind,
         stock: p.stock,
         imageKey: p.imageKey,
         isActive: !p.isActive,
@@ -334,6 +340,24 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                 />
               </Field>
             </div>
+
+            <Field
+              htmlFor="product-kind"
+              label="Turi"
+              hint={
+                form.kind === "streak_shield"
+                  ? "Xarid qilinishi bilan o'quvchiga beriladi (gamifikatsiya yoqilgan bo'lsa)"
+                  : form.kind === "privilege"
+                    ? "Material bo'lmagan mukofot: mentor bilan 1:1, loyihani proyektorda ko'rsatish..."
+                    : undefined
+              }
+            >
+              <Select id="product-kind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as FormState["kind"] })}>
+                <option value="item">Sovg&apos;a</option>
+                <option value="privilege">Imtiyoz</option>
+                <option value="streak_shield">Seriya himoyasi</option>
+              </Select>
+            </Field>
 
             <Field htmlFor="product-category" label="Turkum" hint="Masalan: Merch, Imtiyoz, Kiyim">
               <Input

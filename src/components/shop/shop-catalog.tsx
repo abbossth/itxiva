@@ -111,7 +111,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
-                      {item.category || "Sovg'a"}
+                      {item.kind === "streak_shield" ? "Seriya himoyasi" : item.kind === "privilege" ? item.category || "Imtiyoz" : item.category || "Sovg'a"}
                     </span>
                     {soldOut ? (
                       <Badge variant="secondary">Tugagan</Badge>

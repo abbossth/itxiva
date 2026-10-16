@@ -11,6 +11,7 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getCurrentUser, requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { archiveEntity } from "@/lib/archive";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getAppSettings } from "@/lib/settings";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
 import { notify, notifyAllStudents, notifyMentors } from "@/lib/notifications/notify";
@@ -51,7 +52,9 @@ async function withImageUrls(products: IProductData[]): Promise<ShopProduct[]> {
 export async function getProducts(): Promise<ShopProduct[]> {
   const session = await requireAuth();
   await connectToDatabase();
-  const filter = session.role === "mentor" ? {} : { isActive: true };
+  // Gamifikatsiya o'chiq bo'lsa seriya himoyasi o'quvchiga ko'rinmaydi
+  const shieldHidden = session.role !== "mentor" && !(await getAppSettings()).gamification.enabled;
+  const filter = session.role === "mentor" ? {} : { isActive: true, ...(shieldHidden ? { kind: { $ne: "streak_shield" } } : {}) };
   const products = await Product.find(filter).sort({ isActive: -1, price: 1 }).lean();
   return withImageUrls(JSON.parse(JSON.stringify(products)) as IProductData[]);
 }
@@ -141,6 +144,16 @@ export async function createOrderAction(productId: string): Promise<ActionResult
   const product = await Product.findOne({ _id: productId, isActive: true }).lean();
   if (!product) return { success: false, message: "Mahsulot hozir mavjud emas" };
 
+  // Seriya himoyasi: gamifikatsiya yoqilgan bo'lsa va o'quvchida ko'pi bilan 2 ta bo'lsa
+  const isShield = product.kind === "streak_shield";
+  if (isShield) {
+    if (!(await getAppSettings()).gamification.enabled) return { success: false, message: "Mahsulot hozir mavjud emas" };
+    const me = await User.findById(session.userId).select("streakShields").lean();
+    if ((me?.streakShields ?? 0) >= MAX_STREAK_SHIELDS) {
+      return { success: false, message: `Sizda allaqachon ${MAX_STREAK_SHIELDS} ta himoya bor` };
+    }
+  }
+
   // 1. Zaxirani band qilish (cheklangan bo'lsa)
   if (product.stock !== null && product.stock !== undefined) {
     const reserved = await Product.updateOne(
@@ -174,8 +187,10 @@ export async function createOrderAction(productId: string): Promise<ActionResult
       productId: product._id,
       productTitle: product.title,
       price: product.price,
-      status: "pending",
+      // Himoya darhol beriladi — buyurtma "olingan" holatda yoziladi
+      status: isShield ? "received" : "pending",
     });
+    if (isShield) await User.updateOne({ _id: user._id }, { $inc: { streakShields: 1 } });
     await CoinLedger.create({
       studentId: user._id,
       amount: -product.price,
@@ -191,15 +206,18 @@ export async function createOrderAction(productId: string): Promise<ActionResult
     throw err;
   }
 
-  notifyMentors("order_new", { productTitle: product.title, price: product.price, studentName: session.fullName });
+  if (!isShield) notifyMentors("order_new", { productTitle: product.title, price: product.price, studentName: session.fullName });
 
   revalidateShop();
   return {
     success: true,
-    message: "Buyurtma qabul qilindi! Mentor tasdiqlashini kuting.",
+    message: isShield ? "Seriya himoyasi qo'shildi: bir kun o'tkazib yuborsangiz ham seriyangiz uzilmaydi." : "Buyurtma qabul qilindi! Mentor tasdiqlashini kuting.",
     data: { balance: user.spendableBalance ?? 0 },
   };
 }
+
+/** O'quvchida bir vaqtda ko'pi bilan shuncha seriya himoyasi */
+const MAX_STREAK_SHIELDS = 2;
 
 async function refundOrder(order: IOrder, reason: string) {
   const user = await User.findByIdAndUpdate(

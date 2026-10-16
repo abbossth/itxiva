@@ -5,6 +5,7 @@ export const productSchema = z.object({
   description: z.string().trim().max(500).optional().default(""),
   price: z.coerce.number().int("Narx butun son bo'lishi kerak").min(1, "Narx kamida 1 coin").max(100000),
   category: z.string().trim().max(30).optional().default(""),
+  kind: z.enum(["item", "privilege", "streak_shield"]).optional().default("item"),
   imageKey: z.string().max(300).nullable().optional(),
   stock: z
     .union([z.coerce.number().int().min(0).max(100000), z.null()])
