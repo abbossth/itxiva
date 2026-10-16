@@ -356,7 +356,10 @@ export interface SimilarSubmission {
 export type HomeworkReviewResult = HomeworkReview & { similar: SimilarSubmission[] };
 
 /** Mentorga taxminiy ball va izoh taklif qiladi. Hech narsa saqlanmaydi — bahoni mentor o'zi qo'yadi */
-export async function suggestHomeworkReviewAction(submissionId: string): Promise<ActionResult<HomeworkReviewResult>> {
+export async function suggestHomeworkReviewAction(
+  submissionId: string,
+  { fresh = false }: { fresh?: boolean } = {}
+): Promise<ActionResult<HomeworkReviewResult>> {
   // Bir guruhni ketma-ket tekshirishda limit tez tugamasligi uchun alohida hisob
   const blocked = await guard("ai_review", 60);
   if (blocked) return { success: false, message: blocked };
@@ -439,7 +442,7 @@ export async function suggestHomeworkReviewAction(submissionId: string): Promise
       // AI'ga boshqa o'quvchilarning ismi yuborilmaydi
       similarAnswers: similar.map((s) => ({ percent: s.percent, text: s.text })),
       previousAnswers: previous.map((p) => p.text ?? "").filter((t) => t.trim()),
-    });
+    }, { fresh: fresh === true });
     return {
       success: true,
       data: {

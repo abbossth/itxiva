@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { generateStructured, type AiAttachment } from "./claude";
+import { aiCacheKey, cachedAi } from "./cache";
 
 // Uyga vazifa javobini AI bilan oldindan ko'rib chiqish. Natija faqat mentorga taklif: bahoni mentor o'zi qo'yadi.
 
@@ -184,14 +185,19 @@ const cleanList = (items: string[], max: number) =>
     .slice(0, max)
     .map((v) => v.slice(0, 400));
 
-export async function reviewHomeworkWithAi(input: HomeworkReviewInput): Promise<HomeworkReview> {
-  const data = await generateStructured({
-    schema: reviewSchema,
-    prompt: buildHomeworkReviewPrompt(input),
-    attachments: input.files.map(({ mimeType, data }) => ({ mimeType, data })),
-    effort: "medium",
-    maxTokens: 8000,
-  });
+/**
+ * `fresh` — mentor "Qaytadan tekshirish" bosganda: oldingi natija o'rniga AI qayta so'raladi.
+ * Aks holda xuddi shu javob (matn, fayllar, vazifa) uchun saqlangan natija qaytariladi — limit tejaladi.
+ */
+export async function reviewHomeworkWithAi(input: HomeworkReviewInput, { fresh = false }: { fresh?: boolean } = {}): Promise<HomeworkReview> {
+  const prompt = buildHomeworkReviewPrompt(input);
+  const attachments = input.files.map(({ mimeType, data }) => ({ mimeType, data }));
+  const key = aiCacheKey("hw-review:v1", [prompt, attachments]);
+  return cachedAi(key, () => runReview(prompt, attachments), { fresh });
+}
+
+async function runReview(prompt: string, attachments: { mimeType: string; data: string }[]): Promise<HomeworkReview> {
+  const data = await generateStructured({ schema: reviewSchema, prompt, attachments, effort: "medium", maxTokens: 8000 });
   const checks: HomeworkCheck[] = data.checks.slice(0, 40).map((c) => ({
       task: c.task.trim().slice(0, 60),
       student: c.student.trim().slice(0, 300),

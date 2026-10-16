@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readModelCooldowns, writeModelCooldown } from "./cache";
 
 // Asosiy AI provayder: Gemini (bepul tarif). SDK o'rnatilmagan — REST API to'g'ridan-to'g'ri chaqiriladi.
 
@@ -13,6 +14,10 @@ const PRIMARY_HEAD_START_MS = 12_000;
 // Band (503/429) deb javob bergan yoki javobsiz osilib qolgan model shu vaqt davomida o'tkazib yuboriladi — har so'rovda kutib o'tirmaslik uchun
 const BUSY_COOLDOWN_MS = 3 * 60 * 1000;
 const busyUntil = new Map<string, number>();
+// Kunlik limit tugaganda Google qachon qayta urinish mumkinligini aytadi (masalan, 8 soatdan keyin).
+// Shu vaqtgacha model umuman chaqirilmaydi; belgi bazada saqlanadi — boshqa server nusxalari ham biladi
+const quotaUntil = new Map<string, number>();
+const MAX_QUOTA_COOLDOWN_MS = 24 * 3_600_000;
 
 export class GeminiError extends Error {}
 
@@ -23,7 +28,22 @@ export function isGeminiConfigured(): boolean {
 interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
-  error?: { code?: number; message?: string; status?: string };
+  error?: { code?: number; message?: string; status?: string; details?: { "@type"?: string; retryDelay?: string }[] };
+}
+
+/** 429 javobidan "qachon qayta urinish mumkin" (ms). Kunlik limit bo'lmasa (qisqa kutish) — null */
+export function quotaRetryMs(data: GeminiResponse): number | null {
+  const fromDetails = data.error?.details?.find((d) => d.retryDelay)?.retryDelay;
+  let ms: number | null = null;
+  const seconds = fromDetails?.match(/^([\d.]+)s$/);
+  if (seconds) ms = Number(seconds[1]) * 1000;
+  if (ms === null) {
+    const m = data.error?.message?.match(/retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i);
+    if (m && (m[1] || m[2] || m[3])) ms = ((Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0)) * 60 + Number(m[3] ?? 0)) * 1000;
+  }
+  // Bir necha soniyalik kutish — daqiqalik chegara; uni oddiy "band" kabi qisqa kutamiz
+  if (ms === null || ms <= BUSY_COOLDOWN_MS) return null;
+  return Math.min(ms, MAX_QUOTA_COOLDOWN_MS);
 }
 
 async function callModel(
@@ -115,6 +135,12 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
     }
     if (status === 503 || status === 429) {
       busyUntil.set(model, Date.now() + BUSY_COOLDOWN_MS);
+      const retry = status === 429 ? quotaRetryMs(data) : null;
+      if (retry) {
+        const until = Date.now() + retry;
+        quotaUntil.set(model, until);
+        await writeModelCooldown(model, until);
+      }
     }
     if (status !== 200) {
       console.error(`Gemini API error (${model}):`, `${status} ${data.error?.message ?? ""}`.trim());
@@ -141,14 +167,23 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
     return null;
   };
 
+  // Boshqa server nusxalari aniqlagan kunlik limitlar
+  for (const [model, until] of await readModelCooldowns(MODELS)) {
+    if (until > (quotaUntil.get(model) ?? 0)) quotaUntil.set(model, until);
+  }
   const now = Date.now();
-  const available = MODELS.filter((m) => (busyUntil.get(m) ?? 0) <= now);
+  const withQuota = MODELS.filter((m) => (quotaUntil.get(m) ?? 0) <= now);
+  // Hamma modelning kunlik limiti tugagan: so'rov yuborish befoyda (zaxira provayderga o'tiladi)
+  if (withQuota.length === 0) {
+    throw new GeminiError("AI xizmatining kunlik limiti tugadi. Tekshiruv keyinroq avtomatik qayta bajariladi");
+  }
+  const available = withQuota.filter((m) => (busyUntil.get(m) ?? 0) <= now);
   // Hammasi band deb belgilangan bo'lsa ham, baribir sinab ko'riladi
-  const [primary, ...rest] = available.length > 0 ? available : MODELS;
+  const [primary, ...rest] = available.length > 0 ? available : withQuota;
 
   // Kuchli model band bo'lsa yoki javobsiz osilib qolsa, mentor uni kutib o'tirmasligi kerak. Shuning uchun
-  // eng yengil zaxira model bir vaqtda ishga tushiriladi: kuchlisi ajratilgan vaqt ichida javob bersa — o'sha,
-  // ulgurmasa — zaxiraniki olinadi.
+  // kuchlisi ajratilgan vaqt ichida javob bermasa, eng yengil zaxira model ham ishga tushiriladi va qaysi biri
+  // birinchi javob bersa, o'sha olinadi. Zaxira oldindan ishga tushirilmaydi — har so'rovda limit ikki marta sarflanmasin.
   const backupModel = rest.pop();
   try {
     const primaryRun = tryModel(primary);
@@ -156,21 +191,24 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
       const only = await primaryRun;
       if (only) return only;
     } else {
-      const backupRun = tryModel(backupModel).catch(() => null);
       const headStart = new Promise<"late">((resolve) => setTimeout(() => resolve("late"), PRIMARY_HEAD_START_MS));
 
       const first = await Promise.race([primaryRun, headStart]);
       if (first && first !== "late") return first;
+      const backupRun = tryModel(backupModel).catch(() => null);
 
       if (first === "late") {
         // Kuchli model sekin: qaysi biri birinchi yaroqli javob bersa, o'sha olinadi
-        const fallback = await backupRun;
-        if (fallback) {
-          busyUntil.set(primary, Date.now() + BUSY_COOLDOWN_MS);
-          return fallback;
+        type Win = { answer: z.infer<Schema>; fromBackup: boolean } | null;
+        const asWin = (answer: z.infer<Schema> | null, fromBackup: boolean): Win => (answer ? { answer, fromBackup } : null);
+        const winner = await Promise.race<Win>([
+          backupRun.then((r) => asWin(r, true) ?? primaryRun.then((p) => asWin(p, false))),
+          primaryRun.then((p) => asWin(p, false) ?? backupRun.then((r) => asWin(r, true))),
+        ]);
+        if (winner) {
+          if (winner.fromBackup) busyUntil.set(primary, Date.now() + BUSY_COOLDOWN_MS);
+          return winner.answer;
         }
-        const late = await primaryRun;
-        if (late) return late;
       } else {
         const fallback = await backupRun;
         if (fallback) return fallback;

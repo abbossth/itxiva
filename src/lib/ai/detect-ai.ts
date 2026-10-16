@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { generateStructured } from "./claude";
+import { aiCacheKey, cachedAi } from "./cache";
 import { normalizeForSimilarity } from "@/lib/similarity";
 
 // Javob AI (ChatGPT va h.k.) yordamida yozilgan bo'lish ehtimolini baholaydi. Bu taxmin: aniq aniqlaydigan vosita yo'q,
@@ -61,12 +62,15 @@ export async function estimateAiWriting(params: {
   if (normalizeForSimilarity(params.text).length < MIN_AI_CHECK_CHARS) {
     return { score: null, signals: ["Javob juda qisqa — AI yozganini aniqlab bo'lmaydi"] };
   }
-  const data = await generateStructured({
-    schema: estimateSchema,
-    prompt: buildAiWritingPrompt(params),
-    effort: "low",
-    maxTokens: 3000,
+  const prompt = buildAiWritingPrompt(params);
+  // Bir xil matn (masalan, qayta tekshirish yoki o'zgarmagan qayta yuborish) uchun AI qayta chaqirilmaydi
+  return cachedAi(aiCacheKey("ai-writing:v1", [prompt]), async () => {
+    const data = await generateStructured({ schema: estimateSchema, prompt, effort: "low", maxTokens: 3000 });
+    return toEstimate(data);
   });
+}
+
+function toEstimate(data: z.infer<typeof estimateSchema>): AiWritingEstimate {
   return {
     score: Number.isFinite(data.score) ? Math.min(100, Math.max(0, Math.round(data.score))) : null,
     signals: data.signals

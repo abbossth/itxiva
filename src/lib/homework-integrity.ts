@@ -144,7 +144,7 @@ export async function runIntegrityCheck(submissionId: string): Promise<void> {
     } catch (error) {
       console.error("Homework AI-writing check failed:", error);
       status = "failed";
-      aiSignals = ["AI tekshiruvi ishlamadi — keyinroq qayta tekshiring"];
+      aiSignals = ["AI hozir band yoki kunlik limiti tugagan — tekshiruv keyinroq avtomatik qayta bajariladi"];
     }
   }
 

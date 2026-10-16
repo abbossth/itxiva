@@ -152,12 +152,13 @@ export function AiReviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
 
-  const run = async () => {
+  // fresh — "Qaytadan tekshirish": saqlangan natija emas, AI'dan yangisi so'raladi
+  const run = async (fresh = false) => {
     try {
       setLoading(true);
       setError(null);
       setHidden(false);
-      const res = await suggestHomeworkReviewAction(submissionId);
+      const res = await suggestHomeworkReviewAction(submissionId, { fresh });
       if (res.success && res.data) {
         cache.set(cacheKey, res.data);
         setReview(res.data);
@@ -178,7 +179,7 @@ export function AiReviewPanel({
           type="button"
           variant="outline"
           size="sm"
-          onClick={run}
+          onClick={() => void run()}
           isLoading={loading}
           className="gap-1.5 min-h-[36px]"
         >
@@ -222,7 +223,7 @@ export function AiReviewPanel({
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={run}
+            onClick={() => void run(true)}
             disabled={loading}
             title="Qaytadan tekshirish"
             aria-label="Qaytadan tekshirish"

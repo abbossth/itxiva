@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { generateStructured } from "./claude";
+import { aiCacheKey, readAiCache, writeAiCache } from "./cache";
 
 // Ochiq savol javoblarini AI bilan baholash. Bitta so'rovda bir o'quvchining barcha ochiq javoblari yuboriladi.
 
@@ -36,9 +37,35 @@ const gradesSchema = z.object({
  * Har bir javobga ball (0 … maxPoints, butun son) va qisqa izoh qaytaradi.
  * AI javob bermasa yoki biror savolni tashlab ketsa, o'sha savol natijada bo'lmaydi — uni mentor ko'radi.
  */
+/**
+ * Bir savolga bir xil javob (bo'shliqlar farqi hisobga olinmaydi) avval baholangan bo'lsa, AI qayta chaqirilmaydi:
+ * guruhdagi ko'p o'quvchi bir xil qisqa javob yozganda limit tejaladi. Faqat yangi javoblar AI'ga yuboriladi.
+ */
 export async function gradeOpenAnswersWithAi(items: OpenAnswerItem[]): Promise<Map<string, OpenAnswerGrade>> {
   const result = new Map<string, OpenAnswerGrade>();
   if (items.length === 0) return result;
+
+  const keyOf = (item: OpenAnswerItem) =>
+    aiCacheKey("open-grade:v1", [item.prompt, item.sample.trim(), item.maxPoints, item.answer.slice(0, MAX_ANSWER_CHARS).trim().replace(/\s+/g, " ")]);
+  const fresh: OpenAnswerItem[] = [];
+  for (const item of items) {
+    const hit = await readAiCache<OpenAnswerGrade>(keyOf(item));
+    if (hit) result.set(item.id, hit);
+    else fresh.push(item);
+  }
+  if (fresh.length === 0) return result;
+  const graded = await gradeWithAi(fresh);
+  for (const item of fresh) {
+    const grade = graded.get(item.id);
+    if (!grade) continue;
+    result.set(item.id, grade);
+    await writeAiCache(keyOf(item), grade);
+  }
+  return result;
+}
+
+async function gradeWithAi(items: OpenAnswerItem[]): Promise<Map<string, OpenAnswerGrade>> {
+  const result = new Map<string, OpenAnswerGrade>();
 
   const prompt = `Quyida o'quvchining ochiq savollarga bergan javoblari berilgan. Har birini baholab ber.
 
