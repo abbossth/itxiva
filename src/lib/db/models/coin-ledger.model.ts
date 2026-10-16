@@ -14,7 +14,9 @@ export type CoinTransactionType =
   | "login"
   | "streak"
   | "badge"
-  | "challenge";
+  | "challenge"
+  // XP ni eski reytingga (totalCoins) tenglashtirish: coin 0, faqat xp. Haftalik hisoblarga kirmaydi
+  | "xp_align";
 
 export const COIN_TRANSACTION_TYPES: CoinTransactionType[] = [
   "attendance",
@@ -30,6 +32,7 @@ export const COIN_TRANSACTION_TYPES: CoinTransactionType[] = [
   "streak",
   "badge",
   "challenge",
+  "xp_align",
 ];
 
 export interface ICoinLedgerData {

@@ -10,7 +10,7 @@ const { CoinLedger } = await import("@/lib/db/models/coin-ledger.model");
 const { LevelReward } = await import("@/lib/db/models/level-reward.model");
 const { AppSettings } = await import("@/lib/db/models/app-settings.model");
 const { awardCoins, syncLevel } = await import("@/lib/gamification/award");
-const { backfillXp } = await import("@/lib/gamification/backfill");
+const { backfillXp, alignXpToCoins } = await import("@/lib/gamification/backfill");
 const { buildLevels, levelForXp, levelProgress, DEFAULT_LEVEL_THRESHOLDS } = await import("@/lib/gamification/levels");
 const { parseGamification } = await import("@/lib/gamification/config");
 
@@ -109,6 +109,38 @@ describe("XP backfill", () => {
     expect(await User.findById(s._id).lean()).toMatchObject({ xp: 122, level: 2, pendingLevelUp: null });
     expect((await backfillXp({ dryRun: false })).changes).toHaveLength(0);
     // Backfill daraja bonusini bermaydi
+    expect(await LevelReward.countDocuments()).toBe(0);
+  });
+
+  it("XP oldingi reytingga (totalCoins) tenglashtiriladi: o'rinlar saqlanadi, bir marta, daraja pasaymaydi", async () => {
+    // A: jarimalar tufayli coin XP dan kam; B: mentor tuzatishi tufayli coin XP dan ko'p
+    const a = await student({ fullName: "A", totalCoins: 200 });
+    const b = await student({ fullName: "B", totalCoins: 220 });
+    await CoinLedger.collection.insertMany([
+      { studentId: a._id, amount: 250, type: "attendance", description: "a", createdAt: new Date() },
+      { studentId: a._id, amount: -50, type: "adjustment", description: "jarima", createdAt: new Date() },
+      { studentId: b._id, amount: 180, type: "attendance", description: "a", createdAt: new Date() },
+      { studentId: b._id, amount: 40, type: "adjustment", description: "tuzatish", createdAt: new Date() },
+    ]);
+    await backfillXp({ dryRun: false });
+    expect(await User.findById(a._id).lean()).toMatchObject({ xp: 250, level: 3 });
+
+    const dry = await alignXpToCoins({ dryRun: true });
+    expect(dry.changes.map((c) => [c.fullName, c.xpFrom, c.xpTo]).sort()).toEqual([["A", 250, 200], ["B", 180, 220]]);
+    expect((await User.findById(a._id).lean())?.xp).toBe(250);
+
+    await alignXpToCoins({ dryRun: false });
+    expect(await User.findById(a._id).lean()).toMatchObject({ xp: 200, level: 3 });
+    expect(await User.findById(b._id).lean()).toMatchObject({ xp: 220, level: 2 });
+    expect(await CoinLedger.find({ type: "xp_align" }).sort({ xp: 1 }).lean()).toMatchObject([
+      { studentId: a._id, amount: 0, xp: -50 },
+      { studentId: b._id, amount: 0, xp: 40 },
+    ]);
+
+    // Qayta ishga tushirish va ledger'dan qayta hisoblash natijani o'zgartirmaydi
+    await User.updateOne({ _id: b._id }, { $inc: { totalCoins: 10 } });
+    expect((await alignXpToCoins({ dryRun: false })).changes).toHaveLength(0);
+    expect((await backfillXp({ dryRun: true })).changes).toHaveLength(0);
     expect(await LevelReward.countDocuments()).toBe(0);
   });
 });

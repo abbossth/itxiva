@@ -4,7 +4,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 /** Baza replica set emas (masalan, lokal yagona server): tranzaksiya qo'llanilmaydi */
 function isTransactionUnsupported(error: unknown): boolean {
   const e = error as { code?: number; message?: string };
-  return e?.code === 20 || /replica set|Transaction numbers are only allowed/i.test(e?.message ?? "");
+  return e?.code === 20 || /replica set|Transaction numbers are only allowed|does not support retryable writes/i.test(e?.message ?? "");
 }
 
 /**

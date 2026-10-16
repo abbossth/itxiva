@@ -83,7 +83,7 @@ export async function getLeaderboardAction({
   // Oxirgi 7 kundagi o'sish: do'kon xaridlari reytingga ta'sir qilmaydi, shuning uchun hisobga olinmaydi
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
-    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $ne: "purchase" } } },
+    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $nin: ["purchase", "xp_align"] } } },
     {
       $group: {
         _id: "$studentId",

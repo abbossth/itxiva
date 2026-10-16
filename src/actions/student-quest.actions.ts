@@ -149,7 +149,7 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
       ? User.countDocuments({ role: "student", groupId: user.groupId, isHiddenFromLeaderboard: { $ne: true }, xp: { $gt: user.xp ?? 0 } })
       : Promise.resolve(null),
     CoinLedger.aggregate<{ sum: number }>([
-      { $match: { studentId: scope._id, createdAt: { $gte: new Date(Date.now() - 7 * 86_400_000) }, type: { $ne: "purchase" } } },
+      { $match: { studentId: scope._id, createdAt: { $gte: new Date(Date.now() - 7 * 86_400_000) }, type: { $nin: ["purchase", "xp_align"] } } },
       { $group: { _id: null, sum: { $sum: { $ifNull: ["$xp", { $cond: [{ $in: ["$type", LEGACY_EARNING_TYPES] }, "$amount", 0] }] } } } },
     ]),
   ]);

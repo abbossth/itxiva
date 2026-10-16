@@ -239,3 +239,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Mockupdagi `#4F46E5` o'rniga platformaning asosiy rangi (`teal-*` klasslari CSS o'zgaruvchilari orqali).
 - Animatsiyalar `prefers-reduced-motion` ni hurmat qiladi (konfetti, count-up, progress). Yangi sahifalar uchun skeleton (`loading.tsx`).
 - Yangi muhit o'zgaruvchilari yo'q (mavjud `CRON_SECRET` ishlatiladi); `vercel.json` o'zgarmadi.
+
+### [2026-10-16] G11: XP oldingi reytingga tenglashtiriladi
+- Muammo: backfill XP ni coin tarixidan hisoblagan, lekin davomat jarimalari va mentor tuzatishlari (`adjustment`) XP ga kirmagan, o'chirilgan davomatlar qaytarilmagan. Natijada XP bo'yicha reyting eski `totalCoins` reytingidan farq qilib, ayrim o'quvchilar pastga tushgan.
+- Yechim (mentor so'rovi bilan): `scripts/align-xp.ts` (`npm run align:xp`, `--dry-run`) har o'quvchining XP sini uning `totalCoins` iga tenglashtiradi. Har o'quvchiga bir marta: `xp_align` turidagi ledger yozuvi (coin 0, xp = farq, `xp-align:<o'quvchi>` kaliti) — qayta ishga tushirish hech narsa o'zgartirmaydi, `backfillXp` ham shu natijani beradi.
+- XP kamayishi ham mumkin (jarimasi ko'p o'quvchilarda) — eski reytingdagi tartib aynan saqlanishi uchun. Saqlangan daraja pasaytirilmaydi; daraja bonusi va tabrik oynasi berilmaydi.
+- `xp_align` yozuvi haftalik XP, hisobotlar va o'quvchi coin tarixiga kirmaydi.
+- Bundan keyin XP va coin reytingi biroz ajralishi mumkin: jarima coinni kamaytiradi, XP ni emas (G1 qoidasi).

@@ -10,6 +10,7 @@
     "db": "node scripts/dev-db.mjs",
     "seed": "tsx --env-file=.env.local scripts/seed.ts",
     "backfill:xp": "tsx --env-file=.env.local scripts/backfill-xp.ts",
+    "align:xp": "tsx --env-file=.env.local scripts/align-xp.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

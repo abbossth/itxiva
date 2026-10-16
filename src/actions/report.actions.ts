@@ -149,6 +149,7 @@ export async function getReportData(params: {
   // ---------- Coinlar ----------
   const ledger = await CoinLedger.find({
     createdAt: { $gte: start, $lt: end },
+    type: { $ne: "xp_align" },
     ...(groupId ? { studentId: { $in: studentIds } } : {}),
   })
     .select("studentId amount type")
@@ -449,7 +450,7 @@ export async function getStudentReport(studentId: string): Promise<StudentReport
       .select("examId studentId attemptNumber totalScore maxScore status isPassed submittedAt")
       .sort({ submittedAt: -1 })
       .lean(),
-    CoinLedger.find({ studentId }).sort({ createdAt: -1 }).limit(300).lean(),
+    CoinLedger.find({ studentId, type: { $ne: "xp_align" } }).sort({ createdAt: -1 }).limit(300).lean(),
     Order.find({ studentId }).sort({ createdAt: -1 }).limit(50).lean(),
     HomeworkSubmission.find({ studentId })
       .select("lessonId status score isLate submittedAt")
