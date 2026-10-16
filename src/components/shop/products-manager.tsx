@@ -15,14 +15,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { ProductImage } from "@/components/shop/product-image";
+import { PriceAdvisor } from "@/components/shop/price-advisor";
 import { saveProductAction, deleteProductAction, ShopProduct } from "@/actions/shop.actions";
 import { uploadFileToStorage } from "@/lib/upload-client";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberUz } from "@/lib/utils";
 
 interface FormState {
   title: string;
   description: string;
   price: string;
+  /** Hayotdagi narxi (so'm) — faqat mentor ko'radi */
+  realPrice: string;
   category: string;
   kind: "item" | "privilege" | "streak_shield";
   stock: string; // bo'sh — cheklanmagan
@@ -35,6 +38,7 @@ const EMPTY_FORM: FormState = {
   title: "",
   description: "",
   price: "50",
+  realPrice: "",
   category: "",
   kind: "item",
   stock: "",
@@ -69,6 +73,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
       title: p.title,
       description: p.description || "",
       price: String(p.price),
+      realPrice: p.realPrice ? String(p.realPrice) : "",
       category: p.category || "",
       kind: p.kind ?? "item",
       stock: p.stock === null ? "" : String(p.stock),
@@ -109,6 +114,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
           title: form.title,
           description: form.description,
           price: Number(form.price),
+          realPrice: form.realPrice.trim() === "" ? null : Number(form.realPrice.replace(/\s/g, "")),
           category: form.category,
           kind: form.kind,
           stock: form.stock.trim() === "" ? null : Number(form.stock),
@@ -230,7 +236,14 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <CoinBadge amount={p.price} size="sm" animate={false} />
+                <span className="flex items-center gap-2">
+                  <CoinBadge amount={p.price} size="sm" animate={false} />
+                  {p.realPrice ? (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400" title="Hayotdagi narxi — faqat siz ko'rasiz">
+                      ≈ {formatNumberUz(p.realPrice)} so&apos;m
+                    </span>
+                  ) : null}
+                </span>
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                   {p.stock === null ? "Cheklanmagan" : `${p.stock} ta bor`}
                 </span>
@@ -317,6 +330,26 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </Field>
+
+            <Field htmlFor="product-real-price" label="Hayotdagi narxi (so'm)" hint="Faqat siz ko'rasiz — o'quvchilarga ko'rinmaydi">
+              <Input
+                id="product-real-price"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={500}
+                value={form.realPrice}
+                onChange={(e) => setForm({ ...form, realPrice: e.target.value })}
+                placeholder="masalan: 25000"
+              />
+            </Field>
+
+            <PriceAdvisor
+              realPrice={form.realPrice.trim() === "" ? null : Number(form.realPrice)}
+              productId={editingId}
+              currentPrice={Number(form.price)}
+              onPick={(price) => setForm((f) => ({ ...f, price: String(price) }))}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <Field htmlFor="product-price" label="Narxi (coin)" required>

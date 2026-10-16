@@ -4,6 +4,8 @@ export const productSchema = z.object({
   title: z.string().trim().min(2, "Mahsulot nomi kamida 2 ta belgi bo'lishi kerak").max(80),
   description: z.string().trim().max(500).optional().default(""),
   price: z.coerce.number().int("Narx butun son bo'lishi kerak").min(1, "Narx kamida 1 coin").max(100000),
+  // Hayotdagi narxi (so'm), faqat mentor uchun. Berilmasa o'zgarmaydi; null — o'chiriladi
+  realPrice: z.union([z.coerce.number().int().min(0).max(1_000_000_000), z.null()]).optional(),
   category: z.string().trim().max(30).optional().default(""),
   kind: z.enum(["item", "privilege", "streak_shield"]).optional().default("item"),
   imageKey: z.string().max(300).nullable().optional(),

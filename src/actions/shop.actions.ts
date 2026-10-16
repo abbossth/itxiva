@@ -14,6 +14,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getAppSettings } from "@/lib/settings";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
+import { suggestCoinPrice, type PriceSuggestion } from "@/lib/shop-pricing";
 import { notify, notifyAllStudents, notifyMentors } from "@/lib/notifications/notify";
 import { ActionResult } from "./auth.actions";
 
@@ -55,7 +56,11 @@ export async function getProducts(): Promise<ShopProduct[]> {
   // Gamifikatsiya o'chiq bo'lsa seriya himoyasi o'quvchiga ko'rinmaydi
   const shieldHidden = session.role !== "mentor" && !(await getAppSettings()).gamification.enabled;
   const filter = session.role === "mentor" ? {} : { isActive: true, ...(shieldHidden ? { kind: { $ne: "streak_shield" } } : {}) };
-  const products = await Product.find(filter).sort({ isActive: -1, price: 1 }).lean();
+  // Hayotdagi (so'm) narx faqat mentorga
+  const products = await Product.find(filter)
+    .select(session.role === "mentor" ? {} : { realPrice: 0 })
+    .sort({ isActive: -1, price: 1 })
+    .lean();
   return withImageUrls(JSON.parse(JSON.stringify(products)) as IProductData[]);
 }
 
@@ -100,6 +105,37 @@ export async function saveProductAction(
   revalidateShop();
   const [data] = await withImageUrls([JSON.parse(JSON.stringify(product)) as IProductData]);
   return { success: true, message: productId ? "Mahsulot yangilandi" : "Mahsulot qo'shildi", data };
+}
+
+/** Mentor uchun: hayotdagi narxdan coin narxi tavsiyasi (do'kondagi boshqa mahsulotlar va o'quvchilar daromadi bo'yicha) */
+export async function suggestProductPriceAction(input: { realPrice: number; productId?: string | null }): Promise<PriceSuggestion | null> {
+  await requireMentor();
+  const realPrice = Number(input?.realPrice);
+  if (!Number.isFinite(realPrice) || realPrice <= 0 || realPrice > 1_000_000_000) return null;
+  await connectToDatabase();
+
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const [catalog, earned, students, settings] = await Promise.all([
+    Product.find({
+      realPrice: { $gt: 0 },
+      kind: { $ne: "streak_shield" },
+      ...(isObjectId(input.productId) ? { _id: { $ne: input.productId } } : {}),
+    })
+      .select("title price realPrice")
+      .lean(),
+    CoinLedger.aggregate<{ sum: number }>([
+      { $match: { createdAt: { $gte: since }, amount: { $gt: 0 }, type: { $nin: ["purchase", "adjustment", "xp_align"] } } },
+      { $group: { _id: null, sum: { $sum: "$amount" } } },
+    ]),
+    User.countDocuments({ role: "student", groupId: { $ne: null } }),
+    getAppSettings(),
+  ]);
+  return suggestCoinPrice({
+    realPrice,
+    catalog: catalog.map((p) => ({ title: p.title, price: p.price, realPrice: p.realPrice ?? 0 })),
+    perStudentMonthly: students > 0 ? Math.round((earned[0]?.sum ?? 0) / students) : 0,
+    monthlyTarget: settings.gamification.monthlyCoinTarget,
+  });
 }
 
 export async function deleteProductAction(productId: string): Promise<ActionResult> {

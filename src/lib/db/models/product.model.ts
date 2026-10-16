@@ -11,6 +11,8 @@ export interface IProductData {
   title: string;
   description?: string;
   price: number;
+  /** Hayotdagi narxi (so'm) — faqat mentor ko'radi, coin narxini tavsiya qilish uchun. O'quvchiga yuborilmaydi */
+  realPrice?: number | null;
   category?: string;
   kind?: ProductKind;
   imageKey?: string | null;
@@ -30,6 +32,7 @@ const ProductSchema = new Schema<IProduct>(
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true, default: "" },
     price: { type: Number, required: true, min: 1 },
+    realPrice: { type: Number, default: null, min: 0 },
     category: { type: String, trim: true, default: "" },
     kind: { type: String, enum: ["item", "privilege", "streak_shield"], default: "item" },
     imageKey: { type: String, default: null },

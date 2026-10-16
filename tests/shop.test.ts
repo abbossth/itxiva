@@ -139,3 +139,49 @@ describe("do'kon: buyurtma holatlari", () => {
     expect((await User.findById(student._id).lean())?.spendableBalance).toBe(40);
   });
 });
+
+describe("narx tavsiyasi va so'mdagi narx", () => {
+  it("katalog nisbati, daromad bo'yicha zaxira hisob, yaxlitlash va ogohlantirish", async () => {
+    const { suggestCoinPrice, niceCoins } = await import("@/lib/shop-pricing");
+    expect([niceCoins(0.4), niceCoins(13.4), niceCoins(47), niceCoins(233), niceCoins(1234)]).toEqual([1, 13, 45, 230, 1250]);
+
+    // Katalog: 1 coin ≈ 250 so'm (ikkala mahsulot ham shu nisbatda)
+    const byCatalog = suggestCoinPrice({
+      realPrice: 25_000,
+      catalog: [
+        { title: "Ruchka", price: 20, realPrice: 5_000 },
+        { title: "Futbolka", price: 400, realPrice: 100_000 },
+      ],
+      perStudentMonthly: 200,
+      monthlyTarget: 200,
+    })!;
+    expect(byCatalog).toMatchObject({ basis: "catalog", suggested: 100, low: 80, high: 130, somPerCoin: 250, referencesUsed: 2, warning: null });
+    expect(byCatalog.weeksToEarn).toBeCloseTo(2.2, 1);
+    expect(byCatalog.nearest[0].title).toBe("Ruchka");
+
+    // Katalogda so'm narxi kam — oylik daromad ≈ 30 000 so'mlik sovg'a
+    const byEconomy = suggestCoinPrice({ realPrice: 300_000, catalog: [], perStudentMonthly: 150, monthlyTarget: 200 })!;
+    expect(byEconomy).toMatchObject({ basis: "economy", suggested: 1500, somPerCoin: 200 });
+    expect(byEconomy.warning).toMatch(/3 oydan/);
+    expect(suggestCoinPrice({ realPrice: 0, catalog: [], perStudentMonthly: 0, monthlyTarget: 200 })).toBeNull();
+  });
+
+  it("so'mdagi narx o'quvchiga yuborilmaydi; tavsiyani faqat mentor oladi", async () => {
+    const { student, mentor } = await seed(100, { price: 60 });
+    actAs(sessionFor(mentor));
+    const saved = await shop.saveProductAction({ title: "Stiker", price: 30, realPrice: 8000, isActive: true });
+    expect(saved.data?.realPrice).toBe(8000);
+    // Faolligini almashtirish so'mdagi narxni o'chirmaydi
+    await shop.saveProductAction({ title: "Stiker", price: 30, isActive: false }, saved.data!._id);
+    expect((await Product.findById(saved.data!._id).lean())?.realPrice).toBe(8000);
+    await shop.saveProductAction({ title: "Stiker", price: 30, isActive: true }, saved.data!._id);
+    expect((await shop.getProducts()).find((p) => p.title === "Stiker")?.realPrice).toBe(8000);
+    expect(await shop.suggestProductPriceAction({ realPrice: 16_000 })).toMatchObject({ basis: "economy" });
+
+    actAs(sessionFor(student));
+    const catalog = await shop.getProducts();
+    expect(catalog.length).toBeGreaterThan(0);
+    expect(catalog.every((p) => !("realPrice" in p))).toBe(true);
+    await expect(shop.suggestProductPriceAction({ realPrice: 16_000 })).rejects.toThrow();
+  });
+});
