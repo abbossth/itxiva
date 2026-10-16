@@ -1,13 +1,24 @@
 import Link from "next/link";
 import { BookOpen, CalendarClock, ClipboardCheck, Clock, Coins, PackageCheck, QrCode, Trophy } from "lucide-react";
-import type { StudentDashboard } from "@/actions/dashboard.actions";
+import type { StudentDashboard, StudentHomeStats } from "@/actions/dashboard.actions";
+import type { StudentQuestsData } from "@/actions/student-quest.actions";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DashCard, DashEmpty, Greeting, StatLink } from "@/components/dashboard/dashboard-parts";
+import { AttendanceCard, ChallengeCard, DailyCard, DaysChart, GoalsHero, ScoresChart, SourcesCard } from "@/components/dashboard/student-home-parts";
 import { describeDue, HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS } from "@/lib/homework-status";
 import { formatDateTimeUz, formatDateUz } from "@/lib/utils";
 
-export function StudentDashboardView({ data }: { data: StudentDashboard }) {
+export function StudentDashboardView({
+  data,
+  stats,
+  quests,
+}: {
+  data: StudentDashboard;
+  stats: StudentHomeStats;
+  /** Gamifikatsiya o'chiq bo'lsa null */
+  quests: StudentQuestsData | null;
+}) {
   const { homework } = data;
   const subtitle =
     homework.todoCount > 0
@@ -35,6 +46,8 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
           <span className={buttonVariants({ variant: "primary", size: "sm" })}>O&apos;tish</span>
         </Link>
       )}
+
+      <GoalsHero quests={quests} stats={stats} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatLink
@@ -72,6 +85,20 @@ export function StudentDashboardView({ data }: { data: StudentDashboard }) {
           <span className="flex-1">{data.ordersToConfirm} ta buyurtma topshirildi — olganingizni tasdiqlang</span>
         </Link>
       )}
+
+      {quests && (quests.daily.length > 0 || quests.challenge) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <DailyCard quests={quests} />
+          {quests.challenge && <ChallengeCard challenge={quests.challenge} />}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DaysChart stats={stats} />
+        <ScoresChart stats={stats} />
+        <AttendanceCard stats={stats} />
+        <SourcesCard stats={stats} />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DashCard title="Vazifalar" icon={ClipboardCheck} href="/homework">

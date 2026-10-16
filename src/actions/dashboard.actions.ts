@@ -13,6 +13,10 @@ import { HomeworkSubmission, HomeworkStatus } from "@/lib/db/models/homework-sub
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { formatSchedule, getNextLesson, hasLessonOn } from "@/lib/schedule";
 import { getAppSettings } from "@/lib/settings";
+import { CoinLedger, type CoinTransactionType } from "@/lib/db/models/coin-ledger.model";
+import { QuizSubmission } from "@/lib/db/models/quiz-submission.model";
+import { Product } from "@/lib/db/models/product.model";
+import { addDaysToKey, toDateKey } from "@/lib/schedule";
 import type { HomeworkState } from "@/lib/homework-status";
 
 export interface StudentDashboard {
@@ -113,6 +117,151 @@ export async function getStudentDashboard(): Promise<StudentDashboard> {
       date: l.date ? new Date(l.date).toISOString() : null,
     })),
     ordersToConfirm,
+  };
+}
+
+/** Bosh sahifadagi qiziqtiruvchi bloklar: maqsadlar va diagrammalar uchun ma'lumot */
+export interface StudentHomeStats {
+  unit: "XP" | "coin";
+  /** So'nggi 14 kun: har kunda olingan XP va coin (xarid, jarima va tenglashtirishsiz) */
+  days: { key: string; label: string; weekday: string; xp: number; coins: number }[];
+  /** Oxirgi baholar (eskidan yangiga): vazifa bali yoki test foizi */
+  scores: { kind: "homework" | "quiz"; title: string; percent: number; at: string }[];
+  /** Oxirgi darslar davomati (eskidan yangiga) */
+  attendance: { status: "present" | "late" | "excused" | "absent"; date: string }[];
+  attendancePercent: number | null;
+  /** So'nggi 30 kunda coin manbalari */
+  sources: { type: CoinTransactionType; amount: number }[];
+  /** Do'kondagi keyingi sovg'a: balans yetmaydigan eng arzon mahsulot (hammasi yetsa — eng qimmati) */
+  shopGoal: { title: string; price: number; balance: number } | null;
+  /** Reytingda bir pog'ona yuqoriga chiqish uchun kerakli farq */
+  rankGap: { position: number; total: number; gap: number; aheadName: string | null } | null;
+}
+
+const NOT_EARNING: CoinTransactionType[] = ["purchase", "adjustment", "xp_align"];
+const UZ_WEEKDAY_SHORT = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
+
+export async function getStudentHomeStats(): Promise<StudentHomeStats> {
+  const session = await requireStudent();
+  await connectToDatabase();
+  const [me, settings] = await Promise.all([
+    User.findById(session.userId).select("groupId xp totalCoins spendableBalance").lean(),
+    getAppSettings(),
+  ]);
+  const xpMode = settings.gamification.enabled;
+  const field = xpMode ? "xp" : "totalCoins";
+  const myValue = Math.round((xpMode ? me?.xp : me?.totalCoins) ?? 0);
+  const studentId = new mongoose.Types.ObjectId(session.userId);
+  const groupId = me?.groupId ?? null;
+
+  const today = toDateKey();
+  const firstDay = addDaysToKey(today, -13);
+  const since14 = new Date(Date.now() - 15 * 86_400_000);
+  const since30 = new Date(Date.now() - 30 * 86_400_000);
+
+  const [dayRows, sourceRows, homework, quizzes, records, products, above, groupSize] = await Promise.all([
+    CoinLedger.aggregate<{ _id: string; xp: number; coins: number }>([
+      { $match: { studentId, createdAt: { $gte: since14 }, type: { $nin: NOT_EARNING } } },
+      {
+        $group: {
+          _id: { $dateToString: { date: "$createdAt", format: "%Y-%m-%d", timezone: "Asia/Tashkent" } },
+          xp: { $sum: { $max: [0, { $ifNull: ["$xp", 0] }] } },
+          coins: { $sum: { $max: [0, "$amount"] } },
+        },
+      },
+    ]),
+    CoinLedger.aggregate<{ _id: CoinTransactionType; amount: number }>([
+      { $match: { studentId, createdAt: { $gte: since30 }, amount: { $gt: 0 }, type: { $nin: NOT_EARNING } } },
+      { $group: { _id: "$type", amount: { $sum: "$amount" } } },
+      { $sort: { amount: -1 } },
+    ]),
+    HomeworkSubmission.find({ studentId, status: "graded", score: { $ne: null } })
+      .select("lessonId score submittedAt")
+      .sort({ submittedAt: -1 })
+      .limit(8)
+      .lean(),
+    QuizSubmission.find({ studentId, status: "graded", maxScore: { $gt: 0 } })
+      .select("lessonId totalScore maxScore submittedAt")
+      .sort({ submittedAt: -1 })
+      .limit(8)
+      .lean(),
+    AttendanceRecord.find({ studentId }).select("sessionId status").lean(),
+    Product.find({ isActive: true, kind: { $ne: "streak_shield" }, $or: [{ stock: null }, { stock: { $gt: 0 } }] })
+      .select("title price")
+      .sort({ price: 1 })
+      .lean(),
+    groupId
+      ? User.find({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true }, [field]: { $gt: myValue } })
+          .select(`fullName ${field}`)
+          .sort({ [field]: 1 })
+          .lean()
+      : [],
+    groupId ? User.countDocuments({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true } }) : 0,
+  ]);
+
+  // Kunlar: bo'sh kunlar ham 0 bilan ko'rsatiladi
+  const byDay = new Map(dayRows.map((r) => [r._id, r]));
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const key = addDaysToKey(firstDay, i);
+    const weekday = (new Date(`${key}T12:00:00Z`).getUTCDay() + 6) % 7;
+    const r = byDay.get(key);
+    return { key, label: key.slice(8), weekday: UZ_WEEKDAY_SHORT[weekday], xp: Math.round(r?.xp ?? 0), coins: Math.round(r?.coins ?? 0) };
+  });
+
+  // Baholar: vazifa va testlar aralash, sana bo'yicha
+  const lessonIds = [...homework.map((h) => h.lessonId), ...quizzes.map((q) => q.lessonId)];
+  const titles = new Map((await Lesson.find({ _id: { $in: lessonIds } }).select("title").lean()).map((l) => [String(l._id), l.title]));
+  const scores = [
+    ...homework.map((h) => ({
+      kind: "homework" as const,
+      title: titles.get(String(h.lessonId)) ?? "Vazifa",
+      percent: Math.max(0, Math.min(100, Math.round(h.score ?? 0))),
+      at: new Date(h.submittedAt ?? Date.now()).toISOString(),
+    })),
+    ...quizzes.map((q) => ({
+      kind: "quiz" as const,
+      title: titles.get(String(q.lessonId)) ?? "Test",
+      percent: Math.round((q.totalScore / q.maxScore) * 100),
+      at: new Date(q.submittedAt ?? Date.now()).toISOString(),
+    })),
+  ]
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .slice(-10);
+
+  // Davomat: oxirgi 12 dars
+  const sessions = await AttendanceSession.find({ _id: { $in: records.map((r) => r.sessionId) } }).select("date").lean();
+  const dateOf = new Map(sessions.map((x) => [String(x._id), x.date]));
+  const dated = records
+    .flatMap((r) => {
+      const d = dateOf.get(String(r.sessionId));
+      return d ? [{ status: r.status, date: new Date(d).toISOString() }] : [];
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const counted = dated.filter((r) => r.status !== "excused");
+  const attended = counted.filter((r) => r.status === "present" || r.status === "late").length;
+
+  const balance = me?.spendableBalance ?? 0;
+  const next = products.find((p) => p.price > balance) ?? products[products.length - 1] ?? null;
+  const nearest = above[0];
+
+  return {
+    unit: xpMode ? "XP" : "coin",
+    days,
+    scores,
+    attendance: dated.slice(-12),
+    attendancePercent: counted.length > 0 ? Math.round((attended / counted.length) * 100) : null,
+    sources: sourceRows.map((r) => ({ type: r._id, amount: r.amount })),
+    shopGoal: next ? { title: next.title, price: next.price, balance } : null,
+    rankGap:
+      groupSize > 0
+        ? {
+            // Reyting sahifasidagidek: o'zidan ko'p to'plaganlar soni + 1
+            position: above.length + 1,
+            total: groupSize,
+            gap: nearest ? Math.round((xpMode ? nearest.xp : nearest.totalCoins) ?? 0) - myValue + 1 : 0,
+            aheadName: nearest ? nearest.fullName.trim().split(/\s+/)[0] : null,
+          }
+        : null,
   };
 }
 

@@ -13,6 +13,8 @@ const { AttendanceSession } = await import("@/lib/db/models/attendance-session.m
 const { AttendanceRecord } = await import("@/lib/db/models/attendance-record.model");
 const rewards = await import("@/actions/rewards.actions");
 const profile = await import("@/actions/student-profile.actions");
+const dashboard = await import("@/actions/dashboard.actions");
+const { Product } = await import("@/lib/db/models/product.model");
 
 beforeAll(startDb);
 afterAll(stopDb);
@@ -115,5 +117,38 @@ describe("o'quvchining o'z profili", () => {
     const mentor = await User.create({ login: "m", fullName: "M", role: "mentor", passwordHash: "x" });
     actAs(sessionFor(mentor));
     await expect(profile.getMyProfile()).rejects.toThrow();
+  });
+});
+
+describe("bosh sahifa statistikasi", () => {
+  it("14 kun, manbalar, keyingi sovg'a va reytingdagi farq", async () => {
+    const { me } = await seed();
+    await AppSettings.create({ key: "global", gamification: { enabled: true } });
+    await CoinLedger.create([
+      { studentId: me._id, amount: 5, xp: 5, type: "attendance", description: "Keldi" },
+      { studentId: me._id, amount: 3, xp: 3, type: "quiz", description: "Test" },
+      { studentId: me._id, amount: -20, xp: 0, type: "purchase", description: "Xarid" },
+      { studentId: me._id, amount: 0, xp: 50, type: "xp_align", description: "x" },
+      { studentId: me._id, amount: 4, xp: 4, type: "quest", description: "Eski", createdAt: ago(40 * 86_400_000) },
+    ]);
+    await Product.create([
+      { title: "Stiker", price: 30, isActive: true },
+      { title: "Ruchka", price: 60, isActive: true },
+      { title: "Himoya", price: 45, isActive: true, kind: "streak_shield" },
+    ]);
+    actAs(sessionFor(me));
+    const s = await dashboard.getStudentHomeStats();
+    expect(s.unit).toBe("XP");
+    expect(s.days).toHaveLength(14);
+    expect(s.days[13]).toMatchObject({ xp: 8, coins: 8 });
+    expect(s.days.slice(0, 13).every((d) => d.xp === 0)).toBe(true);
+    expect(s.sources).toEqual([
+      { type: "attendance", amount: 5 },
+      { type: "quiz", amount: 3 },
+    ]);
+    // Balans 40: Stiker (30) yetadi, keyingisi — Ruchka; seriya himoyasi maqsad emas
+    expect(s.shopGoal).toEqual({ title: "Ruchka", price: 60, balance: 40 });
+    // ali 120 XP: vali 300, soli 200 oldinda; gani teng (120) — oldinda emas
+    expect(s.rankGap).toEqual({ position: 3, total: 4, gap: 81, aheadName: "SOLI" });
   });
 });
