@@ -245,3 +245,31 @@ describe("do'kon: vaqtinchalik chegirma", () => {
     expect((await Product.findById(item._id).lean())?.salePrice).toBeNull();
   });
 });
+
+describe("do'kon: mahsulotlar tartibi", () => {
+  it("mentor yuqoriga/pastga suradi; o'quvchi shu tartibda ko'radi; yangi mahsulot tepada; o'quvchi sura olmaydi", async () => {
+    const { student, mentor } = await seed(100, { price: 60 });
+    await Product.create([
+      { title: "Ruchka", price: 20, isActive: true },
+      { title: "Futbolka", price: 400, isActive: true },
+    ]);
+    actAs(sessionFor(student));
+    const titles = async () => (await shop.getProducts()).map((p) => p.title);
+    // Tartiblanmagan: narx bo'yicha
+    expect(await titles()).toEqual(["Ruchka", "Daftar", "Futbolka"]);
+
+    actAs(sessionFor(mentor));
+    const id = async (title: string) => String((await Product.findOne({ title }).lean())!._id);
+    expect((await shop.moveProductAction(await id("Futbolka"), "top")).data?.order).toHaveLength(3);
+    await shop.moveProductAction(await id("Ruchka"), "down");
+    actAs(sessionFor(student));
+    expect(await titles()).toEqual(["Futbolka", "Daftar", "Ruchka"]);
+
+    actAs(sessionFor(mentor));
+    await shop.saveProductAction({ title: "Stiker", price: 15, isActive: true });
+    await shop.moveProductAction(await id("Daftar"), "up");
+    actAs(sessionFor(student));
+    expect(await titles()).toEqual(["Stiker", "Daftar", "Futbolka", "Ruchka"]);
+    await expect(shop.moveProductAction(await id("Ruchka"), "top")).rejects.toThrow();
+  });
+});

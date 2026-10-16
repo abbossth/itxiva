@@ -17,6 +17,8 @@ export interface IProductData {
   salePrice?: number | null;
   saleEndsAt?: Date | string | null;
   category?: string;
+  /** Do'kondagi tartib (kichigi tepada). Mentor hech qachon tartiblamagan bo'lsa — null, narx bo'yicha */
+  sortOrder?: number | null;
   kind?: ProductKind;
   imageKey?: string | null;
   /** null — cheklanmagan */
@@ -39,6 +41,7 @@ const ProductSchema = new Schema<IProduct>(
     salePrice: { type: Number, default: null, min: 1 },
     saleEndsAt: { type: Date, default: null },
     category: { type: String, trim: true, default: "" },
+    sortOrder: { type: Number, default: null },
     kind: { type: String, enum: ["item", "privilege", "streak_shield"], default: "item" },
     imageKey: { type: String, default: null },
     stock: { type: Number, default: null, min: 0 },

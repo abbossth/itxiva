@@ -28,6 +28,9 @@ export type ShopProduct = Omit<IProductData, "_id"> & {
   boughtByMe: boolean;
 };
 
+/** Do'kondagi tartib: mentor belgilagan joy, keyin narx */
+const PRODUCT_ORDER = { sortOrder: 1, price: 1, createdAt: 1 } as const;
+
 /** Sotib olingan deb sanaladigan buyurtmalar: coin to'langan va qaytarilmagan */
 const BOUGHT_STATUSES: OrderStatus[] = ["pending", "accepted", "handed_over", "received"];
 
@@ -79,7 +82,8 @@ export async function getProducts(): Promise<ShopProduct[]> {
   // Hayotdagi (so'm) narx faqat mentorga
   const products = await Product.find(filter)
     .select(session.role === "mentor" ? {} : { realPrice: 0 })
-    .sort({ isActive: -1, price: 1 })
+    // Mentor belgilagan tartib; tartiblanmagan bo'lsa — narx bo'yicha. Mentor ham o'quvchilar ko'radigan tartibni ko'radi
+    .sort(PRODUCT_ORDER)
     .lean();
   return withImageUrls(JSON.parse(JSON.stringify(products)) as IProductData[], session.role === "student" ? session.userId : null);
 }
@@ -111,7 +115,9 @@ export async function saveProductAction(
     product = await Product.findByIdAndUpdate(productId, { $set: parsed.data }, { returnDocument: "after" });
     if (!product) return { success: false, message: "Mahsulot topilmadi" };
   } else {
-    product = await Product.create(parsed.data);
+    // Yangi mahsulot do'konning eng tepasida chiqadi (mentor tartiblagan bo'lsa); keyin xohlagan joyga suriladi
+    const top = await Product.findOne({ sortOrder: { $ne: null } }).sort({ sortOrder: 1 }).select("sortOrder").lean();
+    product = await Product.create({ ...parsed.data, sortOrder: top?.sortOrder != null ? top.sortOrder - 1 : null });
   }
 
   await AuditLog.create({
@@ -131,6 +137,37 @@ export async function saveProductAction(
   revalidateShop();
   const [data] = await withImageUrls([JSON.parse(JSON.stringify(product)) as IProductData]);
   return { success: true, message: productId ? "Mahsulot yangilandi" : "Mahsulot qo'shildi", data };
+}
+
+/**
+ * Mahsulotni do'konda yuqoriga/pastga suradi. Birinchi surishda barcha mahsulotlarga joriy tartib bo'yicha
+ * raqam beriladi, keyin faqat joylar almashadi. Yangi tartib qaytariladi (mentor ro'yxati shu bilan yangilanadi).
+ */
+export async function moveProductAction(
+  productId: string,
+  direction: "up" | "down" | "top" | "bottom"
+): Promise<ActionResult<{ order: string[] }>> {
+  const mentor = await requireMentor();
+  if (!isObjectId(productId) || !["up", "down", "top", "bottom"].includes(direction)) {
+    return { success: false, message: "Mahsulot topilmadi" };
+  }
+  await connectToDatabase();
+  const all = await Product.find({}).select("_id title").sort(PRODUCT_ORDER).lean();
+  const ids = all.map((p) => String(p._id));
+  const from = ids.indexOf(productId);
+  if (from < 0) return { success: false, message: "Mahsulot topilmadi" };
+  const to = direction === "up" ? Math.max(0, from - 1) : direction === "down" ? Math.min(ids.length - 1, from + 1) : direction === "top" ? 0 : ids.length - 1;
+  if (to !== from) {
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    await Product.bulkWrite(ids.map((id, i) => ({ updateOne: { filter: { _id: id }, update: { $set: { sortOrder: i } } } })));
+    await AuditLog.create({
+      actorId: mentor.userId,
+      action: "REORDER_PRODUCTS",
+      details: { productId, title: all[from].title, from: from + 1, to: to + 1 },
+    });
+    revalidateShop();
+  }
+  return { success: true, data: { order: ids } };
 }
 
 /** Mentor uchun: hayotdagi narxdan coin narxi tavsiyasi (do'kondagi boshqa mahsulotlar va o'quvchilar daromadi bo'yicha) */

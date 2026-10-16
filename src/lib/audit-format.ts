@@ -69,6 +69,7 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   DELETE_GROUP: { label: "Guruh o'chirildi", tone: "danger", category: "groups" },
   CREATE_PRODUCT: { label: "Mahsulot qo'shildi", tone: "success", category: "shop" },
   UPDATE_PRODUCT: { label: "Mahsulot tahrirlandi", tone: "teal", category: "shop" },
+  REORDER_PRODUCTS: { label: "Do'kon tartibi o'zgardi", tone: "teal", category: "shop" },
   DELETE_PRODUCT: { label: "Mahsulot o'chirildi", tone: "danger", category: "shop" },
   ACCEPT_ORDER: { label: "Buyurtma qabul qilindi", tone: "success", category: "shop" },
   REJECT_ORDER: { label: "Buyurtma rad etildi", tone: "danger", category: "shop" },

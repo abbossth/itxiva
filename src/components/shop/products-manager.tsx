@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ShoppingBag, Plus, Pencil, Trash2, ImagePlus, Eye, EyeOff } from "lucide-react";
+import { ShoppingBag, Plus, Pencil, Trash2, ImagePlus, Eye, EyeOff, ArrowUp, ArrowDown, ChevronsUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { PriceAdvisor } from "@/components/shop/price-advisor";
 import { PriceTag, SaleOverlay } from "@/components/shop/price-tag";
 import { activeSale, priceWithPercent } from "@/lib/shop-sale";
 import { fromTashkentInputValue, toTashkentInputValue } from "@/lib/schedule";
-import { saveProductAction, deleteProductAction, ShopProduct } from "@/actions/shop.actions";
+import { saveProductAction, deleteProductAction, moveProductAction, ShopProduct } from "@/actions/shop.actions";
 import { uploadFileToStorage } from "@/lib/upload-client";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -155,6 +155,35 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
     }
   };
 
+  const [moving, setMoving] = useState(false);
+
+  // Do'kondagi tartib: darhol joyida almashadi, server boshqacha javob bersa — server tartibi olinadi
+  const move = async (p: ShopProduct, direction: "up" | "down" | "top") => {
+    const before = products;
+    const from = before.findIndex((x) => x._id === p._id);
+    const to = direction === "up" ? Math.max(0, from - 1) : direction === "down" ? Math.min(before.length - 1, from + 1) : 0;
+    if (from < 0 || to === from) return;
+    const next = [...before];
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    setProducts(next);
+    setMoving(true);
+    try {
+      const res = await moveProductAction(p._id, direction);
+      if (res.success && res.data) {
+        const byId = new Map(next.map((x) => [x._id, x]));
+        setProducts(res.data.order.flatMap((id) => byId.get(id) ?? []));
+      } else {
+        setProducts(before);
+        toast.error(res.message || "Tartibni o'zgartirib bo'lmadi");
+      }
+    } catch {
+      setProducts(before);
+      toast.error("Tartibni o'zgartirib bo'lmadi");
+    } finally {
+      setMoving(false);
+    }
+  };
+
   const toggleActive = async (p: ShopProduct) => {
     // Optimistik: holat darhol almashadi, xato bo'lsa qaytariladi
     setProducts((prev) => prev.map((x) => (x._id === p._id ? { ...x, isActive: !p.isActive } : x)));
@@ -229,7 +258,7 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p) => (
+          {products.map((p, index) => (
             <div
               key={p._id}
               className={cn(
@@ -240,10 +269,33 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
               <div className="relative">
                 <ProductImage src={p.imageUrl} alt={p.title} className="aspect-[4/3] w-full" />
                 <SaleOverlay product={p} />
+                {/* Do'kondagi joyi: o'quvchilar ham aynan shu tartibda ko'radi */}
+                <div className="absolute right-2 top-2 flex items-center gap-1 rounded-xl bg-white/95 dark:bg-slate-900/90 p-1 shadow-md backdrop-blur-sm">
+                  {(
+                    [
+                      ["top", ChevronsUp, "Eng tepaga"],
+                      ["up", ArrowUp, "Yuqoriga"],
+                      ["down", ArrowDown, "Pastga"],
+                    ] as const
+                  ).map(([dir, Icon, label]) => (
+                    <button
+                      key={dir}
+                      type="button"
+                      onClick={() => void move(p, dir)}
+                      disabled={moving || (dir === "down" ? index === products.length - 1 : index === 0)}
+                      aria-label={`${p.title}: ${label.toLowerCase()}`}
+                      title={label}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-700 dark:text-slate-200 hover:bg-teal-500/15 hover:text-teal-700 dark:hover:text-teal-300 cursor-pointer disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                    <span className="mr-1.5 rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-slate-700 dark:text-slate-300">#{index + 1}</span>
                     {p.category || "Sovg'a"}
                   </span>
                   <Badge variant={p.isActive ? "success" : "secondary"}>{p.isActive ? "Do'konda" : "Yashirilgan"}</Badge>
