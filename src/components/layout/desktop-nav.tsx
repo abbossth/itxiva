@@ -35,7 +35,7 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level 
   const role = user.role;
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
-  const links = navLinksFor(role, gamification);
+  const links = navLinksFor(role, gamification).filter((l) => l.sidebar !== false);
 
   const toggle = () => {
     const next = !collapsed;
@@ -123,8 +123,8 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level 
             {badgeLink && (
               <Link
                 href={badgeLink}
-                title={`Tekshirilmagan vazifa javoblari: ${count} ta`}
-                aria-label={`Tekshirilmagan vazifa javoblari: ${count} ta — ro'yxatni ochish`}
+                title={role === "student" ? `Topshirish kerak bo'lgan vazifalar: ${count} ta` : `Tekshirilmagan vazifa javoblari: ${count} ta`}
+                aria-label={`${role === "student" ? "Topshirish kerak bo'lgan vazifalar" : "Tekshirilmagan vazifa javoblari"}: ${count} ta — ro'yxatni ochish`}
                 className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-8 min-w-8 items-center justify-center px-1.5 rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 group/badge"
               >
                 <span className="min-w-5 h-5 px-1.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold font-mono flex items-center justify-center group-hover/badge:scale-110 group-hover/badge:bg-amber-400 transition-transform">

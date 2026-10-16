@@ -43,6 +43,8 @@ export interface NavLink {
   gamification?: boolean;
   /** Gamifikatsiya yoqilganda mobil pastki paneldagi o'rni (`primary` o'rniga) */
   primaryWithGamification?: boolean;
+  /** false — kompyuter yon menyusida ko'rinmaydi (u yerda boshqa joydan ochiladi, masalan profil kartasi) */
+  sidebar?: false;
 }
 
 export type NavBadgeKind = "orders" | "homework" | "quests";
@@ -105,17 +107,34 @@ export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
   },
 ];
 
+// O'quvchi menyusi ixcham: darslar, vazifalar va imtihonlar bitta "Darslarim" bo'limida, Yutuqlarim — Topshiriqlar
+// ichida (sahifa tepasidagi tablar orqali). Profil yon menyuning pastidagi kartadan ochiladi.
 export const STUDENT_LINKS: NavLink[] = [
   { href: "/", label: "Bosh sahifa", shortLabel: "Bosh", icon: LayoutDashboard, primary: true },
-  { href: "/lessons", label: "Darslarim", shortLabel: "Darslar", icon: BookOpen, primary: true },
-  { href: "/homework", label: "Vazifalarim", shortLabel: "Vazifa", icon: ClipboardCheck, primary: true, primaryWithGamification: false, badge: "homework" },
-  { href: "/exams", label: "Imtihonlarim", shortLabel: "Imtihon", icon: GraduationCap },
-  { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true, primaryWithGamification: true },
+  { href: "/lessons", label: "Darslarim", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", badgeHref: "/homework", match: ["/homework", "/exams"] },
+  { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true, primaryWithGamification: true, match: ["/achievements"] },
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
+  { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy, primary: true, primaryWithGamification: false },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
-  { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
-  { href: "/achievements", label: "Yutuqlarim", shortLabel: "Yutuqlar", icon: Medal, gamification: true },
-  { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User },
+  { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User, sidebar: false },
+];
+
+export const STUDENT_SECTIONS: { label: string; tabs: NavTab[] }[] = [
+  {
+    label: "Darslarim",
+    tabs: [
+      { href: "/lessons", label: "Darslar", icon: BookOpen },
+      { href: "/homework", label: "Vazifalar", icon: ClipboardCheck, badge: "homework" },
+      { href: "/exams", label: "Imtihonlar", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Topshiriqlar",
+    tabs: [
+      { href: "/quests", label: "Topshiriqlar", icon: Target, gamification: true },
+      { href: "/achievements", label: "Yutuqlarim", icon: Medal, gamification: true },
+    ],
+  },
 ];
 
 /** Rol bo'yicha menyu havolalari; gamifikatsiya o'chiq bo'lsa uning sahifalari ko'rinmaydi */
@@ -125,9 +144,11 @@ export function navLinksFor(role: "mentor" | "student", gamification: boolean): 
     .map((l) => (gamification && l.primaryWithGamification !== undefined ? { ...l, primary: l.primaryWithGamification } : l));
 }
 
-/** Mentor bo'limlari (tablar); bo'sh qolgan bo'lim chiqarib tashlanadi */
-export function mentorSectionsFor(gamification: boolean): { label: string; tabs: NavTab[] }[] {
-  return MENTOR_SECTIONS.map((s) => ({ ...s, tabs: s.tabs.filter((t) => gamification || !t.gamification) })).filter((s) => s.tabs.length > 1);
+/** Bo'limlar (tablar); bitta sahifa qolgan bo'lim chiqarib tashlanadi */
+export function sectionsFor(role: "mentor" | "student", gamification: boolean): { label: string; tabs: NavTab[] }[] {
+  return (role === "mentor" ? MENTOR_SECTIONS : STUDENT_SECTIONS)
+    .map((s) => ({ ...s, tabs: s.tabs.filter((t) => gamification || !t.gamification) }))
+    .filter((s) => s.tabs.length > 1);
 }
 
 export function isNavLinkActive(href: string, pathname: string): boolean {

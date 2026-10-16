@@ -69,7 +69,7 @@ export default async function DashboardLayout({
         />
 
         <main className="flex-1 min-w-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-28 md:pb-8">
-          {session.role === "mentor" && <SectionTabs badges={badges} gamification={gamification} />}
+          <SectionTabs role={session.role} badges={badges} gamification={gamification} />
           {children}
         </main>
       </div>
