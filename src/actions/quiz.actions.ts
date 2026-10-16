@@ -319,15 +319,17 @@ export async function upsertQuizAction(data: unknown): Promise<ActionState> {
     if (lesson.linkId && saved) {
       const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } }).select("_id").lean();
       for (const sib of siblings) {
+        // Savollar ko'chiriladi, lekin test har guruhda alohida ochiladi (yangi nusxa — yopiq)
         await Quiz.findOneAndUpdate(
           { lessonId: sib._id },
           {
-            lessonId: sib._id,
-            title: saved.title,
-            description: saved.description,
-            questions: saved.questions,
-            isPublished: saved.isPublished,
-            passingScore: saved.passingScore,
+            $set: {
+              title: saved.title,
+              description: saved.description,
+              questions: saved.questions,
+              passingScore: saved.passingScore,
+            },
+            $setOnInsert: { lessonId: sib._id, isPublished: false },
           },
           { upsert: true, runValidators: true }
         );

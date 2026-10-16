@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ClipboardCheck, Edit3, Eye, Users } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
-import { getLessonById } from "@/actions/lesson.actions";
+import { getLessonById, getLinkedLessons } from "@/actions/lesson.actions";
+import { LessonVisibility } from "@/components/mentor/lesson-visibility";
 import { getGroupById } from "@/actions/group.actions";
 import { getStudentsByGroup } from "@/actions/student.actions";
 import { getQuizForMentor, getQuizReviewQueue, getQuizSubmissionsForLesson } from "@/actions/quiz.actions";
@@ -33,7 +34,7 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
   }
 
   const groupId = lesson.groupId.toString();
-  const [group, students, homework, roster, quizRes, quizSubsRes, quizReviewRes] = await Promise.all([
+  const [group, students, homework, roster, quizRes, quizSubsRes, quizReviewRes, linked] = await Promise.all([
     getGroupById(groupId),
     getStudentsByGroup(groupId),
     getHomeworkForStudent(id),
@@ -41,6 +42,7 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
     getQuizForMentor(id),
     getQuizSubmissionsForLesson(id),
     getQuizReviewQueue(id),
+    getLinkedLessons(id),
   ]);
   const quizReview = quizReviewRes.data ?? [];
   const quiz = quizRes.data ?? null;
@@ -96,6 +98,14 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
           : "Bu qoralama — o'quvchilar hali ko'rmaydi. Nashr qilish uchun darsni tahrirlang."}
       </p>
 
+      <LessonVisibility
+        lessonId={id}
+        groupName={group ? groupShortName(group) : null}
+        homework={homework ? { open: Boolean(lesson.homework?.isEnabled), dueAt: lesson.homework?.dueAt ? new Date(lesson.homework.dueAt).toISOString() : null } : null}
+        quiz={quiz ? { open: quiz.isPublished } : null}
+        linked={linked}
+      />
+
       <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-5 sm:p-8 space-y-6 shadow-xs">
         <LessonBody
           lesson={lesson}
@@ -108,14 +118,15 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
         />
 
         {homework && (
-          <div id="homework" className="pt-4 border-t border-slate-100 dark:border-slate-800 scroll-mt-24">
+          <div id="homework" className="pt-4 border-t border-slate-100 dark:border-slate-800 scroll-mt-24 space-y-2">
+            {!lesson.homework?.isEnabled && <Badge variant="warning">Vazifa yopiq — o&apos;quvchilarga ko&apos;rinmaydi</Badge>}
             <HomeworkPanel lessonId={id} task={homework.task} submission={null} readOnly />
           </div>
         )}
 
         {quiz && (
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            {!quiz.isPublished && <Badge variant="warning">Test qoralama holatida — o&apos;quvchilarga ko&apos;rinmaydi</Badge>}
+            {!quiz.isPublished && <Badge variant="warning">Test yopiq — o&apos;quvchilarga ko&apos;rinmaydi</Badge>}
             <QuizView lessonId={id} quiz={quiz} initialSubmission={null} role="mentor" />
           </div>
         )}

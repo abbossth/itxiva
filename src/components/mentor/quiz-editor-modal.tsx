@@ -30,6 +30,8 @@ export function QuizEditorModal({
   const [title, setTitle] = useState(initialQuiz?.title || "Dars bo'yicha kichik test");
   const [description, setDescription] = useState(initialQuiz?.description || "");
   const [passingScore, setPassingScore] = useState(initialQuiz?.passingScore || 60);
+  // Yangi test yopiq: mentor uni shu guruhda dars o'tgach ochadi (bog'langan guruhlarda alohida)
+  const [published, setPublished] = useState(Boolean(initialQuiz?.isPublished));
   const [questions, setQuestions] = useState<IQuizQuestion[]>(() => {
     if (initialQuiz?.questions?.length) {
       return initialQuiz.questions;
@@ -142,7 +144,7 @@ export function QuizEditorModal({
         title,
         description,
         passingScore,
-        isPublished: true,
+        isPublished: published,
         questions,
       });
 
@@ -414,7 +416,19 @@ export function QuizEditorModal({
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t border-slate-100 dark:border-slate-800">
+        <DialogFooter className="p-4 border-t border-slate-100 dark:border-slate-800 flex-wrap">
+          <label className="mr-auto flex min-h-[40px] cursor-pointer items-center gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={published}
+              onChange={(e) => setPublished(e.target.checked)}
+              className="h-4 w-4 accent-teal-600"
+            />
+            <span>
+              <span className="block font-semibold text-slate-900 dark:text-slate-100">O&apos;quvchilarga ochiq</span>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400">Faqat shu guruhda. Dars o&apos;tilgach yoqing</span>
+            </span>
+          </label>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Bekor qilish
           </Button>

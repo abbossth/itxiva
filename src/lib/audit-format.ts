@@ -27,6 +27,7 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   UNPUBLISH_LESSON: { label: "Dars qoralamaga olindi", tone: "warning", category: "lessons" },
   TOGGLE_PUBLISH_LESSON: { label: "Dars holati o'zgardi", tone: "warning", category: "lessons" },
   COPY_LESSON_TO_GROUPS: { label: "Dars boshqa guruhlarga qo'shildi", tone: "teal", category: "lessons" },
+  SET_LESSON_VISIBILITY: { label: "Vazifa yoki test o'quvchilarga ochildi/yopildi", tone: "teal", category: "lessons" },
   UNLINK_LESSON: { label: "Dars bog'lanishi uzildi", tone: "warning", category: "lessons" },
   UPSERT_QUIZ: { label: "Test saqlandi", tone: "teal", category: "exams" },
   GRADE_QUIZ: { label: "Test baholandi", tone: "teal", category: "exams" },

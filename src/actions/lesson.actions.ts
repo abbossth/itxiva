@@ -14,6 +14,7 @@ import { archiveEntity } from "@/lib/archive";
 import { lessonSchema, homeworkSchema, HomeworkInput, LessonInput } from "@/lib/validations/lesson.schema";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { notifyGroup } from "@/lib/notifications/notify";
+import { formatDateTimeUz } from "@/lib/utils";
 import { trackMaterialView } from "@/lib/gamification/quests";
 
 export async function getLessonsByGroupAndQuarter({
@@ -73,6 +74,8 @@ export async function getLessonById(lessonId: string) {
 
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const parsed = JSON.parse(JSON.stringify(lesson)) as ILessonData;
+  // Yopiq vazifa o'quvchiga umuman yuborilmaydi (sahifa ma'lumotida ham ko'rinmasin)
+  if (session.role === "student" && !parsed.homework?.isEnabled) parsed.homework = null;
   return {
     ...parsed,
     isNew: parsed.createdAt ? new Date(parsed.createdAt).getTime() > oneWeekAgo : false,
@@ -390,8 +393,6 @@ async function syncLinkedLessons(lesson: ILesson): Promise<number> {
   const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } });
   if (siblings.length === 0) return 0;
 
-  const groups = await Group.find({ _id: { $in: siblings.map((s) => s.groupId) } }).select("schedule").lean();
-  const scheduleOf = new Map(groups.map((g) => [g._id.toString(), g.schedule]));
   const source = lesson.toObject();
 
   for (const sib of siblings) {
@@ -402,19 +403,14 @@ async function syncLinkedLessons(lesson: ILesson): Promise<number> {
     sib.materials = source.materials as typeof sib.materials;
 
     if (source.homework) {
-      // Muddat har guruhda o'ziniki: bor bo'lsa saqlanadi, yo'q bo'lsa o'sha guruh jadvalidan olinadi
-      const ownDue = sib.homework?.dueAt ?? null;
-      const due =
-        ownDue ??
-        (source.homework.isEnabled && sib.date
-          ? getNextLessonAfter(scheduleOf.get(sib.groupId.toString()), toDateKey(sib.date))
-          : null);
+      // Vazifa mazmuni ko'chiriladi, lekin o'quvchilarga ochiq-yopiqligi va muddati har guruhda o'ziniki:
+      // bir guruhda dars o'tib vazifa ochilsa, boshqa guruh (darsi hali bo'lmagan) uni ko'rmaydi
       sib.homework = {
-        isEnabled: source.homework.isEnabled,
+        isEnabled: Boolean(sib.homework?.isEnabled),
         instructions: source.homework.instructions,
         attachments: source.homework.attachments,
         coinsReward: source.homework.coinsReward,
-        dueAt: due,
+        dueAt: sib.homework?.dueAt ?? null,
       } as typeof sib.homework;
     } else if (sib.homework) {
       sib.homework.isEnabled = false;
@@ -427,6 +423,64 @@ async function syncLinkedLessons(lesson: ILesson): Promise<number> {
   return siblings.length;
 }
 
+/**
+ * Shu guruhdagi darsning vazifasi yoki testini o'quvchilarga ochadi/yopadi. Bog'langan boshqa guruhlarga ta'sir qilmaydi:
+ * vazifa va test har guruhda dars o'tgach alohida ochiladi. Vazifa ochilganda muddati bo'lmasa — guruhning keyingi darsi.
+ */
+export async function setLessonVisibilityAction(params: { lessonId: string; homework?: boolean; quiz?: boolean }) {
+  const mentor = await requireMentor();
+  if (typeof params?.lessonId !== "string" || !mongoose.isValidObjectId(params.lessonId)) {
+    return { success: false, message: "Dars topilmadi" };
+  }
+  await connectToDatabase();
+  const lesson = await Lesson.findById(params.lessonId);
+  if (!lesson) return { success: false, message: "Dars topilmadi" };
+
+  const changes: string[] = [];
+  if (typeof params.homework === "boolean") {
+    if (!lesson.homework || (!lesson.homework.instructions?.trim() && !(lesson.homework.attachments?.length ?? 0))) {
+      return { success: false, message: "Bu darsda vazifa yozilmagan. Avval darsni tahrirlab vazifa qo'shing" };
+    }
+    const wasOpen = Boolean(lesson.homework.isEnabled);
+    lesson.homework.isEnabled = params.homework;
+    if (params.homework && !lesson.homework.dueAt) {
+      const group = await Group.findById(lesson.groupId).select("schedule").lean();
+      lesson.homework.dueAt = getNextLessonAfter(group?.schedule, toDateKey(new Date())) ?? null;
+    }
+    await lesson.save();
+    changes.push(params.homework ? "vazifa ochildi" : "vazifa yopildi");
+    if (params.homework && !wasOpen && lesson.isPublished) {
+      const due = lesson.homework.dueAt;
+      notifyGroup(lesson.groupId, "lesson_new", {
+        lessonId: lesson._id.toString(),
+        lessonTitle: lesson.title,
+        homeworkOpened: true,
+        dueLabel: due ? formatDateTimeUz(due) : undefined,
+      });
+    }
+  }
+
+  if (typeof params.quiz === "boolean") {
+    const quiz = await Quiz.findOne({ lessonId: lesson._id }).select("isPublished title").lean();
+    if (!quiz) return { success: false, message: "Bu darsda test yo'q" };
+    await Quiz.updateOne({ _id: quiz._id }, { $set: { isPublished: params.quiz } });
+    changes.push(params.quiz ? "test ochildi" : "test yopildi");
+    if (params.quiz && !quiz.isPublished && lesson.isPublished) {
+      notifyGroup(lesson.groupId, "exam_new", { kind: "quiz", title: `${lesson.title}: ${quiz.title}`, href: `/lessons/${lesson._id}` });
+    }
+  }
+
+  await AuditLog.create({
+    actorId: mentor.userId,
+    action: "SET_LESSON_VISIBILITY",
+    details: { lessonId: lesson._id, title: lesson.title, changes },
+  });
+  revalidatePath(`/lessons/${lesson._id}`);
+  revalidatePath(`/mentor/lessons/${lesson._id}`);
+  revalidatePath("/homework");
+  return { success: true, message: changes.join(", ") };
+}
+
 export interface LinkedLessonInfo {
   _id: string;
   groupId: string;
@@ -434,6 +488,9 @@ export interface LinkedLessonInfo {
   grade: number | null;
   date: string | null;
   isPublished: boolean;
+  /** Shu guruhda vazifa / test o'quvchilarga ochiqmi (null — yo'q) */
+  homeworkOpen: boolean | null;
+  quizOpen: boolean | null;
 }
 
 /** Shu dars bilan bog'langan boshqa guruhlardagi nusxalar */
@@ -445,10 +502,14 @@ export async function getLinkedLessons(lessonId: string): Promise<LinkedLessonIn
   const lesson = await Lesson.findById(lessonId).select("linkId").lean();
   if (!lesson?.linkId) return [];
   const siblings = await Lesson.find({ linkId: lesson.linkId, _id: { $ne: lesson._id } })
-    .select("groupId date isPublished")
+    .select("groupId date isPublished homework.isEnabled homework.instructions homework.attachments")
     .lean();
-  const groups = await Group.find({ _id: { $in: siblings.map((s) => s.groupId) } }).select("name grade").lean();
+  const [groups, quizzes] = await Promise.all([
+    Group.find({ _id: { $in: siblings.map((s) => s.groupId) } }).select("name grade").lean(),
+    Quiz.find({ lessonId: { $in: siblings.map((s) => s._id) } }).select("lessonId isPublished").lean(),
+  ]);
   const groupOf = new Map(groups.map((g) => [g._id.toString(), g]));
+  const quizOf = new Map(quizzes.map((q) => [q.lessonId.toString(), q.isPublished]));
 
   return siblings
     .map((s) => {
@@ -460,6 +521,9 @@ export async function getLinkedLessons(lessonId: string): Promise<LinkedLessonIn
         grade: g?.grade ?? null,
         date: s.date ? new Date(s.date).toISOString() : null,
         isPublished: s.isPublished,
+        homeworkOpen:
+          s.homework && (s.homework.instructions?.trim() || s.homework.attachments?.length) ? Boolean(s.homework.isEnabled) : null,
+        quizOpen: quizOf.has(s._id.toString()) ? Boolean(quizOf.get(s._id.toString())) : null,
       };
     })
     .sort((a, b) => a.groupName.localeCompare(b.groupName));
@@ -516,15 +580,14 @@ export async function copyLessonToGroupsAction(params: { lessonId: string; group
         mimeType: m.mimeType,
         fileSize: m.fileSize,
       })),
+      // Vazifa va test yangi guruhda yopiq: mentor ularni shu guruhda dars o'tgach ochadi
       homework: source.homework
         ? {
-            isEnabled: source.homework.isEnabled,
+            isEnabled: false,
             instructions: source.homework.instructions,
             attachments: source.homework.attachments,
             coinsReward: source.homework.coinsReward,
-            dueAt: source.homework.isEnabled
-              ? getNextLessonAfter(group.schedule, toDateKey(date)) ?? source.homework.dueAt ?? null
-              : null,
+            dueAt: null,
           }
         : null,
       linkId: lesson.linkId,
@@ -538,7 +601,7 @@ export async function copyLessonToGroupsAction(params: { lessonId: string; group
         title: quiz.title,
         description: quiz.description,
         questions: quiz.questions,
-        isPublished: quiz.isPublished,
+        isPublished: false,
         passingScore: quiz.passingScore,
       });
     }

@@ -160,7 +160,10 @@ export async function getHomeworkForStudent(
   await connectToDatabase();
 
   const lesson = await Lesson.findById(lessonId).select("groupId isPublished homework").lean();
-  if (!lesson?.homework?.isEnabled) return null;
+  if (!lesson?.homework) return null;
+  // Mentor yopiq (hali ochilmagan) vazifani ham ko'radi — dars sahifasida uni shu guruh uchun ochadi
+  const hasContent = Boolean(lesson.homework.instructions?.trim() || lesson.homework.attachments?.length);
+  if (!lesson.homework.isEnabled && (session.role === "student" || !hasContent)) return null;
   if (session.role === "student") {
     if (!lesson.isPublished || lesson.groupId.toString() !== session.groupId) return null;
   }

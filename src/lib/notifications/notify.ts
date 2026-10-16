@@ -10,7 +10,7 @@ import { isNotificationEnabled, type NotificationType } from "./types";
 
 export interface NotificationPayloads {
   homework_graded: { lessonId: string; lessonTitle: string; returned?: boolean; score?: number; coins?: number; feedback?: string };
-  lesson_new: { lessonId: string; lessonTitle: string; hasHomework?: boolean };
+  lesson_new: { lessonId: string; lessonTitle: string; hasHomework?: boolean; /** Darsdagi vazifa endi ochildi */ homeworkOpened?: boolean; dueLabel?: string };
   material_new: { lessonId: string; lessonTitle: string; materialTitle: string };
   exam_new: { kind: "quiz" | "exam"; title: string; href: string; startsAt?: string | null };
   homework_due: { lessonId: string; lessonTitle: string; dueLabel: string; /** Mentor qo'lda yuborgan eslatma */ fromMentor?: boolean };
@@ -111,7 +111,9 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
           button: link("Natijani ko'rish", `/lessons/${p.lessonId}#homework`),
         },
   lesson_new: (p) => ({
-    text: [`📚 ${b("Yangi dars")}`, escapeHtml(p.lessonTitle), p.hasHomework ? "\n📝 Uyga vazifa ham bor" : ""].filter(Boolean).join("\n"),
+    text: p.homeworkOpened
+      ? [`📝 ${b("Yangi uyga vazifa")}`, escapeHtml(p.lessonTitle), p.dueLabel ? `\n⏰ Muddat: ${escapeHtml(p.dueLabel)}` : ""].filter(Boolean).join("\n")
+      : [`📚 ${b("Yangi dars")}`, escapeHtml(p.lessonTitle), p.hasHomework ? "\n📝 Uyga vazifa ham bor" : ""].filter(Boolean).join("\n"),
     button: link("Darsni ochish", `/lessons/${p.lessonId}`),
   }),
   material_new: (p) => ({
