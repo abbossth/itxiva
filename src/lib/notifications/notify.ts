@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { escapeHtml, isTelegramConfigured, sendTelegramMessage, type MessageButton } from "@/lib/telegram/api";
 import { isNotificationEnabled, type NotificationType } from "./types";
+import { formatDateTimeUz } from "@/lib/utils";
 
 // Barcha Telegram bildirishnomalari shu modul orqali ketadi.
 // Yangi tur qo'shish: types.ts ga tur va sozlama yorlig'i, shu yerga payload va matn shabloni.
@@ -16,7 +17,7 @@ export interface NotificationPayloads {
   homework_due: { lessonId: string; lessonTitle: string; dueLabel: string; /** Mentor qo'lda yuborgan eslatma */ fromMentor?: boolean };
   coins_changed: { amount: number; reason: string; balance?: number };
   order_status: { productTitle: string; status: "accepted" | "rejected" | "handed_over"; note?: string; refunded?: number };
-  product_new: { title: string; price: number };
+  product_new: { title: string; price: number; /** Chegirma boshlanganda: asl narx va tugash vaqti */ oldPrice?: number; saleEndsAt?: string };
   level_up: { level: number; name: string; bonus: number };
   quest_new: { questId: string; title: string; coinsLabel: string };
   quest_result: { questId: string; title: string; approved: boolean; coins?: number; xp?: number; reason?: string };
@@ -157,7 +158,11 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     };
   },
   product_new: (p) => ({
-    text: `🛍 ${b("Do'konda yangi mahsulot")}\n${escapeHtml(p.title)}\n\nNarxi: ${b(`${p.price} coin`)}`,
+    text: p.oldPrice
+      ? `🏷 ${b("Chegirma!")}\n${escapeHtml(p.title)}\n\n<s>${p.oldPrice} coin</s> → ${b(`${p.price} coin`)} (−${Math.round((1 - p.price / p.oldPrice) * 100)}%)${
+          p.saleEndsAt ? `\n⏳ ${escapeHtml(formatDateTimeUz(p.saleEndsAt))} gacha` : ""
+        }`
+      : `🛍 ${b("Do'konda yangi mahsulot")}\n${escapeHtml(p.title)}\n\nNarxi: ${b(`${p.price} coin`)}`,
     button: link("Do'konni ochish", "/shop"),
   }),
   homework_submitted: (p) => ({

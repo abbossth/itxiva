@@ -14,6 +14,7 @@ const { AttendanceRecord } = await import("@/lib/db/models/attendance-record.mod
 const rewards = await import("@/actions/rewards.actions");
 const profile = await import("@/actions/student-profile.actions");
 const dashboard = await import("@/actions/dashboard.actions");
+const leaderboard = await import("@/actions/leaderboard.actions");
 const { Product } = await import("@/lib/db/models/product.model");
 
 beforeAll(startDb);
@@ -150,5 +151,24 @@ describe("bosh sahifa statistikasi", () => {
     expect(s.shopGoal).toEqual({ title: "Ruchka", price: 60, balance: 40 });
     // ali 120 XP: vali 300, soli 200 oldinda; gani teng (120) — oldinda emas
     expect(s.rankGap).toEqual({ position: 3, total: 4, gap: 81, aheadName: "SOLI" });
+  });
+});
+
+describe("reyting o'lchovi", () => {
+  it("sukutda XP, metric=coin — jami coin bo'yicha; gamifikatsiya o'chiq bo'lsa doim coin", async () => {
+    const { me } = await seed();
+    // ali: XP 120, lekin coin eng ko'p
+    await User.updateOne({ _id: me._id }, { $set: { totalCoins: 900 } });
+    await AppSettings.create({ key: "global", gamification: { enabled: true } });
+    actAs(sessionFor(me));
+    const byXp = await leaderboard.getLeaderboardAction({ type: "all" });
+    expect(byXp).toMatchObject({ unit: "XP", canSwitch: true });
+    expect(byXp.top3[0].displayName).toBe("VALI");
+    const byCoin = await leaderboard.getLeaderboardAction({ type: "all", metric: "coin" });
+    expect(byCoin.unit).toBe("coin");
+    expect(byCoin.top3[0]).toMatchObject({ displayName: "ALI", totalCoins: 900 });
+
+    await AppSettings.updateOne({ key: "global" }, { $set: { "gamification.enabled": false } });
+    expect(await leaderboard.getLeaderboardAction({ type: "all" })).toMatchObject({ unit: "coin", canSwitch: false });
   });
 });

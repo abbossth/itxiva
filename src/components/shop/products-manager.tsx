@@ -5,7 +5,6 @@ import { ShoppingBag, Plus, Pencil, Trash2, ImagePlus, Eye, EyeOff } from "lucid
 import { PageHeader } from "@/components/ui/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CoinBadge } from "@/components/ui/coin-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -16,6 +15,9 @@ import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { ProductImage } from "@/components/shop/product-image";
 import { PriceAdvisor } from "@/components/shop/price-advisor";
+import { PriceTag, SaleOverlay } from "@/components/shop/price-tag";
+import { activeSale, priceWithPercent } from "@/lib/shop-sale";
+import { fromTashkentInputValue, toTashkentInputValue } from "@/lib/schedule";
 import { saveProductAction, deleteProductAction, ShopProduct } from "@/actions/shop.actions";
 import { uploadFileToStorage } from "@/lib/upload-client";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -26,6 +28,10 @@ interface FormState {
   price: string;
   /** Hayotdagi narxi (so'm) — faqat mentor ko'radi */
   realPrice: string;
+  /** Vaqtinchalik chegirma */
+  saleOn: boolean;
+  salePrice: string;
+  saleEnds: string; // "2026-10-24T23:59" (Toshkent)
   category: string;
   kind: "item" | "privilege" | "streak_shield";
   stock: string; // bo'sh — cheklanmagan
@@ -39,6 +45,9 @@ const EMPTY_FORM: FormState = {
   description: "",
   price: "50",
   realPrice: "",
+  saleOn: false,
+  salePrice: "",
+  saleEnds: "",
   category: "",
   kind: "item",
   stock: "",
@@ -74,6 +83,10 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
       description: p.description || "",
       price: String(p.price),
       realPrice: p.realPrice ? String(p.realPrice) : "",
+      // Tugagan chegirma formada o'chiq ko'rinadi (saqlanganda tozalanadi)
+      saleOn: Boolean(activeSale(p)),
+      salePrice: activeSale(p) ? String(p.salePrice) : "",
+      saleEnds: activeSale(p) && p.saleEndsAt ? toTashkentInputValue(p.saleEndsAt) : "",
       category: p.category || "",
       kind: p.kind ?? "item",
       stock: p.stock === null ? "" : String(p.stock),
@@ -115,6 +128,8 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
           description: form.description,
           price: Number(form.price),
           realPrice: form.realPrice.trim() === "" ? null : Number(form.realPrice.replace(/\s/g, "")),
+          salePrice: form.saleOn ? Number(form.salePrice) : null,
+          saleEndsAt: form.saleOn ? fromTashkentInputValue(form.saleEnds)?.toISOString() ?? null : null,
           category: form.category,
           kind: form.kind,
           stock: form.stock.trim() === "" ? null : Number(form.stock),
@@ -222,7 +237,10 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                 !p.isActive && "opacity-60"
               )}
             >
-              <ProductImage src={p.imageUrl} alt={p.title} className="aspect-[4/3] w-full" />
+              <div className="relative">
+                <ProductImage src={p.imageUrl} alt={p.title} className="aspect-[4/3] w-full" />
+                <SaleOverlay product={p} />
+              </div>
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -235,19 +253,13 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{p.description}</p>
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <CoinBadge amount={p.price} size="sm" animate={false} />
-                  {p.realPrice ? (
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400" title="Hayotdagi narxi — faqat siz ko'rasiz">
-                      ≈ {formatNumberUz(p.realPrice)} so&apos;m
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  {p.stock === null ? "Cheklanmagan" : `${p.stock} ta bor`}
-                  <span className="block font-normal">{p.buyers} ta o&apos;quvchi olgan</span>
-                </span>
+              <div className="space-y-2">
+                <PriceTag product={p} size="md" />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  {p.realPrice ? <span title="Hayotdagi narxi — faqat siz ko'rasiz">≈ {formatNumberUz(p.realPrice)} so&apos;m</span> : null}
+                  <span className="font-semibold">{p.stock === null ? "Cheklanmagan" : `${p.stock} ta bor`}</span>
+                  <span>{p.buyers} ta o&apos;quvchi olgan</span>
+                </div>
               </div>
               <div className="flex items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <Button variant="ghost" size="sm" onClick={() => openEdit(p)} className="gap-1.5 flex-1 min-h-[44px]">
@@ -373,6 +385,85 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                   placeholder="∞"
                 />
               </Field>
+            </div>
+
+            {/* Vaqtinchalik chegirma: tugash vaqti o'tgach narx o'zi asliga qaytadi */}
+            <div className={cn("space-y-3 rounded-2xl border p-3.5", form.saleOn ? "border-rose-400/50 bg-rose-50/60 dark:bg-rose-500/10" : "border-slate-200 dark:border-slate-800")}>
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100 min-h-[36px]">
+                <input
+                  type="checkbox"
+                  checked={form.saleOn}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setForm((f) => {
+                      const base = Number(f.price) || 0;
+                      // Yoqilganda: 20% chegirma va bir haftadan keyin 23:59 gacha
+                      const weekLater = toTashkentInputValue(new Date(Date.now() + 7 * 86_400_000)).slice(0, 10) + "T23:59";
+                      return {
+                        ...f,
+                        saleOn: on,
+                        salePrice: on && !f.salePrice && base > 1 ? String(priceWithPercent(base, 20)) : f.salePrice,
+                        saleEnds: on && !f.saleEnds ? weekLater : f.saleEnds,
+                      };
+                    });
+                  }}
+                  className="h-4 w-4 accent-rose-600"
+                />
+                Vaqtinchalik chegirma
+              </label>
+
+              {form.saleOn && (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[10, 20, 30, 50].map((pct) => {
+                      const base = Number(form.price) || 0;
+                      const value = base > 1 ? priceWithPercent(base, pct) : 0;
+                      const active = value > 0 && Number(form.salePrice) === value;
+                      return (
+                        <button
+                          key={pct}
+                          type="button"
+                          disabled={base <= 1}
+                          onClick={() => setForm((f) => ({ ...f, salePrice: String(value) }))}
+                          className={cn(
+                            "min-h-[36px] rounded-lg px-3 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50",
+                            active ? "bg-rose-600 text-white" : "bg-white dark:bg-surface border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-rose-400"
+                          )}
+                        >
+                          −{pct}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field htmlFor="product-sale-price" label="Chegirma narxi (coin)" required>
+                      <Input
+                        id="product-sale-price"
+                        type="number"
+                        min={1}
+                        value={form.salePrice}
+                        onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
+                        required
+                      />
+                    </Field>
+                    <Field htmlFor="product-sale-ends" label="Qachongacha" required>
+                      <Input
+                        id="product-sale-ends"
+                        type="datetime-local"
+                        value={form.saleEnds}
+                        onChange={(e) => setForm({ ...form, saleEnds: e.target.value })}
+                        required
+                      />
+                    </Field>
+                  </div>
+                  {Number(form.salePrice) > 0 && Number(form.price) > Number(form.salePrice) && (
+                    <p className="text-xs text-rose-700 dark:text-rose-300">
+                      O&apos;quvchilar {form.price} o&apos;rniga <strong>{form.salePrice} coin</strong> to&apos;laydi (−
+                      {Math.round((1 - Number(form.salePrice) / Number(form.price)) * 100)}%). Chegirma boshlanganda o&apos;quvchilarga xabar boradi.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
 
             <Field

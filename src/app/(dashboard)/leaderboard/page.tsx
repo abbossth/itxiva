@@ -22,6 +22,8 @@ interface LeaderboardPageProps {
     type?: "all" | "group" | "grade";
     groupId?: string;
     grade?: string;
+    /** "coin" — jami coin bo'yicha (sukutda XP, gamifikatsiya yoqilgan bo'lsa) */
+    metric?: string;
   }>;
 }
 
@@ -136,10 +138,13 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const type = resolvedSearchParams.type || "all";
   const groupId = resolvedSearchParams.groupId;
   const grade = resolvedSearchParams.grade ? parseInt(resolvedSearchParams.grade, 10) : undefined;
+  const metric = resolvedSearchParams.metric === "coin" ? "coin" : undefined;
+  // Filtr havolalari tanlangan o'lchovni (XP yoki coin) saqlaydi
+  const withMetric = (href: string) => (metric ? `${href}${href.includes("?") ? "&" : "?"}metric=coin` : href);
 
   await connectToDatabase();
   const [data, groups, viewer] = await Promise.all([
-    getLeaderboardAction({ type, groupId, grade }),
+    getLeaderboardAction({ type, groupId, grade, metric }),
     getGroups(),
     User.findById(session.userId).select("celebrationsEnabled").lean(),
   ]);
@@ -164,27 +169,58 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
         </div>
 
         <nav aria-label="Reyting turi" className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-full sm:w-fit">
-          <Link href="/leaderboard?type=all" className={tabClass(type === "all")}>
+          <Link href={withMetric("/leaderboard?type=all")} className={tabClass(type === "all")}>
             Umumiy
           </Link>
           <Link
-            href={groups.length > 0 ? `/leaderboard?type=group&groupId=${(session.groupId ?? groups[0]._id).toString()}` : "/leaderboard?type=group"}
+            href={withMetric(groups.length > 0 ? `/leaderboard?type=group&groupId=${(session.groupId ?? groups[0]._id).toString()}` : "/leaderboard?type=group")}
             className={tabClass(type === "group")}
           >
             Guruh
           </Link>
-          <Link href={`/leaderboard?type=grade&grade=${grades[0] ?? 8}`} className={tabClass(type === "grade")}>
+          <Link href={withMetric(`/leaderboard?type=grade&grade=${grades[0] ?? 8}`)} className={tabClass(type === "grade")}>
             Sinf
           </Link>
         </nav>
       </div>
+
+      {data.canSwitch && (
+        <nav aria-label="Reyting o'lchovi" className="flex items-center gap-2 text-xs">
+          <span className="font-semibold text-slate-500 dark:text-slate-400">Saralash:</span>
+          <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1">
+            {(
+              [
+                ["xp", "XP bo'yicha", "Tajriba: sarflanmaydi, faollikni ko'rsatadi"],
+                ["coin", "Coin bo'yicha", "Jami yig'ilgan coin (do'kon xaridi kamaytirmaydi)"],
+              ] as const
+            ).map(([m, label, hint]) => {
+              const href = `/leaderboard?type=${type}${groupId && type === "group" ? `&groupId=${groupId}` : ""}${grade && type === "grade" ? `&grade=${grade}` : ""}${m === "coin" ? "&metric=coin" : ""}`;
+              const active = (metric ?? "xp") === m;
+              return (
+                <Link
+                  key={m}
+                  href={href}
+                  title={hint}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "min-h-[36px] rounded-lg px-3 font-bold flex items-center transition-colors",
+                    active ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                  )}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
       {type === "group" && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {groups.map((g) => (
             <Link
               key={g._id.toString()}
-              href={`/leaderboard?type=group&groupId=${g._id.toString()}`}
+              href={withMetric(`/leaderboard?type=group&groupId=${g._id.toString()}`)}
               title={g.name}
               className={cn(chipClass(groupId === g._id.toString()), "font-mono")}
             >
@@ -196,7 +232,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       {type === "grade" && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {grades.map((gr) => (
-            <Link key={gr} href={`/leaderboard?type=grade&grade=${gr}`} className={chipClass(grade === gr)}>
+            <Link key={gr} href={withMetric(`/leaderboard?type=grade&grade=${gr}`)} className={chipClass(grade === gr)}>
               {gr}-sinflar
             </Link>
           ))}
@@ -207,7 +243,7 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
       {/* Konfetti: o'quvchi kuchli uchlikda bo'lsa; mentorga esa uchlik ko'rsatilganda har doim (har filtr uchun qaytadan) */}
       {hasAnyCoins && celebrate && (
         <TopThreeCelebration
-          key={`${type}-${groupId ?? ""}-${grade ?? ""}`}
+          key={`${type}-${groupId ?? ""}-${grade ?? ""}-${metric ?? "xp"}`}
           rank={session.role === "mentor" ? 1 : me && me.totalCoins > 0 ? me.rank : 0}
         />
       )}

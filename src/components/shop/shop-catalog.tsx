@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { ProductImage } from "@/components/shop/product-image";
 import { createOrderAction, ShopProduct } from "@/actions/shop.actions";
+import { PriceTag, SaleOverlay } from "@/components/shop/price-tag";
+import { activeSale, effectivePrice } from "@/lib/shop-sale";
 import { cn } from "@/lib/utils";
 
 interface ShopCatalogProps {
@@ -35,7 +37,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
     if (!selected) return;
     try {
       setIsOrdering(true);
-      const res = await createOrderAction(selected._id);
+      const res = await createOrderAction(selected._id, effectivePrice(selected));
       if (res.success && res.data) {
         setBalance(res.data.balance);
         if (selected.stock !== null) {
@@ -102,14 +104,21 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
           {products.map((item) => {
             const stock = item.stock === null ? null : stockOverrides[item._id] ?? item.stock;
             const soldOut = stock !== null && stock <= 0;
-            const canAfford = balance >= item.price;
+            const price = effectivePrice(item);
+            const canAfford = balance >= price;
 
             return (
               <div
                 key={item._id}
-                className="stagger-item card-press p-3 sm:p-4 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs flex flex-col gap-3 hover:border-teal-500/40 hover:shadow-md"
+                className={cn(
+                  "stagger-item card-press p-3 sm:p-4 rounded-3xl bg-white dark:bg-surface border shadow-xs flex flex-col gap-3 hover:shadow-md",
+                  activeSale(item) ? "border-rose-400/50 hover:border-rose-500/60" : "border-slate-200/80 dark:border-slate-800/80 hover:border-teal-500/40"
+                )}
               >
-                <ProductImage src={item.imageUrl} alt={item.title} className="aspect-[4/3] w-full" />
+                <div className="relative">
+                  <ProductImage src={item.imageUrl} alt={item.title} className="aspect-[4/3] w-full" />
+                  <SaleOverlay product={item} />
+                </div>
 
                 <div className="flex-1 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
@@ -149,15 +158,26 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <CoinBadge amount={item.price} size="sm" animate={false} />
+                <div className="space-y-2.5">
+                  <PriceTag product={item} />
+                  {/* Yetmasa — qancha qolgani ko'rinadi: maqsad sari rag'bat */}
+                  {!soldOut && !canAfford && (
+                    <div className="space-y-1">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.max(4, Math.min(100, (balance / price) * 100))}%` }} />
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {Math.floor((balance / price) * 100)}% yig&apos;ildi
+                      </p>
+                    </div>
+                  )}
                   <Button
                     variant={canAfford && !soldOut ? "primary" : "secondary"}
                     className="w-full"
                     disabled={!canAfford || soldOut}
                     onClick={() => setSelected(item)}
                   >
-                    {soldOut ? "Tugagan" : canAfford ? "Buyurtma berish" : `Yana ${item.price - balance} coin kerak`}
+                    {soldOut ? "Tugagan" : canAfford ? "Buyurtma berish" : `Yana ${price - balance} coin kerak`}
                   </Button>
                 </div>
               </div>
@@ -177,10 +197,11 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
           <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
             <p>
               <strong>{selected?.title}</strong> uchun balansingizdan{" "}
-              <strong className="text-amber-600 dark:text-amber-400">{selected?.price} coin</strong> yechiladi.
+              <strong className="text-amber-600 dark:text-amber-400">{selected ? effectivePrice(selected) : 0} coin</strong> yechiladi
+              {selected && activeSale(selected) ? ` (chegirma bilan, asl narxi ${selected.price} coin)` : ""}.
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Qoladigan balans: {balance - (selected?.price ?? 0)} coin. Mentor ko&apos;rib chiqmaguncha buyurtmani bekor
+              Qoladigan balans: {balance - (selected ? effectivePrice(selected) : 0)} coin. Mentor ko&apos;rib chiqmaguncha buyurtmani bekor
               qilishingiz mumkin.
             </p>
           </div>

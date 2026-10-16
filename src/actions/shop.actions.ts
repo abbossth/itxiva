@@ -15,6 +15,7 @@ import { getAppSettings } from "@/lib/settings";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { productSchema, ProductInput } from "@/lib/validations/shop.schema";
 import { suggestCoinPrice, type PriceSuggestion } from "@/lib/shop-pricing";
+import { activeSale, effectivePrice } from "@/lib/shop-sale";
 import { notify, notifyAllStudents, notifyMentors } from "@/lib/notifications/notify";
 import { ActionResult } from "./auth.actions";
 
@@ -102,8 +103,11 @@ export async function saveProductAction(
   await connectToDatabase();
 
   let product;
+  let hadSale = false;
   if (productId) {
     if (!isObjectId(productId)) return { success: false, message: "Mahsulot topilmadi" };
+    const before = await Product.findById(productId).select("price salePrice saleEndsAt").lean();
+    hadSale = Boolean(before && activeSale(before));
     product = await Product.findByIdAndUpdate(productId, { $set: parsed.data }, { returnDocument: "after" });
     if (!product) return { success: false, message: "Mahsulot topilmadi" };
   } else {
@@ -116,8 +120,11 @@ export async function saveProductAction(
     details: { productId: product._id, title: product.title, price: product.price },
   });
 
-  // Faqat yangi va do'konda ko'rinadigan mahsulot haqida xabar beriladi
-  if (!productId && product.isActive) {
+  // Faqat yangi va do'konda ko'rinadigan mahsulot haqida xabar beriladi; chegirma boshlanganda — chegirma xabari
+  const sale = activeSale(product);
+  if (product.isActive && sale && !hadSale) {
+    notifyAllStudents("product_new", { title: product.title, price: sale.price, oldPrice: sale.oldPrice, saleEndsAt: sale.endsAt });
+  } else if (!productId && product.isActive) {
     notifyAllStudents("product_new", { title: product.title, price: product.price });
   }
 
@@ -185,7 +192,7 @@ export async function deleteProductAction(productId: string): Promise<ActionResu
  * O'quvchi buyurtma beradi. Coin shu zahoti (atomik) yechiladi; rad etilsa yoki bekor qilinsa qaytariladi.
  * Reytingdagi `totalCoins` kamaymaydi — faqat sarflanadigan balans.
  */
-export async function createOrderAction(productId: string): Promise<ActionResult<{ balance: number }>> {
+export async function createOrderAction(productId: string, expectedPrice?: number): Promise<ActionResult<{ balance: number }>> {
   const session = await requireStudent();
   if (!isObjectId(productId)) return { success: false, message: "Mahsulot topilmadi" };
 
@@ -198,6 +205,12 @@ export async function createOrderAction(productId: string): Promise<ActionResult
 
   const product = await Product.findOne({ _id: productId, isActive: true }).lean();
   if (!product) return { success: false, message: "Mahsulot hozir mavjud emas" };
+  // Chegirma bo'lsa — chegirma narxi. O'quvchi ko'rgan narx o'zgarib qolgan bo'lsa (chegirma tugagan), coin yechilmaydi
+  const price = effectivePrice(product);
+  const onSale = price < product.price;
+  if (typeof expectedPrice === "number" && expectedPrice !== price) {
+    return { success: false, message: `Narx o'zgardi: endi ${price} coin. Sahifani yangilab, qayta tasdiqlang` };
+  }
 
   // Seriya himoyasi: gamifikatsiya yoqilgan bo'lsa va o'quvchida ko'pi bilan 2 ta bo'lsa
   const isShield = product.kind === "streak_shield";
@@ -226,8 +239,8 @@ export async function createOrderAction(productId: string): Promise<ActionResult
 
   // 2. Coin yechish: shart va kamaytirish bitta atomik so'rovda (ikki marta bosishdan himoya)
   const user = await User.findOneAndUpdate(
-    { _id: session.userId, role: "student", spendableBalance: { $gte: product.price } },
-    { $inc: { spendableBalance: -product.price } },
+    { _id: session.userId, role: "student", spendableBalance: { $gte: price } },
+    { $inc: { spendableBalance: -price } },
     { returnDocument: "after" }
   );
   if (!user) {
@@ -241,27 +254,27 @@ export async function createOrderAction(productId: string): Promise<ActionResult
       groupId: user.groupId ?? null,
       productId: product._id,
       productTitle: product.title,
-      price: product.price,
+      price,
       // Himoya darhol beriladi — buyurtma "olingan" holatda yoziladi
       status: isShield ? "received" : "pending",
     });
     if (isShield) await User.updateOne({ _id: user._id }, { $inc: { streakShields: 1 } });
     await CoinLedger.create({
       studentId: user._id,
-      amount: -product.price,
+      amount: -price,
       type: "purchase",
       referenceId: order._id,
-      description: `Do'kon buyurtmasi: ${product.title}`,
+      description: `Do'kon buyurtmasi: ${product.title}${onSale ? ` (chegirma: ${product.price} → ${price})` : ""}`,
       balanceAfter: user.spendableBalance,
     });
   } catch (err) {
     // Buyurtma yozilmasa coin va zaxira qaytariladi
-    await User.updateOne({ _id: user._id }, { $inc: { spendableBalance: product.price } });
+    await User.updateOne({ _id: user._id }, { $inc: { spendableBalance: price } });
     await releaseStock();
     throw err;
   }
 
-  if (!isShield) notifyMentors("order_new", { productTitle: product.title, price: product.price, studentName: session.fullName });
+  if (!isShield) notifyMentors("order_new", { productTitle: product.title, price, studentName: session.fullName });
 
   revalidateShop();
   return {

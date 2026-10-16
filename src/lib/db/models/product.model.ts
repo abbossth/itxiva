@@ -13,6 +13,9 @@ export interface IProductData {
   price: number;
   /** Hayotdagi narxi (so'm) — faqat mentor ko'radi, coin narxini tavsiya qilish uchun. O'quvchiga yuborilmaydi */
   realPrice?: number | null;
+  /** Vaqtinchalik chegirma: shu narx `saleEndsAt` gacha amal qiladi (src/lib/shop-sale.ts) */
+  salePrice?: number | null;
+  saleEndsAt?: Date | string | null;
   category?: string;
   kind?: ProductKind;
   imageKey?: string | null;
@@ -33,6 +36,8 @@ const ProductSchema = new Schema<IProduct>(
     description: { type: String, trim: true, default: "" },
     price: { type: Number, required: true, min: 1 },
     realPrice: { type: Number, default: null, min: 0 },
+    salePrice: { type: Number, default: null, min: 1 },
+    saleEndsAt: { type: Date, default: null },
     category: { type: String, trim: true, default: "" },
     kind: { type: String, enum: ["item", "privilege", "streak_shield"], default: "item" },
     imageKey: { type: String, default: null },

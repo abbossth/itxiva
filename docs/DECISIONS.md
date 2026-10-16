@@ -265,3 +265,10 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - `Product.realPrice` — mahsulotning hayotdagi narxi (so'm). Faqat mentor kiritadi va ko'radi: o'quvchi katalogida (`getProducts`) bu maydon chiqarib tashlanadi; boshqa o'quvchi so'rovlari uni tanlamaydi.
 - Tavsiya (`src/lib/shop-pricing.ts`): so'mdagi narxi kiritilgan kamida 2 ta boshqa mahsulot bo'lsa — ularning coin/so'm nisbatining medianasi (narxlar bir-biriga mos bo'lsin). Aks holda — o'quvchilarning oxirgi 30 kundagi o'rtacha daromadi (yo'q bo'lsa — oylik maqsad) va "oylik daromad ≈ 30 000 so'mlik sovg'a" taxmini. Arzonroq (×0.8), tavsiya va qimmatroq (×1.25) variantlar chiroyli songa yaxlitlanadi; o'rtacha o'quvchi necha haftada yig'ishi ko'rsatiladi, 3 oydan ko'p yoki 1 haftadan kam bo'lsa ogohlantiriladi.
 - Tavsiya faqat yordam: coin narxini mentor o'zi tanlaydi yoki o'zgartiradi.
+
+### [2026-10-17] S2: Vaqtinchalik chegirma, reyting o'lchovi
+- Mahsulotda `salePrice` va `saleEndsAt` (`src/lib/shop-sale.ts`): chegirma faqat asl narxdan arzon va tugash vaqti kelmagan bo'lsa amal qiladi; vaqt o'tgach narx o'zi asliga qaytadi (cron kerak emas). Buyurtmada shu paytdagi narx yechiladi va buyurtmaga yoziladi (qaytarishda aynan shu summa qaytadi). O'quvchi tasdiqlagan narx serverdagidan farq qilsa (chegirma tugab qolgan), coin yechilmaydi.
+- Chegirma boshlanganda (yoqilgan payt, oldin amalda bo'lmagan bo'lsa) o'quvchilarga "Chegirma!" xabari — `product_new` bildirishnomasi (o'sha sozlama).
+- Kartalar: narx katta (tanga + raqam), chegirmada eski narx chizilgan, foiz, rasm ustida "−30%" va "Chegirma: 2 kun qoldi"; yetmasa — balans/narx chizig'i.
+- Reyting: gamifikatsiya yoqilganda "XP bo'yicha / Coin bo'yicha" almashtirgich (`?metric=coin`); sukutda XP. Filtr havolalari tanlovni saqlaydi.
+- Sarlavhadagi ism kartasi bosilsa profil ochiladi.

@@ -207,3 +207,41 @@ describe("do'kon: sotib olganlar soni", () => {
     expect((await shop.getProducts()).find((p) => p._id === String(item._id))).toMatchObject({ buyers: 2, boughtByMe: false });
   });
 });
+
+describe("do'kon: vaqtinchalik chegirma", () => {
+  it("hisoblash: faqat muddati o'tmagan va arzonroq chegirma amal qiladi", async () => {
+    const { activeSale, effectivePrice, saleLeftLabel, priceWithPercent } = await import("@/lib/shop-sale");
+    const now = new Date("2026-10-17T10:00:00Z");
+    const later = new Date("2026-10-19T15:00:00Z");
+    expect(activeSale({ price: 100, salePrice: 70, saleEndsAt: later }, now)).toMatchObject({ price: 70, oldPrice: 100, percent: 30 });
+    expect(effectivePrice({ price: 100, salePrice: 70, saleEndsAt: new Date("2026-10-17T09:00:00Z") }, now)).toBe(100);
+    expect(effectivePrice({ price: 100, salePrice: 120, saleEndsAt: later }, now)).toBe(100);
+    expect(effectivePrice({ price: 100, salePrice: 70, saleEndsAt: null }, now)).toBe(100);
+    expect(saleLeftLabel(later, now)).toBe("2 kun 5 soat qoldi");
+    expect(saleLeftLabel(new Date("2026-10-17T10:30:00Z"), now)).toBe("30 daqiqa qoldi");
+    expect([priceWithPercent(85, 20), priceWithPercent(2, 90)]).toEqual([68, 1]);
+  });
+
+  it("buyurtmada chegirma narxi yechiladi; narx o'zgargan bo'lsa coin yechilmaydi; noto'g'ri chegirma saqlanmaydi", async () => {
+    const { student, mentor, item } = await seed(100, { price: 80 });
+    const ends = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    actAs(sessionFor(mentor));
+    expect(await shop.saveProductAction({ title: "Daftar", price: 80, salePrice: 90, saleEndsAt: ends, isActive: true }, String(item._id))).toMatchObject({ success: false });
+    expect(await shop.saveProductAction({ title: "Daftar", price: 80, salePrice: 50, isActive: true }, String(item._id))).toMatchObject({ success: false });
+    expect(await shop.saveProductAction({ title: "Daftar", price: 80, salePrice: 50, saleEndsAt: ends, isActive: true }, String(item._id))).toMatchObject({ success: true });
+
+    actAs(sessionFor(student));
+    // O'quvchi eski (chegirmasiz) narxni ko'rgan — coin yechilmaydi
+    expect(await shop.createOrderAction(String(item._id), 80)).toMatchObject({ success: false, message: expect.stringMatching(/Narx o'zgardi/) });
+    expect((await User.findById(student._id).lean())?.spendableBalance).toBe(100);
+
+    expect(await shop.createOrderAction(String(item._id), 50)).toMatchObject({ success: true, data: { balance: 50 } });
+    expect(await Order.findOne({ studentId: student._id }).lean()).toMatchObject({ price: 50 });
+    expect(await CoinLedger.findOne({ studentId: student._id, type: "purchase" }).lean()).toMatchObject({ amount: -50 });
+
+    // Chegirmani o'chirish
+    actAs(sessionFor(mentor));
+    await shop.saveProductAction({ title: "Daftar", price: 80, salePrice: null, saleEndsAt: null, isActive: true }, String(item._id));
+    expect((await Product.findById(item._id).lean())?.salePrice).toBeNull();
+  });
+});

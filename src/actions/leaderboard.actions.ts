@@ -35,16 +35,21 @@ export interface LeaderboardData {
   totalCoins: number;
   /** Reyting o'lchovi: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin. `totalCoins`/`weekCoins` shu birlikda */
   unit: "coin" | "XP";
+  /** XP va coin o'rtasida almashtirish mumkinmi (gamifikatsiya yoqilgan bo'lsa) */
+  canSwitch: boolean;
 }
 
 export async function getLeaderboardAction({
   type = "all",
   groupId,
   grade,
+  metric,
 }: {
   type?: "all" | "group" | "grade";
   groupId?: string;
   grade?: number;
+  /** Reyting o'lchovi: sukutda gamifikatsiya yoqilgan bo'lsa XP; "coin" — jami yig'ilgan coin bo'yicha */
+  metric?: "xp" | "coin";
   period?: "all" | "month" | "week";
 }): Promise<LeaderboardData> {
   await connectToDatabase();
@@ -71,7 +76,8 @@ export async function getLeaderboardAction({
   };
 
   // Gamifikatsiya yoqilgan bo'lsa reyting XP bo'yicha (do'kon xaridi va jarima ta'sir qilmaydi)
-  const xpMode = (await getAppSettings()).gamification.enabled;
+  const gamificationOn = (await getAppSettings()).gamification.enabled;
+  const xpMode = gamificationOn && metric !== "coin";
   const field = xpMode ? "xp" : "totalCoins";
   const students = (
     (await User.find(userQuery)
@@ -146,5 +152,6 @@ export async function getLeaderboardAction({
       .slice(0, 3),
     totalCoins: entries.reduce((sum, e) => sum + e.totalCoins, 0),
     unit: xpMode ? "XP" : "coin",
+    canSwitch: gamificationOn,
   };
 }

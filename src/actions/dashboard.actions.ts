@@ -17,6 +17,7 @@ import { CoinLedger, type CoinTransactionType } from "@/lib/db/models/coin-ledge
 import { QuizSubmission } from "@/lib/db/models/quiz-submission.model";
 import { Product } from "@/lib/db/models/product.model";
 import { addDaysToKey, toDateKey } from "@/lib/schedule";
+import { effectivePrice } from "@/lib/shop-sale";
 import type { HomeworkState } from "@/lib/homework-status";
 
 export interface StudentDashboard {
@@ -187,8 +188,7 @@ export async function getStudentHomeStats(): Promise<StudentHomeStats> {
       .lean(),
     AttendanceRecord.find({ studentId }).select("sessionId status").lean(),
     Product.find({ isActive: true, kind: { $ne: "streak_shield" }, $or: [{ stock: null }, { stock: { $gt: 0 } }] })
-      .select("title price")
-      .sort({ price: 1 })
+      .select("title price salePrice saleEndsAt")
       .lean(),
     groupId
       ? User.find({ groupId, role: "student", isHiddenFromLeaderboard: { $ne: true }, [field]: { $gt: myValue } })
@@ -241,7 +241,9 @@ export async function getStudentHomeStats(): Promise<StudentHomeStats> {
   const attended = counted.filter((r) => r.status === "present" || r.status === "late").length;
 
   const balance = me?.spendableBalance ?? 0;
-  const next = products.find((p) => p.price > balance) ?? products[products.length - 1] ?? null;
+  // Chegirmadagi mahsulot chegirma narxida hisoblanadi
+  const priced = products.map((p) => ({ title: p.title, price: effectivePrice(p) })).sort((a, b) => a.price - b.price);
+  const next = priced.find((p) => p.price > balance) ?? priced[priced.length - 1] ?? null;
   const nearest = above[0];
 
   return {
