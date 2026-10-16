@@ -185,3 +185,25 @@ describe("narx tavsiyasi va so'mdagi narx", () => {
     await expect(shop.suggestProductPriceAction({ realPrice: 16_000 })).rejects.toThrow();
   });
 });
+
+describe("do'kon: sotib olganlar soni", () => {
+  it("har o'quvchi bir marta sanaladi; rad etilgan va bekor qilinganlar sanalmaydi; o'zim olganim belgilanadi", async () => {
+    const { student, mentor, item } = await seed(500, { price: 10 });
+    const other = await User.create({ login: "vali", fullName: "Vali", role: "student", passwordHash: "x", spendableBalance: 500 });
+    const third = await User.create({ login: "soli", fullName: "Soli", role: "student", passwordHash: "x", spendableBalance: 500 });
+    const order = (studentId: typeof student._id, status: "pending" | "accepted" | "received" | "rejected" | "cancelled") =>
+      Order.create({ studentId, productId: item._id, productTitle: "Daftar", price: 10, status });
+    await order(student._id, "received");
+    await order(student._id, "pending");
+    await order(other._id, "accepted");
+    await order(third._id, "rejected");
+    await order(third._id, "cancelled");
+
+    actAs(sessionFor(student));
+    expect((await shop.getProducts()).find((p) => p._id === String(item._id))).toMatchObject({ buyers: 2, boughtByMe: true });
+    actAs(sessionFor(third));
+    expect((await shop.getProducts()).find((p) => p._id === String(item._id))).toMatchObject({ buyers: 2, boughtByMe: false });
+    actAs(sessionFor(mentor));
+    expect((await shop.getProducts()).find((p) => p._id === String(item._id))).toMatchObject({ buyers: 2, boughtByMe: false });
+  });
+});

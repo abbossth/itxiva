@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingBag, Sparkles, PackageCheck, ArrowRight } from "lucide-react";
+import { ShoppingBag, Sparkles, PackageCheck, ArrowRight, Flame, Users } from "lucide-react";
 import { fireConfetti } from "@/lib/confetti";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { ProductImage } from "@/components/shop/product-image";
 import { createOrderAction, ShopProduct } from "@/actions/shop.actions";
+import { cn } from "@/lib/utils";
 
 interface ShopCatalogProps {
   products: ShopProduct[];
@@ -27,6 +28,8 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
   const [selected, setSelected] = useState<ShopProduct | null>(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [stockOverrides, setStockOverrides] = useState<Record<string, number>>({});
+  // Eng ko'p olingan mahsulot "Ommabop" belgisini oladi (kamida 2 kishi olgan bo'lsa)
+  const topBuyers = Math.max(0, ...products.map((p) => p.buyers));
 
   const handleOrder = async () => {
     if (!selected) return;
@@ -117,6 +120,11 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
                       <Badge variant="secondary">Tugagan</Badge>
                     ) : stock !== null ? (
                       <Badge variant="warning">{stock} ta qoldi</Badge>
+                    ) : topBuyers >= 2 && item.buyers === topBuyers ? (
+                      <Badge variant="gold" className="gap-1">
+                        <Flame className="w-3 h-3" />
+                        Ommabop
+                      </Badge>
                     ) : null}
                   </div>
                   <h2 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 leading-snug">
@@ -127,6 +135,18 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
                       {item.description}
                     </p>
                   )}
+                  {/* Boshqalarga o'rnak: nechta o'quvchi sotib olgan */}
+                  <p
+                    className={cn(
+                      "flex items-center gap-1.5 text-[11px] font-semibold",
+                      item.buyers > 0 ? "text-teal-700 dark:text-teal-300" : "text-slate-500 dark:text-slate-400"
+                    )}
+                  >
+                    <Users className="w-3.5 h-3.5 shrink-0" />
+                    {item.buyers > 0
+                      ? `${item.buyers} ta o'quvchi sotib oldi${item.boughtByMe ? " · siz ham" : ""}`
+                      : "Hali hech kim olmagan — birinchi bo'ling!"}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

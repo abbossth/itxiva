@@ -244,8 +244,9 @@ export function ProductsManager({ initialProducts }: { initialProducts: ShopProd
                     </span>
                   ) : null}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                   {p.stock === null ? "Cheklanmagan" : `${p.stock} ta bor`}
+                  <span className="block font-normal">{p.buyers} ta o&apos;quvchi olgan</span>
                 </span>
               </div>
               <div className="flex items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-800">

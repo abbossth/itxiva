@@ -18,7 +18,17 @@ import { suggestCoinPrice, type PriceSuggestion } from "@/lib/shop-pricing";
 import { notify, notifyAllStudents, notifyMentors } from "@/lib/notifications/notify";
 import { ActionResult } from "./auth.actions";
 
-export type ShopProduct = Omit<IProductData, "_id"> & { _id: string; imageUrl: string | null };
+export type ShopProduct = Omit<IProductData, "_id"> & {
+  _id: string;
+  imageUrl: string | null;
+  /** Nechta o'quvchi sotib olgan (har biri bir marta; rad etilgan va bekor qilinganlar sanalmaydi) */
+  buyers: number;
+  /** O'quvchining o'zi ham olganmi (mentorda — false) */
+  boughtByMe: boolean;
+};
+
+/** Sotib olingan deb sanaladigan buyurtmalar: coin to'langan va qaytarilmagan */
+const BOUGHT_STATUSES: OrderStatus[] = ["pending", "accepted", "handed_over", "received"];
 
 export interface ShopOrder extends Omit<IOrderData, "_id" | "studentId" | "groupId" | "productId"> {
   _id: string;
@@ -33,9 +43,18 @@ function revalidateShop() {
   revalidatePath("/", "layout");
 }
 
-async function withImageUrls(products: IProductData[]): Promise<ShopProduct[]> {
+async function withImageUrls(products: IProductData[], meId: string | null = null): Promise<ShopProduct[]> {
+  const ids = products.map((p) => new mongoose.Types.ObjectId(String(p._id)));
+  const rows = ids.length
+    ? await Order.aggregate<{ _id: mongoose.Types.ObjectId; buyers: mongoose.Types.ObjectId[] }>([
+        { $match: { productId: { $in: ids }, status: { $in: BOUGHT_STATUSES } } },
+        { $group: { _id: "$productId", buyers: { $addToSet: "$studentId" } } },
+      ])
+    : [];
+  const buyersOf = new Map(rows.map((r) => [String(r._id), r.buyers.map(String)]));
   return Promise.all(
     products.map(async (p) => {
+      const buyers = buyersOf.get(String(p._id)) ?? [];
       let imageUrl: string | null = null;
       if (p.imageKey) {
         try {
@@ -44,7 +63,7 @@ async function withImageUrls(products: IProductData[]): Promise<ShopProduct[]> {
           imageUrl = null;
         }
       }
-      return { ...p, _id: p._id.toString(), imageUrl };
+      return { ...p, _id: p._id.toString(), imageUrl, buyers: buyers.length, boughtByMe: meId !== null && buyers.includes(meId) };
     })
   );
 }
@@ -61,7 +80,7 @@ export async function getProducts(): Promise<ShopProduct[]> {
     .select(session.role === "mentor" ? {} : { realPrice: 0 })
     .sort({ isActive: -1, price: 1 })
     .lean();
-  return withImageUrls(JSON.parse(JSON.stringify(products)) as IProductData[]);
+  return withImageUrls(JSON.parse(JSON.stringify(products)) as IProductData[], session.role === "student" ? session.userId : null);
 }
 
 export async function getMyBalance(): Promise<number> {
