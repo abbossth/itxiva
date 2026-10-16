@@ -34,14 +34,19 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
   const [error, setError] = useState<string | null>(null);
 
   const isCompleted = submission && (submission.status === "graded" || submission.status === "submitted");
+  // Topshirilgandan keyin mentor qo'shgan savollar: ularga hali javob berish mumkin, eskilari qulflangan
+  const answeredIds = new Set((submission?.answers ?? []).map((a) => a.questionId));
+  const newCount = isCompleted ? quiz.questions.filter((q) => !answeredIds.has(q._id ? q._id.toString() : "")).length : 0;
+  const isLocked = (questionId: string) => role === "student" && !!isCompleted && answeredIds.has(questionId);
+  const canSubmit = role === "student" && (!isCompleted || newCount > 0);
 
   const handleSingleSelect = (questionId: string, option: string) => {
-    if (isCompleted && role === "student") return;
+    if (isLocked(questionId)) return;
     setAnswers((prev) => ({ ...prev, [questionId]: option }));
   };
 
   const handleMultipleSelect = (questionId: string, option: string) => {
-    if (isCompleted && role === "student") return;
+    if (isLocked(questionId)) return;
     const current = Array.isArray(answers[questionId])
       ? (answers[questionId] as string[])
       : [];
@@ -52,7 +57,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
   };
 
   const handleTextChange = (questionId: string, value: string) => {
-    if (isCompleted && role === "student") return;
+    if (isLocked(questionId)) return;
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
@@ -62,10 +67,12 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
     setSubmitting(true);
 
     try {
-      const formattedAnswers = Object.entries(answers).map(([questionId, value]) => ({
-        questionId,
-        value,
-      }));
+      const formattedAnswers = Object.entries(answers)
+        .filter(([questionId]) => !isLocked(questionId))
+        .map(([questionId, value]) => ({
+          questionId,
+          value,
+        }));
 
       const res = await submitQuizAction({
         quizId: quiz._id,
@@ -76,7 +83,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
         setError(res.error || "Xatolik yuz berdi");
       } else if (res.data) {
         setSubmission({
-          _id: "temp",
+          _id: submission?._id ?? "temp",
           quizId: quiz._id,
           lessonId: quiz.lessonId,
           studentId: "me",
@@ -134,6 +141,12 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
         )}
       </div>
 
+      {newCount > 0 && role === "student" && (
+        <div className="p-3 text-sm rounded-xl bg-teal-500/10 text-teal-800 dark:text-teal-200 font-medium">
+          Testga {newCount} ta yangi savol qo&apos;shildi. Ularga javob bering: oldingi javoblaringiz va balingiz saqlanadi.
+        </div>
+      )}
+
       {error && (
         <div className="p-3 text-sm rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium">
           {error}
@@ -189,7 +202,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
                       <button
                         type="button"
                         key={oIdx}
-                        disabled={!!isCompleted && role === "student"}
+                        disabled={isLocked(qId)}
                         onClick={() => handleSingleSelect(qId, opt)}
                         className={`w-full text-left p-3.5 rounded-xl border transition-all text-sm flex items-center gap-3 min-h-[48px] select-none ${
                           isSelected
@@ -222,7 +235,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
                       <button
                         type="button"
                         key={oIdx}
-                        disabled={!!isCompleted && role === "student"}
+                        disabled={isLocked(qId)}
                         onClick={() => handleMultipleSelect(qId, opt)}
                         className={`w-full text-left p-3.5 rounded-xl border transition-all text-sm flex items-center gap-3 min-h-[48px] select-none ${
                           isSelected
@@ -250,7 +263,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
                 <div className="pt-1">
                   <input
                     type="text"
-                    disabled={!!isCompleted && role === "student"}
+                    disabled={isLocked(qId)}
                     value={typeof studentAns === "string" ? studentAns : ""}
                     onChange={(e) => handleTextChange(qId, e.target.value)}
                     placeholder="Qisqa javobni yozing..."
@@ -263,7 +276,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
                 <div className="pt-1">
                   <textarea
                     rows={3}
-                    disabled={!!isCompleted && role === "student"}
+                    disabled={isLocked(qId)}
                     value={typeof studentAns === "string" ? studentAns : ""}
                     onChange={(e) => handleTextChange(qId, e.target.value)}
                     placeholder="Batafsil javobingizni yozing..."
@@ -304,14 +317,14 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
           );
         })}
 
-        {!isCompleted && role === "student" && (
+        {canSubmit && (
           <Button
             type="submit"
             isLoading={submitting}
             className="w-full md:w-auto px-8 py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Testni topshirish</span>
+            <span>{newCount > 0 ? "Yangi savollarga javobni yuborish" : "Testni topshirish"}</span>
           </Button>
         )}
       </form>

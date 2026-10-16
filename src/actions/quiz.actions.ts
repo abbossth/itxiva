@@ -63,17 +63,20 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
       }).lean()) as unknown as IQuizSubmissionData | null;
     }
 
-    // Sanitize quiz questions for students who haven't submitted
+    // To'g'ri javob va izoh faqat baholangan va o'quvchi javob bergan savollarda ochiladi:
+    // topshirilgandan keyin qo'shilgan savollarga hali javob berish mumkin
+    const isGraded = submissionDoc?.status === "graded";
+    const answeredIds = new Set((submissionDoc?.answers ?? []).map((a) => a.questionId));
     const questions: IQuizQuestion[] = quizDoc.questions.map((q) => {
-      const isGraded = submissionDoc && submissionDoc.status === "graded";
+      const reveal = user.role === "mentor" || (isGraded && answeredIds.has(String(q._id)));
       return {
         _id: q._id?.toString(),
         type: q.type,
         prompt: q.prompt,
         options: q.options || [],
-        correctAnswers: isGraded || user.role === "mentor" ? q.correctAnswers : [],
+        correctAnswers: reveal ? q.correctAnswers : [],
         points: q.points,
-        explanation: isGraded || user.role === "mentor" ? q.explanation : undefined,
+        explanation: reveal ? q.explanation : undefined,
       };
     });
 
@@ -145,36 +148,63 @@ export async function submitQuizAction(
       return { success: false, error: "Dars hali nashr etilmagan" };
     }
 
-    // Test faqat bir marta topshiriladi (natijada to'g'ri javoblar ko'rsatilgani uchun)
-    const alreadySubmitted = await QuizSubmission.exists({
-      quizId: quiz._id,
-      studentId: user.userId,
-    });
-    if (alreadySubmitted) {
+    // Test faqat bir marta topshiriladi (natijada to'g'ri javoblar ko'rsatilgani uchun).
+    // Topshirilgandan keyin mentor savol qo'shgan bo'lsa — faqat shu yangi savollarga javob qabul qilinadi.
+    const existing = await QuizSubmission.findOne({ quizId: quiz._id, studentId: user.userId }).lean();
+    const answeredIds = new Set((existing?.answers ?? []).map((a) => a.questionId));
+    const questions = existing ? quiz.questions.filter((q) => !answeredIds.has(String(q._id))) : quiz.questions;
+    if (existing && questions.length === 0) {
       return { success: false, error: "Siz bu testni allaqachon topshirgansiz" };
     }
 
     // Auto-grade
-    const { answers, totalScore, maxScore, hasOpenEnded } = autoGradeQuiz({
-      questions: quiz.questions,
+    const graded = autoGradeQuiz({
+      questions,
       submittedAnswers: parsed.data.answers,
     });
+    const { hasOpenEnded } = graded;
 
-    const status = hasOpenEnded ? "submitted" : "graded";
-
-    const created = await QuizSubmission.create({
-      quizId: quiz._id,
-      lessonId: lesson._id,
-      studentId: user.userId,
-      answers,
-      totalScore,
-      maxScore,
-      status,
-      submittedAt: new Date(),
-    });
+    let submission: { _id: mongoose.Types.ObjectId; answers: IQuizAnswer[]; totalScore: number; maxScore: number; status: string };
+    if (existing) {
+      // Shartli yangilash: ikki marta bosilsa ham yangi savollar bir marta qo'shiladi
+      const updated = await QuizSubmission.findOneAndUpdate(
+        { _id: existing._id, "answers.questionId": { $nin: questions.map((q) => String(q._id)) } },
+        {
+          $push: { answers: { $each: graded.answers } },
+          $inc: { totalScore: graded.totalScore, maxScore: graded.maxScore },
+          $set: { status: hasOpenEnded || existing.status === "submitted" ? "submitted" : "graded" },
+        },
+        { returnDocument: "after" }
+      ).lean();
+      if (!updated) {
+        return { success: false, error: "Siz bu testni allaqachon topshirgansiz" };
+      }
+      submission = updated as typeof submission;
+    } else {
+      submission = await QuizSubmission.create({
+        quizId: quiz._id,
+        lessonId: lesson._id,
+        studentId: user.userId,
+        answers: graded.answers,
+        totalScore: graded.totalScore,
+        maxScore: graded.maxScore,
+        status: hasOpenEnded ? "submitted" : "graded",
+        submittedAt: new Date(),
+      });
+    }
+    const { totalScore, maxScore, status } = submission;
+    const answers = submission.answers.map((a) => ({
+      questionId: a.questionId,
+      value: a.value,
+      isCorrect: a.isCorrect,
+      pointsAwarded: a.pointsAwarded,
+      mentorFeedback: a.mentorFeedback,
+      aiGraded: a.aiGraded,
+      correctAnswer: a.correctAnswer,
+    }));
 
     // Gamifikatsiya: javob berilgan savollar kunlik topshiriqqa sanaladi, to'g'ri javoblar coin beradi (javobdan keyin)
-    const answered = answers
+    const answered = graded.answers
       .filter((a) => (Array.isArray(a.value) ? a.value.length > 0 : String(a.value ?? "").trim() !== ""))
       .map((a) => ({ questionId: a.questionId, isCorrect: a.isCorrect }));
     if (answered.length > 0) {
@@ -183,9 +213,9 @@ export async function submitQuizAction(
     }
 
     // Ochiq javoblar javob qaytarilgandan keyin AI bilan tekshiriladi; mentor belgilagan savollar unga qoladi
-    const aiPending = hasOpenEnded && pendingAiAnswers(quiz.questions, answers).length > 0;
+    const aiPending = hasOpenEnded && pendingAiAnswers(questions, graded.answers).length > 0;
     if (aiPending) {
-      const submissionId = created._id.toString();
+      const submissionId = submission._id.toString();
       const lessonId = lesson._id.toString();
       after(async () => {
         try {
@@ -196,7 +226,7 @@ export async function submitQuizAction(
         }
       });
     }
-    const needsMentor = quiz.questions.some((q) => q.type === "open_ended" && !isAutoOpenQuestion(q));
+    const needsMentor = questions.some((q) => q.type === "open_ended" && !isAutoOpenQuestion(q));
 
     revalidatePath(`/lessons/${lesson._id}`);
     revalidatePath(`/mentor/lessons/${lesson._id}`);

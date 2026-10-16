@@ -186,3 +186,56 @@ describe("ochiq savollarni avtomatik tekshirish", () => {
     expect((await ExamSubmission.findById(last!._id).lean())!.answers[0]).toMatchObject({ pointsAwarded: 6, aiGraded: false, correctAnswer: "Mentor yozgan to'g'ri javob" });
   });
 });
+
+describe("topshirilgandan keyin qo'shilgan savollar", () => {
+  it("o'quvchi faqat yangi savollarga javob beradi; eski javob va ball saqlanadi; to'g'ri javob oldindan ochilmaydi", async () => {
+    const { student, lesson, quiz, ids, submit, saved } = await seedQuiz([]);
+    expect((await submit([])).data).toMatchObject({ status: "graded", totalScore: 2, maxScore: 2 });
+
+    // Mentor 2 ta savol qo'shdi
+    await Quiz.updateOne(
+      { _id: quiz._id },
+      {
+        $push: {
+          questions: {
+            $each: [
+              { type: "single_choice", prompt: "3 + 3?", options: ["5", "6"], correctAnswers: ["6"], points: 1, explanation: "Oddiy" },
+              { type: "single_choice", prompt: "1 + 1?", options: ["2", "3"], correctAnswers: ["2"], points: 1 },
+            ],
+          },
+        },
+      }
+    );
+    const fresh = await Quiz.findById(quiz._id).lean();
+    const [q2, q3] = fresh!.questions.slice(1).map((q) => q._id!.toString());
+
+    actAs(sessionFor(student));
+    const view = await quizzes.getQuizForLesson(lesson._id.toString());
+    expect(view.data?.quiz?.questions.map((q) => q.correctAnswers)).toEqual([["4"], [], []]);
+    expect(view.data?.quiz?.questions[1].explanation).toBeUndefined();
+
+    // Eski savol javobini o'zgartirishga urinish e'tiborsiz qoldiriladi
+    const answer = () =>
+      quizzes.submitQuizAction({
+        quizId: quiz._id.toString(),
+        answers: [
+          { questionId: ids[0], value: "3" },
+          { questionId: q2, value: "6" },
+          { questionId: q3, value: "3" },
+        ],
+      });
+    const results = await Promise.all([answer(), answer()]);
+    await Promise.all(afterJobs.splice(0));
+    expect(results.filter((r) => r.success)).toHaveLength(1);
+    expect(results.find((r) => r.success)?.data).toMatchObject({ status: "graded", totalScore: 3, maxScore: 4 });
+
+    const sub = await saved();
+    expect(sub).toMatchObject({ status: "graded", totalScore: 3, maxScore: 4 });
+    expect(sub!.answers.map((a) => [a.value, a.pointsAwarded])).toEqual([["4", 2], ["6", 1], ["3", 0]]);
+
+    // Hamma savolga javob berilgach — boshqa topshirib bo'lmaydi, to'g'ri javoblar ochiladi
+    expect(await answer()).toMatchObject({ success: false, error: "Siz bu testni allaqachon topshirgansiz" });
+    const after = await quizzes.getQuizForLesson(lesson._id.toString());
+    expect(after.data?.quiz?.questions.map((q) => q.correctAnswers)).toEqual([["4"], ["6"], ["2"]]);
+  });
+});
