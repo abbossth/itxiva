@@ -35,3 +35,14 @@ export function stepStreak(prev: StreakState | null | undefined, today: string, 
   }
   return { next: { current, best: Math.max(p.best, current), lastDayKey: today }, usedShield, unchanged: false };
 }
+
+/**
+ * Ko'rsatish uchun seriya: o'quvchi bugun hali kirmagan bo'lsa ham, kecha kirgan (yoki himoya yopadigan bitta kun
+ * o'tkazilgan) bo'lsa seriya saqlanadi; aks holda allaqachon uzilgan — 0.
+ */
+export function effectiveStreak(prev: StreakState | null | undefined, today: string, shields: number): number {
+  if (!prev?.lastDayKey) return 0;
+  if (prev.lastDayKey === today || prev.lastDayKey === addDaysToKey(today, -1)) return prev.current;
+  if (prev.lastDayKey === addDaysToKey(today, -2) && shields > 0) return prev.current;
+  return 0;
+}

@@ -46,6 +46,8 @@ export interface IQuestData {
   /** Tizim yaratgan standart topshiriq (kunlik odatlar) */
   isSystem?: boolean;
   publishedAt?: Date | string | null;
+  /** Haftalik masala: natijasi e'lon qilingan haftalar ("w:2026-W42") */
+  resultsAnnounced?: string[];
   createdBy?: string | mongoose.Types.ObjectId | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -108,6 +110,7 @@ const QuestSchema = new Schema<IQuest>(
     },
     isSystem: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
+    resultsAnnounced: { type: [String], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }

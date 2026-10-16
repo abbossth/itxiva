@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, ShieldCheck, Sparkles, Target, Zap } from "lucide-react";
-import type { StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
+import { Award, BookOpen, CalendarCheck, Check, ChevronRight, ClipboardCheck, Clock, Code2, Flame, LogIn, Medal, ShieldCheck, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
+import { TIER_LABEL, type BadgeId } from "@/lib/gamification/badges";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { DIFFICULTY_LABEL, REPEAT_LABEL, VERIFY_LABEL, VERIFY_TONE, rewardLabel } from "@/lib/gamification/labels";
 import { cn, formatNumberUz, formatTimeUz } from "@/lib/utils";
@@ -152,6 +153,58 @@ function MainCard({ card }: { card: StudentQuestCard }) {
   );
 }
 
+export const BADGE_ICON: Record<BadgeId, typeof Award> = {
+  tests: Award,
+  streak: Flame,
+  attendance: CalendarCheck,
+  homework: ClipboardCheck,
+  certificate: Medal,
+  project: Code2,
+  weekly: Trophy,
+  quests: Target,
+};
+
+const TIER_BAR = { bronze: "bg-orange-700/80", silver: "bg-slate-400", gold: "bg-amber-400" } as const;
+
+function MilestoneCard({ m }: { m: MilestoneView }) {
+  const Icon = BADGE_ICON[m.id];
+  const next = m.next!;
+  return (
+    <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600">
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-slate-900 dark:text-slate-100">{m.title}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {m.description} · {TIER_LABEL[next.tier].toLowerCase()} nishongacha {next.threshold - m.value} qoldi
+          </div>
+        </div>
+        <span className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">
+          {m.value}
+          <span className="text-slate-400">/{next.threshold}</span>
+        </span>
+      </div>
+      <div className="flex gap-1">
+        {m.tiers.map((t, i) => {
+          const from = i === 0 ? 0 : m.tiers[i - 1].threshold;
+          const fill = Math.max(0, Math.min(1, (m.value - from) / (t.threshold - from)));
+          return (
+            <div key={t.tier} className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div className={cn("h-full rounded-full", TIER_BAR[t.tier])} style={{ width: `${fill * 100}%` }} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+        <span>{m.tiers.map((t) => `${TIER_LABEL[t.tier]} · ${t.threshold}`).join("   ")}</span>
+        <span className="font-mono font-bold text-amber-700 dark:text-amber-400">+{next.coins}</span>
+      </div>
+    </div>
+  );
+}
+
 export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
   const [tab, setTab] = useState<Tab>("all");
   const daily = data.daily.filter((c) => matches(c, tab));
@@ -258,6 +311,42 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
               ))}
             </ol>
           </section>
+
+          {data.challenge && (
+            <section aria-label="Guruh chellenji" className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-bold text-slate-900 dark:text-slate-100">{data.challenge.title}</h2>
+                <span className="shrink-0 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  {data.challenge.daysLeft} kun qoldi
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Guruh {data.challenge.target}% davomatga yetsa, har bir a&apos;zo <b className="text-amber-700 dark:text-amber-400">+{data.challenge.coins} coin</b> oladi.
+              </p>
+              <ul className="space-y-1.5">
+                {data.challenge.groups.map((g) => {
+                  const reached = g.rate >= data.challenge!.target;
+                  return (
+                    <li key={g.name} className={cn("grid grid-cols-[3rem_minmax(0,1fr)_2.75rem] items-center gap-2 rounded-lg px-1.5 py-1", g.mine && "bg-teal-500/10")}>
+                      <span className={cn("font-mono text-xs font-bold", g.mine ? "text-teal-700 dark:text-teal-300" : "text-slate-700 dark:text-slate-300")}>{g.name}</span>
+                      <span className="relative h-2 rounded-full bg-slate-100 dark:bg-slate-800">
+                        <span
+                          className={cn("absolute inset-y-0 left-0 rounded-full", reached ? "bg-emerald-500" : g.mine ? "bg-teal-500" : "bg-slate-400")}
+                          style={{ width: `${g.rate}%` }}
+                        />
+                        <span aria-hidden className="absolute -top-1 -bottom-1 w-0.5 bg-slate-900 dark:bg-slate-100" style={{ left: `${data.challenge!.target}%` }} />
+                      </span>
+                      <span className={cn("text-right font-mono text-xs font-bold", reached ? "text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-400")}>{g.rate}%</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span className="h-3 w-0.5 bg-slate-900 dark:bg-slate-100" />
+                Maqsad — {data.challenge.target}%
+              </div>
+            </section>
+          )}
         </aside>
 
         <div className="space-y-5 min-w-0 lg:order-1">
@@ -332,6 +421,24 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
               </div>
             )}
           </section>
+
+          {tab === "all" && data.milestones.length > 0 && (
+            <section aria-labelledby="milestones-title" className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 id="milestones-title" className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Marralar
+                </h2>
+                <Link href="/achievements" className="text-xs font-semibold text-teal-700 dark:text-teal-400 hover:underline">
+                  Barcha nishonlar →
+                </Link>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {data.milestones.map((m) => (
+                  <MilestoneCard key={m.id} m={m} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </div>

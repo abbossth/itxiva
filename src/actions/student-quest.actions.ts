@@ -16,6 +16,13 @@ import { dayKey, monthKey, periodKeyFor, weekStartKey } from "@/lib/gamification
 import { addDaysToKey } from "@/lib/schedule";
 import { LEGACY_EARNING_TYPES } from "@/lib/gamification/backfill";
 import type { LevelSummary } from "./gamification.actions";
+import { Group } from "@/lib/db/models/group.model";
+import { StudentBadge } from "@/lib/db/models/student-badge.model";
+import { badgeMetrics, groupMonthAttendance } from "@/lib/gamification/achievements";
+import { BADGES, nextTier, type BadgeId, type BadgeTier } from "@/lib/gamification/badges";
+import { effectiveStreak } from "@/lib/gamification/streak";
+import { groupShortName } from "@/lib/group-name";
+import { dateFromKey } from "@/lib/schedule";
 
 export type StudentQuestState = "available" | "pending" | "done" | "rejected" | "limit";
 
@@ -47,6 +54,28 @@ export interface StudentQuestsData {
   weekly: (StudentQuestCard & { participants: number }) | null;
   main: StudentQuestCard[];
   counts: { active: number; pending: number; done: number };
+  /** Keyingi bosqichga eng yaqin ikkita marra */
+  milestones: MilestoneView[];
+  /** Ochiq guruh chellenji (joriy oy davomati) */
+  challenge: ChallengeView | null;
+}
+
+export interface MilestoneView {
+  id: BadgeId;
+  title: string;
+  description: string;
+  unit: string;
+  value: number;
+  tiers: { tier: BadgeTier; threshold: number; coins: number; owned: boolean }[];
+  next: { tier: BadgeTier; threshold: number; coins: number } | null;
+}
+
+export interface ChallengeView {
+  title: string;
+  target: number;
+  coins: number;
+  daysLeft: number;
+  groups: { name: string; rate: number; mine: boolean }[];
 }
 
 const WEEK_LABELS = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
@@ -152,11 +181,61 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
   }
 
   const all = [...daily, ...main, ...(weeklyCard ? [weeklyCard] : [])];
+
+  // Marralar: keyingi bosqichga eng yaqin ikkitasi
+  const [metrics, owned] = await Promise.all([
+    badgeMetrics(scope._id),
+    StudentBadge.find({ studentId: scope._id }).select("badge tier").lean(),
+  ]);
+  const ownedSet = new Set(owned.map((b) => `${b.badge}:${b.tier}`));
+  const milestones: MilestoneView[] = BADGES.map((b) => ({
+    id: b.id,
+    title: b.title,
+    description: b.description,
+    unit: b.unit,
+    value: metrics[b.id],
+    tiers: b.tiers.map((t) => ({ ...t, owned: ownedSet.has(`${b.id}:${t.tier}`) })),
+    next: nextTier(b, metrics[b.id]),
+  }))
+    .filter((m) => m.next)
+    .sort((a, b) => b.value / b.next!.threshold - a.value / a.next!.threshold)
+    .slice(0, 2);
+
+  // Guruh chellenji: joriy oyning shu kungacha bo'lgan davomati
+  let challenge: ChallengeView | null = null;
+  const challengeQuest = quests.find((q) => q.autoRule?.kind === "group_challenge");
+  if (challengeQuest?.autoRule) {
+    const gids = (challengeQuest.audience?.groupIds ?? []).map(String);
+    const grades = challengeQuest.audience?.grades ?? [];
+    const groups = await Group.find({
+      isActive: true,
+      ...(gids.length || grades.length ? { $or: [{ _id: { $in: gids } }, { grade: { $in: grades } }] } : {}),
+    })
+      .select("name shortName")
+      .lean();
+    const rates = await groupMonthAttendance(monthKey(), groups.map((g) => g._id));
+    const [y, m] = monthKey().split("-").map(Number);
+    const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    challenge = {
+      title: challengeQuest.title,
+      target: challengeQuest.autoRule.target,
+      coins: challengeQuest.reward.coinsMin,
+      daysLeft: Math.max(0, Math.ceil((dateFromKey(nextMonth).getTime() - Date.now()) / 86_400_000)),
+      groups: groups
+        .map((g) => ({ name: groupShortName(g), rate: rates.get(String(g._id)) ?? 0, mine: String(g._id) === String(scope.groupId) }))
+        .sort((a, b) => b.rate - a.rate),
+    };
+  }
   return {
     level,
     groupRank: ahead === null ? null : ahead + 1,
     weekXp: weekRow[0]?.sum ?? 0,
-    streak: { current: user.streak?.current ?? 0, best: user.streak?.best ?? 0, shields: user.streakShields ?? 0, week },
+    streak: {
+      current: effectiveStreak(user.streak, today, user.streakShields ?? 0),
+      best: user.streak?.best ?? 0,
+      shields: user.streakShields ?? 0,
+      week,
+    },
     daily,
     weekly,
     main,
@@ -165,5 +244,7 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
       pending: all.reduce((s, c) => s + c.pendingCount, 0),
       done: all.filter((c) => c.state === "done").length,
     },
+    milestones,
+    challenge,
   };
 }

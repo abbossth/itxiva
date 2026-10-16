@@ -217,3 +217,11 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Bekor qilish (revoke): tasdiqlangan ish rad etilgan holatga o'tadi, coin (balans yetgancha) va XP qaytariladi, reyestr yozuvi `revoked: true` bilan qoladi — soxta dalil qayta qabul qilinmaydi. Tasdiq, rad etish va bekor qilish audit jurnaliga yoziladi, o'quvchiga Telegram xabari boradi.
 - Fayllar: `quests/<quest>/<o'quvchi>/...` kaliti, PDF/JPG/PNG/WebP (rasm brauzerda WebP ga siqiladi), 10 MB; faylni faqat egasi va mentor ochadi (10 daqiqalik havola).
 - Tezlik cheklovi: o'quvchi daqiqasiga 3 ta yuborish, 10 daqiqada 20 ta fayl.
+
+### [2026-10-16] G8: Seriya, nishonlar, haftalik va oylik yakunlar
+- Seriya Toshkent kunlari bo'yicha, o'quvchi kuniga birinchi marta sahifa ochganda hisoblanadi (`dailyCheckIn`, shartli yangilash). Bitta o'tkazilgan kunni himoya yopadi (himoya avtomatik sarflanadi). Ko'rsatishda `effectiveStreak`: kecha kirmagan (va himoyasi bo'lmagan) o'quvchining seriyasi 0 ko'rinadi.
+- Nishonlar: 8 ta × 3 bosqich = 24 (`src/lib/gamification/badges.ts`): testlar (to'g'ri javoblar), seriya (eng uzun), to'liq davomat (tugagan oylar), vazifalar (80+ ball), sertifikatlar, loyihalar, haftalik g'olib, faol o'quvchi (tasdiqlangan topshiriqlar). Har bosqich bir marta (`StudentBadge` unique + `badge:<id>:<nishon>:<bosqich>` kaliti), coin va XP beradi. Nishon keyin qaytarib olinmaydi (mukofot bekor qilinganda ham).
+- Nishonlar hodisa bo'yicha (test, tasdiq, kirish) va kunlik cron'da (davomat, vazifa) tekshiriladi.
+- Cron: Vercel Hobby kuniga 1 marta — mavjud `/api/cron/daily` gamifikatsiyani ham chaqiradi; `/api/cron/gamification` qo'lda ishga tushirish uchun (xuddi shu `CRON_SECRET`). `vercel.json` o'zgarmadi.
+- Yakunlar har kuni o'tgan hafta/oy uchun ishga tushadi va idempotent: haftalik natija `Quest.resultsAnnounced` bilan bir marta e'lon qilinadi; guruh chellenji va "to'liq davomat" — `m:<oy>` davr kaliti bilan bir marta to'lanadi. Cron bir kun ishlamasa ham natija yo'qolmaydi.
+- Guruh chellenji: oy davomati = (kelgan + kechikkan) / barcha davomat yozuvlari. Sahifada joriy oyning shu kungacha bo'lgan foizi ko'rsatiladi.

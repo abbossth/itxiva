@@ -19,6 +19,7 @@ import { loadStudentScope, questOpen, questVisibleTo } from "@/lib/gamification/
 import { monthKey, periodKeyFor } from "@/lib/gamification/periods";
 import { QUEST_FILE_MAX_BYTES, QUEST_FILE_TYPES, normalizeCertId, normalizeProofUrl } from "@/lib/gamification/proof";
 import { ReviewError, approveSubmission, rejectSubmission, revokeSubmission, systemChecks } from "@/lib/gamification/review";
+import { evaluateBadges } from "@/lib/gamification/achievements";
 import { groupShortName } from "@/lib/group-name";
 import type { ActionResult } from "./auth.actions";
 
@@ -348,6 +349,7 @@ export async function approveQuestSubmissionAction(input: {
       details: { submissionId: input.submissionId, questId: res.quest._id, questTitle: res.quest.title, coins: res.coins, xp: res.xp, place: res.place },
     });
     notify(res.studentId, "quest_result", { questId: String(res.quest._id), title: res.quest.title, approved: true, coins: res.coins, xp: res.xp });
+    await evaluateBadges(res.studentId).catch((error) => console.error("Badge evaluation error:", error));
     revalidatePath("/mentor/quests/review");
     revalidatePath("/mentor/quests");
     return { success: true, message: res.place ? `Tasdiqlandi — ${res.place}-o'rin, +${res.coins} coin` : `Tasdiqlandi: +${res.coins} coin` };

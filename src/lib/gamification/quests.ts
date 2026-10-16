@@ -9,6 +9,7 @@ import { getAppSettings } from "@/lib/settings";
 import { awardCoins } from "./award";
 import { dayKey, monthKey, periodKeyFor, weekStartKey } from "./periods";
 import { stepStreak } from "./streak";
+import { evaluateBadges } from "./achievements";
 import type { GamificationSettings } from "./config";
 
 type Id = string | mongoose.Types.ObjectId;
@@ -178,6 +179,8 @@ export async function dailyCheckIn(studentId: Id): Promise<void> {
 
   await recordActivity(user._id, "login");
   await evaluateAutoQuests(user._id, gamification);
+  // Seriya nishoni: eng uzun seriya o'sgan bo'lishi mumkin (kuniga bir marta)
+  await evaluateBadges(user._id);
 }
 
 // ---------- Avtomatik topshiriqlar ----------
@@ -208,8 +211,15 @@ async function autoProgress(
 }
 
 /** Avtomatik topshiriqni bajarilgan deb yozadi va mukofot beradi (davrda bir marta) */
-export async function completeAutoQuest(quest: IQuest, studentId: mongoose.Types.ObjectId, groupId: Id | null, coins?: number): Promise<boolean> {
-  const periodKey = periodKeyFor(quest.repeat) ?? `d:${dayKey()}`;
+export async function completeAutoQuest(
+  quest: IQuest,
+  studentId: mongoose.Types.ObjectId,
+  groupId: Id | null,
+  coins?: number,
+  /** Oylik yakunlar uchun ("m:2026-10") */
+  periodKeyOverride?: string
+): Promise<boolean> {
+  const periodKey = periodKeyOverride ?? periodKeyFor(quest.repeat) ?? `d:${dayKey()}`;
   const reward = coins ?? quest.reward.coinsMin;
   const xp = questXp(quest, reward);
   await QuestSubmission.init();

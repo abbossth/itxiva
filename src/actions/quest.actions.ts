@@ -17,6 +17,8 @@ import { monthKey, periodKeyFor } from "@/lib/gamification/periods";
 import { dateFromKey } from "@/lib/schedule";
 import { notifyMany } from "@/lib/notifications/notify";
 import { groupShortName } from "@/lib/group-name";
+import { StudentBadge } from "@/lib/db/models/student-badge.model";
+import { BADGES } from "@/lib/gamification/badges";
 import { toQuestView, type QuestView } from "@/lib/gamification/quest-view";
 import type { ActionResult } from "./auth.actions";
 
@@ -268,5 +270,27 @@ export async function getQuestFormContext(): Promise<QuestFormContext> {
     groups: list,
     avgMonthlyCoins: students > 0 ? Math.round((earned?.sum ?? 0) / students) : 0,
     mentorBonusMax: gamification.mentorBonusMax,
+  };
+}
+
+export interface BadgeStatsRow {
+  id: string;
+  title: string;
+  description: string;
+  tiers: { tier: "bronze" | "silver" | "gold"; threshold: number; coins: number; students: number }[];
+}
+
+/** Mentor: nishonlar katalogi va har bosqichni olgan o'quvchilar soni */
+export async function getBadgeStats(): Promise<{ rows: BadgeStatsRow[]; students: number }> {
+  await requireMentor();
+  await connectToDatabase();
+  const [counts, students] = await Promise.all([
+    StudentBadge.aggregate<{ _id: { b: string; t: string }; n: number }>([{ $group: { _id: { b: "$badge", t: "$tier" }, n: { $sum: 1 } } }]),
+    User.countDocuments({ role: "student", groupId: { $ne: null } }),
+  ]);
+  const n = (b: string, t: string) => counts.find((c) => c._id.b === b && c._id.t === t)?.n ?? 0;
+  return {
+    students,
+    rows: BADGES.map((b) => ({ id: b.id, title: b.title, description: b.description, tiers: b.tiers.map((t) => ({ ...t, students: n(b.id, t.tier) })) })),
   };
 }

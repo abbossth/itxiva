@@ -5,6 +5,7 @@ import { dateFromKey } from "@/lib/schedule";
 import { awardCoins } from "./award";
 import { dayKey } from "./periods";
 import { evaluateAutoQuests, recordActivity } from "./quests";
+import { evaluateBadges } from "./achievements";
 
 // Testdan coin (gamifikatsiya): har savol uchun faqat birinchi to'g'ri javobga, kunlik chegara bilan.
 
@@ -57,5 +58,6 @@ export async function rewardQuizAnswers(studentIdRaw: string | mongoose.Types.Ob
   }
 
   await evaluateAutoQuests(studentId, s);
+  await evaluateBadges(studentId);
   return given;
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { notifyFinishedExams, sendHomeworkDueReminders } from "@/lib/notifications/scheduled";
+import { runGamificationCron } from "@/lib/gamification/cron";
 
 // Vercel Cron kuniga bir marta chaqiradi (vercel.json). Vercel so'rovga
 // `Authorization: Bearer <CRON_SECRET>` sarlavhasini o'zi qo'shadi.
@@ -14,7 +15,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const [homework, exams] = await Promise.all([sendHomeworkDueReminders(), notifyFinishedExams()]);
-    return NextResponse.json({ ok: true, homework, examsNotified: exams });
+    // Gamifikatsiya xatosi boshqa eslatmalarga ta'sir qilmasin
+    const gamification = await runGamificationCron().catch((error) => {
+      console.error("Gamification cron error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification });
   } catch (error) {
     console.error("Daily cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });
