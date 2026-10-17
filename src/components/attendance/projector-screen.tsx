@@ -28,11 +28,14 @@ import { useToast } from "@/components/ui/toast";
 import {
   rotateAttendanceSessionAction,
   closeAttendanceSessionAction,
+  bulkSetAttendanceStatusAction,
   exportAttendanceCsvAction,
   getAttendanceSessionForProjector,
   ProjectorSessionData,
 } from "@/actions/attendance.actions";
 import { formatTimeUz } from "@/lib/utils";
+import { ATTENDANCE_COINS, formatCoinDelta } from "@/lib/attendance-status";
+import { ExcuseStudentsDialog, type ExcuseCandidate } from "./excuse-students-dialog";
 import { playCheckInSound, unlockSound } from "@/lib/sound";
 
 interface AttendeeRecord {
@@ -61,6 +64,8 @@ interface ProjectorScreenProps {
     qrDataUrl: string;
     deepLink: string;
     secondsRemaining: number;
+    /** Dars tugash vaqti: kelmaganlardan jarima shu paytda olinadi */
+    lessonEndsAt: string;
   };
 }
 
@@ -75,6 +80,8 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [isExcuseOpen, setIsExcuseOpen] = useState(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
 
   const [soundOn, setSoundOn] = useState(true);
   const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
@@ -253,7 +260,31 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
     }
   };
 
-  const presentCount = data.records.filter((r) => r.status === "present").length;
+  // Kelganlar ro'yxatida faqat darsga kelganlar; mentor belgilagan "sababli"/"kelmagan"lar o'ng tomondagi ro'yxatda
+  const attendees = data.records.filter((r) => r.status === "present" || r.status === "late");
+  const excused = data.records.filter((r) => r.status === "excused");
+  const waiting: ExcuseCandidate[] = [
+    ...data.absentStudents.map((st) => ({ id: st._id, fullName: st.fullName, login: st.login })),
+    ...data.records
+      .filter((r) => r.status === "absent")
+      .map((r) => ({ id: r.studentId._id, fullName: r.studentId.fullName, login: r.studentId.login })),
+  ].sort((a, b) => a.fullName.localeCompare(b.fullName));
+  const lessonEndLabel = formatTimeUz(data.lessonEndsAt);
+
+  const undoExcuse = async (studentId: string) => {
+    setUndoingId(studentId);
+    try {
+      const res = await bulkSetAttendanceStatusAction({ sessionId, studentIds: [studentId], status: "absent" });
+      if (!res.success) toast.error(res.message || "Bekor qilib bo'lmadi");
+      await refreshData();
+    } catch {
+      toast.error("Bekor qilib bo'lmadi");
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
+  const presentCount = attendees.length;
   const progressPercent = data.totalStudents > 0 ? Math.round((presentCount / data.totalStudents) * 100) : 0;
 
   return (
@@ -279,7 +310,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
               </Badge>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {data.group?.grade}-sinf • kelganga +{data.session.defaultCoinsReward} coin · kelmaganga jarima sessiya yopilganda
+              {data.group?.grade}-sinf • kelganga +{data.session.defaultCoinsReward} coin · kelmaganga jarima dars tugagach ({lessonEndLabel})
             </p>
           </div>
         </div>
@@ -464,12 +495,12 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
 
             {/* List of attendees */}
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1 space-y-1">
-              {data.records.length === 0 ? (
+              {attendees.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
                   Hali hech kim davomatdan o&apos;tmadi...
                 </div>
               ) : (
-                data.records.map((r) => (
+                attendees.map((r) => (
                   <div
                     key={r._id}
                     className={`flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors duration-700 animate-in fade-in ${
@@ -492,7 +523,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
 
                     <div className="flex items-center gap-2 shrink-0 text-right">
                       <Badge variant={r.method === "qr" ? "teal" : "gold"}>
-                        {r.method === "qr" ? "QR" : "Kod"}
+                        {r.method === "qr" ? "QR" : r.method === "code" ? "Kod" : r.status === "late" ? "Kechikkan" : "Qo'lda"}
                       </Badge>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                         {formatTimeUz(r.markedAt)}
@@ -504,42 +535,79 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             </div>
           </div>
 
-          {/* Kelmaganlar: hali davomatdan o'tmagan o'quvchilar */}
+          {/* Kelmaganlar: hali davomatdan o'tmagan o'quvchilar va mentor "sababli" deb belgilaganlar */}
           <div className="p-5 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <h2 className="font-bold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <UserX className="w-5 h-5 text-rose-500" />
                 <span>Kelmaganlar ro&apos;yxati</span>
+                <span className="text-xs font-bold font-mono text-rose-600 dark:text-rose-400">{waiting.length}</span>
               </h2>
-              <span className="text-xs font-bold font-mono text-rose-600 dark:text-rose-400">
-                {data.absentStudents.length}
-              </span>
+              {waiting.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={() => setIsExcuseOpen(true)} className="shrink-0 text-blue-700 dark:text-blue-300">
+                  Sababli qilish
+                </Button>
+              )}
             </div>
+            {waiting.length > 0 && (
+              <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                {formatCoinDelta(ATTENDANCE_COINS.absent)} coin faqat dars tugagach ({lessonEndLabel}) olinadi. Kechikib kelganlar shu orada
+                davomatdan o&apos;tsa, jarima olinmaydi.
+              </p>
+            )}
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-[340px] overflow-y-auto pr-1">
-              {data.absentStudents.length === 0 ? (
+              {waiting.length === 0 && excused.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
                   {data.totalStudents === 0
                     ? "Guruhda o'quvchi yo'q"
                     : "Hamma davomatdan o'tdi"}
                 </div>
               ) : (
-                data.absentStudents.map((st) => (
-                  <div key={st._id} className="flex items-center gap-2.5 py-2.5 px-2 min-w-0">
-                    <Avatar name={st.fullName} size="sm" />
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
-                        {st.fullName}
+                <>
+                  {waiting.map((st) => (
+                    <div key={st.id} className="flex items-center gap-2.5 py-2.5 px-2 min-w-0">
+                      <Avatar name={st.fullName} size="sm" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{st.fullName}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{st.login}</div>
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{st.login}</div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {excused.map((r) => (
+                    <div key={r._id} className="flex items-center justify-between gap-2 py-2.5 px-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Avatar name={r.studentId.fullName} size="sm" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{r.studentId.fullName}</div>
+                          <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300">Sababli</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => undoExcuse(r.studentId._id)}
+                        disabled={undoingId === r.studentId._id}
+                        className="shrink-0 min-h-[36px] rounded-lg px-2 text-[11px] font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 disabled:opacity-50 cursor-pointer"
+                      >
+                        Bekor qilish
+                      </button>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {isExcuseOpen && (
+        <ExcuseStudentsDialog
+          sessionId={sessionId}
+          students={waiting}
+          onClose={() => setIsExcuseOpen(false)}
+          onDone={() => void refreshData()}
+        />
+      )}
 
       {/* Close Confirmation Dialog */}
       <ConfirmDialog
@@ -553,7 +621,11 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
         description={
           <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
             <p>
-              Sessiyani yakunlamoqchimisiz? Kelmagan barcha o&apos;quvchilar avtomatik tarzda <strong>&quot;Kelmagan&quot; (0 coin)</strong> deb belgilanadi.
+              Sessiyani yopmoqchimisiz? Davomatdan o&apos;tmaganlar <strong>&quot;Kelmagan&quot;</strong> deb belgilanadi.
+            </p>
+            <p>
+              {formatCoinDelta(ATTENDANCE_COINS.absent)} coin ulardan <strong>dars tugagach ({lessonEndLabel})</strong> olinadi. Kechikib kelganlarni
+              shu orada dars sahifasida &quot;Kechikkan&quot; deb belgilasangiz, jarima olinmaydi.
             </p>
           </div>
         }

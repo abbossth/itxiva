@@ -278,3 +278,8 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Ro'yxat bitta so'rov bilan olinadi (`getSearchIndex`) va brauzer xotirasida 2 daqiqa turadi; har bosilgan harf serverga bormaydi, natija bir zumda. Tugmaga sichqoncha kelganda oldindan yuklanadi.
 - Solishtirish (`src/lib/search.ts`): registr, apostrof (o'/oʻ) farqsiz, kirill yozuv lotinga o'giriladi; so'rovdagi hamma so'z topilishi shart. Sarlavha boshidan topilgani birinchi, keyin so'z boshidan, keyin izoh/kalit so'zlardan. Natijalar turi bo'yicha guruhlanadi (eng mos guruh tepada), topilgan qism belgilanadi.
 - O'quvchiga boshqa guruh ma'lumoti, yopiq test/vazifa belgisi va mahsulotning so'mdagi narxi berilmaydi.
+
+### [2026-10-17] D1: Kelmaganlarga jarima dars tugagach
+- QR sessiya dars tugashidan oldin yopilsa, belgilanmaganlar darhol "kelmagan" bo'ladi, lekin −5 coin jadval bo'yicha dars tugagach olinadi (`finalizeEndedSessions`, har 5 daqiqalik cron va mentor sahifalari chaqiradi). Shu orada "kechikkan" deb belgilangan o'quvchi faqat +3 oladi — undan oldin coin olinib, keyin qaytarilmaydi. Dars tugagandan keyin yopilsa — darhol yakunlanadi (avvalgidek). Mentor "Hozir yakunlash" bilan kutmay yakunlay oladi. Qo'lda kiritilgan darslar avvalgidek mentorning "Yakunlash" tugmasi bilan.
+- Kelmaganlarni birdan "sababli" qilish (`bulkSetAttendanceStatusAction`): ochiq sessiya ekranida ham, yopilgan dars sahifasida ham; ro'yxatdan keraksizini olib tashlash mumkin. Faqat shu guruh o'quvchilari.
+- Oldindan "sababli"/"kelmagan" deb belgilangan o'quvchi keyin kelib QR yoki kod kiritsa — "kelgan" bo'ladi (+5).

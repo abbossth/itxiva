@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ClipboardCheck, Download, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, Download, Search, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { triggerDownload } from "@/lib/xlsx-client";
 import { cn, formatDateUz, formatTimeUz } from "@/lib/utils";
 import { UZ_WEEKDAYS, getTashkentParts } from "@/lib/schedule";
 import type { AttendanceStatus } from "@/lib/db/models/attendance-record.model";
+import { ExcuseStudentsDialog } from "@/components/attendance/excuse-students-dialog";
 
 const METHOD_LABEL = { qr: "QR", code: "Kod", manual: "Qo'lda" } as const;
 
@@ -41,6 +42,8 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<AttendanceStatus | "all">("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [isExcuseOpen, setIsExcuseOpen] = useState(false);
+  const penaltyAt = detail.session.penaltyAt;
 
   const counts = useMemo(() => {
     const c: Record<AttendanceStatus, number> = { present: 0, late: 0, excused: 0, absent: 0 };
@@ -49,6 +52,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
   }, [roster]);
 
   const attended = counts.present + counts.late;
+  const absentRows = roster.filter((r) => (r.status ?? "absent") === "absent");
   // Sababli qoldirganlar foiz hisobiga kirmaydi (jurnal va hisobotlar bilan bir xil qoida)
   const counted = roster.length - counts.excused;
   const percent = counted > 0 ? Math.round((attended / counted) * 100) : 0;
@@ -189,8 +193,22 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         </div>
       )}
 
+      {/* Dars tugashidan oldin yopilgan dars: jarima dars tugagach avtomatik olinadi */}
+      {!isFinalized && penaltyAt && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-blue-500/40 bg-blue-50 dark:bg-blue-500/10 p-4">
+          <Clock className="w-5 h-5 shrink-0 text-blue-700 dark:text-blue-300" />
+          <div className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">
+            <span className="font-bold">Jarima dars tugagach ({formatTimeUz(penaltyAt)}) olinadi.</span> Kechikib kelganlarni
+            &quot;Kechikkan&quot; deb belgilang — ulardan {formatCoinDelta(rules.absent)} coin olinmaydi.
+          </div>
+          <Button variant="secondary" onClick={handleFinalize} isLoading={isFinalizing} className="shrink-0 min-h-[44px]">
+            Hozir yakunlash
+          </Button>
+        </div>
+      )}
+
       {/* Qo'lda kiritilgan dars: jarima mentor belgilab bo'lgach qo'llanadi */}
-      {!isFinalized && (
+      {!isFinalized && !penaltyAt && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-500/50 bg-amber-50 dark:bg-amber-500/10 p-4">
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">
@@ -238,15 +256,22 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400 pointer-events-none" />
-        <Input
-          aria-label="O'quvchini qidirish"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="O'quvchini qidirish..."
-          className="pl-10"
-        />
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-slate-400 pointer-events-none" />
+          <Input
+            aria-label="O'quvchini qidirish"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="O'quvchini qidirish..."
+            className="pl-10"
+          />
+        </div>
+        {absentRows.length > 0 && (
+          <Button variant="secondary" onClick={() => setIsExcuseOpen(true)} className="shrink-0 min-h-[44px] text-blue-700 dark:text-blue-300">
+            Kelmaganlarni sababli qilish ({absentRows.length})
+          </Button>
+        )}
       </div>
 
       {/* Ro'yxat */}
@@ -307,6 +332,19 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           })
         )}
       </div>
+
+      {isExcuseOpen && (
+        <ExcuseStudentsDialog
+          sessionId={detail.session._id}
+          students={absentRows.map((r) => ({ id: r.studentId, fullName: r.fullName, login: r.login }))}
+          onClose={() => setIsExcuseOpen(false)}
+          onDone={(ids) => {
+            const done = new Set(ids);
+            setRoster((rows) => rows.map((r) => (done.has(r.studentId) ? { ...r, status: "excused" } : r)));
+            router.refresh();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={isConvertOpen}

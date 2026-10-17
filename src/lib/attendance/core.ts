@@ -6,7 +6,7 @@ import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { ATTENDANCE_COINS, coinRulesOf } from "@/lib/attendance-status";
-import { addDaysToKey, dateFromKey, isValidSchedule, toDateKey } from "@/lib/schedule";
+import { addDaysToKey, dateFromKey, isValidSchedule, toDateKey, type GroupSchedule } from "@/lib/schedule";
 import { notify } from "@/lib/notifications/notify";
 import { syncLevel } from "@/lib/gamification/award";
 
@@ -154,19 +154,29 @@ export async function applyAttendanceStatus(
   return { oldStatus, coinDelta };
 }
 
-/**
- * Darsni yakunlaydi: belgilanmagan o'quvchilar "kelmagan" bo'ladi va kelmaganlarga jarima qo'llanadi.
- * Bir sessiya uchun faqat bir marta ishlaydi.
- */
-export async function finalizeSession(sessionId: string | mongoose.Types.ObjectId): Promise<boolean> {
-  const now = new Date();
-  const session = await AttendanceSession.findOneAndUpdate(
-    { _id: sessionId, finalizedAt: null },
-    { $set: { finalizedAt: now } },
-    { returnDocument: "after" }
-  );
-  if (!session) return false;
+// Dars tugaganidan keyin sessiya shuncha vaqt ochiq qolishi mumkin
+const CLOSE_GRACE_MS = 30 * 60 * 1000;
+// Jadvali yo'q guruhda sessiya eng ko'pi bilan shuncha ochiq turadi (dars shu vaqtda tugagan hisoblanadi)
+const MAX_OPEN_MS = 3 * 60 * 60 * 1000;
 
+/** Darsning tugash vaqti: guruh jadvali bo'yicha; jadval bo'lmasa — boshlanganidan 3 soat keyin */
+export function lessonEndOf(
+  session: Pick<IAttendanceSession, "date" | "startTime">,
+  schedule: Partial<GroupSchedule> | null | undefined
+): Date {
+  return isValidSchedule(schedule)
+    ? dateFromKey(toDateKey(session.date), schedule.endTime)
+    : new Date(new Date(session.startTime).getTime() + MAX_OPEN_MS);
+}
+
+/** Sessiya guruhining jadvali bo'yicha dars tugash vaqti */
+export async function lessonEndForSession(session: Pick<IAttendanceSession, "groupId" | "date" | "startTime">): Promise<Date> {
+  const group = await Group.findById(session.groupId).select("schedule").lean();
+  return lessonEndOf(session, group?.schedule);
+}
+
+/** Belgilanmagan o'quvchilarga "kelmagan" yozuvi (jarimasiz — jarimani `finalizeSession` qo'llaydi) */
+async function markMissingAsAbsent(session: Pick<IAttendanceSession, "_id" | "groupId">, at: Date) {
   const [students, existing] = await Promise.all([
     User.find({ groupId: session.groupId, role: "student" }).select("_id").lean(),
     AttendanceRecord.find({ sessionId: session._id }).select("studentId").lean(),
@@ -181,7 +191,7 @@ export async function finalizeSession(sessionId: string | mongoose.Types.ObjectI
         groupId: session.groupId,
         status: "absent",
         method: "manual",
-        markedAt: now,
+        markedAt: at,
         coinsAwarded: 0,
         balanceDelta: 0,
       })),
@@ -191,6 +201,22 @@ export async function finalizeSession(sessionId: string | mongoose.Types.ObjectI
       if ((error as { code?: number })?.code !== 11000) throw error;
     });
   }
+}
+
+/**
+ * Darsni yakunlaydi: belgilanmagan o'quvchilar "kelmagan" bo'ladi va kelmaganlarga jarima qo'llanadi.
+ * Bir sessiya uchun faqat bir marta ishlaydi.
+ */
+export async function finalizeSession(sessionId: string | mongoose.Types.ObjectId): Promise<boolean> {
+  const now = new Date();
+  const session = await AttendanceSession.findOneAndUpdate(
+    { _id: sessionId, finalizedAt: null },
+    { $set: { finalizedAt: now } },
+    { returnDocument: "after" }
+  );
+  if (!session) return false;
+
+  await markMissingAsAbsent(session, now);
 
   const absent = await AttendanceRecord.find({ sessionId: session._id, status: "absent" });
   for (const record of absent) {
@@ -200,15 +226,22 @@ export async function finalizeSession(sessionId: string | mongoose.Types.ObjectI
   return true;
 }
 
-/** Ochiq sessiyani yopadi va yakunlaydi */
-export async function closeSession(sessionId: string | mongoose.Types.ObjectId, actorId?: string): Promise<boolean> {
+/**
+ * Ochiq sessiyani yopadi. Belgilanmaganlar darhol "kelmagan" bo'ladi, lekin jarima dars tugagach qo'llanadi:
+ * dars boshida yopilgan sessiyadan keyin kechikib kelgan o'quvchidan coin olinib, keyin qaytarilmasin.
+ */
+export async function closeSession(sessionId: string | mongoose.Types.ObjectId, actorId?: string, now: Date = new Date()): Promise<boolean> {
   const closed = await AttendanceSession.findOneAndUpdate(
     { _id: sessionId, status: "active" },
-    { $set: { status: "closed", endTime: new Date() } },
+    { $set: { status: "closed", endTime: now } },
     { returnDocument: "after" }
   );
   if (!closed) return false;
-  await finalizeSession(closed._id);
+  if (now.getTime() >= (await lessonEndForSession(closed)).getTime()) {
+    await finalizeSession(closed._id);
+  } else {
+    await markMissingAsAbsent(closed, now);
+  }
   const summary = await recomputeSummary(closed._id);
   await AuditLog.create({
     actorId: actorId ?? closed.mentorId,
@@ -218,32 +251,53 @@ export async function closeSession(sessionId: string | mongoose.Types.ObjectId, 
   return true;
 }
 
-// Dars tugaganidan keyin sessiya shuncha vaqt ochiq qolishi mumkin
-const CLOSE_GRACE_MS = 30 * 60 * 1000;
-// Jadvali yo'q guruhda sessiya eng ko'pi bilan shuncha ochiq turadi
-const MAX_OPEN_MS = 3 * 60 * 60 * 1000;
-
-/** Mentor yopishni unutgan sessiyalar: dars tugaganidan 30 daqiqa o'tgach yoki ertasi kuni avtomatik yopiladi */
+/**
+ * Mentor yopishni unutgan sessiyalar: dars tugaganidan 30 daqiqa o'tgach yoki ertasi kuni avtomatik yopiladi.
+ * Dars tugashidan oldin yopilgan sessiyalarda kelmaganlarga jarima ham shu yerda (dars tugagach) qo'llanadi.
+ */
 export async function closeExpiredSessions(now: Date = new Date()): Promise<number> {
   const active = await AttendanceSession.find({ status: "active" }).select("groupId date startTime").lean();
-  if (active.length === 0) return 0;
-
-  const groups = await Group.find({ _id: { $in: active.map((s) => s.groupId) } }).select("schedule").lean();
-  const scheduleOf = new Map(groups.map((g) => [g._id.toString(), g.schedule]));
-  const todayKey = toDateKey(now);
-
   let closed = 0;
-  for (const s of active) {
-    const dateKey = toDateKey(s.date);
-    const schedule = scheduleOf.get(s.groupId.toString());
-    const expiresAt = isValidSchedule(schedule)
-      ? dateFromKey(dateKey, schedule.endTime).getTime() + CLOSE_GRACE_MS
-      : new Date(s.startTime).getTime() + MAX_OPEN_MS;
-    if (dateKey !== todayKey || now.getTime() > expiresAt) {
-      if (await closeSession(s._id)) closed++;
+  if (active.length > 0) {
+    const groups = await Group.find({ _id: { $in: active.map((s) => s.groupId) } }).select("schedule").lean();
+    const scheduleOf = new Map(groups.map((g) => [g._id.toString(), g.schedule]));
+    const todayKey = toDateKey(now);
+
+    for (const s of active) {
+      const schedule = scheduleOf.get(s.groupId.toString());
+      const expiresAt = lessonEndOf(s, schedule).getTime() + (isValidSchedule(schedule) ? CLOSE_GRACE_MS : 0);
+      if (toDateKey(s.date) !== todayKey || now.getTime() > expiresAt) {
+        if (await closeSession(s._id, undefined, now)) closed++;
+      }
     }
   }
+  await finalizeEndedSessions(now);
   return closed;
+}
+
+/**
+ * Dars tugashidan oldin yopilgan (QR) sessiyalar: dars tugagach kelmaganlarga jarima qo'llanadi.
+ * Qo'lda kiritilgan darslar bunga kirmaydi — ularni mentor "Yakunlash" bilan o'zi yakunlaydi.
+ */
+export async function finalizeEndedSessions(now: Date = new Date()): Promise<number> {
+  const waiting = await AttendanceSession.find({
+    status: "closed",
+    finalizedAt: null,
+    coinRules: { $ne: null },
+    isManual: { $ne: true },
+  })
+    .select("groupId date startTime")
+    .lean();
+  if (waiting.length === 0) return 0;
+
+  const groups = await Group.find({ _id: { $in: waiting.map((s) => s.groupId) } }).select("schedule").lean();
+  const scheduleOf = new Map(groups.map((g) => [g._id.toString(), g.schedule]));
+  let finalized = 0;
+  for (const s of waiting) {
+    if (now.getTime() < lessonEndOf(s, scheduleOf.get(s.groupId.toString())).getTime()) continue;
+    if (await finalizeSession(s._id)) finalized++;
+  }
+  return finalized;
 }
 
 /** Guruhning shu kundagi sessiyasi (bo'lsa) */

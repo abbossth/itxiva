@@ -23,7 +23,7 @@ import {
   getTashkentParts,
 } from "@/lib/schedule";
 import mongoose from "mongoose";
-import { ATTENDANCE_COINS, coinRulesOf, type AttendanceCoinRules } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, coinRulesOf, type AttendanceCoinRules } from "@/lib/attendance-status";
 import {
   applyAttendanceStatus,
   closeExpiredSessions,
@@ -32,6 +32,7 @@ import {
   finalizeSession,
   findSessionOnDay,
   isSessionFinalized,
+  lessonEndOf,
   recomputeSummary,
   settleRecordCoins,
 } from "@/lib/attendance/core";
@@ -258,6 +259,8 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
     0,
     attSession.rotateIntervalSeconds - elapsedSeconds
   );
+  // Kelmaganlardan jarima shu vaqtda olinadi (sessiya undan oldin yopilsa ham)
+  const lessonEndsAt = lessonEndOf(attSession, group?.schedule).toISOString();
 
   return {
     session: JSON.parse(JSON.stringify(attSession)) as ProjectorSessionData,
@@ -268,6 +271,7 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
     qrDataUrl,
     deepLink,
     secondsRemaining,
+    lessonEndsAt,
   };
 }
 
@@ -390,10 +394,26 @@ export async function markAttendanceAction(params: {
     studentId: effectiveUserId,
   });
 
-  if (existingRecord) {
+  if (existingRecord && ATTENDED.includes(existingRecord.status)) {
     return {
       success: false,
       message: "Siz ushbu dars uchun allaqachon davomatdan o'tgansiz!",
+    };
+  }
+  // Mentor oldindan "sababli" yoki "kelmagan" deb belgilagan, lekin o'quvchi kelib davomatdan o'tdi — kelgan
+  if (existingRecord) {
+    existingRecord.status = "present";
+    existingRecord.method = method;
+    existingRecord.markedAt = now;
+    const coinsEarned = await settleRecordCoins(activeSession, existingRecord, {
+      silent: true,
+      description: `Dars davomati uchun (${method === "qr" ? "QR kod" : "Kiritilgan kod"})`,
+    });
+    await recomputeSummary(activeSession._id);
+    return {
+      success: true,
+      message: coinsEarned > 0 ? `Davomat belgilandi! Sizga +${coinsEarned} coin berildi.` : "Davomat belgilandi!",
+      data: { coinsEarned, markedAt: now },
     };
   }
 
@@ -607,6 +627,48 @@ export async function manualUpdateAttendanceAction(params: {
   return { success: true, message: "Davomat o'zgartirildi" };
 }
 
+/**
+ * Bir nechta o'quvchining holatini birdan o'zgartiradi (masalan, kelmaganlarni "sababli" qilish).
+ * Ochiq sessiyada ham ishlaydi: belgilangan o'quvchi keyin kelib QR o'tsa, "kelgan" bo'ladi.
+ */
+export async function bulkSetAttendanceStatusAction(params: {
+  sessionId: string;
+  studentIds: string[];
+  status: AttendanceStatus;
+}): Promise<ActionResult<{ changed: number }>> {
+  const session = await requireMentor();
+  if (!mongoose.isValidObjectId(params?.sessionId) || !STATUS_VALUES.includes(params.status)) {
+    return { success: false, message: "Sessiya topilmadi" };
+  }
+  const ids = Array.isArray(params.studentIds) ? [...new Set(params.studentIds.filter((id) => mongoose.isValidObjectId(id)))] : [];
+  if (ids.length === 0) return { success: false, message: "O'quvchi tanlanmagan" };
+  if (ids.length > 200) return { success: false, message: "Juda ko'p o'quvchi tanlandi" };
+  await connectToDatabase();
+
+  const attSession = await AttendanceSession.findById(params.sessionId);
+  if (!attSession) return { success: false, message: "Sessiya topilmadi" };
+  // Faqat shu guruh o'quvchilari (yoki shu darsda yozuvi bor, keyin ko'chirilganlar)
+  const [students, recorded] = await Promise.all([
+    User.find({ _id: { $in: ids }, role: "student", groupId: attSession.groupId }).select("_id").lean(),
+    AttendanceRecord.find({ sessionId: attSession._id, studentId: { $in: ids } }).select("studentId").lean(),
+  ]);
+  const allowed = new Set([...students.map((st) => st._id.toString()), ...recorded.map((r) => r.studentId.toString())]);
+
+  let changed = 0;
+  for (const id of ids) {
+    if (!allowed.has(id)) continue;
+    const { oldStatus } = await applyAttendanceStatus(attSession, id, params.status);
+    if (oldStatus !== params.status) changed++;
+  }
+  await recomputeSummary(attSession._id);
+  await AuditLog.create({
+    actorId: session.userId,
+    action: "MANUAL_ATTENDANCE",
+    details: { sessionId: params.sessionId, newStatus: params.status, students: changed, bulk: true },
+  });
+  return { success: true, message: `${changed} ta o'quvchi «${ATTENDANCE_STATUS_META[params.status].label.toLowerCase()}» deb belgilandi`, data: { changed } };
+}
+
 export interface SessionRosterRow {
   studentId: string;
   fullName: string;
@@ -633,6 +695,8 @@ export interface SessionDetail {
     isManual: boolean;
     /** Eski coin qoidasida olingan dars — mentor uni joriy qoidaga o'tkazishi mumkin */
     isLegacyRules: boolean;
+    /** Dars tugashidan oldin yopilgan QR dars: kelmaganlardan jarima shu vaqtda avtomatik olinadi */
+    penaltyAt: string | null;
   };
   group: { _id: string; name: string; grade: number } | null;
   roster: SessionRosterRow[];
@@ -650,7 +714,7 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
   if (!attSession) return null;
 
   const [group, students, records] = await Promise.all([
-    Group.findById(attSession.groupId).select("name grade").lean(),
+    Group.findById(attSession.groupId).select("name grade schedule").lean(),
     User.find({ groupId: attSession.groupId, role: "student" }).select("fullName login").lean(),
     AttendanceRecord.find({ sessionId }).populate("studentId", "fullName login").lean(),
   ]);
@@ -696,6 +760,8 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
       isFinalized: isSessionFinalized(attSession),
       isManual: Boolean(attSession.isManual),
       isLegacyRules: !attSession.coinRules,
+      penaltyAt:
+        !isSessionFinalized(attSession) && !attSession.isManual ? lessonEndOf(attSession, group?.schedule).toISOString() : null,
     },
     group: group ? { _id: group._id.toString(), name: group.name, grade: group.grade } : null,
     roster: [...rows.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),
