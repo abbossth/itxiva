@@ -2,21 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Sonni 0 dan sanab chiqadi. "Harakatni kamaytirish" yoqilgan bo'lsa darhol yakuniy qiymat ko'rinadi */
+/**
+ * Sonni sanab chiqadi: birinchi marta 0 dan, keyin qiymat o'zgarsa (masalan, reytingda XP → coin almashtirilganda
+ * sahifa qayta yuklanmaydi, komponent saqlanib qoladi) eski qiymatdan yangisiga.
+ * "Harakatni kamaytirish" yoqilgan bo'lsa darhol yakuniy qiymat ko'rinadi.
+ */
 export function CountUp({ value, duration = 900, className }: { value: number; duration?: number; className?: string }) {
   const [shown, setShown] = useState(value);
-  const started = useRef(false);
+  // Ekranda oxirgi ko'rsatilgan son: animatsiya to'xtatilsa ham keyingisi shu yerdan davom etadi
+  const shownRef = useRef(0);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    if (value === 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const from = shownRef.current;
+    const instant = from === value || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frame = 0;
     const start = performance.now();
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
+      const t = instant ? 1 : Math.min(1, (now - start) / duration);
       // ease-out: oxirida sekinlashadi
-      setShown(Math.round(value * (1 - Math.pow(1 - t, 3))));
+      const next = Math.round(from + (value - from) * (1 - Math.pow(1 - t, 3)));
+      shownRef.current = next;
+      setShown(next);
       if (t < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
