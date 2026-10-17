@@ -29,10 +29,13 @@ export function Header({ user, balance = null }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-bg/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Logo size="sm" href="/" animated />
+        <div className="flex min-w-0 items-center gap-2 sm:gap-4 lg:gap-8">
+          <Logo size="sm" href="/" animated />
+          {/* Qidiruv chapda — sahifa va amallarni topish uchun */}
+          <SearchButton className="lg:w-72" />
+        </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SearchButton />
           {/* Juda tor ekranda (o'quvchida balans ham bor) kun/tun tugmasi pastki varaqqa o'tadi */}
           <div className={balance !== null ? "hidden min-[420px]:block" : undefined}>
             <ThemeToggle />

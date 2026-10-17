@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const OPEN_EVENT = "itxiva:open-palette";
 
@@ -20,8 +21,8 @@ function useIsApple(): boolean {
   );
 }
 
-/** Sarlavhadagi qidiruv tugmasi: palitrani ochadi */
-export function SearchButton() {
+/** Sarlavhadagi qidiruv tugmasi: palitrani ochadi. Katta ekranda qidiruv maydoni ko'rinishida (header'ning chap tomonida) */
+export function SearchButton({ className }: { className?: string } = {}) {
   const shortcut = useIsApple() ? "⌘K" : "Ctrl K";
   return (
     <button
@@ -29,11 +30,14 @@ export function SearchButton() {
       onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
       aria-label={`Qidirish (${shortcut})`}
       aria-keyshortcuts="Control+K Meta+K"
-      className="flex items-center gap-2 min-h-[44px] sm:min-h-[40px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface px-3 text-xs text-slate-500 dark:text-slate-400 hover:border-teal-500/50 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
+      className={cn(
+        "flex items-center gap-2 min-h-[44px] sm:min-h-[40px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-surface px-3 text-xs text-slate-500 dark:text-slate-400 hover:border-teal-500/50 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer",
+        className
+      )}
     >
       <Search className="w-4 h-4 shrink-0" />
-      <span className="hidden lg:inline">Qidirish</span>
-      <kbd className="hidden lg:inline rounded-md border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+      <span className="hidden lg:inline">Sahifa yoki amalni qidirish…</span>
+      <kbd className="hidden lg:inline ml-auto rounded-md border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
         {shortcut}
       </kbd>
     </button>
