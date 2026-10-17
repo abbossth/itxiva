@@ -15,6 +15,7 @@ import { ProductImage } from "@/components/shop/product-image";
 import { createOrderAction, ShopProduct } from "@/actions/shop.actions";
 import { PriceTag, SaleOverlay } from "@/components/shop/price-tag";
 import { activeSale, effectivePrice } from "@/lib/shop-sale";
+import { announceBalance } from "@/lib/rewards-client";
 import { cn } from "@/lib/utils";
 
 interface ShopCatalogProps {
@@ -40,6 +41,7 @@ export function ShopCatalog({ products, initialBalance, activeOrders }: ShopCata
       const res = await createOrderAction(selected._id, effectivePrice(selected));
       if (res.success && res.data) {
         setBalance(res.data.balance);
+        announceBalance(res.data.balance);
         if (selected.stock !== null) {
           setStockOverrides((prev) => ({ ...prev, [selected._id]: (prev[selected._id] ?? selected.stock ?? 1) - 1 }));
         }

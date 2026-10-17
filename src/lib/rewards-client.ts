@@ -8,3 +8,11 @@ export function requestRewardCheck(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(REWARD_CHECK_EVENT));
 }
+
+/** Balans o'zgardi (xarid, mukofot): header'dagi coin soni darhol yangilanadi */
+export const BALANCE_EVENT = "itxiva:balance";
+
+export function announceBalance(balance: number): void {
+  if (typeof window === "undefined" || !Number.isFinite(balance)) return;
+  window.dispatchEvent(new CustomEvent<number>(BALANCE_EVENT, { detail: balance }));
+}

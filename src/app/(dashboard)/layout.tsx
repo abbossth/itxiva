@@ -10,6 +10,8 @@ import { SIDEBAR_COOKIE } from "@/components/layout/nav-links";
 import { getOrdersBadgeCount } from "@/actions/shop.actions";
 import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 import { getAppSettings } from "@/lib/settings";
+import { connectToDatabase } from "@/lib/db/connect";
+import { User } from "@/lib/db/models/user.model";
 import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
@@ -30,15 +32,18 @@ export default async function DashboardLayout({
   if (session.mustChangePassword) {
     redirect("/change-password");
   }
+  await connectToDatabase();
 
-  const [orders, homework, quests, cookieStore, settings, levelState] = await Promise.all([
+  const [orders, homework, quests, cookieStore, settings, levelState, me] = await Promise.all([
     getOrdersBadgeCount(),
     getHomeworkBadgeCount(),
     getQuestsBadgeCount(),
     cookies(),
     getAppSettings(),
     getStudentLevelState(),
+    session.role === "student" ? User.findById(session.userId).select("spendableBalance").lean() : null,
   ]);
+  const balance = session.role === "student" ? me?.spendableBalance ?? 0 : null;
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const gamification = settings.gamification.enabled;
@@ -56,7 +61,7 @@ export default async function DashboardLayout({
       )}
 
       {/* Sticky Top Header */}
-      <Header user={session} />
+      <Header user={session} balance={balance} />
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">

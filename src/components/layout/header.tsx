@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/actions/auth.actions";
+import { HeaderBalance } from "@/components/layout/header-balance";
 
 interface HeaderProps {
   user: {
@@ -18,9 +19,11 @@ interface HeaderProps {
     role: "mentor" | "student";
     login: string;
   };
+  /** O'quvchining sarflanadigan coin balansi (mentorda — yo'q) */
+  balance?: number | null;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, balance = null }: HeaderProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   return (
@@ -28,9 +31,14 @@ export function Header({ user }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <Logo size="sm" href="/" animated />
 
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <SearchButton />
-          <ThemeToggle />
+          {/* Juda tor ekranda (o'quvchida balans ham bor) kun/tun tugmasi pastki varaqqa o'tadi */}
+          <div className={balance !== null ? "hidden min-[420px]:block" : undefined}>
+            <ThemeToggle />
+          </div>
+          {/* Server qiymati o'zgarsa (sahifa yangilanganda) komponent yangidan boshlanadi */}
+          {balance !== null && <HeaderBalance key={balance} initial={balance} />}
 
           {/* Desktop: ism va rol — bosilsa profil ochiladi (mobilda pastki varaqdan) */}
           <Link
@@ -111,6 +119,13 @@ export function Header({ user }: HeaderProps) {
               </div>
             </div>
           </div>
+
+          {balance !== null && (
+            <div className="flex min-[420px]:hidden items-center justify-between gap-3 rounded-xl px-3 min-h-[44px] text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <span>Kun / tun rejimi</span>
+              <ThemeToggle />
+            </div>
+          )}
 
           {/* Navigation Links in Sheet */}
           <div className="space-y-1">

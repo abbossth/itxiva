@@ -8,7 +8,7 @@ import { COIN_TYPE_COLORS } from "@/lib/coin-types";
 import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 import { playRewardSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
-import { LEVEL_UP_CLOSED_EVENT, REWARD_CHECK_EVENT } from "@/lib/rewards-client";
+import { LEVEL_UP_CLOSED_EVENT, REWARD_CHECK_EVENT, announceBalance } from "@/lib/rewards-client";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 /** Sahifa almashganda yoki oynaga qaytilganda tekshiruvlar orasidagi eng kam vaqt */
@@ -38,6 +38,7 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
       if (r && !open.current) {
         open.current = true;
         setReward(r);
+        announceBalance(r.balance);
       }
     } catch {
       // Tabrik chiqmasa ham sahifa ishlayveradi
