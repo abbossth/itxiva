@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { prefetchSearchIndex } from "./search-index";
 
 const OPEN_EVENT = "itxiva:open-palette";
 
@@ -21,13 +22,16 @@ function useIsApple(): boolean {
   );
 }
 
-/** Sarlavhadagi qidiruv tugmasi: palitrani ochadi. Katta ekranda qidiruv maydoni ko'rinishida (header'ning chap tomonida) */
+/** Sarlavhadagi qidiruv tugmasi: palitrani ochadi. Darslar, materiallar va sahifalarni qidirish. Katta ekranda qidiruv maydoni ko'rinishida (header'ning chap tomonida) */
 export function SearchButton({ className }: { className?: string } = {}) {
   const shortcut = useIsApple() ? "⌘K" : "Ctrl K";
   return (
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+      // Ro'yxat bosilishidan oldin yuklanib qo'yiladi — palitra ochilganda natijalar tayyor
+      onPointerEnter={prefetchSearchIndex}
+      onFocus={prefetchSearchIndex}
       aria-label={`Qidirish (${shortcut})`}
       aria-keyshortcuts="Control+K Meta+K"
       className={cn(
@@ -36,7 +40,7 @@ export function SearchButton({ className }: { className?: string } = {}) {
       )}
     >
       <Search className="w-4 h-4 shrink-0" />
-      <span className="hidden lg:inline">Sahifa yoki amalni qidirish…</span>
+      <span className="hidden lg:inline truncate">Dars, material, sahifa…</span>
       <kbd className="hidden lg:inline ml-auto rounded-md border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
         {shortcut}
       </kbd>

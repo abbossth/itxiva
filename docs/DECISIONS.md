@@ -272,3 +272,9 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Kartalar: narx katta (tanga + raqam), chegirmada eski narx chizilgan, foiz, rasm ustida "−30%" va "Chegirma: 2 kun qoldi"; yetmasa — balans/narx chizig'i.
 - Reyting: gamifikatsiya yoqilganda "XP bo'yicha / Coin bo'yicha" almashtirgich (`?metric=coin`); sukutda XP. Filtr havolalari tanlovni saqlaydi.
 - Sarlavhadagi ism kartasi bosilsa profil ochiladi.
+
+### [2026-10-17] U1: Platforma bo'yicha qidiruv
+- Qidiruv (Ctrl/⌘ K) endi sahifa va amallardan tashqari ma'lumotni ham topadi. O'quvchi: o'z guruhining nashr etilgan darslari, materiallari, imtihonlari, ochiq topshiriqlar va do'kon. Mentor: hamma darslar (qoralamalar ham), materiallar, imtihonlar, topshiriqlar, mahsulotlar, guruhlar va o'quvchilar.
+- Ro'yxat bitta so'rov bilan olinadi (`getSearchIndex`) va brauzer xotirasida 2 daqiqa turadi; har bosilgan harf serverga bormaydi, natija bir zumda. Tugmaga sichqoncha kelganda oldindan yuklanadi.
+- Solishtirish (`src/lib/search.ts`): registr, apostrof (o'/oʻ) farqsiz, kirill yozuv lotinga o'giriladi; so'rovdagi hamma so'z topilishi shart. Sarlavha boshidan topilgani birinchi, keyin so'z boshidan, keyin izoh/kalit so'zlardan. Natijalar turi bo'yicha guruhlanadi (eng mos guruh tepada), topilgan qism belgilanadi.
+- O'quvchiga boshqa guruh ma'lumoti, yopiq test/vazifa belgisi va mahsulotning so'mdagi narxi berilmaydi.
