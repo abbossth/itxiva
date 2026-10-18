@@ -103,7 +103,7 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
               key={l.level}
               aria-current={l.state === "current" ? "step" : undefined}
               className={cn(
-                "flex items-center gap-2.5 rounded-xl border px-3 py-2.5",
+                "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 cursor-default transition-colors hover:border-teal-500/40",
                 l.state === "current" && "border-teal-600 bg-teal-600 text-white",
                 l.state === "passed" && "border-slate-200 dark:border-slate-800",
                 l.state === "future" && "border-transparent bg-slate-50 dark:bg-slate-900/50",

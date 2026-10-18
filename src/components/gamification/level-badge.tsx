@@ -156,68 +156,94 @@ export function LevelBadge({
   const i = Math.min(10, Math.max(1, level)) - 1;
   const label = `${level}-daraja: ${LEVEL_NAMES[i]} (${LEVEL_MATERIALS[i].toLowerCase()})`;
 
+  // Ustiga borilganda (o'zi yoki `group` ota elementi): yetilmagan daraja ham o'z rangida, nur va yulduzchalar bilan
+  // ko'rinadi, emblema kattalashib yorqinroq porlaydi
+  const glowColor = tier.glow ?? "rgba(255,255,255,0.35)";
+  const reveal = locked ? "opacity-0 group-hover:opacity-100 group-hover/lv:opacity-100" : "";
+
   return (
     <span
       role="img"
       aria-label={label}
       title={label}
-      className={cn("relative inline-grid shrink-0 place-items-center", s.box, locked && "opacity-45 grayscale", className)}
-      style={!locked && tier.glow ? { filter: `drop-shadow(0 0 ${s.glow}px ${tier.glow})` } : undefined}
+      className={cn(
+        "group/lv relative inline-grid shrink-0 place-items-center transition-[transform,filter] duration-300 ease-out",
+        "[filter:var(--lv-glow)] group-hover:[filter:var(--lv-glow-hover)] hover:[filter:var(--lv-glow-hover)] group-hover:scale-110 hover:scale-110 motion-reduce:group-hover:scale-100 motion-reduce:hover:scale-100",
+        s.box,
+        className
+      )}
+      style={
+        {
+          "--lv-glow": !locked && tier.glow ? `drop-shadow(0 0 ${s.glow}px ${tier.glow})` : "none",
+          "--lv-glow-hover": `drop-shadow(0 0 ${Math.round(s.glow * 1.8)}px ${glowColor}) brightness(1.12) saturate(1.15)`,
+        } as React.CSSProperties
+      }
     >
-      {!locked && tier.aura && (
+      <span
+        className={cn(
+          "absolute inset-0 grid place-items-center transition-[opacity,filter] duration-300",
+          locked && "opacity-45 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover/lv:opacity-100 group-hover/lv:grayscale-0"
+        )}
+      >
+        {tier.aura && (
+          <span
+            aria-hidden
+            className={cn("absolute -inset-[14%] rounded-full opacity-80 blur-[1.5px] transition-opacity duration-300 motion-safe:animate-[spin_7s_linear_infinite]", reveal)}
+            style={{ background: tier.aura, mask: "radial-gradient(circle, transparent 54%, black 58%)", WebkitMask: "radial-gradient(circle, transparent 54%, black 58%)" }}
+          />
+        )}
+        {/* Gardish: metall, ustida yorug' chiziq */}
+        <span aria-hidden className="absolute inset-0 rounded-full shadow-[inset_0_-2px_3px_rgba(0,0,0,0.35)]" style={{ background: tier.rim }} />
+        <span aria-hidden className="absolute inset-[4%] rounded-full bg-gradient-to-b from-white/45 via-transparent to-transparent" />
+        {/* Yuz: material */}
         <span
           aria-hidden
-          className="absolute -inset-[14%] rounded-full opacity-80 blur-[1.5px] motion-safe:animate-[spin_7s_linear_infinite]"
-          style={{ background: tier.aura, mask: "radial-gradient(circle, transparent 54%, black 58%)", WebkitMask: "radial-gradient(circle, transparent 54%, black 58%)" }}
-        />
-      )}
-      {/* Gardish: metall, ustida yorug' chiziq */}
-      <span aria-hidden className="absolute inset-0 rounded-full shadow-[inset_0_-2px_3px_rgba(0,0,0,0.35)]" style={{ background: tier.rim }} />
-      <span aria-hidden className="absolute inset-[4%] rounded-full bg-gradient-to-b from-white/45 via-transparent to-transparent" />
-      {/* Yuz: material */}
-      <span
-        aria-hidden
-        className="absolute inset-[13%] overflow-hidden rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.5)]"
-        style={{ background: tier.face }}
-      >
-        {tier.facets && (
+          className="absolute inset-[13%] overflow-hidden rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.45),0_1px_0_rgba(255,255,255,0.5)]"
+          style={{ background: tier.face }}
+        >
+          {tier.facets && (
+            <span
+              className="absolute inset-0 mix-blend-overlay"
+              style={{ background: "repeating-conic-gradient(from 11deg, rgba(255,255,255,0.55) 0deg 22.5deg, rgba(0,0,0,0.25) 22.5deg 45deg)" }}
+            />
+          )}
+          {tier.stars && (
+            <span
+              className="absolute inset-0 opacity-90"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle, #fff 0.6px, transparent 1.2px), radial-gradient(circle, rgba(255,255,255,0.7) 0.5px, transparent 1px)",
+                backgroundSize: "28% 28%, 19% 19%",
+                backgroundPosition: "0 0, 9% 13%",
+              }}
+            />
+          )}
+          <span className="absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-black/20" />
+          {/* Yaltirash: har darajada bor, yuqorida — yorqinroq va tez-tez; ustiga borilganda — yana bitta tezkor chaqnash */}
           <span
-            className="absolute inset-0 mix-blend-overlay"
-            style={{ background: "repeating-conic-gradient(from 11deg, rgba(255,255,255,0.55) 0deg 22.5deg, rgba(0,0,0,0.25) 22.5deg 45deg)" }}
-          />
-        )}
-        {tier.stars && (
-          <span
-            className="absolute inset-0 opacity-90"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, #fff 0.6px, transparent 1.2px), radial-gradient(circle, rgba(255,255,255,0.7) 0.5px, transparent 1px)",
-              backgroundSize: "28% 28%, 19% 19%",
-              backgroundPosition: "0 0, 9% 13%",
-            }}
-          />
-        )}
-        <span className="absolute inset-0 bg-gradient-to-br from-white/35 via-transparent to-black/20" />
-        {/* Yaltirash: har darajada bor, yuqorida — yorqinroq va tez-tez */}
-        {!locked && (
-          <span
-            className="level-glint absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent motion-reduce:hidden"
+            className={cn("level-glint absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent motion-reduce:hidden", reveal)}
             style={{ opacity: 0.25 + level * 0.06, animationDuration: `${Math.max(1.8, 4.6 - level * 0.28)}s`, animationDelay: `${(level % 4) * 0.35}s` }}
           />
-        )}
-      </span>
-      <Icon aria-hidden className={cn("relative drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.45)]", tier.ink, s.icon)} strokeWidth={2.4} />
-      {/* Chaqnoq yulduzchalar: 3-darajadan bittadan boshlab, 10-darajada beshta */}
-      {!locked &&
-        size !== "xs" &&
-        TWINKLES.slice(0, twinkleCount(level)).map((t, i) => (
-          <Sparkle
-            key={i}
-            aria-hidden
-            className="reward-twinkle pointer-events-none absolute fill-white text-white drop-shadow-[0_0_3px_rgba(255,255,255,0.9)] motion-reduce:hidden"
-            style={{ left: t.left, top: t.top, width: `${t.size}%`, height: `${t.size}%`, animationDelay: t.delay }}
+          <span
+            className="level-glint absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 transition-opacity group-hover:opacity-90 group-hover/lv:opacity-90 motion-reduce:hidden"
+            style={{ animationDuration: "1.1s" }}
           />
-        ))}
+        </span>
+        <Icon aria-hidden className={cn("relative drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.45)]", tier.ink, s.icon)} strokeWidth={2.4} />
+        {/* Chaqnoq yulduzchalar: 3-darajadan bittadan boshlab, 10-darajada beshta; ustiga borilganda — hammasi */}
+        {size !== "xs" &&
+          TWINKLES.map((t, i) => (
+            <Sparkle
+              key={i}
+              aria-hidden
+              className={cn(
+                "reward-twinkle pointer-events-none absolute fill-white text-white drop-shadow-[0_0_3px_rgba(255,255,255,0.9)] transition-opacity motion-reduce:hidden",
+                locked || i >= twinkleCount(level) ? "opacity-0 group-hover:opacity-100 group-hover/lv:opacity-100" : ""
+              )}
+              style={{ left: t.left, top: t.top, width: `${t.size}%`, height: `${t.size}%`, animationDelay: t.delay }}
+            />
+          ))}
+      </span>
       {s.pip && (
         <span
           aria-hidden
