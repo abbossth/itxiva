@@ -16,3 +16,22 @@ export function announceBalance(balance: number): void {
   if (typeof window === "undefined" || !Number.isFinite(balance)) return;
   window.dispatchEvent(new CustomEvent<number>(BALANCE_EVENT, { detail: balance }));
 }
+
+// Katta oynalar (mukofot, e'lon) bir-birining ustiga chiqmasin: bittasi ochiq bo'lsa, ikkinchisi u yopilishini kutadi
+export const OVERLAY_FREE_EVENT = "itxiva:overlay-free";
+
+export function overlayBusy(except?: string): boolean {
+  if (typeof document === "undefined") return false;
+  const current = document.body.dataset.overlay;
+  return Boolean(current) && current !== except;
+}
+
+export function claimOverlay(name: string): void {
+  document.body.dataset.overlay = name;
+}
+
+export function releaseOverlay(name: string): void {
+  if (document.body.dataset.overlay !== name) return;
+  delete document.body.dataset.overlay;
+  window.dispatchEvent(new Event(OVERLAY_FREE_EVENT));
+}

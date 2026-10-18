@@ -9,7 +9,7 @@ import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelBadge, XpBar, levelColor } from "@/components/gamification/level-badge";
 import type { LevelSummary } from "@/actions/gamification.actions";
 import { formatNumberUz } from "@/lib/utils";
 
@@ -142,9 +142,19 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level 
           href="/achievements"
           title={collapsed ? `${level.level}-daraja · ${level.name} · ${level.xp} XP` : undefined}
           className={cn(
-            "mt-4 flex items-center gap-3 rounded-2xl bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+            "mt-4 flex items-center gap-3 rounded-2xl border border-transparent bg-slate-100/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
             collapsed ? "justify-center p-1.5" : "p-3"
           )}
+          // Daraja rangidagi ramka: daraja oshgan sari yorqinroq
+          style={
+            level.level > 1
+              ? {
+                  borderColor: `color-mix(in srgb, ${levelColor(level.level)} ${25 + level.level * 6}%, transparent)`,
+                  background: `linear-gradient(135deg, color-mix(in srgb, ${levelColor(level.level)} ${4 + level.level * 1.5}%, transparent), transparent)`,
+                  boxShadow: level.level >= 6 ? `0 6px 22px -12px ${levelColor(level.level)}` : undefined,
+                }
+              : undefined
+          }
         >
           <LevelBadge level={level.level} />
           {!collapsed && (

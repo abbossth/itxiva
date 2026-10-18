@@ -17,6 +17,10 @@ import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
 import { RewardCelebration } from "@/components/gamification/reward-celebration";
 import { accentCss } from "@/lib/theme-accents";
+import { resolveAmbience } from "@/lib/ambience";
+import { toDateKey } from "@/lib/schedule";
+import { LevelBackdrop } from "@/components/layout/level-ambience";
+import { AnnouncementModal } from "@/components/announcements/announcement-modal";
 
 export default async function DashboardLayout({
   children,
@@ -41,16 +45,22 @@ export default async function DashboardLayout({
     cookies(),
     getAppSettings(),
     getStudentLevelState(),
-    session.role === "student" ? User.findById(session.userId).select("spendableBalance").lean() : null,
+    session.role === "student" ? User.findById(session.userId).select("spendableBalance celebrationsEnabled").lean() : null,
   ]);
   const balance = session.role === "student" ? me?.spendableBalance ?? 0 : null;
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const gamification = settings.gamification.enabled;
   const badges = { orders, homework, quests };
+  // Bezaklar: o'quvchi profilida effektlarni o'chirgan bo'lsa — ko'rsatilmaydi
+  const effectsOn = session.role !== "student" || me?.celebrationsEnabled !== false;
+  const ambience = effectsOn ? resolveAmbience(settings.ambience, toDateKey()) : null;
+  const studentLevel =
+    effectsOn && gamification && settings.ambience.levelEffects && session.role === "student" ? levelState?.summary.level ?? null : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-bg">
+    <div className="relative isolate min-h-screen flex flex-col bg-slate-50 dark:bg-bg">
+      {studentLevel && <LevelBackdrop level={studentLevel} />}
       {/* Mentor tanlagan asosiy rang: qiymatlar faqat koddagi tayyor shkalalardan olinadi */}
       {accentStyle && <style>{accentStyle}</style>}
       {/* Lokal ishlab chiqishda: bu yerdagi o'zgarishlar (masalan, parol tiklash) itxiva.uz ga ta'sir qilmaydi */}
@@ -61,7 +71,7 @@ export default async function DashboardLayout({
       )}
 
       {/* Sticky Top Header */}
-      <Header user={session} balance={balance} />
+      <Header user={session} balance={balance} ambience={ambience ?? undefined} level={studentLevel} />
 
       {/* Main body with sticky desktop sidebar */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
@@ -87,6 +97,9 @@ export default async function DashboardLayout({
 
       {/* Coin yoki XP olinganda: o'yindagidek tabrik (daraja oynasidan keyin) */}
       {session.role === "student" && <RewardCelebration waitForLevelUp={Boolean(levelState?.levelUp)} />}
+
+      {/* Mentor e'lonlari: kirishda modal oynada (daraja va mukofot oynalari bilan navbat bilan) */}
+      {session.role === "student" && <AnnouncementModal waitForLevelUp={Boolean(levelState?.levelUp)} effects={effectsOn} />}
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
       <CommandPaletteTrigger role={session.role} gamification={gamification} />

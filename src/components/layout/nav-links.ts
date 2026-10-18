@@ -20,6 +20,7 @@ import {
   ListChecks,
   Inbox,
   Coins,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,7 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
   { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
+  { href: "/mentor/announcements", label: "E'lonlar", shortLabel: "E'lon", icon: Megaphone },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
   { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },
   { href: "/profile", label: "Sozlamalar", shortLabel: "Sozlama", icon: Settings, match: ["/mentor/settings", "/mentor/import", "/mentor/audit"] },

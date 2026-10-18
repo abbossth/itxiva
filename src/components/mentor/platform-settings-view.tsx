@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive as ArchiveIcon, CalendarRange, Check, Palette, SlidersHorizontal, Sparkles, UserRoundPen } from "lucide-react";
+import { Archive as ArchiveIcon, CalendarRange, Check, Palette, SlidersHorizontal, Sparkles, UserRoundPen, Wand2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -11,6 +11,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArchiveView } from "@/components/mentor/archive-view";
 import { GamificationSettingsForm } from "@/components/mentor/gamification-settings-form";
+import { AmbienceSettingsForm } from "@/components/mentor/ambience-settings-form";
 import type { ArchiveItem } from "@/actions/archive.actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useToast } from "@/components/ui/toast";
@@ -30,7 +31,7 @@ export function PlatformSettingsView({
   settings: AppSettingsData;
   yearOptions: string[];
   archive: ArchiveItem[];
-  initialTab?: "general" | "archive" | "gamification";
+  initialTab?: "general" | "archive" | "gamification" | "ambience";
 }) {
   const [tab, setTab] = useState<string>(initialTab);
   const router = useRouter();
@@ -79,6 +80,10 @@ export function PlatformSettingsView({
             <Sparkles className="w-4 h-4 mr-1.5" />
             Gamifikatsiya
           </TabsTrigger>
+          <TabsTrigger value="ambience">
+            <Wand2 className="w-4 h-4 mr-1.5" />
+            Bezak
+          </TabsTrigger>
           <TabsTrigger value="archive">
             <ArchiveIcon className="w-4 h-4 mr-1.5" />
             Arxiv{archive.length > 0 ? ` (${archive.length})` : ""}
@@ -86,6 +91,9 @@ export function PlatformSettingsView({
         </TabsList>
         <TabsContent value="archive">
           <ArchiveView items={archive} />
+        </TabsContent>
+        <TabsContent value="ambience">
+          <AmbienceSettingsForm initial={settings.ambience} gamification={settings.gamification.enabled} />
         </TabsContent>
         <TabsContent value="gamification">
           <GamificationSettingsForm initial={settings.gamification} />

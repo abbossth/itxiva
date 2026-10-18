@@ -8,7 +8,15 @@ import { COIN_TYPE_COLORS } from "@/lib/coin-types";
 import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 import { playRewardSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
-import { LEVEL_UP_CLOSED_EVENT, REWARD_CHECK_EVENT, announceBalance } from "@/lib/rewards-client";
+import {
+  LEVEL_UP_CLOSED_EVENT,
+  OVERLAY_FREE_EVENT,
+  REWARD_CHECK_EVENT,
+  announceBalance,
+  claimOverlay,
+  overlayBusy,
+  releaseOverlay,
+} from "@/lib/rewards-client";
 import { flyCoins } from "@/lib/coin-flight";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -30,14 +38,15 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
   const open = useRef(false);
 
   const check = useCallback(async (force = false) => {
-    if (busy.current || open.current || blocked.current) return;
+    if (busy.current || open.current || blocked.current || overlayBusy("reward")) return;
     if (!force && Date.now() - lastCheck.current < THROTTLE_MS) return;
     busy.current = true;
     lastCheck.current = Date.now();
     try {
       const r = await getUnseenRewardsAction();
-      if (r && !open.current) {
+      if (r && !open.current && !overlayBusy("reward")) {
         open.current = true;
+        claimOverlay("reward");
         setReward(r);
       }
     } catch {
@@ -61,12 +70,17 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
       timers.push(setTimeout(() => void check(true), 600));
     };
     const onVisible = () => document.visibilityState === "visible" && void check();
+    // E'lon yopilgach — kutib turgan mukofot ko'rsatiladi
+    // (o'zi yopilganda takror ko'rsatmaslik uchun oddiy, cheklovli tekshiruv)
+    const onOverlayFree = () => timers.push(setTimeout(() => void check(), 500));
+    window.addEventListener(OVERLAY_FREE_EVENT, onOverlayFree);
     window.addEventListener(REWARD_CHECK_EVENT, onAction);
     window.addEventListener(LEVEL_UP_CLOSED_EVENT, onLevelClosed);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       timers.forEach(clearTimeout);
       window.removeEventListener(REWARD_CHECK_EVENT, onAction);
+      window.removeEventListener(OVERLAY_FREE_EVENT, onOverlayFree);
       window.removeEventListener(LEVEL_UP_CLOSED_EVENT, onLevelClosed);
       document.removeEventListener("visibilitychange", onVisible);
     };
@@ -83,6 +97,7 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
     }
     void acknowledgeRewardsAction(reward.until).catch(() => {});
     open.current = false;
+    releaseOverlay("reward");
     lastCheck.current = Date.now();
     setReward(null);
   }, [reward]);

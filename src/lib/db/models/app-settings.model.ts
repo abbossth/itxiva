@@ -14,6 +14,8 @@ export interface IAppSettings extends Document {
   studentProfileEdit?: boolean;
   /** Gamifikatsiya sozlamalari — `parseGamification` (src/lib/gamification/config.ts) bilan o'qiladi */
   gamification?: Record<string, unknown> | null;
+  /** Bezaklar (fasl effektlari, bayramlar, daraja bezagi) — `parseAmbience` (src/lib/ambience.ts) bilan o'qiladi */
+  ambience?: Record<string, unknown> | null;
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>(
@@ -24,6 +26,7 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     accent: { type: String, default: null, trim: true },
     studentProfileEdit: { type: Boolean, default: false },
     gamification: { type: Schema.Types.Mixed, default: null },
+    ambience: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

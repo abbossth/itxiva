@@ -76,6 +76,7 @@ const ICON_TONES: Record<GroupId, string> = {
 
 const MENTOR_ACTIONS: { href: string; label: string; keywords: string }[] = [
   { href: "/mentor/lessons/new", label: "Yangi dars yaratish", keywords: "dars qoshish lesson" },
+  { href: "/mentor/announcements/new", label: "Yangi e'lon (tabrik, xabar)", keywords: "elon e'lon xabar tabrik bayram yangi yil hayit announcement" },
   { href: "/mentor/groups", label: "Davomat ochish", keywords: "qr kod sessiya davomat jurnal" },
   { href: "/mentor/shop", label: "Do'konga mahsulot qo'shish", keywords: "mahsulot sovga" },
 ];

@@ -523,3 +523,36 @@ h1,
 }
 .level-tap { animation: level-tap 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 @media (prefers-reduced-motion: reduce) { .level-tap { animation: none; } }
+
+/* Fasl effektlari (header): zarrachalar yuqoridan tushadi yoki ko'tariladi — sekin va oz sonli */
+@keyframes amb-fall {
+  0% { transform: translate3d(0, -14px, 0) rotate(0deg); }
+  100% { transform: translate3d(var(--dx, 0px), 118px, 0) rotate(var(--rot, 0deg)); }
+}
+.amb-fall { animation: amb-fall 10s ease-in infinite; will-change: transform; }
+@keyframes amb-rise {
+  0% { transform: translateY(14px) scale(0.6); opacity: 0; }
+  35% { opacity: var(--o, 0.7); }
+  100% { transform: translateY(-34px) scale(1); opacity: 0; }
+}
+.amb-rise { animation: amb-rise 7s ease-out infinite; }
+@keyframes amb-bulb {
+  0%, 100% { opacity: 0.35; box-shadow: none; }
+  50% { opacity: 1; box-shadow: 0 0 6px 1px currentColor; }
+}
+.amb-bulb { animation: amb-bulb 1.8s ease-in-out infinite; }
+
+/* Daraja bezagi: header ostidagi chiziq bo'ylab yorug'lik yuradi */
+@keyframes level-line {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.level-line-glint { animation: level-line 5s ease-in-out infinite; }
+@keyframes level-float {
+  0%, 100% { transform: translateY(0); opacity: 0.25; }
+  50% { transform: translateY(-10px); opacity: 0.9; }
+}
+.level-float { animation: level-float 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .amb-fall, .amb-rise, .amb-bulb, .level-line-glint, .level-float { animation: none; display: none; }
+}

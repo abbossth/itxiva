@@ -12,6 +12,10 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/actions/auth.actions";
 import { HeaderBalance } from "@/components/layout/header-balance";
+import { HeaderAmbience } from "@/components/layout/ambience";
+import { LevelHeaderLine } from "@/components/layout/level-ambience";
+import { levelColor } from "@/components/gamification/level-badge";
+import type { Holiday, Season } from "@/lib/ambience";
 
 interface HeaderProps {
   user: {
@@ -21,14 +25,20 @@ interface HeaderProps {
   };
   /** O'quvchining sarflanadigan coin balansi (mentorda — yo'q) */
   balance?: number | null;
+  /** Fasl/bayram effekti (sozlamalardan) */
+  ambience?: { season: Season | null; holiday: Holiday };
+  /** O'quvchi darajasi (daraja bezagi yoqilgan bo'lsa): header chizig'i va profil ramkasi shu rangda */
+  level?: number | null;
 }
 
-export function Header({ user, balance = null }: HeaderProps) {
+export function Header({ user, balance = null, ambience, level = null }: HeaderProps) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-bg/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      {ambience && <HeaderAmbience season={ambience.season} holiday={ambience.holiday} />}
+      {level ? <LevelHeaderLine level={level} /> : null}
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-2 sm:gap-4 lg:gap-8">
           <Logo size="sm" href="/" animated />
           {/* Qidiruv chapda — sahifa va amallarni topish uchun */}
@@ -48,6 +58,15 @@ export function Header({ user, balance = null }: HeaderProps) {
             href="/profile"
             title="Mening profilim"
             className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/50 dark:border-slate-700/50 hover:border-teal-500/50 hover:bg-white dark:hover:bg-slate-800 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
+            // Daraja bezagi: profil kartasi ramkasi daraja rangida, yuqori darajada yorug'lik bilan
+            style={
+              level && level > 1
+                ? {
+                    borderColor: `color-mix(in srgb, ${levelColor(level)} ${30 + level * 5}%, transparent)`,
+                    boxShadow: level >= 5 ? `0 0 ${level * 2}px -4px ${levelColor(level)}` : undefined,
+                  }
+                : undefined
+            }
           >
             <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs">
               <UserIcon className="w-4 h-4" />

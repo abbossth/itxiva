@@ -9,6 +9,7 @@ import { isAcademicYear } from "@/lib/settings";
 import { isAccentId } from "@/lib/theme-accents";
 import { gamificationSettingsSchema } from "@/lib/validations/gamification.schema";
 import { ensureSystemQuests } from "@/lib/gamification/quests";
+import { parseAmbience, SEASON_MODES } from "@/lib/ambience";
 import type { ActionResult } from "./auth.actions";
 
 /** Joriy o'quv yili, chorak va asosiy rang — barcha foydalanuvchilar uchun */
@@ -54,4 +55,20 @@ export async function updateGamificationSettingsAction(input: unknown): Promise<
     success: true,
     message: parsed.data.enabled ? "Gamifikatsiya sozlamalari saqlandi" : "Saqlandi — gamifikatsiya o'chiq",
   };
+}
+
+/** Bezaklar: fasl effektlari (avtomatik / o'chiq / aniq fasl), bayram bezagi va o'quvchi darajasiga mos bezak */
+export async function updateAmbienceSettingsAction(input: unknown): Promise<ActionResult> {
+  const mentor = await requireMentor();
+  const raw = (input ?? {}) as Record<string, unknown>;
+  if (!SEASON_MODES.includes(raw.season as never) || typeof raw.levelEffects !== "boolean" || typeof raw.holidays !== "boolean") {
+    return { success: false, message: "Sozlama noto'g'ri" };
+  }
+  const ambience = parseAmbience(raw);
+
+  await connectToDatabase();
+  await AppSettings.updateOne({ key: "global" }, { $set: { ambience } }, { upsert: true });
+  await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_SETTINGS", details: { ambience } });
+  revalidatePath("/", "layout");
+  return { success: true, message: "Bezak sozlamalari saqlandi" };
 }

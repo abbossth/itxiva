@@ -4,6 +4,7 @@ import { AppSettings } from "@/lib/db/models/app-settings.model";
 import { DEFAULT_ACCENT, isAccentId } from "@/lib/theme-accents";
 import { toDateKey } from "@/lib/schedule";
 import { parseGamification, type GamificationSettings } from "@/lib/gamification/config";
+import { parseAmbience, type AmbienceSettings } from "@/lib/ambience";
 
 export interface AppSettingsData {
   academicYear: string;
@@ -12,6 +13,7 @@ export interface AppSettingsData {
   /** O'quvchilar o'z shaxsiy ma'lumotlarini tahrirlay oladi (sukutda yopiq) */
   studentProfileEdit: boolean;
   gamification: GamificationSettings;
+  ambience: AmbienceSettings;
 }
 
 const YEAR_RE = /^(\d{4})-(\d{4})$/;
@@ -52,5 +54,6 @@ export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
     accent: isAccentId(doc?.accent) ? doc!.accent! : DEFAULT_ACCENT,
     studentProfileEdit: doc?.studentProfileEdit === true,
     gamification: parseGamification(doc?.gamification),
+    ambience: parseAmbience(doc?.ambience),
   };
 });
