@@ -131,6 +131,17 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
     `/leaderboard?type=${type}${groupId && type === "group" ? `&groupId=${groupId}` : ""}${grade && type === "grade" ? `&grade=${grade}` : ""}${m === "coin" ? "&metric=coin" : ""}`;
   const leader = data.top3[0];
 
+  // O'quvchida o'z guruhi birinchi turadi (sukut ham shu), mentorda — umumiy reyting
+  const ownGroup = viewerGroupId ? groups.find((g) => g._id.toString() === viewerGroupId) : undefined;
+  const allTab = { type: "all" as const, label: "Umumiy", href: "/leaderboard?type=all" };
+  const groupTab = {
+    type: "group" as const,
+    label: role === "student" && ownGroup ? "Guruhim" : "Guruh",
+    href: groups.length > 0 ? `/leaderboard?type=group&groupId=${(ownGroup?._id ?? groups[0]._id).toString()}` : "/leaderboard?type=group",
+  };
+  const gradeTab = { type: "grade" as const, label: "Sinf", href: `/leaderboard?type=grade&grade=${ownGroup?.grade ?? grades[0] ?? 8}` };
+  const typeTabs = role === "student" && ownGroup ? [groupTab, allTab, gradeTab] : [allTab, groupTab, gradeTab];
+
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-12">
       {/* Sahna: sarlavha, filtrlar va kuchli uchlik bitta qorong'i kartada (ikkala rejimda ham) */}
@@ -159,18 +170,11 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
           </div>
 
           <nav aria-label="Reyting turi" className="flex w-full items-center gap-1 rounded-2xl bg-white/10 p-1 ring-1 ring-white/10 sm:w-fit">
-            <Link href={withMetric("/leaderboard?type=all")} className={tabClass(type === "all")}>
-              Umumiy
-            </Link>
-            <Link
-              href={withMetric(groups.length > 0 ? `/leaderboard?type=group&groupId=${(viewerGroupId ?? groups[0]._id).toString()}` : "/leaderboard?type=group")}
-              className={tabClass(type === "group")}
-            >
-              Guruh
-            </Link>
-            <Link href={withMetric(`/leaderboard?type=grade&grade=${grades[0] ?? 8}`)} className={tabClass(type === "grade")}>
-              Sinf
-            </Link>
+            {typeTabs.map((t) => (
+              <Link key={t.type} href={withMetric(t.href)} className={tabClass(type === t.type)} aria-current={type === t.type ? "page" : undefined}>
+                {t.label}
+              </Link>
+            ))}
           </nav>
         </div>
 

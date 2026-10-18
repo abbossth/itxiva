@@ -23,8 +23,11 @@ export default async function LeaderboardPage({ searchParams }: LeaderboardPageP
   const session = await requireAuth();
   const resolvedSearchParams = await searchParams;
 
-  const type = resolvedSearchParams.type === "group" || resolvedSearchParams.type === "grade" ? resolvedSearchParams.type : "all";
-  const groupId = resolvedSearchParams.groupId;
+  // O'quvchi sukutda o'z guruhi reytingini ko'radi, umumiy va sinf reytingi — tab orqali
+  const ownGroupId = session.role === "student" && session.groupId ? String(session.groupId) : null;
+  const requested = resolvedSearchParams.type;
+  const type = requested === "group" || requested === "grade" || requested === "all" ? requested : ownGroupId ? "group" : "all";
+  const groupId = resolvedSearchParams.groupId ?? (type === "group" ? ownGroupId ?? undefined : undefined);
   const grade = resolvedSearchParams.grade ? parseInt(resolvedSearchParams.grade, 10) : undefined;
   const metric = resolvedSearchParams.metric === "coin" ? "coin" : undefined;
 
