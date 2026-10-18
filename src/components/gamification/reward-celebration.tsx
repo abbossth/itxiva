@@ -9,6 +9,7 @@ import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 import { playRewardSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { LEVEL_UP_CLOSED_EVENT, REWARD_CHECK_EVENT, announceBalance } from "@/lib/rewards-client";
+import { flyCoins } from "@/lib/coin-flight";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 /** Sahifa almashganda yoki oynaga qaytilganda tekshiruvlar orasidagi eng kam vaqt */
@@ -38,7 +39,6 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
       if (r && !open.current) {
         open.current = true;
         setReward(r);
-        announceBalance(r.balance);
       }
     } catch {
       // Tabrik chiqmasa ham sahifa ishlayveradi
@@ -72,8 +72,15 @@ export function RewardCelebration({ waitForLevelUp }: { waitForLevelUp: boolean 
     };
   }, [check]);
 
-  const close = useCallback(() => {
+  // Yopilganda tangalar oynadan header'dagi balansga uchib boradi; balans birinchi tanga yetganda o'sadi
+  const close = useCallback((coinRect?: DOMRect) => {
     if (!reward) return;
+    if (reward.coins > 0 && reward.effects && coinRect) {
+      const balance = reward.balance;
+      flyCoins({ from: coinRect, amount: reward.coins, onFirstArrive: () => announceBalance(balance) });
+    } else {
+      announceBalance(reward.balance);
+    }
     void acknowledgeRewardsAction(reward.until).catch(() => {});
     open.current = false;
     lastCheck.current = Date.now();
@@ -116,8 +123,10 @@ const SPARKLES = [
   { left: "26%", top: "40%", size: 10, delay: "0.3s" },
 ];
 
-export function RewardOverlay({ reward, onClose }: { reward: RewardSummary; onClose: () => void }) {
+export function RewardOverlay({ reward, onClose: closeWith }: { reward: RewardSummary; onClose: (coinRect?: DOMRect) => void }) {
   const { effects } = reward;
+  const coinRef = useRef<HTMLDivElement>(null);
+  const onClose = useCallback(() => closeWith(coinRef.current?.getBoundingClientRect()), [closeWith]);
   const mainIsCoin = reward.coins > 0;
   const main = useCountUp(mainIsCoin ? reward.coins : reward.xp, 500);
   const xpCount = useCountUp(reward.xp, 900);
@@ -184,7 +193,7 @@ export function RewardOverlay({ reward, onClose }: { reward: RewardSummary; onCl
 
           <div className="relative flex flex-col items-center px-5 pb-5 pt-7 text-center sm:px-6 sm:pb-6 sm:pt-8">
             {/* Tanga */}
-            <div className="reward-coin relative h-24 w-24" style={{ perspective: 600 }}>
+            <div ref={coinRef} className="reward-coin relative h-24 w-24" style={{ perspective: 600 }}>
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 shadow-[0_0_40px_rgba(251,191,36,0.6)]" />
               <div className="absolute inset-[7px] rounded-full border-2 border-amber-200/70 bg-gradient-to-br from-amber-300 to-amber-500" />
               <div className="absolute inset-0 flex items-center justify-center">

@@ -77,6 +77,7 @@ const SIZES = {
   md: { box: "h-12 w-12", icon: "h-5 w-5", glow: 12, pip: true },
   lg: { box: "h-16 w-16", icon: "h-7 w-7", glow: 16, pip: true },
   xl: { box: "h-28 w-28", icon: "h-12 w-12", glow: 28, pip: true },
+  hero: { box: "h-40 w-40 sm:h-44 sm:w-44", icon: "h-20 w-20", glow: 44, pip: true },
 } as const;
 
 export function levelTier(level: number): Tier {
@@ -133,7 +134,7 @@ export function LevelBadge({
           aria-hidden
           className={cn(
             "absolute left-1/2 -translate-x-1/2 rounded-full bg-slate-950 font-mono font-black leading-none text-white ring-2 ring-white dark:ring-slate-900",
-            size === "xl" ? "-bottom-2 px-2.5 py-1 text-sm" : "-bottom-1.5 px-1.5 py-0.5 text-[10px]"
+            size === "hero" ? "-bottom-3 px-3.5 py-1.5 text-lg" : size === "xl" ? "-bottom-2 px-2.5 py-1 text-sm" : "-bottom-1.5 px-1.5 py-0.5 text-[10px]"
           )}
         >
           {level}
