@@ -16,6 +16,7 @@ import { HomeworkPanel } from "@/components/homework/homework-panel";
 import { QuizView } from "@/components/quiz/quiz-view";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS, type HomeworkState } from "@/lib/homework-status";
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { groupShortName } from "@/lib/group-name";
@@ -219,7 +220,7 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
                   {students.length} o&apos;quvchi. Bu bo&apos;limni faqat siz ko&apos;rasiz
                 </p>
               </div>
-              <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
                 {roster && (
                   <span className={cn("px-2 py-1 rounded-md", SCORE_TONE[scoreTone(students.length > 0 ? (submitted / students.length) * 100 : null)].soft)}>
                     Vazifa: {submitted} / {students.length}
@@ -230,6 +231,8 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
                     Test: {quizTaken} / {students.length}
                   </span>
                 )}
+                {/* Dars paytida javoblar kelib turadi: jadval o'zi har 30 soniyada yangilanadi */}
+                <RefreshButton intervalMs={30_000} />
               </div>
             </div>
 
