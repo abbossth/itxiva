@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumberUz } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -29,5 +30,5 @@ export function CountUp({ value, duration = 900, className }: { value: number; d
     return () => cancelAnimationFrame(frame);
   }, [value, duration]);
 
-  return <span className={className}>{shown.toLocaleString("uz-UZ")}</span>;
+  return <span className={className}>{formatNumberUz(shown)}</span>;
 }

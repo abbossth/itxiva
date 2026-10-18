@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import type { AchievementsData } from "@/actions/student-quest.actions";
-import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelBadge, XpBar, levelColor } from "@/components/gamification/level-badge";
 import { LevelRevealTrigger } from "@/components/gamification/level-reveal";
 import { CountUp } from "@/components/leaderboard/count-up";
 import { BadgeInfo } from "@/components/gamification/badge-info";
@@ -101,32 +101,60 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
           {data.levelUpBonus > 0 && <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">har yangi darajada +{data.levelUpBonus} coin</span>}
         </div>
         <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {data.levels.map((l) => (
-            <li
-              key={l.level}
-              aria-current={l.state === "current" ? "step" : undefined}
-              className={cn(
-                "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 cursor-default transition-colors hover:border-teal-500/40",
-                l.state === "current" && "border-teal-600 bg-teal-600 text-white",
-                l.state === "passed" && "border-slate-200 dark:border-slate-800",
-                l.state === "future" && "border-transparent bg-slate-50 dark:bg-slate-900/50",
-                l.level === 10 && l.state === "future" && "border-dashed border-amber-400 bg-amber-50 dark:bg-amber-500/10"
-              )}
-            >
-              <LevelRevealTrigger level={l.level} owned={l.state !== "future"} minXp={l.minXp}>
-                <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
-              </LevelRevealTrigger>
-              <span className="min-w-0">
-                <span className={cn("block truncate text-[10px] font-bold uppercase tracking-wider", l.state === "current" ? "text-white/75" : "text-slate-500 dark:text-slate-400")}>
-                  {l.level}-daraja · {LEVEL_MATERIALS[l.level - 1]}
+          {data.levels.map((l) => {
+            const current = l.state === "current";
+            return (
+              <li
+                key={l.level}
+                aria-current={current ? "step" : undefined}
+                style={{ "--lv": levelColor(l.level) } as React.CSSProperties}
+                className={cn(
+                  // Karta darajaning o'z rangida: joriysi — yorqin, o'tilganlari — yengil, kelajakdagilari — ustiga borilganda yonadi
+                  "group relative flex items-center gap-2.5 overflow-hidden rounded-xl border px-3 py-2.5 cursor-default transition-all duration-300",
+                  "hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--lv)_65%,transparent)] hover:bg-[color-mix(in_srgb,var(--lv)_14%,transparent)] hover:shadow-[0_8px_28px_-10px_var(--lv)]",
+                  current &&
+                    "border-[color-mix(in_srgb,var(--lv)_75%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--lv)_32%,transparent),color-mix(in_srgb,var(--lv)_8%,transparent))] shadow-[0_8px_30px_-10px_var(--lv)]",
+                  l.state === "passed" && "border-[color-mix(in_srgb,var(--lv)_35%,transparent)] bg-[color-mix(in_srgb,var(--lv)_7%,transparent)]",
+                  l.state === "future" && "border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50"
+                )}
+              >
+                {/* Joriy darajada yuqori chap burchakdan rangli nur */}
+                {current && (
+                  <span aria-hidden className="pointer-events-none absolute -left-6 -top-6 h-20 w-20 rounded-full bg-[var(--lv)] opacity-30 blur-2xl" />
+                )}
+                <LevelRevealTrigger level={l.level} owned={l.state !== "future"} minXp={l.minXp} className="relative">
+                  <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
+                </LevelRevealTrigger>
+                <span className="relative min-w-0 flex-1">
+                  <span
+                    className={cn(
+                      "block truncate text-[10px] font-bold uppercase tracking-wider transition-colors",
+                      l.state === "future"
+                        ? "text-slate-500 dark:text-slate-400 group-hover:text-[color-mix(in_srgb,var(--lv)_70%,#0f172a)] dark:group-hover:text-[color-mix(in_srgb,var(--lv)_60%,white)]"
+                        : "text-[color-mix(in_srgb,var(--lv)_70%,#0f172a)] dark:text-[color-mix(in_srgb,var(--lv)_60%,white)]"
+                    )}
+                  >
+                    {l.level}-daraja · {LEVEL_MATERIALS[l.level - 1]}
+                  </span>
+                  <span className="block truncate text-sm font-black text-slate-900 dark:text-slate-100">{l.name}</span>
+                  {current ? (
+                    <span className="mt-1 block">
+                      <span className="block h-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--lv)_20%,transparent)]">
+                        <span className="block h-full rounded-full bg-[var(--lv)]" style={{ width: `${Math.max(4, data.level.percent)}%` }} />
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[10px] text-slate-600 dark:text-slate-300">
+                        {formatNumberUz(data.level.xp)} / {data.level.nextXp !== null ? formatNumberUz(data.level.nextXp) : "∞"} XP
+                      </span>
+                    </span>
+                  ) : (
+                    <span className={cn("block font-mono text-[11px]", l.state === "passed" ? "font-sans font-semibold text-emerald-700 dark:text-emerald-400" : "text-slate-500")}>
+                      {l.state === "passed" ? "O'tildi ✓" : `${formatNumberUz(l.minXp)} XP`}
+                    </span>
+                  )}
                 </span>
-                <span className={cn("block truncate text-sm font-bold", l.state === "current" ? "text-white" : "text-slate-900 dark:text-slate-100")}>{l.name}</span>
-                <span className={cn("block font-mono text-[11px]", l.state === "passed" ? "font-sans font-semibold text-emerald-700 dark:text-emerald-400" : l.state === "current" ? "text-white/80" : "text-slate-500")}>
-                  {l.state === "passed" ? "O'tildi" : l.state === "current" ? `${formatNumberUz(data.level.xp)} / ${data.level.nextXp !== null ? formatNumberUz(data.level.nextXp) : "∞"}` : `${formatNumberUz(l.minXp)} XP`}
-                </span>
-              </span>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       </section>
 

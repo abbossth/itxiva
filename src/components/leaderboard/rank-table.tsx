@@ -3,7 +3,7 @@ import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { RankDelta } from "@/components/leaderboard/rank-delta";
 import { NameAvatar } from "@/components/leaderboard/name-avatar";
 import { LevelBadge } from "@/components/gamification/level-badge";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberUz } from "@/lib/utils";
 
 interface RankTableProps {
   entries: LeaderboardEntry[];
@@ -103,7 +103,7 @@ export function RankTable({ entries, unit = "coin" }: RankTableProps) {
 
             <div className="shrink-0 text-right">
               <div className="font-mono text-sm sm:text-base font-black tabular-nums text-slate-900 dark:text-slate-100">
-                {entry.totalCoins.toLocaleString("uz-UZ")}
+                {formatNumberUz(entry.totalCoins)}
               </div>
               {entry.weekCoins > 0 ? (
                 <div className="inline-flex items-center gap-0.5 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400" title="Oxirgi 7 kunda">

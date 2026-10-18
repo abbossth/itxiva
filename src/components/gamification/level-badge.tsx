@@ -130,6 +130,12 @@ const SIZES = {
   hero: { box: "h-40 w-40 sm:h-44 sm:w-44", icon: "h-20 w-20", glow: 44, pip: true },
 } as const;
 
+/** Darajaning asosiy rangi — kartalar shu rangda bezatiladi (emblema materialiga mos) */
+const LEVEL_COLORS = ["#9ca3af", "#ea580c", "#b07a3c", "#94a3b8", "#eab308", "#818cf8", "#10b981", "#e11d48", "#38bdf8", "#a855f7"];
+export function levelColor(level: number): string {
+  return LEVEL_COLORS[Math.min(10, Math.max(1, Math.round(level) || 1)) - 1];
+}
+
 export function levelTier(level: number): Tier {
   return TIERS[Math.min(10, Math.max(1, Math.round(level) || 1))];
 }

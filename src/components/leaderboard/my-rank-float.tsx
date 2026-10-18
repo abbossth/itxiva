@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberUz } from "@/lib/utils";
 
 /**
  * Ro'yxatda o'z qatori ko'rinmay qolganda pastda kichik panel: "Siz · 12-o'rin · 340 XP".
@@ -37,7 +37,7 @@ export function MyRankFloat({ rank, value, unit }: { rank: number; value: number
     >
       <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-teal-500 px-2 font-mono text-sm font-black tabular-nums">{rank}</span>
       <span className="text-sm font-bold whitespace-nowrap">
-        Siz · <span className="font-mono tabular-nums">{value.toLocaleString("uz-UZ")}</span> {unit}
+        Siz · <span className="font-mono tabular-nums">{formatNumberUz(value)}</span> {unit}
       </span>
       <Icon className="w-4 h-4 text-white/70" />
     </button>

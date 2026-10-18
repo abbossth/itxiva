@@ -10,7 +10,7 @@ import { MyRankFloat } from "@/components/leaderboard/my-rank-float";
 import { NameAvatar } from "@/components/leaderboard/name-avatar";
 import { LevelBadge } from "@/components/gamification/level-badge";
 import { groupShortName } from "@/lib/group-name";
-import { cn } from "@/lib/utils";
+import { cn, formatNumberUz } from "@/lib/utils";
 
 // Filtrlar qorong'i sahna ustida turadi
 const tabClass = (active: boolean) =>
@@ -166,7 +166,7 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
               Reyting
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-white/70">
-              {data.totalParticipants} o&apos;quvchi · jami {data.totalCoins.toLocaleString("uz-UZ")} {data.unit}
+              {data.totalParticipants} o&apos;quvchi · jami {formatNumberUz(data.totalCoins)} {data.unit}
               {leader && leader.totalCoins > 0 ? ` · peshqadam: ${leader.displayName}` : ""}
             </p>
           </div>
