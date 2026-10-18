@@ -3,7 +3,7 @@ import { Medal } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getBadgeStats } from "@/actions/quest.actions";
 import { PageHeader } from "@/components/ui/page-header";
-import { BADGE_BY_ID, TIER_LABEL } from "@/lib/gamification/badges";
+import { TIER_LABEL } from "@/lib/gamification/badges";
 import { BadgeMedal } from "@/components/gamification/badge-medal";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +46,7 @@ export default async function BadgesPage() {
               {b.tiers.map((t) => (
                 <li key={t.tier} className={cn("rounded-xl px-2.5 py-2", TIER_TONE[t.tier])}>
                   <div className="text-[11px] font-bold">
-                    {BADGE_BY_ID[b.id]?.tierNames[t.tier]} <span className="font-normal opacity-75">· {TIER_LABEL[t.tier].toLowerCase()}</span>
+                    {TIER_LABEL[t.tier]}
                   </div>
                   <div className="font-mono text-sm font-black">{t.threshold}</div>
                   <div className="text-[11px]">+{t.coins} coin</div>

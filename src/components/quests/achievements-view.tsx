@@ -125,7 +125,7 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
         </ol>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="space-y-4">
         <section className={card} aria-labelledby="badges">
           <div className="mb-3 flex items-center justify-between">
             <h2 id="badges" className="font-bold text-slate-900 dark:text-slate-100">Nishonlar</h2>
@@ -133,8 +133,10 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
               {data.badgesOwned} / {data.badgesTotal}
             </span>
           </div>
-          <p className="-mt-1 mb-3 text-xs text-slate-500 dark:text-slate-400">Nishon ustiga boring yoki bosing — u nima uchun va qanday olinishi ko&apos;rinadi.</p>
-          <ul className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-4">
+          <p className="-mt-1 mb-3 text-xs text-slate-500 dark:text-slate-400">
+            Har nishonning 3 bosqichi bor: bronza, kumush, oltin. Kartani bosing — qanday olinishi va har bosqich uchun coin ko&apos;rinadi.
+          </p>
+          <ul className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {data.badges.map((b) => (
               <li key={b.id}>
                 <BadgeInfo id={b.id} tier={b.tier} value={b.value} />

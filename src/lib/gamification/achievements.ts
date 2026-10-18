@@ -124,9 +124,9 @@ export async function evaluateBadges(studentId: Id): Promise<string[]> {
           studentId,
           coin: t.coins,
           type: "badge",
-          description: `Nishon: ${def.title} · ${def.tierNames[t.tier]} (${TIER_LABEL[t.tier].toLowerCase()})`,
+          description: `Nishon: ${def.title} · ${TIER_LABEL[t.tier]}`,
           idempotencyKey: `badge:${studentId}:${def.id}:${t.tier}`,
-          notifyReason: `Yangi nishon: ${def.title} · ${def.tierNames[t.tier]} (${TIER_LABEL[t.tier].toLowerCase()})`,
+          notifyReason: `Yangi nishon: ${def.title} · ${TIER_LABEL[t.tier]}`,
         });
       }
     }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, ShieldCheck, Sparkles, Target, Zap } from "lucide-react";
 import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
-import { BADGE_BY_ID, TIER_LABEL } from "@/lib/gamification/badges";
+import { TIER_LABEL } from "@/lib/gamification/badges";
 import { BadgeMedal } from "@/components/gamification/badge-medal";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { DIFFICULTY_LABEL, REPEAT_LABEL, VERIFY_LABEL, VERIFY_TONE, rewardLabel } from "@/lib/gamification/labels";
@@ -160,7 +160,6 @@ const TIER_BAR = { bronze: "bg-orange-700/80", silver: "bg-slate-400", gold: "bg
 function MilestoneCard({ m }: { m: MilestoneView }) {
   const next = m.next!;
   const owned = [...m.tiers].reverse().find((t) => t.owned)?.tier ?? null;
-  const names = BADGE_BY_ID[m.id]?.tierNames;
   return (
     <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 space-y-3">
       <div className="flex items-start gap-3">
@@ -168,7 +167,7 @@ function MilestoneCard({ m }: { m: MilestoneView }) {
         <div className="min-w-0 flex-1">
           <div className="font-bold text-slate-900 dark:text-slate-100">{m.title}</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            {owned && names ? <b className="text-slate-700 dark:text-slate-300">{names[owned]}</b> : m.description} · &quot;{names?.[next.tier]}&quot; unvonigacha {next.threshold - m.value} qoldi
+            {owned ? <b className="text-slate-700 dark:text-slate-300">{TIER_LABEL[owned]}</b> : m.description} · {TIER_LABEL[next.tier].toLowerCase()} bosqichgacha {next.threshold - m.value} qoldi
           </div>
         </div>
         <span className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">
@@ -188,7 +187,7 @@ function MilestoneCard({ m }: { m: MilestoneView }) {
         })}
       </div>
       <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-        <span>{m.tiers.map((t) => `${names?.[t.tier] ?? TIER_LABEL[t.tier]} · ${t.threshold}`).join("   ")}</span>
+        <span>{m.tiers.map((t) => `${TIER_LABEL[t.tier]} · ${t.threshold}`).join("   ")}</span>
         <span className="font-mono font-bold text-amber-700 dark:text-amber-400">+{next.coins}</span>
       </div>
     </div>
