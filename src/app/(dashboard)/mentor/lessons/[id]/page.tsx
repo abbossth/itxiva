@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, ClipboardCheck, Edit3, Eye, Plus, Users } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getLessonById, getLinkedLessons } from "@/actions/lesson.actions";
-import { LessonVisibility } from "@/components/mentor/lesson-visibility";
+import { LinkedGroupsStrip, VisibilityToggle } from "@/components/mentor/lesson-visibility";
 import { getGroupById } from "@/actions/group.actions";
 import { getStudentsByGroup } from "@/actions/student.actions";
 import { getQuizForMentor, getQuizReviewQueue, getQuizSubmissionsForLesson } from "@/actions/quiz.actions";
@@ -128,23 +128,7 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
         </div>
       </div>
 
-      {/* O'quvchi ko'radigan ko'rinish */}
-      <p className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300">
-        <Eye className="w-4 h-4 shrink-0 text-teal-600 dark:text-teal-400" />
-        {lesson.isPublished
-          ? "Dars o'quvchilarga aynan shunday ko'rinadi. Fayllarni shu yerdan ochib, dars paytida ishlatishingiz mumkin."
-          : "Bu qoralama — o'quvchilar hali ko'rmaydi. Nashr qilish uchun darsni tahrirlang."}
-      </p>
-
-      <LessonVisibility
-        lessonId={id}
-        groupName={group ? groupShortName(group) : null}
-        homework={homework ? { open: Boolean(lesson.homework?.isEnabled), dueAt: lesson.homework?.dueAt ? new Date(lesson.homework.dueAt).toISOString() : null } : null}
-        quiz={quiz ? { open: quiz.isPublished } : null}
-        linked={linked}
-      />
-
-      <LessonPanelCard>
+      <LessonPanelCard className="space-y-4">
         <LessonHeader
           lesson={lesson}
           badges={
@@ -154,50 +138,76 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
             </>
           }
         />
+        {!lesson.isPublished && (
+          <p className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <Eye className="w-4 h-4 shrink-0" />
+            Bu qoralama — o&apos;quvchilar hali ko&apos;rmaydi. Nashr qilish uchun darsni tahrirlang.
+          </p>
+        )}
+        <LinkedGroupsStrip linked={linked} />
       </LessonPanelCard>
 
       <LessonTabs tabs={tabs}>
-        <LessonTabPanel id="lesson" className="space-y-3">
-          <PanelBar href={editHref("lesson")} label="Konspekt va videoni tahrirlash" />
+        <LessonTabPanel id="lesson">
           <LessonPanelCard>
             {hasLessonMain(lesson) ? (
-              <LessonMain lesson={lesson} />
+              <>
+                <LessonMain lesson={lesson} />
+                <PanelFooter href={editHref("lesson")} label="Konspekt va videoni tahrirlash" />
+              </>
             ) : (
               <EmptyPanel text="Konspekt ham, video ham yo'q." href={editHref("lesson")} action="Konspekt yozish" />
             )}
           </LessonPanelCard>
         </LessonTabPanel>
 
-        <LessonTabPanel id="materials" className="space-y-3">
-          <PanelBar href={editHref("materials")} label="Materiallarni tahrirlash" />
+        <LessonTabPanel id="materials">
           <LessonPanelCard>
             {files.length > 0 ? (
-              <FilePreview lessonId={id} materials={lesson.materials ?? []} hideTitle />
+              <>
+                <FilePreview lessonId={id} materials={lesson.materials ?? []} hideTitle />
+                <PanelFooter href={editHref("materials")} label="Materiallarni tahrirlash" />
+              </>
             ) : (
               <EmptyPanel text="Fayl yoki havola qo'shilmagan." href={editHref("materials")} action="Material qo'shish" />
             )}
           </LessonPanelCard>
         </LessonTabPanel>
 
-        <LessonTabPanel id="homework" className="space-y-3">
-          <PanelBar href={editHref("homework")} label="Vazifani tahrirlash">
-            {homework && !lesson.homework?.isEnabled && <Badge variant="warning">Vazifa yopiq — o&apos;quvchilarga ko&apos;rinmaydi</Badge>}
-          </PanelBar>
+        <LessonTabPanel id="homework">
           <LessonPanelCard>
             {homework ? (
-              <HomeworkPanel lessonId={id} task={homework.task} submission={null} readOnly />
+              <>
+                <HomeworkPanel lessonId={id} task={homework.task} submission={null} readOnly />
+                <PanelFooter href={editHref("homework")} label="Tahrirlash">
+                  <VisibilityToggle
+                    lessonId={id}
+                    kind="homework"
+                    open={Boolean(lesson.homework?.isEnabled)}
+                    dueAt={lesson.homework?.dueAt ? new Date(lesson.homework.dueAt).toISOString() : null}
+                    groupName={group ? groupShortName(group) : null}
+                  />
+                </PanelFooter>
+              </>
             ) : (
               <EmptyPanel text="Bu darsda uyga vazifa yo'q." href={editHref("homework")} action="Vazifa berish" />
             )}
           </LessonPanelCard>
         </LessonTabPanel>
 
-        <LessonTabPanel id="quiz" className="space-y-3">
-          <PanelBar href={editHref("quiz")} label="Testni tahrirlash">
-            {quiz && !quiz.isPublished && <Badge variant="warning">Test yopiq — o&apos;quvchilarga ko&apos;rinmaydi</Badge>}
-          </PanelBar>
+        <LessonTabPanel id="quiz">
           {quiz ? (
-            <QuizView lessonId={id} quiz={quiz} initialSubmission={null} role="mentor" />
+            <QuizView
+              lessonId={id}
+              quiz={quiz}
+              initialSubmission={null}
+              role="mentor"
+              footer={
+                <PanelFooter href={editHref("quiz")} label="Tahrirlash">
+                  <VisibilityToggle lessonId={id} kind="quiz" open={quiz.isPublished} groupName={group ? groupShortName(group) : null} />
+                </PanelFooter>
+              }
+            />
           ) : (
             <LessonPanelCard>
               <EmptyPanel text="Bu darsda test yo'q." href={editHref("quiz")} action="Test tuzish" />
@@ -296,12 +306,12 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
   );
 }
 
-/** Tab tepasidagi qator: holat belgilari va shu bo'limni tahrirlash tugmasi */
-function PanelBar({ href, label, children }: { href: string; label: string; children?: React.ReactNode }) {
+/** Karta ichida, eng pastda: holat (ochish/yopish) va shu bo'limni tahrirlash tugmasi */
+function PanelFooter({ href, label, children }: { href: string; label: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex flex-wrap items-center gap-2">{children}</div>
-      <Link href={href} className={buttonVariants({ variant: "outline", size: "sm", className: "min-h-[40px] ml-auto" })}>
+    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+      {children}
+      <Link href={href} className={buttonVariants({ variant: "outline", size: "sm", className: "min-h-[40px] ml-auto shrink-0" })}>
         <Edit3 className="w-4 h-4" />
         {label}
       </Link>

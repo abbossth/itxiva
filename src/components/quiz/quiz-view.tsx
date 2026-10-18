@@ -16,9 +16,11 @@ interface QuizViewProps {
   quiz: IQuizData;
   initialSubmission: IQuizSubmissionData | null;
   role: "student" | "mentor";
+  /** Karta ichida, eng pastda (mentor ko'rinishida: ochish/yopish va tahrirlash) */
+  footer?: React.ReactNode;
 }
 
-export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
+export function QuizView({ quiz, initialSubmission, role, footer }: QuizViewProps) {
   const router = useRouter();
   const [submission, setSubmission] = useState<IQuizSubmissionData | null>(initialSubmission);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>(() => {
@@ -331,6 +333,7 @@ export function QuizView({ quiz, initialSubmission, role }: QuizViewProps) {
           </Button>
         )}
       </form>
+      {footer}
     </Card>
   );
 }
