@@ -152,7 +152,7 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
                       b.tier ? TIER_TEXT[b.tier] : "text-slate-500 dark:text-slate-400"
                     )}
                   >
-                    {b.tier && names ? names[b.tier] : b.next ? `${b.value}/${b.next.threshold}` : ""}
+                    {b.tier && names ? names[b.tier] : b.next ? `"${names?.[b.next.tier]}"gacha ${b.value}/${b.next.threshold}` : ""}
                   </span>
                 </li>
               );

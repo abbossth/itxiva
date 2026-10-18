@@ -98,23 +98,17 @@ export function BadgeMedal({ id, tier, size = "md", className }: { id: BadgeId; 
   const label = tier ? `${def?.title} · ${def?.tierNames[tier]} (${TIER_LABEL[tier]})` : `${def?.title} — hali olinmagan`;
   const [light, mid, dark] = COLOR[id];
 
-  if (!tier) {
-    return (
-      <span role="img" aria-label={label} className={cn("relative inline-flex flex-col items-center", className)}>
-        <span className={cn("relative grid place-items-center rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50", s.box)}>
-          <Icon className={cn("text-slate-300 dark:text-slate-600", s.icon)} />
-          <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 ring-2 ring-white dark:ring-surface">
-            <Lock className="h-2.5 w-2.5" />
-          </span>
-        </span>
-      </span>
-    );
-  }
-
-  const t = TIER_STYLE[tier];
+  // Hali olinmagan: birinchi (bronza) medal xira va kulrang, qulf bilan — o'quvchi nimaga intilayotganini ko'radi
+  const locked = !tier;
+  const t = TIER_STYLE[tier ?? "bronze"];
 
   return (
-    <span role="img" aria-label={label} title={label} className={cn("relative inline-flex flex-col items-center", className)}>
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn("relative inline-flex flex-col items-center", locked && "opacity-75 grayscale-[0.45] saturate-75", className)}
+    >
       {/* Lenta: medal ortidan ikki uchi chiqib turadi */}
       <span aria-hidden className={cn("absolute top-[62%] flex justify-between", s.ribbon)}>
         <span className="h-full w-[46%]" style={{ background: mid, clipPath: "polygon(0 0,100% 0,100% 100%,50% 78%,0 100%)", transform: "rotate(14deg)" }} />
@@ -122,7 +116,7 @@ export function BadgeMedal({ id, tier, size = "md", className }: { id: BadgeId; 
       </span>
       <span
         className={cn("relative grid place-items-center", s.box)}
-        style={t.glow ? { filter: `drop-shadow(0 0 ${s.glow}px ${hexA(mid, t.glow)})` } : undefined}
+        style={!locked && t.glow ? { filter: `drop-shadow(0 0 ${s.glow}px ${hexA(mid, t.glow)})` } : undefined}
       >
         {t.aura && (
           <span
@@ -158,13 +152,18 @@ export function BadgeMedal({ id, tier, size = "md", className }: { id: BadgeId; 
           <Crown aria-hidden className={cn("absolute left-1/2 -translate-x-1/2 fill-amber-300 text-amber-500 drop-shadow-[0_1px_3px_rgba(180,83,9,0.6)]", s.crown)} strokeWidth={2} />
         )}
         <Icon aria-hidden className={cn("relative text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]", s.icon)} strokeWidth={2.4} />
+        {locked && (
+          <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-slate-700 text-white ring-2 ring-white dark:ring-surface">
+            <Lock className="h-2.5 w-2.5" />
+          </span>
+        )}
       </span>
       {/* Bosqich yulduzchalari: ★ ☆ ☆ */}
       <span aria-hidden className="relative -mt-1.5 flex items-center gap-px rounded-full bg-slate-950/85 px-1 py-0.5 ring-1 ring-white/20">
         {[1, 2, 3].map((n) => (
           <Star
             key={n}
-            className={cn(s.star, n <= t.stars ? "fill-amber-300 text-amber-300" : "fill-transparent text-white/30")}
+            className={cn(s.star, !locked && n <= t.stars ? "fill-amber-300 text-amber-300" : "fill-transparent text-white/30")}
             strokeWidth={2}
           />
         ))}
