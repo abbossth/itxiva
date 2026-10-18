@@ -305,7 +305,7 @@ export function MyProfileView({
         )}
 
         <TabsContent value="grades">
-          <GradesPanel report={report} homeworkHref={(id) => `/lessons/${id}#homework`} />
+          <GradesPanel report={report} homeworkHref={(id) => `/lessons/${id}?tab=homework`} />
         </TabsContent>
 
         <TabsContent value="attendance">

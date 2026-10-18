@@ -20,7 +20,7 @@ function HomeworkRow({ item }: { item: MyHomeworkItem }) {
   return (
     <li>
       <Link
-        href={`/lessons/${item.lessonId}#homework`}
+        href={`/lessons/${item.lessonId}?tab=homework`}
         className="group flex items-center gap-3 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface hover:border-teal-500/40 hover:shadow-md transition-all min-h-[72px]"
       >
         <div className="min-w-0 flex-1 space-y-1.5">

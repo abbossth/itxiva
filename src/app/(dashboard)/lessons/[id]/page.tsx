@@ -6,7 +6,9 @@ import { getQuizForLesson } from "@/actions/quiz.actions";
 import { getHomeworkForStudent } from "@/actions/homework.actions";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { HomeworkPanel } from "@/components/homework/homework-panel";
-import { LessonBody } from "@/components/lessons/lesson-body";
+import { hasLessonMain, LessonHeader, LessonMain, LessonPanelCard, lessonFiles } from "@/components/lessons/lesson-body";
+import { FilePreview } from "@/components/lessons/file-preview";
+import { LessonTabPanel, LessonTabs, type LessonTabDef } from "@/components/lessons/lesson-tabs";
 import { QuizView } from "@/components/quiz/quiz-view";
 
 interface LessonDetailPageProps {
@@ -33,16 +35,46 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
     redirect(`/mentor/lessons/${lesson._id}`);
   }
 
-  const [quizRes, homework, session] = await Promise.all([
-    getQuizForLesson(resolvedParams.id),
-    getHomeworkForStudent(resolvedParams.id),
-    getCurrentUser(),
-  ]);
+  const [quizRes, homework] = await Promise.all([getQuizForLesson(resolvedParams.id), getHomeworkForStudent(resolvedParams.id)]);
   const quizData = quizRes.data;
+  const lessonId = lesson._id.toString();
+  const files = lessonFiles(lesson);
+
+  // Bo'limlar: bo'shlari ko'rsatilmaydi
+  const tabs: LessonTabDef[] = [];
+  if (hasLessonMain(lesson)) tabs.push({ id: "lesson", label: "Dars", icon: "lesson" });
+  if (files.length > 0) tabs.push({ id: "materials", label: "Materiallar", icon: "materials", meta: String(files.length) });
+  if (homework) {
+    const sub = homework.submission;
+    tabs.push({
+      id: "homework",
+      label: "Uyga vazifa",
+      icon: "homework",
+      ...(!sub
+        ? { meta: "Topshirilmagan", tone: "attention" as const }
+        : sub.status === "returned"
+        ? { meta: "Qayta ishlash", tone: "attention" as const }
+        : sub.status === "graded"
+        ? { meta: `${sub.score ?? 0} ball`, tone: "done" as const }
+        : { meta: "Tekshirilmoqda" }),
+    });
+  }
+  if (quizData?.quiz) {
+    const sub = quizData.submission;
+    tabs.push({
+      id: "quiz",
+      label: "Test",
+      icon: "quiz",
+      ...(!sub
+        ? { meta: `${quizData.quiz.questions.length} savol`, tone: "attention" as const }
+        : sub.status === "graded"
+        ? { meta: `${sub.totalScore}/${sub.maxScore}`, tone: "done" as const }
+        : { meta: "Tekshirilmoqda" }),
+    });
+  }
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto animate-in fade-in">
-      {/* Back button */}
       <div>
         <Link
           href="/lessons"
@@ -53,36 +85,48 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
         </Link>
       </div>
 
-      {/* Main card */}
-      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-5 sm:p-8 space-y-6 shadow-xs">
-        <LessonBody lesson={lesson} />
+      <LessonPanelCard>
+        <LessonHeader lesson={lesson} />
+      </LessonPanelCard>
 
-        {/* Uyga vazifa */}
-        {homework && (
-          <div id="homework" className="pt-4 border-t border-slate-100 dark:border-slate-800 scroll-mt-24">
-            <HomeworkPanel
-              // Javob yuborilgach yoki mentor baholagach forma holati yangidan boshlanadi
-              key={`${homework.submission?.status ?? "missing"}-${homework.submission?.attempt ?? 0}`}
-              lessonId={lesson._id.toString()}
-              task={homework.task}
-              submission={homework.submission}
-              readOnly={session?.role !== "student"}
-            />
-          </div>
-        )}
+      {tabs.length === 0 ? (
+        <p className="py-10 text-center text-sm text-slate-500 dark:text-slate-400">Bu darsga hali material qo&apos;shilmagan.</p>
+      ) : (
+        <LessonTabs tabs={tabs}>
+          <LessonTabPanel id="lesson">
+            <LessonPanelCard>
+              <LessonMain lesson={lesson} />
+            </LessonPanelCard>
+          </LessonTabPanel>
 
-        {/* Lesson Quiz */}
-        {quizData?.quiz && (
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-            <QuizView
-              lessonId={lesson._id.toString()}
-              quiz={quizData.quiz}
-              initialSubmission={quizData.submission}
-              role="student"
-            />
-          </div>
-        )}
-      </div>
+          <LessonTabPanel id="materials">
+            <LessonPanelCard>
+              <FilePreview lessonId={lessonId} materials={lesson.materials ?? []} hideTitle />
+            </LessonPanelCard>
+          </LessonTabPanel>
+
+          {homework && (
+            <LessonTabPanel id="homework">
+              <LessonPanelCard>
+                <HomeworkPanel
+                  // Javob yuborilgach yoki mentor baholagach forma holati yangidan boshlanadi
+                  key={`${homework.submission?.status ?? "missing"}-${homework.submission?.attempt ?? 0}`}
+                  lessonId={lessonId}
+                  task={homework.task}
+                  submission={homework.submission}
+                  readOnly={viewer?.role !== "student"}
+                />
+              </LessonPanelCard>
+            </LessonTabPanel>
+          )}
+
+          {quizData?.quiz && (
+            <LessonTabPanel id="quiz">
+              <QuizView lessonId={lessonId} quiz={quizData.quiz} initialSubmission={quizData.submission} role="student" />
+            </LessonTabPanel>
+          )}
+        </LessonTabs>
+      )}
     </div>
   );
 }

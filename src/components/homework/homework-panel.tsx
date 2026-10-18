@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   ClipboardCheck,
   Clock,
   Link as LinkIcon,
@@ -76,6 +77,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
   const [links, setLinks] = useState<string[]>(submission?.links ?? []);
   const [files, setFiles] = useState<IHomeworkFile[]>(submission?.files ?? []);
   const [linkDraft, setLinkDraft] = useState("");
+  const [showLinkInput, setShowLinkInput] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -107,6 +109,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
     }
     if (!links.includes(normalized)) setLinks([...links, normalized]);
     setLinkDraft("");
+    setShowLinkInput(false);
     setErrorMsg(null);
   };
 
@@ -186,6 +189,9 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
         </div>
       </div>
 
+      {/* Qayerda turibdi: topshiriq → javob yuborildi → baholandi */}
+      {!readOnly && <HomeworkSteps state={state} />}
+
       {/* Topshiriq */}
       <div className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4 sm:p-5">
         {task.instructions && (
@@ -261,160 +267,204 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
         </div>
       )}
 
-      {/* Javob formasi */}
+      {/* Javob formasi: matn, ostida biriktirilganlar va bitta amallar qatori */}
       {editing && !readOnly && !isGraded && (
-        <div className="space-y-4 rounded-2xl border border-teal-500/30 p-4 sm:p-5 animate-in fade-in">
-          <div className="space-y-1.5">
-            <label htmlFor="hw-text" className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Javob matni yoki kod
-            </label>
-            <Textarea
-              id="hw-text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={HOMEWORK_MAX_TEXT}
-              rows={8}
-              spellCheck={false}
-              placeholder="Javobingizni yoki kodingizni shu yerga yozing..."
-              className="font-mono text-xs sm:text-sm"
-            />
-          </div>
+        <div className="rounded-2xl border border-teal-500/30 bg-white dark:bg-surface animate-in fade-in focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/15 transition-shadow">
+          <label htmlFor="hw-text" className="sr-only">
+            Javob matni yoki kod
+          </label>
+          <Textarea
+            id="hw-text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={HOMEWORK_MAX_TEXT}
+            rows={7}
+            spellCheck={false}
+            placeholder="Javobingizni yoki kodingizni shu yerga yozing..."
+            className="font-mono text-xs sm:text-sm border-0 rounded-b-none focus:ring-0 focus:border-0 bg-transparent dark:bg-transparent"
+          />
 
-          <div className="space-y-2">
-            <label htmlFor="hw-link" className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Havolalar <span className="font-normal text-slate-500 dark:text-slate-400">(GitHub, Scratch, Google Drive...)</span>
-            </label>
-            {links.length > 0 && (
-              <ul className="space-y-1.5">
-                {links.map((link) => (
-                  <li
-                    key={link}
-                    className="flex items-center gap-2 pl-3 pr-1 rounded-xl bg-slate-100 dark:bg-slate-800/70 text-xs sm:text-sm text-slate-700 dark:text-slate-200"
+          {(links.length > 0 || files.length > 0) && (
+            <ul className="flex flex-wrap gap-1.5 px-3 pb-2">
+              {links.map((link) => (
+                <li
+                  key={link}
+                  className="inline-flex max-w-full items-center gap-1.5 pl-2.5 pr-0.5 rounded-lg bg-sky-500/10 text-xs text-slate-700 dark:text-slate-200"
+                >
+                  <LinkIcon className="w-3.5 h-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                  <span className="truncate max-w-[240px]">{link.replace(/^https?:\/\//, "")}</span>
+                  <button
+                    type="button"
+                    onClick={() => setLinks(links.filter((l) => l !== link))}
+                    aria-label={`${link} havolasini olib tashlash`}
+                    className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
                   >
-                    <LinkIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                    <span className="truncate flex-1">{link}</span>
-                    <button
-                      type="button"
-                      onClick={() => setLinks(links.filter((l) => l !== link))}
-                      aria-label={`${link} havolasini olib tashlash`}
-                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex items-center gap-2">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+              {files.map((file) => (
+                <li
+                  key={file.key}
+                  className="inline-flex max-w-full items-center gap-1.5 pl-2.5 pr-0.5 rounded-lg bg-teal-500/10 text-xs text-slate-700 dark:text-slate-200"
+                >
+                  <Paperclip className="w-3.5 h-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
+                  <span className="truncate max-w-[200px]">{file.name}</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatFileSize(file.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles(files.filter((f) => f.key !== file.key))}
+                    aria-label={`${file.name} faylini olib tashlash`}
+                    className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {showLinkInput && (
+            <div className="flex items-center gap-2 px-3 pb-2 animate-in fade-in">
               <Input
                 id="hw-link"
                 type="url"
                 inputMode="url"
+                autoFocus
+                aria-label="Havola (GitHub, Scratch, Google Drive...)"
                 value={linkDraft}
                 onChange={(e) => setLinkDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     addLink();
+                  } else if (e.key === "Escape") {
+                    setShowLinkInput(false);
                   }
                 }}
-                placeholder="https://..."
+                placeholder="https://github.com/... yoki Scratch, Google Drive havolasi"
               />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={addLink}
-                disabled={!linkDraft.trim()}
-                className="shrink-0 gap-1.5 min-h-[44px]"
-              >
+              <Button type="button" variant="secondary" onClick={addLink} disabled={!linkDraft.trim()} className="shrink-0 gap-1.5 min-h-[44px]">
                 <Plus className="w-4 h-4" />
                 Qo&apos;shish
               </Button>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Fayllar{" "}
-              <span className="font-normal text-slate-500 dark:text-slate-400">
-                ({HOMEWORK_MAX_FILES} tagacha, har biri {HOMEWORK_MAX_FILE_MB} MB gacha)
-              </span>
-            </p>
-            {files.length > 0 && (
-              <ul className="space-y-1.5">
-                {files.map((file) => (
-                  <li
-                    key={file.key}
-                    className="flex items-center gap-2 pl-3 pr-1 rounded-xl bg-slate-100 dark:bg-slate-800/70 text-xs sm:text-sm text-slate-700 dark:text-slate-200"
-                  >
-                    <Paperclip className="w-3.5 h-3.5 shrink-0 text-teal-600" />
-                    <span className="truncate flex-1">{file.name}</span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{formatFileSize(file.size)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setFiles(files.filter((f) => f.key !== file.key))}
-                      aria-label={`${file.name} faylini olib tashlash`}
-                      className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-rose-600 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFiles}
-              className="sr-only"
-              tabIndex={-1}
-              aria-label="Javob fayllarini tanlash"
-            />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFiles}
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Javob fayllarini tanlash"
+          />
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 dark:border-slate-800 px-2 py-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLinkInput((v) => !v)}
+              disabled={links.length >= HOMEWORK_MAX_LINKS}
+              className="gap-1.5 min-h-[44px]"
+              title={`Ko'pi bilan ${HOMEWORK_MAX_LINKS} ta havola`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              Havola
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={Boolean(uploading) || files.length >= HOMEWORK_MAX_FILES}
-              className="gap-2 min-h-[44px]"
+              className="gap-1.5 min-h-[44px]"
+              title={`${HOMEWORK_MAX_FILES} tagacha fayl, har biri ${HOMEWORK_MAX_FILE_MB} MB gacha`}
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-              <span className="truncate max-w-[220px]">{uploading ? `Yuklanmoqda: ${uploading}` : "Fayl tanlash"}</span>
+              <span className="truncate max-w-[160px]">{uploading ? `Yuklanmoqda: ${uploading}` : "Fayl"}</span>
             </Button>
-          </div>
 
+            <div className="ml-auto flex items-center gap-2">
+              {submission && state === "submitted" && (
+                <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={isSending} className="min-h-[44px]">
+                  Bekor qilish
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSubmit}
+                isLoading={isSending}
+                disabled={Boolean(uploading)}
+                className="gap-2 min-h-[44px] font-semibold"
+              >
+                <Send className="w-4 h-4" />
+                {submission ? "Qayta yuborish" : "Javobni yuborish"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editing && !readOnly && !isGraded && (errorMsg || due?.overdue) && (
+        <div className="space-y-1">
           {errorMsg && (
             <p role="alert" className="text-sm font-medium text-rose-600 dark:text-rose-400">
               {errorMsg}
             </p>
           )}
-
           {due?.overdue && (
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400" suppressHydrationWarning>
               Muddat o&apos;tgan — javob &quot;kechikkan&quot; deb belgilanadi.
             </p>
           )}
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {submission && state === "submitted" && (
-              <Button type="button" variant="ghost" onClick={() => setEditing(false)} disabled={isSending} className="min-h-[44px]">
-                Bekor qilish
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSubmit}
-              isLoading={isSending}
-              disabled={Boolean(uploading)}
-              className="gap-2 min-h-[44px] font-semibold"
-            >
-              <Send className="w-4 h-4" />
-              {submission ? "Qayta yuborish" : "Javobni yuborish"}
-            </Button>
-          </div>
         </div>
       )}
     </section>
+  );
+}
+
+/** Vazifa bosqichlari: o'quvchi qayerda turganini bir qarashda ko'radi */
+function HomeworkSteps({ state }: { state: "missing" | HomeworkSubmissionView["status"] }) {
+  // Nechta bosqich bajarilgan: topshiriq doim berilgan; returned — mentor qaytargan, javob qayta yuboriladi
+  const doneCount = state === "graded" ? 3 : state === "submitted" ? 2 : 1;
+  const steps = [
+    "Topshiriq berildi",
+    state === "missing" ? "Javob yuborish" : state === "returned" ? "Qayta yuborish" : "Javob yuborildi",
+    state === "graded" ? "Baholandi" : "Mentor tekshiradi",
+  ];
+  return (
+    <ol className="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold" aria-label="Vazifa bosqichlari">
+      {steps.map((label, i) => {
+        const done = i < doneCount;
+        const active = i === doneCount;
+        return (
+          <li key={i} className="flex min-w-0 flex-1 items-center gap-1.5" aria-current={active ? "step" : undefined}>
+            <span
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                done
+                  ? "bg-emerald-500 text-white"
+                  : active
+                  ? state === "returned"
+                    ? "bg-rose-500 text-white"
+                    : "bg-teal-600 text-white"
+                  : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+              }`}
+            >
+              {done ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : i + 1}
+            </span>
+            <span className={`truncate ${done || active ? "text-slate-800 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"}`}>
+              {label}
+            </span>
+            {i < steps.length - 1 && (
+              <span className={`h-px flex-1 min-w-3 ${i < doneCount - 1 ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"}`} aria-hidden />
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

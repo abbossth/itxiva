@@ -336,7 +336,7 @@ export function LessonsManager({
                   ) : (
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       Vazifa yo&apos;q ·{" "}
-                      <Link href={`/mentor/lessons/${id}/edit#homework`} className="font-semibold text-teal-700 dark:text-teal-300 hover:underline">
+                      <Link href={`/mentor/lessons/${id}/edit?tab=homework`} className="font-semibold text-teal-700 dark:text-teal-300 hover:underline">
                         qo&apos;shish
                       </Link>
                     </span>

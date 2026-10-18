@@ -97,7 +97,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
           text: [`🔁 ${b("Vazifa qayta ishlashga qaytarildi")}`, escapeHtml(p.lessonTitle), p.feedback ? `\n💬 ${escapeHtml(clip(p.feedback, 1500))}` : ""]
             .filter(Boolean)
             .join("\n"),
-          button: link("Vazifani ochish", `/lessons/${p.lessonId}#homework`),
+          button: link("Vazifani ochish", `/lessons/${p.lessonId}?tab=homework`),
         }
       : {
           text: [
@@ -109,7 +109,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
           ]
             .filter(Boolean)
             .join("\n"),
-          button: link("Natijani ko'rish", `/lessons/${p.lessonId}#homework`),
+          button: link("Natijani ko'rish", `/lessons/${p.lessonId}?tab=homework`),
         },
   lesson_new: (p) => ({
     text: p.homeworkOpened
@@ -129,7 +129,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
   }),
   homework_due: (p) => ({
     text: `⏰ ${b(p.fromMentor ? "Uyga vazifani topshirish esingizdan chiqmasin" : "Vazifa muddati yaqin")}\n${escapeHtml(p.lessonTitle)}\n\nMuddat: ${b(p.dueLabel)}`,
-    button: link("Vazifani topshirish", `/lessons/${p.lessonId}#homework`),
+    button: link("Vazifani topshirish", `/lessons/${p.lessonId}?tab=homework`),
   }),
   coins_changed: (p) => ({
     text: [

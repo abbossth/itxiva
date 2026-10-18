@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 interface FilePreviewProps {
   lessonId: string;
   materials: IMaterial[];
+  /** Alohida "Materiallar" bo'limida sarlavha ortiqcha */
+  hideTitle?: boolean;
 }
 
 function formatBytes(bytes?: number): string {
@@ -26,7 +28,7 @@ function getFileIcon(type: string, mimeType?: string) {
   return FileText;
 }
 
-export function FilePreview({ lessonId, materials }: FilePreviewProps) {
+export function FilePreview({ lessonId, materials, hideTitle = false }: FilePreviewProps) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -70,9 +72,11 @@ export function FilePreview({ lessonId, materials }: FilePreviewProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-        Materiallar va fayllar ({nonVideoMaterials.length})
-      </h3>
+      {!hideTitle && (
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+          Materiallar va fayllar ({nonVideoMaterials.length})
+        </h3>
+      )}
 
       {errorMsg && (
         <div className="p-3 text-xs rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900">

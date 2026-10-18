@@ -111,7 +111,7 @@ export function StudentDashboardView({
                 return (
                   <li key={h.lessonId}>
                     <Link
-                      href={`/lessons/${h.lessonId}#homework`}
+                      href={`/lessons/${h.lessonId}?tab=homework`}
                       className="flex items-center gap-3 rounded-xl border border-slate-200/80 dark:border-slate-800 p-3 hover:border-teal-500/50 transition-colors min-h-[56px]"
                     >
                       <span className="min-w-0 flex-1">

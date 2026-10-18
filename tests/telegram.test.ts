@@ -165,7 +165,7 @@ describe("telegram: bildirishnoma yuborish", () => {
     expect(msg.text).toContain("Zo'r &amp; toza");
     expect(msg.reply_markup?.inline_keyboard[0][0]).toEqual({
       text: "Natijani ko'rish",
-      url: "https://itxiva.uz/lessons/6ac000000000000000000001#homework",
+      url: "https://itxiva.uz/lessons/6ac000000000000000000001?tab=homework",
     });
   });
 
