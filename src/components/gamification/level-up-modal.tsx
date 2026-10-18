@@ -3,24 +3,13 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Coins, Sparkles, Star } from "lucide-react";
-import { LevelBadge, XpBar, levelTier } from "@/components/gamification/level-badge";
+import { Coins, Sparkles } from "lucide-react";
+import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelStage, celebrateLevel } from "@/components/gamification/level-reveal";
 import { acknowledgeLevelUpAction, type LevelUpInfo } from "@/actions/gamification.actions";
-import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
-import { playRewardSound } from "@/lib/sound";
-import { haptic } from "@/lib/haptics";
 import { formatNumberUz } from "@/lib/utils";
 import { LEVEL_UP_CLOSED_EVENT } from "@/lib/rewards-client";
 import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
-
-const SPARKLES = [
-  { left: "14%", top: "16%", size: 16, delay: "0.9s" },
-  { left: "82%", top: "12%", size: 20, delay: "1.3s" },
-  { left: "88%", top: "44%", size: 12, delay: "1.7s" },
-  { left: "8%", top: "48%", size: 14, delay: "1.1s" },
-  { left: "70%", top: "26%", size: 10, delay: "2s" },
-  { left: "28%", top: "30%", size: 10, delay: "1.5s" },
-];
 
 /**
  * Yangi darajaga chiqqanda bir marta: ekran qorayadi, yangi daraja emblemasi markazda kichikdan kattalashib,
@@ -37,7 +26,6 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
     () => true,
     () => false
   );
-  const tierGlow = levelTier(info.level).glow ?? "rgba(45,212,191,0.55)";
 
   const close = useCallback(
     (goTo?: string) => {
@@ -57,15 +45,7 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
     // Emblema "tushgan" paytda: ovoz, titrash va ikki tomondan konfetti
-    const t = setTimeout(() => {
-      playRewardSound();
-      haptic([40, 60, 40, 60, 120]);
-      if (prefersReducedMotion()) return;
-      const colors = ["#fbbf24", "#fde68a", "#ffffff", "#14b8a6", "#a78bfa"];
-      void fireConfetti({ particleCount: 140, spread: 100, startVelocity: 48, origin: { y: 0.38 }, colors, zIndex: 80 });
-      void fireConfetti({ particleCount: 70, angle: 60, spread: 70, origin: { x: 0, y: 0.8 }, colors, zIndex: 80 });
-      void fireConfetti({ particleCount: 70, angle: 120, spread: 70, origin: { x: 1, y: 0.8 }, colors, zIndex: 80 });
-    }, 750);
+    const t = setTimeout(celebrateLevel, 750);
     return () => {
       clearTimeout(t);
       window.removeEventListener("keydown", onKey);
@@ -82,30 +62,7 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
 
       <div className="pointer-events-none relative flex min-h-full flex-col items-center justify-center p-4 text-center text-white">
         {/* Emblema: markazda kattalashib tushadi, orqasida nurlar va chaqnash */}
-        <div className="relative grid h-72 w-72 place-items-center">
-          <div
-            aria-hidden
-            className="reward-rays absolute inset-[-30%] rounded-full opacity-50"
-            style={{
-              background: "repeating-conic-gradient(from 0deg, rgba(251,191,36,0.5) 0deg 9deg, transparent 9deg 24deg)",
-              maskImage: "radial-gradient(circle, black 20%, transparent 64%)",
-              WebkitMaskImage: "radial-gradient(circle, black 20%, transparent 64%)",
-            }}
-          />
-          <div aria-hidden className="level-flash absolute inset-[12%] rounded-full" style={{ background: `radial-gradient(circle, rgba(255,255,255,0.95), ${tierGlow} 45%, transparent 70%)` }} />
-          <div aria-hidden className="level-ring absolute inset-[18%] rounded-full border-4" style={{ borderColor: tierGlow }} />
-          {SPARKLES.map((s, i) => (
-            <Star
-              key={i}
-              aria-hidden
-              className="reward-twinkle absolute fill-amber-200 text-amber-200"
-              style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: s.delay }}
-            />
-          ))}
-          <div className="level-emblem relative">
-            <LevelBadge level={info.level} size="hero" />
-          </div>
-        </div>
+        <LevelStage level={info.level} />
 
         <div className="pointer-events-auto relative -mt-2 w-full max-w-sm space-y-3">
           <p className="reward-item text-xs font-black uppercase tracking-[0.35em] text-amber-300" style={{ animationDelay: "1s" }}>

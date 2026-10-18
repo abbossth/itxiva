@@ -28,6 +28,7 @@ import { OwnPhoto } from "@/components/profile/own-photo";
 import { StudentPersonalForm } from "@/components/students/student-personal-form";
 import { StatTile } from "@/components/reports/report-parts";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelRevealTrigger } from "@/components/gamification/level-reveal";
 import { levelFrame } from "@/components/quests/achievements-view";
 import {
   ActivityTimeline,
@@ -113,7 +114,9 @@ export function MyProfileView({
             {g && (
               <div className="pt-2 max-w-md">
                 <div className="flex items-center gap-3">
-                  <LevelBadge level={g.level} size="md" />
+                  <LevelRevealTrigger level={g.level} owned>
+                    <LevelBadge level={g.level} size="md" />
+                  </LevelRevealTrigger>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2 text-xs">
                       <span className="font-bold text-slate-900 dark:text-slate-100">

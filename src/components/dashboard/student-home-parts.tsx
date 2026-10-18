@@ -9,6 +9,7 @@ import { TIER_LABEL } from "@/lib/gamification/badges";
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { cn, formatDateUz, formatNumberUz } from "@/lib/utils";
 import { LevelBadge } from "@/components/gamification/level-badge";
+import { LevelRevealTrigger } from "@/components/gamification/level-reveal";
 
 // O'quvchi bosh sahifasining qiziqtiruvchi bloklari: maqsadlar, kunlik topshiriqlar, chellenj va diagrammalar.
 // Diagrammalar oddiy SVG/CSS bilan — kutubxonasiz, tez yuklanadi.
@@ -99,7 +100,9 @@ export function GoalsHero({ quests, stats }: { quests: StudentQuestsData | null;
         {level ? (
           <div className="flex items-center gap-4 lg:w-72 lg:shrink-0">
             <Ring percent={level.percent}>
-              <LevelBadge level={level.level} size="lg" />
+              <LevelRevealTrigger level={level.level} owned>
+                <LevelBadge level={level.level} size="lg" />
+              </LevelRevealTrigger>
             </Ring>
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300">Mening darajam</p>

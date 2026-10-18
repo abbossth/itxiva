@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import type { AchievementsData } from "@/actions/student-quest.actions";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelRevealTrigger } from "@/components/gamification/level-reveal";
 import { CountUp } from "@/components/leaderboard/count-up";
 import { BadgeInfo } from "@/components/gamification/badge-info";
 import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
@@ -42,7 +43,9 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
             <span className={cn("grid h-16 w-16 place-items-center rounded-full bg-teal-600 text-xl font-black text-white ring-offset-white dark:ring-offset-slate-900", levelFrame(data.level.level))}>
               {initials(data.profile.fullName)}
             </span>
-            <LevelBadge level={data.level.level} size="sm" className="absolute -bottom-2 -right-3" />
+            <LevelRevealTrigger level={data.level.level} owned className="absolute -bottom-2 -right-3">
+              <LevelBadge level={data.level.level} size="sm" />
+            </LevelRevealTrigger>
           </span>
           <div className="min-w-0 flex-1">
             <div className="truncate text-xl font-black text-slate-900 dark:text-slate-100">{data.profile.fullName}</div>
@@ -110,7 +113,9 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
                 l.level === 10 && l.state === "future" && "border-dashed border-amber-400 bg-amber-50 dark:bg-amber-500/10"
               )}
             >
-              <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
+              <LevelRevealTrigger level={l.level} owned={l.state !== "future"} minXp={l.minXp}>
+                <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
+              </LevelRevealTrigger>
               <span className="min-w-0">
                 <span className={cn("block truncate text-[10px] font-bold uppercase tracking-wider", l.state === "current" ? "text-white/75" : "text-slate-500 dark:text-slate-400")}>
                   {l.level}-daraja · {LEVEL_MATERIALS[l.level - 1]}

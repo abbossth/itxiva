@@ -7,6 +7,7 @@ import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actio
 import { TIER_LABEL } from "@/lib/gamification/badges";
 import { BadgeMedal } from "@/components/gamification/badge-medal";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
+import { LevelRevealTrigger } from "@/components/gamification/level-reveal";
 import { DIFFICULTY_LABEL, REPEAT_LABEL, VERIFY_LABEL, VERIFY_TONE, rewardLabel } from "@/lib/gamification/labels";
 import { cn, formatNumberUz, formatTimeUz } from "@/lib/utils";
 
@@ -238,7 +239,9 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
         <aside className="space-y-4 lg:order-2 lg:sticky lg:top-20">
           <section aria-label="Daraja" className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 space-y-3">
             <div className="flex items-center gap-3">
-              <LevelBadge level={data.level.level} size="md" />
+              <LevelRevealTrigger level={data.level.level} owned>
+                <LevelBadge level={data.level.level} size="md" />
+              </LevelRevealTrigger>
               <div className="min-w-0">
                 <div className="truncate text-lg font-black text-slate-900 dark:text-slate-100">{data.level.name}</div>
                 {data.level.nextName && <div className="text-xs text-slate-500 dark:text-slate-400">Keyingisi: <b>{data.level.nextName}</b></div>}
