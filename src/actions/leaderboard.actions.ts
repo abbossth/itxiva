@@ -26,6 +26,8 @@ export interface LeaderboardEntry {
   /** Daraja (XP bo'yicha) — faqat gamifikatsiya yoqilganda */
   level?: number;
   levelName?: string;
+  /** Faqat o'quvchining o'zi uchun: hozirgi (sarflanadigan) balansi — reytingdagi "jami yig'ilgan"dan farqi tushunarli bo'lsin */
+  balance?: number;
 }
 
 export interface LeaderboardData {
@@ -87,7 +89,7 @@ export async function getLeaderboardAction({
   const field = xpMode ? "xp" : "totalCoins";
   const students = (
     (await User.find(userQuery)
-      .select("fullName groupId totalCoins xp")
+      .select("fullName groupId totalCoins xp spendableBalance")
       .sort({ [field]: -1, createdAt: 1 })
       .lean()) as unknown as IUser[]
   ).map((st) => ({ ...st, totalCoins: (xpMode ? st.xp : st.totalCoins) ?? 0, xp: st.xp ?? 0 }));
@@ -143,6 +145,7 @@ export async function getLeaderboardAction({
       weekCoins: weekMap.get(student._id.toString()) ?? 0,
       isCurrentUser,
       ...(level ? { level: level.level, levelName: level.name } : {}),
+      ...(isCurrentUser ? { balance: student.spendableBalance ?? 0 } : {}),
     });
   }
 

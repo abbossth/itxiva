@@ -60,7 +60,7 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
             </div>
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <CountUp value={me.totalCoins} className="font-mono text-2xl sm:text-3xl font-black tabular-nums text-slate-900 dark:text-slate-100" />
-              <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{data.unit}</span>
+              <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{data.unit === "coin" ? "coin yig'ilgan" : data.unit}</span>
               {me.level !== undefined && (
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-violet-500/10 py-0.5 pl-0.5 pr-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">
                   <LevelBadge level={me.level} size="xs" />
@@ -73,6 +73,13 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
                 </span>
               )}
             </div>
+            {/* Coin reytingi jami yig'ilgan bo'yicha: do'kondagi xarid reytingni tushirmaydi — balans alohida ko'rsatiladi */}
+            {data.unit === "coin" && me.balance !== undefined && me.balance < me.totalCoins && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Hozirgi balansingiz: <b className="font-mono text-amber-700 dark:text-amber-400">{formatNumberUz(me.balance)} coin</b> · do&apos;konda{" "}
+                {formatNumberUz(me.totalCoins - me.balance)} coin sarflagansiz (reytingdan ayirilmaydi)
+              </p>
+            )}
           </div>
         </div>
 
@@ -207,6 +214,11 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
                   );
                 })}
               </nav>
+            )}
+            {data.canSwitch && (
+              <span className="text-[11px] text-white/60">
+                {metric === "coin" ? "Jami yig'ilgan coin — do'konda sarflangani ayirilmaydi" : "XP — tajriba, sarflanmaydi"}
+              </span>
             )}
             {type === "group" && (
               <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-none">
