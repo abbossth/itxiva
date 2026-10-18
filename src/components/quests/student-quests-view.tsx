@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Award, BookOpen, CalendarCheck, Check, ChevronRight, ClipboardCheck, Clock, Code2, Flame, LogIn, Medal, ShieldCheck, Sparkles, Target, Trophy, Zap } from "lucide-react";
+import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, ShieldCheck, Sparkles, Target, Zap } from "lucide-react";
 import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
-import { TIER_LABEL, type BadgeId } from "@/lib/gamification/badges";
+import { BADGE_BY_ID, TIER_LABEL } from "@/lib/gamification/badges";
+import { BadgeMedal } from "@/components/gamification/badge-medal";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { DIFFICULTY_LABEL, REPEAT_LABEL, VERIFY_LABEL, VERIFY_TONE, rewardLabel } from "@/lib/gamification/labels";
 import { cn, formatNumberUz, formatTimeUz } from "@/lib/utils";
@@ -153,32 +154,21 @@ function MainCard({ card }: { card: StudentQuestCard }) {
   );
 }
 
-export const BADGE_ICON: Record<BadgeId, typeof Award> = {
-  tests: Award,
-  streak: Flame,
-  attendance: CalendarCheck,
-  homework: ClipboardCheck,
-  certificate: Medal,
-  project: Code2,
-  weekly: Trophy,
-  quests: Target,
-};
 
 const TIER_BAR = { bronze: "bg-orange-700/80", silver: "bg-slate-400", gold: "bg-amber-400" } as const;
 
 function MilestoneCard({ m }: { m: MilestoneView }) {
-  const Icon = BADGE_ICON[m.id];
   const next = m.next!;
+  const owned = [...m.tiers].reverse().find((t) => t.owned)?.tier ?? null;
+  const names = BADGE_BY_ID[m.id]?.tierNames;
   return (
     <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 space-y-3">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600">
-          <Icon className="h-5 w-5" />
-        </span>
+        <BadgeMedal id={m.id} tier={owned} size="sm" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="font-bold text-slate-900 dark:text-slate-100">{m.title}</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            {m.description} · {TIER_LABEL[next.tier].toLowerCase()} nishongacha {next.threshold - m.value} qoldi
+            {owned && names ? <b className="text-slate-700 dark:text-slate-300">{names[owned]}</b> : m.description} · &quot;{names?.[next.tier]}&quot; unvonigacha {next.threshold - m.value} qoldi
           </div>
         </div>
         <span className="font-mono text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">
@@ -198,7 +188,7 @@ function MilestoneCard({ m }: { m: MilestoneView }) {
         })}
       </div>
       <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-        <span>{m.tiers.map((t) => `${TIER_LABEL[t.tier]} · ${t.threshold}`).join("   ")}</span>
+        <span>{m.tiers.map((t) => `${names?.[t.tier] ?? TIER_LABEL[t.tier]} · ${t.threshold}`).join("   ")}</span>
         <span className="font-mono font-bold text-amber-700 dark:text-amber-400">+{next.coins}</span>
       </div>
     </div>

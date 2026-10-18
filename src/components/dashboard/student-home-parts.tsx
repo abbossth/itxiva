@@ -5,7 +5,7 @@ import type { StudentQuestsData } from "@/actions/student-quest.actions";
 import { DashCard, DashEmpty } from "@/components/dashboard/dashboard-parts";
 import { ATTENDANCE_STATUS_META } from "@/lib/attendance-status";
 import { COIN_TYPE_COLORS, COIN_TYPE_LABELS } from "@/lib/coin-types";
-import { TIER_LABEL } from "@/lib/gamification/badges";
+import { BADGE_BY_ID, TIER_LABEL } from "@/lib/gamification/badges";
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { cn, formatDateUz, formatNumberUz } from "@/lib/utils";
 import { LevelBadge } from "@/components/gamification/level-badge";
@@ -169,7 +169,7 @@ export function GoalsHero({ quests, stats }: { quests: StudentQuestsData | null;
             <GoalRow
               icon={Award}
               tone="bg-violet-500/15 text-violet-700 dark:text-violet-300"
-              title={`${milestone.title}: ${TIER_LABEL[milestone.next.tier].toLowerCase()} nishon`}
+              title={`${milestone.title}: "${BADGE_BY_ID[milestone.id]?.tierNames[milestone.next.tier] ?? TIER_LABEL[milestone.next.tier]}" unvoni`}
               detail={`Yana ${formatNumberUz(milestone.next.threshold - milestone.value)} ${milestone.unit} · +${milestone.next.coins} coin`}
               percent={pct(milestone.value, milestone.next.threshold)}
               value={`${milestone.value} / ${milestone.next.threshold}`}

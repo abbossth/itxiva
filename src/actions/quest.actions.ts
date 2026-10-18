@@ -18,7 +18,7 @@ import { dateFromKey } from "@/lib/schedule";
 import { notifyMany } from "@/lib/notifications/notify";
 import { groupShortName } from "@/lib/group-name";
 import { StudentBadge } from "@/lib/db/models/student-badge.model";
-import { BADGES } from "@/lib/gamification/badges";
+import { BADGES, type BadgeId } from "@/lib/gamification/badges";
 import { toQuestView, type QuestView } from "@/lib/gamification/quest-view";
 import type { ActionResult } from "./auth.actions";
 
@@ -274,7 +274,7 @@ export async function getQuestFormContext(): Promise<QuestFormContext> {
 }
 
 export interface BadgeStatsRow {
-  id: string;
+  id: BadgeId;
   title: string;
   description: string;
   tiers: { tier: "bronze" | "silver" | "gold"; threshold: number; coins: number; students: number }[];
