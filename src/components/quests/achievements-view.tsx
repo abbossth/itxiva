@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, Lock } from "lucide-react";
 import type { AchievementsData } from "@/actions/student-quest.actions";
-import { XpBar } from "@/components/gamification/level-badge";
+import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { CountUp } from "@/components/leaderboard/count-up";
 import { BADGE_ICON } from "@/components/quests/student-quests-view";
 import { TIER_LABEL } from "@/lib/gamification/badges";
@@ -43,8 +43,11 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
 
       <section className={cn(card, "flex flex-col gap-4 lg:flex-row lg:items-center")} aria-label="Profil">
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <span className={cn("grid h-16 w-16 shrink-0 place-items-center rounded-full bg-teal-600 text-xl font-black text-white ring-offset-white dark:ring-offset-slate-900", levelFrame(data.level.level))}>
-            {initials(data.profile.fullName)}
+          <span className="relative shrink-0">
+            <span className={cn("grid h-16 w-16 place-items-center rounded-full bg-teal-600 text-xl font-black text-white ring-offset-white dark:ring-offset-slate-900", levelFrame(data.level.level))}>
+              {initials(data.profile.fullName)}
+            </span>
+            <LevelBadge level={data.level.level} size="sm" className="absolute -bottom-2 -right-3" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="truncate text-xl font-black text-slate-900 dark:text-slate-100">{data.profile.fullName}</div>
@@ -112,15 +115,9 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
                 l.level === 10 && l.state === "future" && "border-dashed border-amber-400 bg-amber-50 dark:bg-amber-500/10"
               )}
             >
-              <span
-                className={cn(
-                  "grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-sm font-black",
-                  l.state === "current" ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                )}
-              >
-                {l.level}
-              </span>
+              <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
               <span className="min-w-0">
+                <span className={cn("block truncate text-[10px] font-bold uppercase tracking-wider", l.state === "current" ? "text-white/75" : "text-slate-500 dark:text-slate-400")}>{l.level}-daraja</span>
                 <span className={cn("block truncate text-sm font-bold", l.state === "current" ? "text-white" : "text-slate-900 dark:text-slate-100")}>{l.name}</span>
                 <span className={cn("block font-mono text-[11px]", l.state === "passed" ? "font-sans font-semibold text-emerald-700 dark:text-emerald-400" : l.state === "current" ? "text-white/80" : "text-slate-500")}>
                   {l.state === "passed" ? "O'tildi" : l.state === "current" ? `${formatNumberUz(data.level.xp)} / ${data.level.nextXp !== null ? formatNumberUz(data.level.nextXp) : "∞"}` : `${formatNumberUz(l.minXp)} XP`}

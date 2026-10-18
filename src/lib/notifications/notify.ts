@@ -5,6 +5,7 @@ import { User } from "@/lib/db/models/user.model";
 import { escapeHtml, isTelegramConfigured, sendTelegramMessage, type MessageButton } from "@/lib/telegram/api";
 import { isNotificationEnabled, type NotificationType } from "./types";
 import { formatDateTimeUz } from "@/lib/utils";
+import { LEVEL_EMOJI } from "@/lib/gamification/levels";
 
 // Barcha Telegram bildirishnomalari shu modul orqali ketadi.
 // Yangi tur qo'shish: types.ts ga tur va sozlama yorlig'i, shu yerga payload va matn shabloni.
@@ -55,7 +56,7 @@ const clip = (v: string, max = 300) => (v.length > max ? `${v.slice(0, max - 1)}
 
 const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Message } = {
   level_up: (p) => ({
-    text: [`🎉 ${b("Yangi daraja!")}`, `${p.level}-daraja · ${escapeHtml(p.name)}`, p.bonus > 0 ? `\n🪙 Bonus: ${b(`+${p.bonus}`)} coin` : ""]
+    text: [`🎉 ${b("Yangi daraja!")}`, `${LEVEL_EMOJI[p.level - 1] ?? "⭐"} ${p.level}-daraja · ${b(escapeHtml(p.name))}`, p.bonus > 0 ? `\n🪙 Bonus: ${b(`+${p.bonus}`)} coin` : ""]
       .filter(Boolean)
       .join("\n"),
     button: link("Yutuqlarimni ko'rish", "/achievements"),

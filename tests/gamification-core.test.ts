@@ -32,7 +32,7 @@ describe("darajalar", () => {
     expect(levelForXp(99).level).toBe(1);
     expect(levelForXp(100).level).toBe(2);
     expect(levelForXp(4999).level).toBe(9);
-    expect(levelForXp(5000)).toMatchObject({ level: 10, name: "Xorazmiy vorisi" });
+    expect(levelForXp(5000)).toMatchObject({ level: 10, name: "Xorazmiy Vorisi" });
     expect(levelProgress(640)).toMatchObject({ current: { level: 4 }, next: { level: 5 }, toNext: 260, percent: 35 });
     expect(levelProgress(9000)).toMatchObject({ next: null, percent: 100, toNext: 0 });
   });
@@ -80,7 +80,7 @@ describe("daraja bonusi", () => {
     // 260 XP → 3-daraja (2 va 3 uchun bonus); bonus XP bermaydi
     expect(u).toMatchObject({ level: 3, pendingLevelUp: 3, xp: 260, spendableBalance: 360 });
     expect(await LevelReward.countDocuments({ studentId: s._id })).toBe(2);
-    expect(notify).toHaveBeenCalledWith(s._id, "level_up", { level: 3, name: "Kodchi", bonus: 100 });
+    expect(notify).toHaveBeenCalledWith(s._id, "level_up", { level: 3, name: "Bag Qiruvchi", bonus: 100 });
 
     await Promise.all([syncLevel(s._id), syncLevel(s._id)]);
     expect((await User.findById(s._id).lean())?.spendableBalance).toBe(360);

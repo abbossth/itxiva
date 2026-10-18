@@ -8,6 +8,7 @@ import { CountUp } from "@/components/leaderboard/count-up";
 import { TopThreeCelebration } from "@/components/leaderboard/celebrate";
 import { MyRankFloat } from "@/components/leaderboard/my-rank-float";
 import { NameAvatar } from "@/components/leaderboard/name-avatar";
+import { LevelBadge } from "@/components/gamification/level-badge";
 import { groupShortName } from "@/lib/group-name";
 import { cn } from "@/lib/utils";
 
@@ -61,8 +62,9 @@ function MyRankHero({ me, data }: { me: LeaderboardEntry; data: LeaderboardData 
               <CountUp value={me.totalCoins} className="font-mono text-2xl sm:text-3xl font-black tabular-nums text-slate-900 dark:text-slate-100" />
               <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{data.unit}</span>
               {me.level !== undefined && (
-                <span className="rounded-md bg-violet-500/10 px-1.5 py-0.5 font-mono text-[11px] font-bold text-violet-700 dark:text-violet-300">
-                  Lv {me.level} · {me.levelName}
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-violet-500/10 py-0.5 pl-0.5 pr-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">
+                  <LevelBadge level={me.level} size="xs" />
+                  {me.levelName}
                 </span>
               )}
               {me.weekCoins > 0 && (

@@ -2,6 +2,7 @@ import { Crown, TrendingUp } from "lucide-react";
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { CountUp } from "@/components/leaderboard/count-up";
 import { initials } from "@/components/leaderboard/name-avatar";
+import { LevelBadge } from "@/components/gamification/level-badge";
 import { cn } from "@/lib/utils";
 
 interface PodiumProps {
@@ -75,9 +76,10 @@ export function Podium({ top3, unit = "coin" }: PodiumProps) {
                 </div>
                 {entry.level !== undefined && (
                   <span
-                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-slate-950 px-1.5 py-0.5 font-mono text-[10px] font-black text-white ring-1 ring-white/20"
-                    title={entry.levelName}
+                    className="absolute -bottom-2 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-slate-950 py-0.5 pl-0.5 pr-2 font-mono text-[10px] font-black text-white ring-1 ring-white/20"
+                    title={`${entry.level}-daraja · ${entry.levelName}`}
                   >
+                    <LevelBadge level={entry.level} size="xs" />
                     Lv {entry.level}
                   </span>
                 )}

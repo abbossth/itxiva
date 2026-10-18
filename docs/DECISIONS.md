@@ -290,3 +290,8 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - Tanlangan tab manzilda `?tab=` — havolalar (bildirishnomalar, bosh sahifa, Vazifalarim) to'g'ridan-to'g'ri vazifa tabini ochadi; eski `#homework` havolalari ham ishlaydi. Yashirin tablar sahifada qoladi, shuning uchun yozilayotgan javob tab almashganda yo'qolmaydi.
 - Tahrirlash sahifasi ham shu tablarda (`/mentor/lessons/:id/edit?tab=homework`), mentor dars ko'rinishidagi har bo'limning "Tahrirlash" tugmasi aynan o'sha bo'limni ochadi. Saqlash bitta (pastki panel); o'zgargan bo'lim tabida nuqta. Xato boshqa tabda bo'lsa (sarlavha bo'sh, vazifa matni yo'q) — o'sha tab ochilib, maydonga fokus beriladi. Test o'z oynasida alohida saqlanadi (avvalgidek); test tabida savollar ro'yxati ko'rinadi.
 - O'quvchining vazifa javobi: bosqichlar ("Topshiriq berildi → Javob yuborish → Mentor tekshiradi"), bitta javob maydoni va ostida "Havola" / "Fayl" tugmalari, biriktirilganlar chip ko'rinishida.
+
+### [2026-10-19] G1: Daraja unvonlari va emblemalari
+- Daraja nomlari o'yin unvonlariga almashtirildi: Kod Uchquni → Piksel Ovchisi → Bag Qiruvchi → Terminal Ritsari → Algoritm Jangchisi → Server Sehrgari → Kiber Ninja → Raqamli Ajdar → Kod Afsonasi → Xorazmiy Vorisi. Nomlar bazada saqlanmaydi (koddan olinadi), chegaralar (XP) o'zgarmadi — orqaga mos.
+- Raqam o'rniga emblema (`LevelBadge`): daraja oshgan sari shakl (doira → olti burchak → sakkiz burchak → qalqon → yulduz), rang va yorug'lik kuchayadi; 7-darajadan orqada nur aylanadi (harakatni kamaytirish yoqilgan bo'lsa to'xtaydi). Yetilmagan darajalar kulrang. Yon menyu, bosh sahifa, Yutuqlarim, profil, topshiriqlar, yangi daraja oynasi va reytingda.
+- Telegram "Yangi daraja" xabarida darajaning belgisi (✨ … 👑).

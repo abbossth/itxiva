@@ -2,6 +2,7 @@ import { TrendingUp } from "lucide-react";
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { RankDelta } from "@/components/leaderboard/rank-delta";
 import { NameAvatar } from "@/components/leaderboard/name-avatar";
+import { LevelBadge } from "@/components/gamification/level-badge";
 import { cn } from "@/lib/utils";
 
 interface RankTableProps {
@@ -72,9 +73,10 @@ export function RankTable({ entries, unit = "coin" }: RankTableProps) {
                 {entry.isCurrentUser && <RankDelta rank={entry.rank} />}
                 {entry.level !== undefined && (
                   <span
-                    className="shrink-0 rounded-md bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-violet-700 dark:text-violet-300"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-500/10 py-0.5 pl-0.5 pr-1.5 font-mono text-[10px] font-bold text-violet-700 dark:text-violet-300"
                     title={`${entry.level}-daraja: ${entry.levelName}`}
                   >
+                    <LevelBadge level={entry.level} size="xs" />
                     Lv {entry.level}
                   </span>
                 )}
