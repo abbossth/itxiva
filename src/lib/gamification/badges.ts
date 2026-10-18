@@ -9,6 +9,8 @@ export interface BadgeDef {
   /** Progress yozuvi: "{n} ta to'g'ri javob" */
   unit: string;
   description: string;
+  /** Nishonni qanday olish — o'quvchiga tushuntirish (nishon ustiga borilganda chiqadi) */
+  howTo: string;
   /** Bosqich unvonlari: bronza → kumush → oltin (kuchayib boradi) */
   tierNames: Record<BadgeTier, string>;
   tiers: { tier: BadgeTier; threshold: number; coins: number }[];
@@ -22,6 +24,7 @@ export const BADGES: BadgeDef[] = [
     title: "Aql Jangchisi",
     unit: "ta to'g'ri javob",
     description: "Testlardagi to'g'ri javoblar",
+    howTo: "Dars testlarida savollarga to'g'ri javob bering. Har bir savolning faqat birinchi to'g'ri javobi hisoblanadi — bir savolni qayta yechish hisobni oshirmaydi.",
     tierNames: { bronze: "Askar", silver: "Qo'mondon", gold: "Sarkarda" },
     tiers: [
       { tier: "bronze", threshold: 50, coins: 20 },
@@ -34,6 +37,7 @@ export const BADGES: BadgeDef[] = [
     title: "To'xtamas Lashkar",
     unit: "kunlik seriya",
     description: "Eng uzun kirish seriyasi",
+    howTo: "Har kuni platformaga kiring. Ketma-ket kunlar seriyani o'stiradi, bir kun qoldirsangiz seriya boshidan boshlanadi. Eng uzun seriyangiz hisoblanadi; do'kondagi \"seriya himoyasi\" bir kunni saqlab qoladi.",
     tierNames: { bronze: "Sabotli", silver: "Temir Lashkar", gold: "Mag'lubiyatsiz" },
     tiers: [
       { tier: "bronze", threshold: 10, coins: 15 },
@@ -46,6 +50,7 @@ export const BADGES: BadgeDef[] = [
     title: "Qal'a Himoyachisi",
     unit: "oy birorta darsni qoldirmagan",
     description: "Oy davomida birorta darsni qoldirmang",
+    howTo: "Oy davomida hamma darsga keling — birorta ham \"kelmadi\" bo'lmasin (kechikib kelish ham hisoblanadi). Oy tugagach, shunday har oy +1 bo'ladi.",
     tierNames: { bronze: "Qorovul", silver: "Qal'a Posboni", gold: "Qal'a Sarkardasi" },
     tiers: [
       { tier: "bronze", threshold: 1, coins: 40 },
@@ -58,6 +63,7 @@ export const BADGES: BadgeDef[] = [
     title: "Arena Gladiatori",
     unit: "ta vazifa 80+ ball bilan",
     description: "Uyga vazifalar 80 va undan yuqori ball bilan",
+    howTo: "Uyga vazifani topshiring va mentordan 80 yoki undan yuqori ball oling. Har shunday baholangan vazifa +1.",
     tierNames: { bronze: "Gladiator", silver: "Arena Chempioni", gold: "Arena Imperatori" },
     tiers: [
       { tier: "bronze", threshold: 10, coins: 20 },
@@ -70,6 +76,7 @@ export const BADGES: BadgeDef[] = [
     title: "Bilim Fotihi",
     unit: "ta tasdiqlangan sertifikat",
     description: "Onlayn kurs sertifikatlari",
+    howTo: "Onlayn kursni tugatib, sertifikatingizni \"Topshiriqlar\" bo'limi orqali yuboring. Mentor tasdiqlagan har sertifikat +1.",
     tierNames: { bronze: "Fotih", silver: "Buyuk Fotih", gold: "Jahongir" },
     tiers: [
       { tier: "bronze", threshold: 1, coins: 10 },
@@ -82,6 +89,7 @@ export const BADGES: BadgeDef[] = [
     title: "Imperiya Bunyodkori",
     unit: "ta qabul qilingan loyiha",
     description: "Mentor qabul qilgan loyihalar",
+    howTo: "O'zingiz qilgan loyihani (sayt, o'yin, ilova) \"Topshiriqlar\" bo'limi orqali yuboring. Mentor qabul qilgan har loyiha +1.",
     tierNames: { bronze: "Bunyodkor", silver: "Qal'a Me'mori", gold: "Imperiya Asoschisi" },
     tiers: [
       { tier: "bronze", threshold: 1, coins: 10 },
@@ -94,6 +102,7 @@ export const BADGES: BadgeDef[] = [
     title: "Turnir G'olibi",
     unit: "marta 1–3-o'rin",
     description: "Haftalik masalada sovrinli o'rin",
+    howTo: "Haftalik masalani boshqalardan tezroq to'g'ri yeching va 1–3-o'rinni egallang. Har sovrinli o'rin +1.",
     tierNames: { bronze: "Ritsar", silver: "Chempion", gold: "Afsona" },
     tiers: [
       { tier: "bronze", threshold: 1, coins: 10 },
@@ -106,6 +115,7 @@ export const BADGES: BadgeDef[] = [
     title: "Yurish Qahramoni",
     unit: "ta bajarilgan topshiriq",
     description: "Mentor tasdiqlagan topshiriqlar",
+    howTo: "\"Topshiriqlar\" bo'limidagi vazifalarni bajarib, dalil yuboring. Mentor tasdiqlagan har topshiriq +1 (kunlik avtomatik topshiriqlar bunga kirmaydi).",
     tierNames: { bronze: "Botir", silver: "Pahlavon", gold: "Alpomish" },
     tiers: [
       { tier: "bronze", threshold: 5, coins: 10 },

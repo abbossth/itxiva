@@ -507,3 +507,10 @@ h1,
 @media (prefers-reduced-motion: reduce) {
   .level-emblem, .level-flash, .level-ring, .level-title { animation: none; }
 }
+
+/* Daraja emblemasining yaltirashi: yorug' chiziq yuz bo'ylab o'tadi (tezligi va yorqinligi darajaga qarab) */
+@keyframes level-glint {
+  0%, 45% { transform: translateX(-120%) skewX(-20deg); }
+  75%, 100% { transform: translateX(340%) skewX(-20deg); }
+}
+.level-glint { animation: level-glint 3s ease-in-out infinite; }

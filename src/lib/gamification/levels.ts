@@ -6,22 +6,26 @@ export interface LevelDef {
   minXp: number;
 }
 
-// Har daraja — o'yin unvoni: yuqorilagan sari kuchliroq. Nomlar bazada saqlanmaydi, shuning uchun bemalol o'zgartirish mumkin
+// Har daraja — bir so'zli unvon; emblemasi o'z materialidan (temir → mis → bronza → kumush → oltin → platina →
+// zumrad → yoqut → olmos → koinot). Nomlar bazada saqlanmaydi, shuning uchun bemalol o'zgartirish mumkin
 export const LEVEL_NAMES = [
-  "Kod Uchquni",
-  "Piksel Ovchisi",
-  "Bag Qiruvchi",
-  "Terminal Ritsari",
-  "Algoritm Jangchisi",
-  "Server Sehrgari",
-  "Kiber Ninja",
-  "Raqamli Ajdar",
-  "Kod Afsonasi",
-  "Xorazmiy Vorisi",
+  "Shogird",
+  "Izlanuvchi",
+  "Jangchi",
+  "Ritsar",
+  "Botir",
+  "Sarkarda",
+  "Qahramon",
+  "Afsona",
+  "Titan",
+  "Xorazmiy",
 ] as const;
 
+/** Daraja emblemasining materiali */
+export const LEVEL_MATERIALS = ["Temir", "Mis", "Bronza", "Kumush", "Oltin", "Platina", "Zumrad", "Yoqut", "Olmos", "Koinot"] as const;
+
 /** Telegram xabarlari uchun darajaning belgisi (sahifada — LevelBadge emblemasi) */
-export const LEVEL_EMOJI = ["✨", "🎯", "🐞", "🛡️", "⚔️", "🪄", "⚡", "🐉", "💎", "👑"] as const;
+export const LEVEL_EMOJI = ["⚙️", "🟤", "🥉", "🥈", "🥇", "💠", "💚", "❤️‍🔥", "💎", "🌌"] as const;
 
 export const DEFAULT_LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2000, 2800, 3800, 5000];
 

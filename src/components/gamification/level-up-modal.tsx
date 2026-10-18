@@ -11,6 +11,7 @@ import { playRewardSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { formatNumberUz } from "@/lib/utils";
 import { LEVEL_UP_CLOSED_EVENT } from "@/lib/rewards-client";
+import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
 
 const SPARKLES = [
   { left: "14%", top: "16%", size: 16, delay: "0.9s" },
@@ -116,7 +117,7 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
             </span>
           </h2>
           <p className="reward-item text-sm text-white/75" style={{ animationDelay: "1.35s" }}>
-            {info.level}-daraja · {formatNumberUz(info.xp)} XP to&apos;pladingiz. Shu sur&apos;atda davom eting!
+            {info.level}-daraja · {LEVEL_MATERIALS[info.level - 1] ?? ""} emblema · {formatNumberUz(info.xp)} XP to&apos;pladingiz. Shu sur&apos;atda davom eting!
           </p>
 
           {info.bonus > 0 && (

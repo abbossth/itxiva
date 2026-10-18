@@ -5,8 +5,8 @@ import { Check, Lock } from "lucide-react";
 import type { AchievementsData } from "@/actions/student-quest.actions";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { CountUp } from "@/components/leaderboard/count-up";
-import { BadgeMedal } from "@/components/gamification/badge-medal";
-import { BADGE_BY_ID, TIER_LABEL } from "@/lib/gamification/badges";
+import { BadgeInfo } from "@/components/gamification/badge-info";
+import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
 import { cn, formatDateUz, formatNumberUz } from "@/lib/utils";
 
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-5";
@@ -19,11 +19,6 @@ export function levelFrame(level: number): string {
   return "ring-2 ring-slate-300 dark:ring-slate-600 ring-offset-2";
 }
 
-const TIER_TEXT = {
-  bronze: "text-orange-700 dark:text-orange-300",
-  silver: "text-slate-600 dark:text-slate-300",
-  gold: "text-amber-700 dark:text-amber-300",
-} as const;
 
 function initials(name: string) {
   const p = name.trim().split(/\s+/);
@@ -117,7 +112,9 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
             >
               <LevelBadge level={l.level} size="sm" locked={l.state === "future"} />
               <span className="min-w-0">
-                <span className={cn("block truncate text-[10px] font-bold uppercase tracking-wider", l.state === "current" ? "text-white/75" : "text-slate-500 dark:text-slate-400")}>{l.level}-daraja</span>
+                <span className={cn("block truncate text-[10px] font-bold uppercase tracking-wider", l.state === "current" ? "text-white/75" : "text-slate-500 dark:text-slate-400")}>
+                  {l.level}-daraja · {LEVEL_MATERIALS[l.level - 1]}
+                </span>
                 <span className={cn("block truncate text-sm font-bold", l.state === "current" ? "text-white" : "text-slate-900 dark:text-slate-100")}>{l.name}</span>
                 <span className={cn("block font-mono text-[11px]", l.state === "passed" ? "font-sans font-semibold text-emerald-700 dark:text-emerald-400" : l.state === "current" ? "text-white/80" : "text-slate-500")}>
                   {l.state === "passed" ? "O'tildi" : l.state === "current" ? `${formatNumberUz(data.level.xp)} / ${data.level.nextXp !== null ? formatNumberUz(data.level.nextXp) : "∞"}` : `${formatNumberUz(l.minXp)} XP`}
@@ -136,27 +133,13 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
               {data.badgesOwned} / {data.badgesTotal}
             </span>
           </div>
-          <ul className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-            {data.badges.map((b) => {
-              const names = BADGE_BY_ID[b.id]?.tierNames;
-              const title = b.next
-                ? `${b.description}: ${b.value} / ${b.next.threshold} — keyingi unvon "${names?.[b.next.tier]}" (${TIER_LABEL[b.next.tier].toLowerCase()})`
-                : `${b.description}: barcha bosqichlar olingan`;
-              return (
-                <li key={b.id} className="flex flex-col items-center gap-1.5 text-center" title={title}>
-                  <BadgeMedal id={b.id} tier={b.tier} size="md" className="mb-1" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{b.title}</span>
-                  <span
-                    className={cn(
-                      "text-[11px] font-semibold",
-                      b.tier ? TIER_TEXT[b.tier] : "text-slate-500 dark:text-slate-400"
-                    )}
-                  >
-                    {b.tier && names ? names[b.tier] : b.next ? `"${names?.[b.next.tier]}"gacha ${b.value}/${b.next.threshold}` : ""}
-                  </span>
-                </li>
-              );
-            })}
+          <p className="-mt-1 mb-3 text-xs text-slate-500 dark:text-slate-400">Nishon ustiga boring yoki bosing — u nima uchun va qanday olinishi ko&apos;rinadi.</p>
+          <ul className="grid grid-cols-3 gap-x-2 gap-y-4 sm:grid-cols-4">
+            {data.badges.map((b) => (
+              <li key={b.id}>
+                <BadgeInfo id={b.id} tier={b.tier} value={b.value} />
+              </li>
+            ))}
           </ul>
         </section>
 
