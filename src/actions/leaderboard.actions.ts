@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { formatShortName } from "@/lib/utils";
 import { getAppSettings } from "@/lib/settings";
 import { LEGACY_EARNING_TYPES } from "@/lib/gamification/backfill";
+import { buildLevels, levelForXp } from "@/lib/gamification/levels";
 
 export interface LeaderboardEntry {
   rank: number;
@@ -22,6 +23,9 @@ export interface LeaderboardEntry {
   /** Oxirgi 7 kunda reytingga qo'shilgan (yoki olingan) coin */
   weekCoins: number;
   isCurrentUser: boolean;
+  /** Daraja (XP bo'yicha) — faqat gamifikatsiya yoqilganda */
+  level?: number;
+  levelName?: string;
 }
 
 export interface LeaderboardData {
@@ -76,7 +80,9 @@ export async function getLeaderboardAction({
   };
 
   // Gamifikatsiya yoqilgan bo'lsa reyting XP bo'yicha (do'kon xaridi va jarima ta'sir qilmaydi)
-  const gamificationOn = (await getAppSettings()).gamification.enabled;
+  const { gamification } = await getAppSettings();
+  const gamificationOn = gamification.enabled;
+  const levels = gamificationOn ? buildLevels(gamification.levelThresholds) : null;
   const xpMode = gamificationOn && metric !== "coin";
   const field = xpMode ? "xp" : "totalCoins";
   const students = (
@@ -84,7 +90,7 @@ export async function getLeaderboardAction({
       .select("fullName groupId totalCoins xp")
       .sort({ [field]: -1, createdAt: 1 })
       .lean()) as unknown as IUser[]
-  ).map((st) => ({ ...st, totalCoins: (xpMode ? st.xp : st.totalCoins) ?? 0 }));
+  ).map((st) => ({ ...st, totalCoins: (xpMode ? st.xp : st.totalCoins) ?? 0, xp: st.xp ?? 0 }));
 
   // Oxirgi 7 kundagi o'sish: do'kon xaridlari reytingga ta'sir qilmaydi, shuning uchun hisobga olinmaydi
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -120,6 +126,7 @@ export async function getLeaderboardAction({
     const isCurrentUser = student._id.toString() === session.userId;
 
     // Privacy formatting: student sees "Ali V.", mentor sees full name
+    const level = levels ? levelForXp(student.xp, levels) : null;
     const displayName =
       session.role === "mentor" || isCurrentUser
         ? student.fullName
@@ -135,6 +142,7 @@ export async function getLeaderboardAction({
       totalCoins: student.totalCoins || 0,
       weekCoins: weekMap.get(student._id.toString()) ?? 0,
       isCurrentUser,
+      ...(level ? { level: level.level, levelName: level.name } : {}),
     });
   }
 

@@ -1,6 +1,7 @@
 import { TrendingUp } from "lucide-react";
 import { LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { RankDelta } from "@/components/leaderboard/rank-delta";
+import { NameAvatar } from "@/components/leaderboard/name-avatar";
 import { cn } from "@/lib/utils";
 
 interface RankTableProps {
@@ -8,6 +9,13 @@ interface RankTableProps {
   /** Reyting o'lchovi: coin yoki XP */
   unit?: "coin" | "XP";
 }
+
+// Kuchli uchlik qatorlari ro'yxatda ham medal rangida ajralib turadi
+const ROW_TINT: Record<number, string> = {
+  1: "bg-amber-500/[0.07]",
+  2: "bg-slate-400/[0.08]",
+  3: "bg-orange-500/[0.06]",
+};
 
 const MEDAL: Record<number, string> = {
   1: "bg-amber-400 text-amber-950",
@@ -34,7 +42,9 @@ export function RankTable({ entries, unit = "coin" }: RankTableProps) {
             id={entry.isCurrentUser ? "my-rank" : undefined}
             className={cn(
               "rank-row relative flex items-center gap-3 px-3 sm:px-4 py-2.5 scroll-mt-24",
-              entry.isCurrentUser ? "bg-teal-500/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+              entry.isCurrentUser
+                ? "bg-teal-500/10"
+                : cn((entry.totalCoins > 0 && ROW_TINT[entry.rank]) || "", "hover:bg-slate-50 dark:hover:bg-slate-800/40")
             )}
             // Faqat birinchi ekrandagi qatorlar navbat bilan chiqadi — uzun ro'yxat kutib qolmaydi
             style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
@@ -49,6 +59,8 @@ export function RankTable({ entries, unit = "coin" }: RankTableProps) {
               {entry.rank}
             </span>
 
+            <NameAvatar name={entry.fullName ?? entry.displayName} seed={entry.userId} className="hidden sm:flex" />
+
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn("truncate text-sm sm:text-base font-semibold", entry.isCurrentUser ? "text-teal-800 dark:text-teal-200 font-bold" : "text-slate-900 dark:text-slate-100")}>
@@ -58,13 +70,29 @@ export function RankTable({ entries, unit = "coin" }: RankTableProps) {
                   <span className="shrink-0 rounded-full bg-teal-600 px-1.5 py-0.5 text-[10px] font-bold text-white">Siz</span>
                 )}
                 {entry.isCurrentUser && <RankDelta rank={entry.rank} />}
+                {entry.level !== undefined && (
+                  <span
+                    className="shrink-0 rounded-md bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-violet-700 dark:text-violet-300"
+                    title={`${entry.level}-daraja: ${entry.levelName}`}
+                  >
+                    Lv {entry.level}
+                  </span>
+                )}
                 <span className="shrink-0 text-xs text-slate-600 dark:text-slate-400">{entry.groupName}</span>
               </div>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
                   className={cn(
                     "bar-grow h-full rounded-full",
-                    entry.rank === 1 ? "bg-amber-500" : entry.isCurrentUser ? "bg-teal-500" : "bg-teal-500/50"
+                    entry.isCurrentUser
+                      ? "bg-teal-500"
+                      : entry.totalCoins > 0 && entry.rank === 1
+                      ? "bg-amber-500"
+                      : entry.totalCoins > 0 && entry.rank === 2
+                      ? "bg-slate-400"
+                      : entry.totalCoins > 0 && entry.rank === 3
+                      ? "bg-orange-500"
+                      : "bg-teal-500/50"
                   )}
                   style={{ width: `${percent}%`, animationDelay: `${Math.min(index, 12) * 35 + 200}ms` }}
                 />
