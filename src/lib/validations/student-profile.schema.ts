@@ -25,6 +25,8 @@ export const studentProfileSchema = z.object({
   fatherPhone: phone,
   motherName: text(80),
   motherPhone: phone,
+  /** Qaysi hujjati bor: tug'ilganlik guvohnomasi yoki pasport/ID-karta (bo'sh — tanlanmagan) */
+  documentType: z.enum(["birthCert", "passport", ""]).default(""),
   birthCertNumber: text(30),
   birthCertIssuedAt: dateKey,
   birthCertIssuedBy: text(160),

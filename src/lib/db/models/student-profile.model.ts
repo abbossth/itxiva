@@ -20,6 +20,8 @@ export interface IStudentProfile extends Document {
   fatherPhone?: string;
   motherName?: string;
   motherPhone?: string;
+  /** Qaysi hujjati bor (profil to'liqligi shu hujjat bo'yicha hisoblanadi); null — tanlanmagan */
+  documentType?: "birthCert" | "passport" | null;
   /** Tug'ilganlik haqidagi guvohnoma */
   birthCertNumberEnc?: string | null;
   birthCertIssuedAt?: Date | null;
@@ -50,6 +52,7 @@ const StudentProfileSchema = new Schema<IStudentProfile>(
     fatherPhone: text,
     motherName: text,
     motherPhone: text,
+    documentType: { type: String, enum: ["birthCert", "passport", null], default: null },
     birthCertNumberEnc: { type: String, default: null },
     birthCertIssuedAt: { type: Date, default: null },
     birthCertIssuedBy: text,

@@ -24,6 +24,9 @@ import { groupMonthAttendance } from "@/lib/gamification/achievements";
 import { formatSchedule, getNextLesson } from "@/lib/schedule";
 import { describeAudit } from "@/lib/audit-format";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { awardCoins } from "@/lib/gamification/award";
+import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
+import { PROFILE_COMPLETE_REWARD, profileCompleteness, profileRewardKey } from "@/lib/profile-completeness";
 import type { ActionResult } from "./auth.actions";
 
 /** Faqat sana ("YYYY-MM-DD") sifatida saqlanadigan maydonlar: UTC yarim tunda yoziladi, vaqt zonasiga bog'liq emas */
@@ -66,6 +69,7 @@ function toOwnData(profile: ProfileLean): OwnProfileInput {
     fatherPhone: profile?.fatherPhone ?? "",
     motherName: profile?.motherName ?? "",
     motherPhone: profile?.motherPhone ?? "",
+    documentType: profile?.documentType ?? "",
     birthCertNumber: decryptField(profile?.birthCertNumberEnc),
     birthCertIssuedAt: toKey(profile?.birthCertIssuedAt),
     birthCertIssuedBy: profile?.birthCertIssuedBy ?? "",
@@ -89,6 +93,7 @@ function toStoredFields(d: OwnProfileInput) {
     fatherPhone: d.fatherPhone,
     motherName: d.motherName,
     motherPhone: d.motherPhone,
+    documentType: d.documentType || null,
     birthCertNumberEnc: encryptField(d.birthCertNumber),
     birthCertIssuedAt: toDate(d.birthCertIssuedAt),
     birthCertIssuedBy: d.birthCertIssuedBy,
@@ -98,6 +103,24 @@ function toStoredFields(d: OwnProfileInput) {
     passportIssuedBy: d.passportIssuedBy,
     pinflEnc: encryptField(d.pinfl),
   };
+}
+
+/**
+ * Profil 100% to'ldirilgan bo'lsa o'quvchiga bir marta coin beriladi (kalit bilan — qayta saqlash yoki
+ * qayta ochish ikkinchi marta bermaydi). Kim to'ldirgani muhim emas: tahrirlash yopiq bo'lsa mentor to'ldiradi.
+ * Qaytaradi: hozir berildimi.
+ */
+async function rewardCompleteProfile(studentId: string, data: OwnProfileInput): Promise<boolean> {
+  if (!profileCompleteness(data).complete) return false;
+  const res = await awardCoins({
+    studentId,
+    coin: PROFILE_COMPLETE_REWARD,
+    type: "bonus",
+    description: "Profil 100% to'ldirildi",
+    idempotencyKey: profileRewardKey(studentId),
+    notifyReason: "Profil 100% to'ldirildi",
+  });
+  return res.ok && res.applied;
 }
 
 async function photoUrlOf(key?: string | null): Promise<string | null> {
@@ -183,6 +206,8 @@ export async function updateStudentProfileAction(studentId: string, input: unkno
     { upsert: true }
   );
 
+  await rewardCompleteProfile(studentId, d);
+
   // Audit yozuviga qiymatlar emas, faqat hodisaning o'zi yoziladi (hujjat raqamlari jurnalga tushmaydi)
   await AuditLog.create({
     actorId: mentor.userId,
@@ -243,7 +268,7 @@ export async function getOwnProfile(): Promise<OwnProfileData> {
   return { photoUrl: await photoUrlOf(profile?.photoKey), personal: toOwnData(profile), canEdit: settings.studentProfileEdit };
 }
 
-export async function updateOwnProfileAction(input: unknown): Promise<ActionResult> {
+export async function updateOwnProfileAction(input: unknown): Promise<ActionResult<{ rewarded: number }>> {
   const session = await requireStudent();
   // Ruxsat har safar serverda tekshiriladi: mentor yopgan bo'lsa, eski ochiq sahifadan ham saqlab bo'lmaydi
   if (!(await getAppSettings()).studentProfileEdit) {
@@ -266,9 +291,13 @@ export async function updateOwnProfileAction(input: unknown): Promise<ActionResu
     details: { studentLogin: session.login, fullName: session.fullName },
   });
 
+  const rewarded = await rewardCompleteProfile(session.userId, parsed.data);
+
   revalidatePath("/profile");
   revalidatePath(`/mentor/students/${session.userId}`);
-  return { success: true, message: "Ma'lumotlar saqlandi" };
+  return rewarded
+    ? { success: true, message: `Profil 100% to'ldirildi — +${PROFILE_COMPLETE_REWARD} coin!`, data: { rewarded: PROFILE_COMPLETE_REWARD } }
+    : { success: true, message: "Ma'lumotlar saqlandi", data: { rewarded: 0 } };
 }
 
 /** O'quvchi o'z rasmini qo'yadi yoki olib tashlaydi (null) */
@@ -330,19 +359,24 @@ export interface MyProfileData {
     badgeTotal: number;
   } | null;
   quests: { title: string; status: "pending" | "approved" | "rejected"; coins: number; at: string }[];
+  /** Profilni 100% to'ldirish mukofoti: miqdori va olinganmi */
+  profileReward: { amount: number; received: boolean };
 }
 
 /** O'quvchining o'z profili: o'zi, guruhi, natijalari va tarixlari */
 export async function getMyProfile(): Promise<MyProfileData | null> {
   const session = await requireStudent();
+  await connectToDatabase();
+  // Profilni avvalroq to'ldirgan (yoki mentor to'ldirgan) o'quvchi ham mukofotni oladi; hisobot shundan keyin o'qiladi
+  const profile = await loadProfile(session.userId);
+  await rewardCompleteProfile(session.userId, toOwnData(profile));
   const report = await getMyReport();
   if (!report) return null;
-  await connectToDatabase();
 
-  const [user, profile, settings] = await Promise.all([
+  const [user, settings, rewardReceived] = await Promise.all([
     User.findById(session.userId).select("groupId createdAt xp streak streakShields isHiddenFromLeaderboard").lean(),
-    loadProfile(session.userId),
     getAppSettings(),
+    CoinLedger.exists({ studentId: session.userId, idempotencyKey: profileRewardKey(session.userId) }),
   ]);
   const xpMode = settings.gamification.enabled;
   const field = xpMode ? "xp" : "totalCoins";
@@ -421,5 +455,6 @@ export async function getMyProfile(): Promise<MyProfileData | null> {
       coins: q.coins ?? 0,
       at: new Date(q.reviewedAt ?? q.submittedAt ?? q.createdAt ?? Date.now()).toISOString(),
     })),
+    profileReward: { amount: PROFILE_COMPLETE_REWARD, received: Boolean(rewardReceived) },
   };
 }

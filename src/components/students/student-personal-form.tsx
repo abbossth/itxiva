@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, FileText, IdCard, Lock, ShieldCheck, StickyNote, UserRound, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Coins, FileText, IdCard, Lock, ShieldCheck, StickyNote, UserRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { updateOwnProfileAction, updateStudentProfileAction, type StudentPersonalData } from "@/actions/student-profile.actions";
 import type { OwnProfileInput } from "@/lib/validations/student-profile.schema";
+import { requestRewardCheck } from "@/lib/rewards-client";
+import {
+  BIRTH_CERT_KEYS,
+  PARENT_KEYS,
+  PASSPORT_KEYS,
+  ageOf,
+  countFilled,
+  profileCompleteness,
+  type DocumentType,
+} from "@/lib/profile-completeness";
 import { cn } from "@/lib/utils";
 
 type FormState = StudentPersonalData & { fullName: string };
@@ -68,24 +78,18 @@ function Section({
   );
 }
 
-const countFilled = (form: Record<string, unknown>, keys: string[]) => keys.filter((k) => String(form[k] ?? "").trim() !== "").length;
 const joinFilled = (...parts: (string | null | undefined)[]) => parts.filter((p) => p && p.trim()).join(" · ");
-
-/** Tug'ilgan sanadan to'liq yosh */
-function ageOf(birthDate: string): number | null {
-  if (!birthDate) return null;
-  const [y, m, d] = birthDate.split("-").map(Number);
-  const now = new Date();
-  let age = now.getFullYear() - y;
-  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
-  return age >= 0 && age < 120 ? age : null;
-}
 
 type Props =
   // Mentor: istalgan o'quvchi, ism-familiya va izoh bilan
   | { mode: "mentor"; studentId: string; fullName: string; personal: StudentPersonalData }
-  // O'quvchi: faqat o'zi; `locked` — mentor tahrirlashni yopgan (faqat ko'rish)
-  | { mode: "student"; personal: OwnProfileInput; locked: boolean };
+  // O'quvchi: faqat o'zi; `locked` — mentor tahrirlashni yopgan (faqat ko'rish); `reward` — 100% uchun coin
+  | { mode: "student"; personal: OwnProfileInput; locked: boolean; reward?: { amount: number; received: boolean } };
+
+const DOCUMENTS: { id: DocumentType; label: string; hint: string; icon: typeof IdCard }[] = [
+  { id: "birthCert", label: "Tug'ilganlik guvohnomasi", hint: "16 yoshgacha", icon: FileText },
+  { id: "passport", label: "Pasport yoki ID-karta", hint: "16 yoshdan", icon: IdCard },
+];
 
 export function StudentPersonalForm(props: Props) {
   const router = useRouter();
@@ -114,6 +118,8 @@ export function StudentPersonalForm(props: Props) {
       if (res.success) {
         toast.success(res.message || "Ma'lumotlar saqlandi");
         router.refresh();
+        // Profil 100% bo'lib coin berilgan bo'lsa — mukofot oynasi (coin header'dagi balansga uchib boradi)
+        if (((res.data as { rewarded?: number } | undefined)?.rewarded ?? 0) > 0) requestRewardCheck();
       } else {
         toast.error(res.message || "Saqlab bo'lmadi");
       }
@@ -128,12 +134,10 @@ export function StudentPersonalForm(props: Props) {
   const genderLabel = form.gender === "male" ? "O'g'il bola" : form.gender === "female" ? "Qiz bola" : "";
 
   const basicKeys = [...(isMentor ? ["fullName"] : []), "birthDate", "gender", "phone", "school", "address"];
-  const parentKeys = ["fatherName", "fatherPhone", "motherName", "motherPhone"];
-  const birthCertKeys = ["birthCertNumber", "birthCertIssuedAt", "birthCertIssuedBy"];
-  const passportKeys = ["passportNumber", "pinfl", "passportIssuedAt", "passportExpiresAt", "passportIssuedBy"];
-  const allKeys = [...basicKeys, ...parentKeys, ...birthCertKeys, ...passportKeys];
-  const filledAll = countFilled(form, allKeys);
-  const fullPercent = Math.round((filledAll / allKeys.length) * 100);
+  // 100% hisobiga faqat o'quvchida bor hujjat kiradi (tanlangani yoki yoshi/to'ldirilganiga qarab taxmin qilingani)
+  const completeness = profileCompleteness(form);
+  const docType = completeness.documentType;
+  const reward = props.mode === "student" ? props.reward : undefined;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -150,14 +154,39 @@ export function StudentPersonalForm(props: Props) {
           : "Bu ma'lumotlarni faqat siz va mentor ko'rasiz — boshqa o'quvchilarga ko'rinmaydi. Bilmagan maydonni bo'sh qoldirishingiz mumkin."}
       </p>
 
-      {/* Qancha to'ldirilgani */}
-      <div className="flex items-center gap-3 px-1">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-          <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${fullPercent}%` }} />
+      {/* Qancha to'ldirilgani (o'quvchida — 100% uchun coin mukofoti bilan) */}
+      <div
+        className={cn(
+          "rounded-2xl px-4 py-3 space-y-2",
+          reward && (reward.received ? "bg-emerald-500/10 ring-1 ring-emerald-500/20" : "bg-amber-500/10 ring-1 ring-amber-500/25")
+        )}
+      >
+        {reward && (
+          <p
+            className={cn(
+              "flex items-center gap-2 text-sm font-semibold",
+              reward.received ? "text-emerald-800 dark:text-emerald-300" : "text-amber-900 dark:text-amber-200"
+            )}
+          >
+            {reward.received ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Coins className="h-4 w-4 shrink-0" />}
+            {reward.received
+              ? `Profil to'liq — ${reward.amount} coin olingan`
+              : completeness.complete
+                ? `Hammasi to'ldirildi — saqlang va ${reward.amount} coin oling!`
+                : `Profilni 100% to'ldiring va ${reward.amount} coin oling`}
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800">
+            <div
+              className={cn("h-full rounded-full transition-all duration-500", completeness.complete ? "bg-emerald-500" : "bg-teal-500")}
+              style={{ width: `${completeness.percent}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-400 tabular-nums">
+            {completeness.percent}% · {completeness.filled} / {completeness.total}
+          </span>
         </div>
-        <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-slate-400 tabular-nums">
-          {filledAll} / {allKeys.length} maydon to&apos;ldirilgan
-        </span>
       </div>
 
       {/* Yopiq bo'lsa barcha maydonlar faqat o'qish uchun */}
@@ -201,8 +230,8 @@ export function StudentPersonalForm(props: Props) {
         <Section
           icon={Users}
           title="Ota-onasi"
-          filled={countFilled(form, parentKeys)}
-          total={parentKeys.length}
+          filled={countFilled(form, PARENT_KEYS)}
+          total={PARENT_KEYS.length}
           summary={joinFilled(form.fatherName, form.motherName)}
           defaultOpen
         >
@@ -222,60 +251,98 @@ export function StudentPersonalForm(props: Props) {
           </div>
         </Section>
 
-        {/* Hujjatlar kam o'zgaradi — sukutda yig'iq, xulosada raqami ko'rinadi */}
-        <Section
-          icon={FileText}
-          title="Tug'ilganlik haqidagi guvohnoma"
-          filled={countFilled(form, birthCertKeys)}
-          total={birthCertKeys.length}
-          summary={joinFilled(form.birthCertNumber, form.birthCertIssuedBy)}
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field htmlFor="sp-bc-number" label="Seriya va raqami">
-              <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
-            </Field>
-            <Field htmlFor="sp-bc-date" label="Berilgan sana">
-              <Input id="sp-bc-date" type="date" {...text("birthCertIssuedAt")} />
-            </Field>
-            <Field htmlFor="sp-bc-by" label="Kim tomonidan berilgan" className="sm:col-span-2 lg:col-span-1">
-              <Input id="sp-bc-by" placeholder="Masalan: Xiva shahar FHDY bo'limi" {...text("birthCertIssuedBy")} maxLength={160} />
-            </Field>
+        {/* Hujjat: o'quvchida yoki guvohnoma, yoki pasport bo'ladi — faqat tanlangani ko'rinadi va hisobga olinadi.
+            Ikkinchisining avval kiritilgan ma'lumotlari o'chirilmaydi, shunchaki yashirinadi */}
+        <div className="space-y-2">
+          <p className="px-1 text-xs font-semibold text-slate-700 dark:text-slate-300">Qaysi hujjatingiz bor?</p>
+          <div role="radiogroup" aria-label="Hujjat turi" className="grid grid-cols-2 gap-2">
+            {DOCUMENTS.map((doc) => {
+              const selected = docType === doc.id;
+              const Icon = doc.icon;
+              return (
+                <button
+                  key={doc.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => set("documentType", doc.id)}
+                  className={cn(
+                    "flex min-h-[56px] items-center gap-2.5 rounded-xl border p-3 text-left transition-colors cursor-pointer disabled:cursor-default",
+                    selected
+                      ? "border-teal-500 bg-teal-500/10 text-teal-800 dark:text-teal-200"
+                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-surface text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold leading-tight">{doc.label}</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-slate-400">{doc.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </Section>
+        </div>
 
-        <Section
-          icon={IdCard}
-          title="Pasport yoki ID-karta"
-          filled={countFilled(form, passportKeys)}
-          total={passportKeys.length}
-          summary={joinFilled(form.passportNumber, form.pinfl && `JSHSHIR ${form.pinfl}`)}
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field htmlFor="sp-pass-number" label="Seriya va raqami">
-              <Input id="sp-pass-number" placeholder="AB 1234567" {...text("passportNumber")} maxLength={20} autoComplete="off" className="font-mono" />
-            </Field>
-            <Field htmlFor="sp-pinfl" label="JSHSHIR (PINFL)" hint="14 ta raqam">
-              <Input
-                id="sp-pinfl"
-                inputMode="numeric"
-                placeholder="00000000000000"
-                value={form.pinfl}
-                onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
-                autoComplete="off"
-                className="font-mono"
-              />
-            </Field>
-            <Field htmlFor="sp-pass-by" label="Kim tomonidan berilgan" className="sm:col-span-2 lg:col-span-1">
-              <Input id="sp-pass-by" placeholder="Masalan: Xiva shahar IIB" {...text("passportIssuedBy")} maxLength={160} />
-            </Field>
-            <Field htmlFor="sp-pass-date" label="Berilgan sana">
-              <Input id="sp-pass-date" type="date" {...text("passportIssuedAt")} />
-            </Field>
-            <Field htmlFor="sp-pass-exp" label="Amal qilish muddati">
-              <Input id="sp-pass-exp" type="date" {...text("passportExpiresAt")} />
-            </Field>
-          </div>
-        </Section>
+        {docType === "birthCert" && (
+          <Section
+            icon={FileText}
+            title="Tug'ilganlik haqidagi guvohnoma"
+            filled={countFilled(form, BIRTH_CERT_KEYS)}
+            total={BIRTH_CERT_KEYS.length}
+            summary={joinFilled(form.birthCertNumber, form.birthCertIssuedBy)}
+            defaultOpen
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field htmlFor="sp-bc-number" label="Seriya va raqami">
+                <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
+              </Field>
+              <Field htmlFor="sp-bc-date" label="Berilgan sana">
+                <Input id="sp-bc-date" type="date" {...text("birthCertIssuedAt")} />
+              </Field>
+              <Field htmlFor="sp-bc-by" label="Kim tomonidan berilgan" className="sm:col-span-2 lg:col-span-1">
+                <Input id="sp-bc-by" placeholder="Masalan: Xiva shahar FHDY bo'limi" {...text("birthCertIssuedBy")} maxLength={160} />
+              </Field>
+            </div>
+          </Section>
+        )}
+
+        {docType === "passport" && (
+          <Section
+            icon={IdCard}
+            title="Pasport yoki ID-karta"
+            filled={countFilled(form, PASSPORT_KEYS)}
+            total={PASSPORT_KEYS.length}
+            summary={joinFilled(form.passportNumber, form.pinfl && `JSHSHIR ${form.pinfl}`)}
+            defaultOpen
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field htmlFor="sp-pass-number" label="Seriya va raqami">
+                <Input id="sp-pass-number" placeholder="AB 1234567" {...text("passportNumber")} maxLength={20} autoComplete="off" className="font-mono" />
+              </Field>
+              <Field htmlFor="sp-pinfl" label="JSHSHIR (PINFL)" hint="14 ta raqam">
+                <Input
+                  id="sp-pinfl"
+                  inputMode="numeric"
+                  placeholder="00000000000000"
+                  value={form.pinfl}
+                  onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
+                  autoComplete="off"
+                  className="font-mono"
+                />
+              </Field>
+              <Field htmlFor="sp-pass-by" label="Kim tomonidan berilgan" className="sm:col-span-2 lg:col-span-1">
+                <Input id="sp-pass-by" placeholder="Masalan: Xiva shahar IIB" {...text("passportIssuedBy")} maxLength={160} />
+              </Field>
+              <Field htmlFor="sp-pass-date" label="Berilgan sana">
+                <Input id="sp-pass-date" type="date" {...text("passportIssuedAt")} />
+              </Field>
+              <Field htmlFor="sp-pass-exp" label="Amal qilish muddati">
+                <Input id="sp-pass-exp" type="date" {...text("passportExpiresAt")} />
+              </Field>
+            </div>
+          </Section>
+        )}
 
         {isMentor && (
           <Section

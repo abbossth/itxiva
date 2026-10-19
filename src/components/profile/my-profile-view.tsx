@@ -103,7 +103,11 @@ export function MyProfileView({
       </div>
 
       {/* Ikki bo'lim: profil (natijalar va tarix) va sozlamalar; tanlangani manzilda ?tab= bo'lib turadi */}
-      <LessonTabs tabs={PROFILE_TABS} ariaLabel="Profil bo'limlari">
+      <LessonTabs
+        // Profil 100% bo'lmaguncha Sozlamalar tabida coin eslatmasi turadi
+        tabs={data.profileReward.received ? PROFILE_TABS : PROFILE_TABS.map((t) => (t.id === "settings" ? { ...t, meta: `+${data.profileReward.amount}`, tone: "attention" as const } : t))}
+        ariaLabel="Profil bo'limlari"
+      >
         <LessonTabPanel id="profile" className="space-y-4">
           {/* Men: rasm, ism, daraja */}
           <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface shadow-xs">
@@ -337,6 +341,7 @@ export function MyProfileView({
               mode="student"
               personal={data.personal}
               locked={!data.canEdit}
+              reward={data.profileReward}
             />
           </div>
 
