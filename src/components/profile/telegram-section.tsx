@@ -13,6 +13,7 @@ import {
   type TelegramStatus,
 } from "@/actions/telegram.actions";
 import { notificationsForRole } from "@/lib/notifications/types";
+import { TelegramCommunityBadge } from "@/components/profile/telegram-community";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { formatDateUz } from "@/lib/utils";
 
@@ -114,18 +115,21 @@ export function TelegramSection({ initial, role }: { initial: TelegramStatus; ro
       {!status.available ? (
         <p className="text-sm text-slate-600 dark:text-slate-400">Telegram bot hali sozlanmagan. Mentorga murojaat qiling.</p>
       ) : status.linked ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-            <span>
-              {status.username ? <span className="font-mono font-semibold">@{status.username}</span> : "Telegram hisobingiz"} ulangan
-              {status.linkedAt ? ` · ${formatDateUz(status.linkedAt)}` : ""}
-            </span>
-          </p>
-          <Button type="button" variant="secondary" size="sm" onClick={handleUnlink} isLoading={busy === "unlink"} className="gap-2 min-h-[44px]">
-            <Unplug className="w-4 h-4" />
-            Uzish
-          </Button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span>
+                {status.username ? <span className="font-mono font-semibold">@{status.username}</span> : "Telegram hisobingiz"} ulangan
+                {status.linkedAt ? ` · ${formatDateUz(status.linkedAt)}` : ""}
+              </span>
+            </p>
+            <Button type="button" variant="secondary" size="sm" onClick={handleUnlink} isLoading={busy === "unlink"} className="gap-2 min-h-[44px]">
+              <Unplug className="w-4 h-4" />
+              Uzish
+            </Button>
+          </div>
+          {status.community && <TelegramCommunityBadge community={status.community} linked />}
         </div>
       ) : (
         <div className="space-y-3">
@@ -156,10 +160,13 @@ export function TelegramSection({ initial, role }: { initial: TelegramStatus; ro
               <p className="text-xs text-slate-600 dark:text-slate-400">Havola 10 daqiqa amal qiladi.</p>
             </div>
           ) : (
-            <Button type="button" variant="primary" onClick={handleLink} isLoading={busy === "link"} className="gap-2 min-h-[44px] font-semibold">
-              <Send className="w-4 h-4" />
-              Telegram&apos;ni ulash
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="primary" onClick={handleLink} isLoading={busy === "link"} className="gap-2 min-h-[44px] font-semibold">
+                <Send className="w-4 h-4" />
+                Telegram&apos;ni ulash
+              </Button>
+              {status.community && <TelegramCommunityBadge community={status.community} linked={false} />}
+            </div>
           )}
         </div>
       )}

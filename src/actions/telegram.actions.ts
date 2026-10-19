@@ -8,6 +8,7 @@ import { TELEGRAM_LINK_REWARD, rewardTelegramLink, telegramRewardKey } from "@/l
 import { requireAuth } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getBotUsername, isTelegramConfigured } from "@/lib/telegram/api";
+import { telegramCommunity, type TelegramCommunity } from "@/lib/telegram/community";
 import { createTelegramLinkToken, unlinkTelegram, LINK_TOKEN_TTL_MS } from "@/lib/telegram/link";
 import { isNotificationType, notificationsForRole } from "@/lib/notifications/types";
 import { ActionResult } from "./auth.actions";
@@ -21,12 +22,14 @@ export interface TelegramStatus {
   prefs: Record<string, boolean>;
   /** O'quvchi uchun: ulagani uchun bir martalik coin, olinganmi */
   reward: { amount: number; received: boolean } | null;
+  /** Nechta o'quvchi ulagan — ulash tugmasi yonida ko'rsatiladi (bot sozlanmagan bo'lsa null) */
+  community: TelegramCommunity | null;
 }
 
 export async function getTelegramStatus(): Promise<TelegramStatus> {
   const session = await requireAuth();
   await connectToDatabase();
-  const user = await User.findById(session.userId).select("telegram notificationPrefs").lean();
+  const user = await User.findById(session.userId).select("telegram notificationPrefs groupId").lean();
 
   const prefs: Record<string, boolean> = {};
   for (const option of notificationsForRole(session.role)) {
@@ -42,13 +45,17 @@ export async function getTelegramStatus(): Promise<TelegramStatus> {
     reward = { amount: TELEGRAM_LINK_REWARD, received: Boolean(received) };
   }
 
+  const available = isTelegramConfigured() && Boolean(getBotUsername());
+  const community = available ? await telegramCommunity(session.role === "student" ? user?.groupId : null) : null;
+
   return {
-    available: isTelegramConfigured() && Boolean(getBotUsername()),
+    available,
     linked,
     username: user?.telegram?.username ?? null,
     linkedAt: user?.telegram?.linkedAt ? new Date(user.telegram.linkedAt).toISOString() : null,
     prefs,
     reward,
+    community,
   };
 }
 

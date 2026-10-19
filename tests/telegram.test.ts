@@ -330,3 +330,40 @@ describe("profil: reytingdagi salyut sozlamasi", () => {
     await expect(setCelebrationsEnabledAction(true)).rejects.toThrow();
   });
 });
+
+describe("telegram: nechta o'quvchi ulagan", () => {
+  it("faol o'quvchilarni sanaydi, guruh ulushini beradi va boshqalarning faqat bosh harflarini chiqaradi", async () => {
+    const { default: mongoose } = await import("mongoose");
+    const groupA = new mongoose.Types.ObjectId();
+    const groupB = new mongoose.Types.ObjectId();
+    const link = (chatId: string, linkedAt: string) => ({ telegram: { chatId, username: "secret_tg", linkedAt: new Date(linkedAt) } });
+    const me = await User.create({ login: "me", fullName: "Karimov Ali", role: "student", passwordHash: "x", groupId: groupA });
+    await User.create([
+      { login: "s1", fullName: "Rahimova Zarina", role: "student", passwordHash: "x", groupId: groupA, ...link("1", "2026-01-01") },
+      { login: "s2", fullName: "Olimov Bek", role: "student", passwordHash: "x", groupId: groupB, ...link("2", "2026-02-01") },
+      // reytingdan yashirilgan — sanaladi, lekin bosh harflari chiqmaydi
+      { login: "s3", fullName: "Yashirin Odam", role: "student", passwordHash: "x", groupId: groupB, isHiddenFromLeaderboard: true, ...link("3", "2026-03-01") },
+      { login: "s4", fullName: "Ulamagan Talaba", role: "student", passwordHash: "x", groupId: groupB },
+      // arxivdagi o'quvchi (guruhsiz) va mentor sanalmaydi
+      { login: "old", fullName: "Arxiv Talaba", role: "student", passwordHash: "x", groupId: null, ...link("4", "2026-04-01") },
+      { login: "mentor", fullName: "Mentor Ustoz", role: "mentor", passwordHash: "x", ...link("5", "2026-05-01") },
+    ]);
+
+    actAs(sessionFor(me));
+    const status = await telegramActions.getTelegramStatus();
+    expect(status.community).toEqual({
+      linked: 3,
+      total: 5,
+      group: { linked: 1, total: 2 },
+      recent: ["OB", "RZ"],
+    });
+    expect(JSON.stringify(status.community)).not.toMatch(/Olimov|secret_tg|s2/);
+  });
+
+  it("mentorda guruh ulushi yo'q", async () => {
+    const mentor = await mkUser("ustoz", "mentor");
+    actAs(sessionFor(mentor));
+    const status = await telegramActions.getTelegramStatus();
+    expect(status.community).toEqual({ linked: 0, total: 0, group: null, recent: [] });
+  });
+});
