@@ -1,15 +1,23 @@
 import { redirect } from "next/navigation";
-import { ShieldAlert } from "lucide-react";
+import { Check, EyeOff, KeyRound, Lightbulb, ShieldCheck } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/guards";
-import { Logo } from "@/components/layout/logo";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { PasswordForm } from "@/components/auth/password-form";
+import { AuthFeatures, AuthHeadline, AuthShell } from "@/components/auth/auth-shell";
 import { logoutAction } from "@/actions/auth.actions";
+import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "Parolni almashtirish — ITXiva",
   robots: { index: false },
 };
+
+const TIPS = [
+  { icon: KeyRound, title: "Faqat o'zingiz biladigan parol", text: "Mentor bergan vaqtinchalik parol shundan keyin ishlamaydi" },
+  { icon: EyeOff, title: "Hech kimga aytmang", text: "Do'stlar ham, mentor ham parolingizni so'ramaydi" },
+  { icon: Lightbulb, title: "Eslash oson, topish qiyin", text: "Bir nechta so'z va raqamni qo'shing — uzun parol kuchliroq" },
+];
+
+const STEPS = ["Kirish", "Yangi parol", "Platforma"];
 
 export default async function ChangePasswordPage() {
   const session = await getCurrentUser();
@@ -22,45 +30,69 @@ export default async function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-bg p-4 sm:p-6">
-      <div className="flex justify-end max-w-5xl mx-auto w-full pt-2">
-        <ThemeToggle />
+    <AuthShell
+      panel={
+        <>
+          <AuthHeadline eyebrow="Oxirgi qadam" line1="Hisobingiz —" line2="faqat sizniki." />
+          <AuthFeatures items={TIPS} />
+        </>
+      }
+      below={
+        <form action={logoutAction} className="mt-4 text-center">
+          <button
+            type="submit"
+            className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 underline-offset-4 hover:underline cursor-pointer min-h-[44px] px-3"
+          >
+            Boshqa hisob bilan kirish
+          </button>
+        </form>
+      }
+    >
+      {/* Qadamlar: kirish bajarildi, hozir yangi parol, keyin platforma */}
+      <ol className="mb-6 flex items-center gap-2" aria-label="Qadamlar">
+        {STEPS.map((step, i) => {
+          const done = i === 0;
+          const current = i === 1;
+          return (
+            <li key={step} className="flex flex-1 items-center gap-2 last:flex-none" aria-current={current ? "step" : undefined}>
+              <span
+                className={cn(
+                  "grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold",
+                  done && "bg-teal-600 text-white",
+                  current && "bg-teal-500/15 text-teal-700 ring-2 ring-teal-500 dark:text-teal-300",
+                  !done && !current && "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                )}
+              >
+                {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : i + 1}
+              </span>
+              <span
+                className={cn(
+                  "text-xs font-semibold whitespace-nowrap",
+                  current ? "text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400"
+                )}
+              >
+                {step}
+              </span>
+              {i < STEPS.length - 1 && (
+                <span aria-hidden className={cn("h-px flex-1", done ? "bg-teal-500" : "bg-slate-200 dark:bg-slate-700")} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="mb-6">
+        <h1 className="font-display text-2xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          <ShieldCheck className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+          Yangi parol o&apos;rnating
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">
+          <span className="font-semibold text-slate-700 dark:text-slate-200">{session.fullName}</span>, siz mentor bergan
+          vaqtinchalik parol bilan kirdingiz. Davom etish uchun faqat o&apos;zingiz biladigan parol o&apos;ylab toping.
+        </p>
       </div>
 
-      <main className="w-full max-w-md mx-auto my-auto">
-        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-6 sm:p-8 shadow-xl shadow-slate-200/50 dark:shadow-none">
-          <div className="flex flex-col items-center text-center mb-6">
-            <Logo size="md" />
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mt-4 mb-2">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Parolni almashtirish</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
-              {session.fullName}, siz mentor bergan vaqtinchalik parol bilan kirdingiz. Davom etish uchun faqat
-              o&apos;zingiz biladigan yangi parol o&apos;rnating.
-            </p>
-          </div>
-
-          <PasswordForm
-            idPrefix="first"
-            submitLabel="Parolni saqlash va davom etish"
-            buttonClassName="w-full mt-2 font-semibold"
-          />
-
-          <form action={logoutAction} className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-            <button
-              type="submit"
-              className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 underline-offset-4 hover:underline cursor-pointer min-h-[44px] px-3"
-            >
-              Boshqa hisob bilan kirish
-            </button>
-          </form>
-        </div>
-      </main>
-
-      <footer className="text-center py-4 text-xs text-slate-500 dark:text-slate-400">
-        &copy; {new Date().getFullYear()} ITXiva
-      </footer>
-    </div>
+      <PasswordForm idPrefix="first" submitLabel="Saqlash va davom etish" large buttonClassName="w-full !mt-6 font-semibold" />
+    </AuthShell>
   );
 }
