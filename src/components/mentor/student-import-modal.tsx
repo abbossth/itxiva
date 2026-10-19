@@ -5,6 +5,7 @@ import { Download, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { importStudentsAction, ImportedStudentResult } from "@/actions/student.actions";
+import { ColumnHeader, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
 
 interface StudentImportModalProps {
   isOpen: boolean;
@@ -139,24 +140,7 @@ export function StudentImportModal({
 
           {/* Table of created credentials */}
           <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 sticky top-0">
-                <tr>
-                  <th className="p-2.5 font-bold">FIO</th>
-                  <th className="p-2.5 font-bold">Login</th>
-                  <th className="p-2.5 font-bold">Parol</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
-                {credentials.map((c, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="p-2.5 font-medium">{c.fullName}</td>
-                    <td className="p-2.5 font-mono text-teal-600 dark:text-teal-400">{c.login}</td>
-                    <td className="p-2.5 font-mono font-bold text-amber-600 dark:text-amber-400">{c.password}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <CredentialsTable credentials={credentials} />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
@@ -178,5 +162,35 @@ export function StudentImportModal({
         </div>
       )}
     </Dialog>
+  );
+}
+
+const CREDENTIAL_COLUMNS: ColumnDef<ImportedStudentResult>[] = [
+  { key: "fullName", label: "FIO", value: (c) => c.fullName, filter: "text" },
+  { key: "login", label: "Login", value: (c) => c.login, filter: "text" },
+];
+
+/** Yaratilgan login va parollar — ism yoki login bo'yicha saralash/qidirish */
+function CredentialsTable({ credentials }: { credentials: ImportedStudentResult[] }) {
+  const table = useTableControls(credentials, CREDENTIAL_COLUMNS);
+  return (
+    <table className="w-full text-left text-xs">
+      <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 sticky top-0">
+        <tr>
+          <th className="p-2.5 font-bold"><ColumnHeader table={table} column="fullName">FIO</ColumnHeader></th>
+          <th className="p-2.5 font-bold"><ColumnHeader table={table} column="login">Login</ColumnHeader></th>
+          <th className="p-2.5 font-bold">Parol</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+        {table.rows.map((c) => (
+          <tr key={c.login} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+            <td className="p-2.5 font-medium">{c.fullName}</td>
+            <td className="p-2.5 font-mono text-teal-600 dark:text-teal-400">{c.login}</td>
+            <td className="p-2.5 font-mono font-bold text-amber-600 dark:text-amber-400">{c.password}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

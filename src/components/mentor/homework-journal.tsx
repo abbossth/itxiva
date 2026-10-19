@@ -1,8 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { HomeworkJournal as JournalData } from "@/actions/homework.actions";
 import { cn, formatDateTimeUz } from "@/lib/utils";
+import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
+
+type StudentRow = JournalData["students"][number];
+const COLUMNS: ColumnDef<StudentRow>[] = [
+  { key: "fullName", label: "O'quvchi", value: (st) => st.fullName, filter: "text" },
+  { key: "done", label: "Topshirdi", value: (st) => st.done },
+  { key: "avgScore", label: "O'rtacha", value: (st) => st.avgScore, filter: "range" },
+];
 
 function scoreClass(score: number) {
   if (score >= 85) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
@@ -23,15 +33,24 @@ export function HomeworkJournal({ journal }: { journal: JournalData | null }) {
   }
   // eslint-disable-next-line react-hooks/purity -- server komponent: har so'rovda bir marta hisoblanadi
   const now = Date.now();
+  return <JournalTable journal={journal} now={now} />;
+}
+
+function JournalTable({ journal, now }: { journal: JournalData; now: number }) {
   const total = journal.lessons.length;
+  // Ism, topshirganlar soni va o'rtacha ball bo'yicha saralash/filtr (ustun sarlavhasidan)
+  const table = useTableControls(journal.students, COLUMNS);
 
   return (
     <div className="space-y-2 page-enter">
+      <TableFilterBar table={table} />
       <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
-              <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold px-3 py-2 min-w-[160px]">O&apos;quvchi</th>
+              <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold px-3 py-2 min-w-[160px]">
+                <ColumnHeader table={table} column="fullName">O&apos;quvchi</ColumnHeader>
+              </th>
               {journal.lessons.map((l) => (
                 <th key={l._id} className="p-0 font-semibold">
                   <Link
@@ -44,11 +63,15 @@ export function HomeworkJournal({ journal }: { journal: JournalData | null }) {
                   </Link>
                 </th>
               ))}
-              <th className="px-3 py-2 font-bold text-right min-w-[96px]">Topshirdi · o&apos;rtacha</th>
+              <th className="px-3 py-2 font-bold text-right min-w-[120px] whitespace-nowrap">
+                <ColumnHeader table={table} column="done" align="right">Topshirdi</ColumnHeader>
+                <span className="mx-0.5 text-slate-400">·</span>
+                <ColumnHeader table={table} column="avgScore" align="right">o&apos;rtacha</ColumnHeader>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {journal.students.map((st, idx) => (
+            {table.rows.map((st, idx) => (
               <tr key={st.studentId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                 <td className="sticky left-0 z-10 bg-white dark:bg-surface px-3 py-1.5 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
                   <span className="text-slate-500 dark:text-slate-400 font-normal mr-1.5">{idx + 1}.</span>

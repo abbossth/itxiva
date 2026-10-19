@@ -6,6 +6,7 @@ import {
   getExamSubmissionsForMentor,
 } from "@/actions/exam.actions";
 import { Card } from "@/components/ui/card";
+import { SortableTable } from "@/components/ui/table-controls";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AiGradeButton } from "@/components/mentor/ai-grade-button";
@@ -116,97 +117,97 @@ export default async function ExamSubmissionsPage({ params }: ExamSubmissionsPag
           </Card>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500 border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="px-4 py-3">O&apos;quvchi</th>
-                  <th className="px-4 py-3">Guruh</th>
-                  <th className="px-4 py-3">Topshirilgan vaqt</th>
-                  <th className="px-4 py-3">Holat</th>
-                  <th className="px-4 py-3">Ball</th>
-                  <th className="px-4 py-3 text-right">Amal</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {submissions.map((sub) => {
-                  const isGraded = sub.status === "graded";
-                  const isNeedsReview = sub.status === "submitted";
-
-                  return (
-                    <tr
-                      key={sub._id}
-                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors ${
-                        sub.isMain || sub.status === "in_progress" ? "" : "opacity-60"
-                      }`}
-                    >
-                      <td className="px-4 py-3.5">
-                        <div className="font-semibold text-slate-900 dark:text-slate-100">
-                          {sub.studentName}
+            <SortableTable
+              tableClassName="w-full text-left text-sm"
+              theadClassName="bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500 border-b border-slate-200 dark:border-slate-800"
+              tbodyClassName="divide-y divide-slate-100 dark:divide-slate-800"
+              filterBarClassName="px-4 pt-3"
+              columns={[
+                { key: "student", label: "O'quvchi", thClassName: "px-4 py-3", tdClassName: "px-4 py-3.5", filter: "text" },
+                { key: "group", label: "Guruh", thClassName: "px-4 py-3", tdClassName: "px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300" },
+                { key: "submittedAt", label: "Topshirilgan vaqt", thClassName: "px-4 py-3", tdClassName: "px-4 py-3.5 text-xs text-slate-500", filter: false },
+                { key: "status", label: "Holat", thClassName: "px-4 py-3", tdClassName: "px-4 py-3.5", filter: "options" },
+                { key: "score", label: "Ball", thClassName: "px-4 py-3", tdClassName: "px-4 py-3.5 font-bold font-mono text-slate-900 dark:text-slate-100" },
+                { key: "actions", label: "Amal", thClassName: "px-4 py-3 text-right", tdClassName: "px-4 py-3.5 text-right", controls: false },
+              ]}
+              rows={submissions.map((sub) => {
+                const isGraded = sub.status === "graded";
+                const isNeedsReview = sub.status === "submitted";
+                const statusLabel = sub.lockedForViolations
+                  ? "Bloklangan"
+                  : isGraded
+                    ? sub.isPassed
+                      ? "O'tdi"
+                      : "Yetmadi"
+                    : isNeedsReview
+                      ? "Tekshirish kerak"
+                      : "Yechmoqda";
+                return {
+                  key: sub._id,
+                  className: `hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors ${sub.isMain || sub.status === "in_progress" ? "" : "opacity-60"}`,
+                  values: {
+                    student: sub.studentName,
+                    group: sub.groupName,
+                    submittedAt: sub.submittedAt ? new Date(sub.submittedAt).toISOString() : null,
+                    status: statusLabel,
+                    score: sub.maxScore > 0 ? Math.round((sub.totalScore / sub.maxScore) * 100) : sub.totalScore,
+                  },
+                  cells: [
+                    <>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{sub.studentName}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{sub.studentLogin}</div>
+                      {exam.maxAttempts > 1 && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <span>{sub.attemptNumber}-urinish</span>
+                          {sub.isMain ? <Badge variant="teal">Asosiy</Badge> : sub.status !== "in_progress" && <span>· oldingi</span>}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">{sub.studentLogin}</div>
-                        {exam.maxAttempts > 1 && (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            <span>{sub.attemptNumber}-urinish</span>
-                            {sub.isMain ? <Badge variant="teal">Asosiy</Badge> : sub.status !== "in_progress" && <span>· oldingi</span>}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-slate-600 dark:text-slate-300">
-                        {sub.groupName}
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-slate-500">
-                        {sub.submittedAt
-                          ? formatDateTimeUz(sub.submittedAt)
-                          : "Topshirilmagan"}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {sub.lockedForViolations ? (
-                          <Badge variant="rose" className="text-xs flex items-center gap-1 w-fit">
-                            <ShieldAlert className="w-3 h-3" />
-                            <span>Bloklangan</span>
-                          </Badge>
-                        ) : isGraded ? (
-                          <Badge variant={sub.isPassed ? "teal" : "rose"} className="text-xs">
-                            {sub.isPassed ? "O'tdi" : "Yetmadi"}
-                          </Badge>
-                        ) : isNeedsReview ? (
-                          <Badge variant="amber" className="text-xs flex items-center gap-1 w-fit">
-                            <Clock className="w-3 h-3" />
-                            <span>Tekshirish kerak</span>
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            Yechmoqda
-                          </Badge>
-                        )}
-                        {(sub.violations > 0 || sub.lockedForViolations) && (
-                          <div className="mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                            {sub.lockedForViolations
-                              ? `${MAX_EXAM_VIOLATIONS} ta ogohlantirish — 0 ball`
-                              : `${sub.violations}/${MAX_EXAM_VIOLATIONS} ogohlantirish`}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 font-bold font-mono text-slate-900 dark:text-slate-100">
-                        {sub.totalScore} / {sub.maxScore}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="inline-flex flex-wrap items-center justify-end gap-2">
-                          {sub.lockedForViolations && <ExamUnlockButton submissionId={sub._id} studentName={sub.studentName} />}
-                          <Link
-                            href={`/mentor/exams/${exam._id}/submissions/${sub._id}`}
-                            className={buttonVariants({ variant: "outline", size: "sm", className: "h-8 text-xs" })}
-                          >
-                            <span>Baholash</span>
-                            <ExternalLink className="w-3 h-3 ml-1" />
-                          </Link>
+                      )}
+                    </>,
+                    sub.groupName,
+                    sub.submittedAt ? formatDateTimeUz(sub.submittedAt) : "Topshirilmagan",
+                    <>
+                      {sub.lockedForViolations ? (
+                        <Badge variant="rose" className="text-xs flex items-center gap-1 w-fit">
+                          <ShieldAlert className="w-3 h-3" />
+                          <span>Bloklangan</span>
+                        </Badge>
+                      ) : isGraded ? (
+                        <Badge variant={sub.isPassed ? "teal" : "rose"} className="text-xs">
+                          {sub.isPassed ? "O'tdi" : "Yetmadi"}
+                        </Badge>
+                      ) : isNeedsReview ? (
+                        <Badge variant="amber" className="text-xs flex items-center gap-1 w-fit">
+                          <Clock className="w-3 h-3" />
+                          <span>Tekshirish kerak</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          Yechmoqda
+                        </Badge>
+                      )}
+                      {(sub.violations > 0 || sub.lockedForViolations) && (
+                        <div className="mt-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                          {sub.lockedForViolations
+                            ? `${MAX_EXAM_VIOLATIONS} ta ogohlantirish — 0 ball`
+                            : `${sub.violations}/${MAX_EXAM_VIOLATIONS} ogohlantirish`}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      )}
+                    </>,
+                    `${sub.totalScore} / ${sub.maxScore}`,
+                    <div key="a" className="inline-flex flex-wrap items-center justify-end gap-2">
+                      {sub.lockedForViolations && <ExamUnlockButton submissionId={sub._id} studentName={sub.studentName} />}
+                      <Link
+                        href={`/mentor/exams/${exam._id}/submissions/${sub._id}`}
+                        className={buttonVariants({ variant: "outline", size: "sm", className: "h-8 text-xs" })}
+                      >
+                        <span>Baholash</span>
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Link>
+                    </div>,
+                  ],
+                };
+              })}
+            />
           </div>
         )}
       </div>

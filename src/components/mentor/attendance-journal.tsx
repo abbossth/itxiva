@@ -10,6 +10,14 @@ import { getAttendanceJournal, AttendanceJournal as JournalData } from "@/action
 import { ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER } from "@/lib/attendance-status";
 import { UZ_WEEKDAYS_SHORT, getTashkentParts, dateFromKey, toDateKey } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
+import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
+
+type StudentRow = JournalData["students"][number];
+const NO_STUDENTS: StudentRow[] = [];
+const COLUMNS: ColumnDef<StudentRow>[] = [
+  { key: "fullName", label: "O'quvchi", value: (st) => st.fullName, filter: "text" },
+  { key: "percent", label: "Davomat", value: (st) => st.percent, filter: "range" },
+];
 
 const UZ_MONTHS = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
 
@@ -57,6 +65,8 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
   }, [groupId, monthKey]);
 
   const journal = isLoading ? null : result?.data ?? null;
+  // Ism va davomat foizi bo'yicha saralash/filtr (ustun sarlavhasidan)
+  const table = useTableControls(journal?.students ?? NO_STUDENTS, COLUMNS);
   const [year, month] = monthKey.split("-").map(Number);
   const isCurrentMonth = monthKey >= toDateKey().slice(0, 7);
 
@@ -130,12 +140,13 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
               ochib, &quot;O&apos;chirish&quot; tugmasi bilan olib tashlang — coinlar qayta hisoblanadi.
             </p>
           )}
+          <TableFilterBar table={table} />
           <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300">
                   <th className="sticky left-0 z-10 bg-slate-50 dark:bg-surface-2 text-left font-bold px-3 py-2 min-w-[160px]">
-                    O&apos;quvchi
+                    <ColumnHeader table={table} column="fullName">O&apos;quvchi</ColumnHeader>
                   </th>
                   {journal.sessions.map((s) => {
                     const weekday = getTashkentParts(dateFromKey(s.dateKey, "12:00")).weekday;
@@ -157,11 +168,13 @@ export function AttendanceJournal({ groupId, onManualEntry }: { groupId: string;
                       </th>
                     );
                   })}
-                  <th className="px-3 py-2 font-bold text-right min-w-[70px]">Davomat</th>
+                  <th className="px-3 py-2 font-bold text-right min-w-[70px]">
+                    <ColumnHeader table={table} column="percent" align="right">Davomat</ColumnHeader>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {journal.students.map((st, idx) => (
+                {table.rows.map((st, idx) => (
                   <tr key={st.studentId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                     <td className="sticky left-0 z-10 bg-white dark:bg-surface px-3 py-1.5 font-semibold text-slate-900 dark:text-slate-100 max-w-[200px] truncate">
                       <span className="text-slate-500 dark:text-slate-400 font-normal mr-1.5">{idx + 1}.</span>

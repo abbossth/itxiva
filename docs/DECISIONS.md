@@ -312,3 +312,7 @@ Ushbu hujjatda loyihani amalga oshirish davomida qabul qilingan texnik qarorlar,
 - O'quvchi: kirishda modal oynada; "Tushunarli" bosilguncha har kirishda chiqadi, bir nechta bo'lsa — navbat bilan. Yangi daraja va mukofot oynalari bilan navbat (`claimOverlay`/`releaseOverlay`): bir vaqtda bittasi. Bayram/tabrik e'lonida konfetti (effektlar yoqilgan bo'lsa).
 - Rasmlar vaqtinchalik havola bilan beriladi, fayl kaliti o'quvchiga berilmaydi — fayl serverda auditoriya tekshirilib ochiladi.
 - Statistika (`AnnouncementView`, o'quvchi+e'lon bo'yicha bitta yozuv): ko'rdi (necha marta), tushundi, nimani bosdi (havola/fayl/rasm); auditoriya ro'yxati filtr bilan (ko'rmaganlar, ko'rganlar, bosganlar).
+
+### [2026-10-19] T1: Jadvallarda saralash va filtr
+- Barcha jadvallarda (hisobotlar, guruh o'quvchilari, davomat va vazifa jurnallari, dars natijalari, imtihon javoblari, e'lon auditoriyasi, coin iqtisodiyoti, Yutuqlarim, import natijasi) ustun sarlavhasi bosilganda kichik menyu: o'sish/kamayish bo'yicha saralash va filtr. Filtr turi ustun qiymatlariga qarab o'zi tanlanadi: matn — qidiruv, kam xil qiymat — belgilash ro'yxati, raqamlar — "dan–gacha". Qiymati yo'q qatorlar saralashda doim oxirida.
+- `src/components/ui/table-controls.tsx`: `useTableControls` (client jadvallar o'z ko'rinishini saqlaydi), `SortableTable` (server sahifalar: kataklar serverda, saralash brauzerda). Filtr qo'yilganda jadval tepasida "N / M qator · Tozalash".

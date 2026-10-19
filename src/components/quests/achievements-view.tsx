@@ -9,6 +9,7 @@ import { CountUp } from "@/components/leaderboard/count-up";
 import { BadgeInfo } from "@/components/gamification/badge-info";
 import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
 import { cn, formatDateUz, formatNumberUz } from "@/lib/utils";
+import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
 
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-5";
 
@@ -228,52 +229,73 @@ export function AchievementsView({ data }: { data: AchievementsData }) {
           </p>
         ) : (
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-sm">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-900/50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <th className="px-4 sm:px-5 py-2 font-bold">Topshiriq</th>
-                  <th className="px-3 py-2 font-bold">Sana</th>
-                  <th className="px-3 py-2 font-bold">Holat</th>
-                  <th className="px-3 py-2 font-bold">Izoh</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.submissions.map((s) => (
-                  <tr key={s._id}>
-                    <td className="px-4 sm:px-5 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
-                      {s.title}
-                      {s.detail && <span className="font-normal text-slate-500"> · {s.detail}</span>}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 dark:text-slate-400">{formatDateUz(s.date)}</td>
-                    <td className="px-3 py-2.5">
-                      {s.revoked ? (
-                        <span className="rounded-md bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">Bekor qilindi</span>
-                      ) : s.status === "approved" ? (
-                        <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-300">+{s.coins}</span>
-                      ) : s.status === "pending" ? (
-                        <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:text-amber-300">Tekshiruvda</span>
-                      ) : (
-                        <span className="rounded-md bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">Rad etildi</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400">
-                      {s.reason || "—"}
-                      {s.status === "rejected" && !s.revoked && (
-                        <>
-                          {" "}
-                          <Link href={`/quests/${s.questId}`} className="font-semibold text-teal-700 dark:text-teal-400 underline">
-                            Qayta yuborish
-                          </Link>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SubmissionsTable submissions={data.submissions} />
           </div>
         )}
       </section>
     </div>
+  );
+}
+
+type Submission = AchievementsData["submissions"][number];
+const submissionStatus = (s: Submission) =>
+  s.revoked ? "Bekor qilindi" : s.status === "approved" ? "Tasdiqlandi" : s.status === "pending" ? "Tekshiruvda" : "Rad etildi";
+const SUBMISSION_COLUMNS: ColumnDef<Submission>[] = [
+  { key: "title", label: "Topshiriq", value: (s) => s.title, filter: "text" },
+  { key: "date", label: "Sana", value: (s) => s.date, filter: false },
+  { key: "status", label: "Holat", value: submissionStatus, filter: "options" },
+  { key: "reason", label: "Izoh", value: (s) => s.reason || null, filter: "text" },
+];
+
+/** Yuborganlarim: topshiriq, sana va holat bo'yicha saralash/filtr */
+function SubmissionsTable({ submissions }: { submissions: Submission[] }) {
+  const table = useTableControls(submissions, SUBMISSION_COLUMNS);
+  return (
+    <>
+      <TableFilterBar table={table} className="px-4 sm:px-5 pb-2" />
+      <table className="w-full min-w-[34rem] text-sm">
+        <thead>
+          <tr className="bg-slate-50 dark:bg-slate-900/50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th className="px-4 sm:px-5 py-2 font-bold"><ColumnHeader table={table} column="title">Topshiriq</ColumnHeader></th>
+            <th className="px-3 py-2 font-bold"><ColumnHeader table={table} column="date">Sana</ColumnHeader></th>
+            <th className="px-3 py-2 font-bold"><ColumnHeader table={table} column="status">Holat</ColumnHeader></th>
+            <th className="px-3 py-2 font-bold"><ColumnHeader table={table} column="reason">Izoh</ColumnHeader></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {table.rows.map((s) => (
+            <tr key={s._id}>
+              <td className="px-4 sm:px-5 py-2.5 font-semibold text-slate-900 dark:text-slate-100">
+                {s.title}
+                {s.detail && <span className="font-normal text-slate-500"> · {s.detail}</span>}
+              </td>
+              <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 dark:text-slate-400">{formatDateUz(s.date)}</td>
+              <td className="px-3 py-2.5">
+                {s.revoked ? (
+                  <span className="rounded-md bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">Bekor qilindi</span>
+                ) : s.status === "approved" ? (
+                  <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-300">+{s.coins}</span>
+                ) : s.status === "pending" ? (
+                  <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-800 dark:text-amber-300">Tekshiruvda</span>
+                ) : (
+                  <span className="rounded-md bg-rose-500/10 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:text-rose-300">Rad etildi</span>
+                )}
+              </td>
+              <td className="px-3 py-2.5 text-slate-600 dark:text-slate-400">
+                {s.reason || "—"}
+                {s.status === "rejected" && !s.revoked && (
+                  <>
+                    {" "}
+                    <Link href={`/quests/${s.questId}`} className="font-semibold text-teal-700 dark:text-teal-400 underline">
+                      Qayta yuborish
+                    </Link>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

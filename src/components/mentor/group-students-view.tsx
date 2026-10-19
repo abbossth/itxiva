@@ -28,6 +28,14 @@ import { ResetPasswordModal } from "@/components/mentor/reset-password-modal";
 import { CredentialsExport } from "@/components/mentor/credentials-export";
 import { moveStudentAction, deleteStudentAction } from "@/actions/student.actions";
 import { formatDateUz } from "@/lib/utils";
+import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
+
+const COLUMNS: ColumnDef<IUserData>[] = [
+  { key: "fullName", label: "O'quvchi", value: (s) => s.fullName, filter: "text" },
+  { key: "login", label: "Login", value: (s) => s.login, filter: "text" },
+  { key: "coins", label: "Coinlar", value: (s) => s.totalCoins ?? 0 },
+  { key: "lastLogin", label: "Oxirgi kirish", value: (s) => (s.lastLoginAt ? new Date(s.lastLoginAt).toISOString() : null), filter: false },
+];
 
 interface GroupStudentsViewProps {
   group: IGroupData;
@@ -61,11 +69,14 @@ export function GroupStudentsView({
 
   const { toast } = useToast();
 
-  const filtered = students.filter(
+  const searched = students.filter(
     (s) =>
       s.fullName.toLowerCase().includes(search.toLowerCase()) ||
       s.login.toLowerCase().includes(search.toLowerCase())
   );
+  // Ustun sarlavhasidan saralash va filtr
+  const table = useTableControls(searched, COLUMNS);
+  const filtered = table.rows;
 
   const handleMove = async () => {
     if (!studentToMove || !targetGroupId) return;
@@ -132,16 +143,18 @@ export function GroupStudentsView({
         </div>
       </div>
 
+      <TableFilterBar table={table} />
+
       {/* === DESKTOP TABLE VIEW (md and up) === */}
       <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
         <table className="w-full text-left text-xs sm:text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">
             <tr>
               <th className="px-4 py-2.5 font-bold w-12">#</th>
-              <th className="px-4 py-2.5 font-bold">O&apos;quvchi</th>
-              <th className="px-4 py-2.5 font-bold">Login</th>
-              <th className="px-4 py-2.5 font-bold text-center">Coinlar</th>
-              <th className="px-4 py-2.5 font-bold">Oxirgi kirish</th>
+              <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="fullName">O&apos;quvchi</ColumnHeader></th>
+              <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="login">Login</ColumnHeader></th>
+              <th className="px-4 py-2.5 font-bold text-center"><ColumnHeader table={table} column="coins" align="center">Coinlar</ColumnHeader></th>
+              <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="lastLogin">Oxirgi kirish</ColumnHeader></th>
               <th className="px-4 py-2.5 font-bold text-right">Amallar</th>
             </tr>
           </thead>

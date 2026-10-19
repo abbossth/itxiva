@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { updateGamificationSettingsAction } from "@/actions/settings.actions";
 import type { CoinEconomy } from "@/actions/economy.actions";
 import { cn, formatNumberUz } from "@/lib/utils";
+import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
 
 const card = "rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface p-4 sm:p-5";
 
@@ -161,30 +162,7 @@ export function CoinEconomyView({ data }: { data: CoinEconomy }) {
           {data.products.length === 0 ? (
             <p className="text-sm text-slate-500">Do&apos;konda faol mahsulot yo&apos;q.</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <th className="py-1.5 font-bold">Mahsulot</th>
-                  <th className="py-1.5 text-right font-bold">Narx</th>
-                  <th className="py-1.5 text-right font-bold">Hozir</th>
-                  <th className="py-1.5 text-right font-bold">Reja bilan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {data.products.map((p) => (
-                  <tr key={p.title}>
-                    <td className="py-2 font-semibold text-slate-900 dark:text-slate-100">{p.title}</td>
-                    <td className="py-2 text-right font-mono font-bold text-amber-700 dark:text-amber-400">{p.price}</td>
-                    <td className="py-2 text-right">
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", monthsTone(p.monthsNow))}>{months(p.monthsNow)}</span>
-                    </td>
-                    <td className="py-2 text-right">
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", monthsTone(p.monthsPlan))}>{months(p.monthsPlan)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ProductsTable products={data.products} />
           )}
           <div className="mt-4 rounded-xl bg-teal-500/10 p-3">
             <div className="mb-1.5 text-sm font-bold text-teal-800 dark:text-teal-200">Arzon, lekin qadrli imtiyozlar qo&apos;shing</div>
@@ -289,5 +267,47 @@ export function CoinEconomyView({ data }: { data: CoinEconomy }) {
         </section>
       </div>
     </div>
+  );
+}
+
+type ProductRow = CoinEconomy["products"][number];
+const PRODUCT_COLUMNS: ColumnDef<ProductRow>[] = [
+  { key: "title", label: "Mahsulot", value: (p) => p.title, filter: "text" },
+  { key: "price", label: "Narx", value: (p) => p.price },
+  { key: "monthsNow", label: "Hozir", value: (p) => p.monthsNow },
+  { key: "monthsPlan", label: "Reja bilan", value: (p) => p.monthsPlan },
+];
+
+/** Mahsulotlar: o'rtacha o'quvchi necha oyda yig'adi (hozir va reja bilan) — ustun bo'yicha saralash/filtr */
+function ProductsTable({ products }: { products: ProductRow[] }) {
+  const table = useTableControls(products, PRODUCT_COLUMNS);
+  return (
+    <>
+      <TableFilterBar table={table} className="mb-1" />
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th className="py-1.5 font-bold"><ColumnHeader table={table} column="title">Mahsulot</ColumnHeader></th>
+            <th className="py-1.5 text-right font-bold"><ColumnHeader table={table} column="price" align="right">Narx</ColumnHeader></th>
+            <th className="py-1.5 text-right font-bold"><ColumnHeader table={table} column="monthsNow" align="right">Hozir</ColumnHeader></th>
+            <th className="py-1.5 text-right font-bold"><ColumnHeader table={table} column="monthsPlan" align="right">Reja bilan</ColumnHeader></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {table.rows.map((p) => (
+            <tr key={p.title}>
+              <td className="py-2 font-semibold text-slate-900 dark:text-slate-100">{p.title}</td>
+              <td className="py-2 text-right font-mono font-bold text-amber-700 dark:text-amber-400">{p.price}</td>
+              <td className="py-2 text-right">
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", monthsTone(p.monthsNow))}>{months(p.monthsNow)}</span>
+              </td>
+              <td className="py-2 text-right">
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", monthsTone(p.monthsPlan))}>{months(p.monthsPlan)}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

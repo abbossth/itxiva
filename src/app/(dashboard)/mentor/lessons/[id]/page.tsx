@@ -17,7 +17,8 @@ import { QuizView } from "@/components/quiz/quiz-view";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
-import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS, type HomeworkState } from "@/lib/homework-status";
+import { LessonResultsTable } from "@/components/mentor/lesson-results-table";
+import { type HomeworkState } from "@/lib/homework-status";
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { groupShortName } from "@/lib/group-name";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,6 @@ export const metadata = {
   title: "Dars — ITXiva",
 };
 
-const pill = "inline-block min-w-[3.5rem] px-2 py-1 rounded-lg text-xs font-bold tabular-nums text-center";
 
 export default async function MentorLessonViewPage({ params }: { params: Promise<{ id: string }> }) {
   await requireMentorPage();
@@ -256,48 +256,7 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
             ) : rows.length === 0 ? (
               <p className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">Guruhda o&apos;quvchi yo&apos;q</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-                      <th className="py-2 pr-2 text-left font-bold">O&apos;quvchi</th>
-                      {roster && <th className="px-2 py-2 text-center font-bold">Uyga vazifa</th>}
-                      {quiz && <th className="px-2 py-2 text-center font-bold">Test</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {rows.map((r) => (
-                      <tr key={r.id}>
-                        <td className="py-1.5 pr-2">
-                          <Link href={`/mentor/students/${r.id}`} className="font-semibold text-slate-900 dark:text-slate-100 hover:text-teal-700 dark:hover:text-teal-300 hover:underline">
-                            {r.fullName}
-                          </Link>
-                        </td>
-                        {roster && (
-                          <td className="px-2 py-1.5 text-center">
-                            {r.homeworkScore !== null ? (
-                              <span className={cn(pill, SCORE_TONE[scoreTone(r.homeworkScore)].soft)}>{r.homeworkScore} / 100</span>
-                            ) : (
-                              <Badge variant={HOMEWORK_STATE_BADGE[r.homeworkState]}>{HOMEWORK_STATE_LABELS[r.homeworkState]}</Badge>
-                            )}
-                          </td>
-                        )}
-                        {quiz && (
-                          <td className="px-2 py-1.5 text-center">
-                            {r.quiz ? (
-                              <span className={cn(pill, SCORE_TONE[scoreTone(r.quiz.percent)].soft)}>
-                                {r.quiz.score} / {r.quiz.max}
-                              </span>
-                            ) : (
-                              <span className={cn(pill, SCORE_TONE.none.soft)}>—</span>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <LessonResultsTable rows={rows} showHomework={Boolean(roster)} showQuiz={Boolean(quiz)} />
             )}
           </section>
         </LessonTabPanel>
