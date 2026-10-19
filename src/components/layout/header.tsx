@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { LogOut, User as UserIcon, ShieldCheck } from "lucide-react";
+import { LogOut, Settings, User as UserIcon, ShieldCheck } from "lucide-react";
+import { selectLessonTab } from "@/components/lessons/lesson-tabs";
 import { Logo } from "@/components/layout/logo";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchButton } from "@/components/layout/command-palette-trigger";
@@ -159,6 +160,20 @@ export function Header({ user, balance = null, ambience, level = null }: HeaderP
               >
                 <UserIcon className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <span>Mening profilim</span>
+              </Link>
+            )}
+            {user.role === "student" && (
+              <Link
+                href="/profile?tab=settings"
+                onClick={() => {
+                  setSheetOpen(false);
+                  // Profil allaqachon ochiq bo'lsa ham Sozlamalar tabiga o'tadi
+                  selectLessonTab("settings");
+                }}
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition-colors min-h-[44px]"
+              >
+                <Settings className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                <span>Sozlamalar</span>
               </Link>
             )}
             {user.role === "mentor" && (

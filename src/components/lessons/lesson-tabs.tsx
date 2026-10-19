@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, BookOpen, ClipboardCheck, HelpCircle, Link2, Paperclip, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, ClipboardCheck, HelpCircle, Link2, Paperclip, Settings, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * Yashirin tablar ham sahifada qoladi — yozilgan javob yoki forma tab almashganda yo'qolmaydi.
  */
 
-export type LessonTabIcon = "lesson" | "materials" | "homework" | "quiz" | "results" | "groups";
+export type LessonTabIcon = "lesson" | "materials" | "homework" | "quiz" | "results" | "groups" | "profile" | "settings";
 
 const ICONS: Record<LessonTabIcon, LucideIcon> = {
   lesson: BookOpen,
@@ -21,6 +21,8 @@ const ICONS: Record<LessonTabIcon, LucideIcon> = {
   quiz: HelpCircle,
   results: BarChart3,
   groups: Link2,
+  profile: User,
+  settings: Settings,
 };
 
 export interface LessonTabDef {
@@ -57,11 +59,14 @@ export function LessonTabs({
   defaultTab,
   children,
   className,
+  ariaLabel = "Dars bo'limlari",
 }: {
   tabs: LessonTabDef[];
   defaultTab?: string;
   children: React.ReactNode;
   className?: string;
+  /** Tablar ro'yxati nomi (ekran o'quvchilar uchun); boshqa sahifalarda ham ishlatiladi, masalan profil */
+  ariaLabel?: string;
 }) {
   // Birinchi ochilishda — manzildagi ?tab= (server ham aynan shuni chizadi), keyin — bosilgan tab
   const searchParams = useSearchParams();
@@ -117,7 +122,7 @@ export function LessonTabs({
           >
             <div
               role="tablist"
-              aria-label="Dars bo'limlari"
+              aria-label={ariaLabel}
               onKeyDown={onKeyDown}
               className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
