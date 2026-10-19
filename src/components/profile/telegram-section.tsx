@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BellRing, CheckCircle2, ExternalLink, Loader2, Send, Unplug } from "lucide-react";
+import { BellRing, CheckCircle2, Coins, ExternalLink, Loader2, Send, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
@@ -13,6 +13,7 @@ import {
   type TelegramStatus,
 } from "@/actions/telegram.actions";
 import { notificationsForRole } from "@/lib/notifications/types";
+import { requestRewardCheck } from "@/lib/rewards-client";
 import { formatDateUz } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 3000;
@@ -35,16 +36,19 @@ export function TelegramSection({ initial, role }: { initial: TelegramStatus; ro
       try {
         const fresh = await getTelegramStatus();
         if (fresh.linked) {
+          const rewarded = Boolean(fresh.reward?.received && !status.reward?.received);
           setStatus(fresh);
           setLinkUrl(null);
-          toast.success("Telegram ulandi!");
+          toast.success(rewarded ? `Telegram ulandi! +${fresh.reward?.amount} coin` : "Telegram ulandi!");
+          // Ulangani uchun coin berildi — mukofot oynasi
+          if (rewarded) requestRewardCheck();
         }
       } catch {
         // tarmoq uzilsa keyingi urinishda qayta so'raladi
       }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [linkUrl, status.linked, toast]);
+  }, [linkUrl, status.linked, status.reward?.received, toast]);
 
   const handleLink = async () => {
     try {
@@ -95,8 +99,9 @@ export function TelegramSection({ initial, role }: { initial: TelegramStatus; ro
 
   return (
     <section
+      id="telegram"
       aria-labelledby="telegram-heading"
-      className="p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5"
+      className="scroll-mt-36 p-6 rounded-3xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
         <h2 id="telegram-heading" className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -127,6 +132,12 @@ export function TelegramSection({ initial, role }: { initial: TelegramStatus; ro
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Vazifa tekshirilganda, yangi dars chiqqanda yoki buyurtma holati o&apos;zgarganda xabar Telegram&apos;ga keladi.
           </p>
+          {status.reward && !status.reward.received && (
+            <p className="flex w-fit items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-900 ring-1 ring-amber-500/25 dark:text-amber-200">
+              <Coins className="h-4 w-4 shrink-0" />
+              Ulasangiz — +{status.reward.amount} coin
+            </p>
+          )}
           {linkUrl ? (
             <div role="status" className="rounded-2xl border border-teal-500/40 bg-teal-50 dark:bg-teal-500/10 p-4 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">

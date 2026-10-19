@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
+import { TELEGRAM_LINK_REWARD, rewardTelegramLink } from "@/lib/telegram/reward";
 
 export const LINK_TOKEN_TTL_MS = 10 * 60 * 1000;
 
@@ -18,7 +19,7 @@ export async function createTelegramLinkToken(userId: string): Promise<string> {
 }
 
 export type LinkResult =
-  | { ok: true; fullName: string; role: "mentor" | "student" }
+  | { ok: true; fullName: string; role: "mentor" | "student"; rewarded: number }
   | { ok: false; reason: "invalid" | "expired" };
 
 /**
@@ -52,7 +53,17 @@ export async function consumeTelegramLinkToken(
     .select("fullName role")
     .lean();
   if (!linked) return { ok: false, reason: "invalid" };
-  return { ok: true, fullName: linked.fullName, role: linked.role };
+
+  // O'quvchiga ulagani uchun bir martalik coin; mukofot xato bersa ham ulanish o'z kuchida qoladi
+  let rewarded = 0;
+  if (linked.role === "student") {
+    try {
+      if (await rewardTelegramLink(String(linked._id))) rewarded = TELEGRAM_LINK_REWARD;
+    } catch (error) {
+      console.error("[telegram] ulash mukofotini berib bo'lmadi", error);
+    }
+  }
+  return { ok: true, fullName: linked.fullName, role: linked.role, rewarded };
 }
 
 export async function unlinkTelegram(userId: string): Promise<void> {

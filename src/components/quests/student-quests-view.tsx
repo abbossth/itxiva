@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, ShieldCheck, Sparkles, Target, Zap } from "lucide-react";
+import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, Send, ShieldCheck, Sparkles, Target, UserRoundCheck, Zap } from "lucide-react";
 import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
+import type { OneTimeTask } from "@/lib/onboarding-rewards";
 import { TIER_LABEL } from "@/lib/gamification/badges";
 import { BadgeMedal } from "@/components/gamification/badge-medal";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
@@ -74,6 +75,65 @@ function DailyCard({ card }: { card: StudentQuestCard }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+const ONE_TIME_ICON = { profile: UserRoundCheck, telegram: Send } as const;
+
+/** Bir martalik topshiriq: profilni to'ldirish yoki Telegram'ni ulash — bajarilguncha Sozlamalarga olib boradi */
+function OneTimeCard({ task }: { task: OneTimeTask }) {
+  const Icon = ONE_TIME_ICON[task.id];
+  const percent = task.progress ? Math.round((task.progress.current / task.progress.target) * 100) : null;
+  const body = (
+    <>
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            "grid h-10 w-10 place-items-center rounded-xl",
+            task.done ? "bg-emerald-500/15 text-emerald-600" : "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+          )}
+        >
+          {task.done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+        </span>
+        <span className="rounded-lg bg-amber-500/10 px-2 py-1 font-mono text-xs font-bold text-amber-700 dark:text-amber-400">+{task.coins} coin</span>
+      </div>
+      <div>
+        <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{task.title}</div>
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{task.description}</p>
+      </div>
+      {task.done ? (
+        <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Bajarildi · coin olingan</div>
+      ) : (
+        <div className="flex items-center gap-3">
+          {percent !== null ? (
+            <>
+              <XpBar percent={percent} className="flex-1" />
+              <span className="font-mono text-xs tabular-nums text-slate-600 dark:text-slate-400">{percent}%</span>
+            </>
+          ) : (
+            <span className="flex-1" />
+          )}
+          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-teal-700 dark:text-teal-400">
+            {task.id === "telegram" ? "Ulash" : "To'ldirish"}
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      )}
+    </>
+  );
+  const box = "rounded-2xl border p-4 space-y-3 block";
+  return task.done ? (
+    <div className={cn(box, "border-emerald-500/30 bg-emerald-500/5")}>{body}</div>
+  ) : (
+    <Link
+      href={task.href}
+      className={cn(
+        box,
+        "border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface transition-colors hover:border-teal-500/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
+      )}
+    >
+      {body}
+    </Link>
   );
 }
 
@@ -200,6 +260,8 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
   const daily = data.daily.filter((c) => matches(c, tab));
   const main = data.main.filter((c) => matches(c, tab));
   const weekly = data.weekly && matches(data.weekly, tab) ? data.weekly : null;
+  // Bir martalik: bajarilmaganlari "Barchasi"/"Faol"da, bajarilganlari faqat "Bajarilgan"da (doim ko'rinib turmasin)
+  const oneTime = data.oneTime.filter((t) => (tab === "done" ? t.done : tab === "pending" ? false : !t.done));
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "all", label: "Barchasi" },
     { id: "active", label: "Faol" },
@@ -356,6 +418,19 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
               <div className="grid gap-3 sm:grid-cols-3">
                 {daily.map((c) => (
                   <DailyCard key={c.quest._id} card={c} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {oneTime.length > 0 && (
+            <section aria-labelledby="one-time-title" className="space-y-2">
+              <h2 id="one-time-title" className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Bir martalik topshiriqlar
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {oneTime.map((t) => (
+                  <OneTimeCard key={t.id} task={t} />
                 ))}
               </div>
             </section>

@@ -116,6 +116,36 @@ describe("telegram: hisobni ulash", () => {
   });
 });
 
+describe("telegram: ulagani uchun coin", () => {
+  it("o'quvchi bir marta +5 coin oladi: uzib qayta ulash ikkinchi marta bermaydi", async () => {
+    const user = await mkUser("ali");
+    await webhook.POST(update(`/start ${await createTelegramLinkToken(user._id.toString())}`));
+    expect(sent.at(-1)?.text).toContain("+5 coin");
+    expect((await User.findById(user._id).lean())?.spendableBalance).toBe(5);
+
+    actAs(sessionFor(user));
+    expect((await telegramActions.getTelegramStatus()).reward).toEqual({ amount: 5, received: true });
+    await telegramActions.unlinkTelegramAction();
+    await webhook.POST(update(`/start ${await createTelegramLinkToken(user._id.toString())}`));
+    expect(sent.at(-1)?.text).not.toContain("coin");
+    expect((await User.findById(user._id).lean())?.spendableBalance).toBe(5);
+  });
+
+  it("avvalroq ulab qo'ygan o'quvchi holatni ochganda oladi; mentorga berilmaydi", async () => {
+    const student = await mkUser("ali");
+    await User.updateOne({ _id: student._id }, { $set: { telegram: { chatId: "555", username: null, linkedAt: new Date() } } });
+    actAs(sessionFor(student));
+    expect((await telegramActions.getTelegramStatus()).reward?.received).toBe(true);
+    expect((await User.findById(student._id).lean())?.spendableBalance).toBe(5);
+
+    const mentor = await mkUser("ustoz", "mentor");
+    await webhook.POST(update(`/start ${await createTelegramLinkToken(mentor._id.toString())}`, 888));
+    expect((await User.findById(mentor._id).lean())?.spendableBalance ?? 0).toBe(0);
+    actAs(sessionFor(mentor));
+    expect((await telegramActions.getTelegramStatus()).reward).toBeNull();
+  });
+});
+
 describe("telegram: webhook himoyasi", () => {
   it("maxfiy sarlavhasiz yoki noto'g'ri sarlavha bilan so'rov rad etiladi", async () => {
     const user = await mkUser("ali");

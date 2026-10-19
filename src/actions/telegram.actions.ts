@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
+import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
+import { TELEGRAM_LINK_REWARD, rewardTelegramLink, telegramRewardKey } from "@/lib/telegram/reward";
 import { requireAuth } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getBotUsername, isTelegramConfigured } from "@/lib/telegram/api";
@@ -17,6 +19,8 @@ export interface TelegramStatus {
   username: string | null;
   linkedAt: string | null;
   prefs: Record<string, boolean>;
+  /** O'quvchi uchun: ulagani uchun bir martalik coin, olinganmi */
+  reward: { amount: number; received: boolean } | null;
 }
 
 export async function getTelegramStatus(): Promise<TelegramStatus> {
@@ -29,12 +33,22 @@ export async function getTelegramStatus(): Promise<TelegramStatus> {
     prefs[option.type] = user?.notificationPrefs?.[option.type] !== false;
   }
 
+  // Avvalroq ulab qo'ygan o'quvchi ham mukofotni oladi (kalit bilan — bir marta)
+  const linked = Boolean(user?.telegram?.chatId);
+  let reward: TelegramStatus["reward"] = null;
+  if (session.role === "student") {
+    if (linked) await rewardTelegramLink(session.userId);
+    const received = await CoinLedger.exists({ studentId: session.userId, idempotencyKey: telegramRewardKey(session.userId) });
+    reward = { amount: TELEGRAM_LINK_REWARD, received: Boolean(received) };
+  }
+
   return {
     available: isTelegramConfigured() && Boolean(getBotUsername()),
-    linked: Boolean(user?.telegram?.chatId),
+    linked,
     username: user?.telegram?.username ?? null,
     linkedAt: user?.telegram?.linkedAt ? new Date(user.telegram.linkedAt).toISOString() : null,
     prefs,
+    reward,
   };
 }
 

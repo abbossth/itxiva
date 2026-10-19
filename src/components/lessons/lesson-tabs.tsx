@@ -85,9 +85,14 @@ export function LessonTabs({
     };
     const onSelect = (e: Event) => show((e as CustomEvent<string>).detail);
     window.addEventListener(TAB_EVENT, onSelect);
-    // Eski havolalar (#homework) — mos tabga o'tkaziladi
+    // Eski havolalar (#homework) — mos tabga o'tkaziladi; tab bo'lmagan #id (masalan, #telegram) — shu bo'limga aylantiriladi
     const hash = window.location.hash.slice(1);
-    const timer = hash ? window.setTimeout(() => show(hash), 0) : undefined;
+    const timer = hash
+      ? window.setTimeout(() => {
+          if (ids.split(",").includes(hash)) show(hash);
+          else document.getElementById(hash)?.scrollIntoView({ block: "start" });
+        }, 0)
+      : undefined;
     return () => {
       window.removeEventListener(TAB_EVENT, onSelect);
       window.clearTimeout(timer);

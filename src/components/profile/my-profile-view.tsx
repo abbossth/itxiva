@@ -78,6 +78,10 @@ export function MyProfileView({
   const { student, attendance } = report;
   const { homeworkAvg, quizAvg, examAvg } = reportAverages(report);
 
+  const pendingReward =
+    (data.profileReward.received ? 0 : data.profileReward.amount) +
+    (telegram.available && telegram.reward && !telegram.reward.received ? telegram.reward.amount : 0);
+
   const activity = useMemo(
     () =>
       buildActivity(
@@ -104,8 +108,8 @@ export function MyProfileView({
 
       {/* Ikki bo'lim: profil (natijalar va tarix) va sozlamalar; tanlangani manzilda ?tab= bo'lib turadi */}
       <LessonTabs
-        // Profil 100% bo'lmaguncha Sozlamalar tabida coin eslatmasi turadi
-        tabs={data.profileReward.received ? PROFILE_TABS : PROFILE_TABS.map((t) => (t.id === "settings" ? { ...t, meta: `+${data.profileReward.amount}`, tone: "attention" as const } : t))}
+        // Olinmagan bir martalik mukofotlar (profil 100%, Telegram) Sozlamalar tabida eslatib turiladi
+        tabs={pendingReward > 0 ? PROFILE_TABS.map((t) => (t.id === "settings" ? { ...t, meta: `+${pendingReward}`, tone: "attention" as const } : t)) : PROFILE_TABS}
         ariaLabel="Profil bo'limlari"
       >
         <LessonTabPanel id="profile" className="space-y-4">

@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
       if (result.ok) {
         await sendTelegramMessage(
           chatId,
-          `✅ <b>Hisobingiz ulandi</b>\n${escapeHtml(result.fullName)} (${result.role === "mentor" ? "mentor" : "o'quvchi"})\n\nEndi bildirishnomalar shu yerga keladi. Qaysi xabarlar kelishini saytdagi profilingizda sozlashingiz mumkin.`,
+          `✅ <b>Hisobingiz ulandi</b>\n${escapeHtml(result.fullName)} (${result.role === "mentor" ? "mentor" : "o'quvchi"})\n\nEndi bildirishnomalar shu yerga keladi. Qaysi xabarlar kelishini saytdagi profilingizda sozlashingiz mumkin.${
+            result.rewarded > 0 ? `\n\n🎁 Ulaganingiz uchun <b>+${result.rewarded} coin</b>!` : ""
+          }`,
           SITE_URL.startsWith("https://") ? { text: "Profilni ochish", url: `${SITE_URL}/profile` } : null
         );
       } else {

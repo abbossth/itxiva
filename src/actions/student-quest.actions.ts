@@ -26,6 +26,7 @@ import { BADGES, nextTier, type BadgeId, type BadgeTier } from "@/lib/gamificati
 import { effectiveStreak } from "@/lib/gamification/streak";
 import { groupShortName } from "@/lib/group-name";
 import { dateFromKey } from "@/lib/schedule";
+import { oneTimeTasks, type OneTimeTask } from "@/lib/onboarding-rewards";
 
 export type StudentQuestState = "available" | "pending" | "done" | "rejected" | "limit";
 
@@ -61,6 +62,8 @@ export interface StudentQuestsData {
   milestones: MilestoneView[];
   /** Ochiq guruh chellenji (joriy oy davomati) */
   challenge: ChallengeView | null;
+  /** Bir martalik: profilni to'ldirish, Telegram'ni ulash */
+  oneTime: OneTimeTask[];
 }
 
 export interface MilestoneView {
@@ -129,6 +132,8 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
   if (!scope) return null;
   // Sahifa ochilganda ham shartlar tekshiriladi (masalan, kecha boshlangan seriya)
   await evaluateAutoQuests(scope._id, gamification);
+  // Bir martalik topshiriqlar (shart bajarilgan bo'lsa coin shu yerda beriladi — balans undan keyin o'qiladi)
+  const oneTime = await oneTimeTasks(String(scope._id));
 
   const user = await User.findById(scope._id).select("xp spendableBalance streak streakShields groupId").lean();
   if (!user) return null;
@@ -249,6 +254,7 @@ export async function getStudentQuestsData(): Promise<StudentQuestsData | null> 
     },
     milestones,
     challenge,
+    oneTime,
   };
 }
 

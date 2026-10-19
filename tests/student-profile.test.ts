@@ -170,3 +170,21 @@ describe("profil 100% uchun coin", () => {
     expect((await User.findById(student._id).lean())?.spendableBalance).toBe(10);
   });
 });
+
+describe("bir martalik topshiriqlar", () => {
+  it("profil: nechta maydon to'ldirilgani ko'rinadi, to'liq bo'lganda bajarildi; bot sozlanmagan bo'lsa Telegram yo'q", async () => {
+    const { oneTimeTasks } = await import("@/lib/onboarding-rewards");
+    const student = await loginAs("ali", "student");
+    await openEditing(true);
+    await actions.updateOwnProfileAction(filledBase);
+
+    const before = await oneTimeTasks(student._id.toString());
+    expect(before.map((t) => t.id)).toEqual(["profile"]);
+    expect(before[0]).toMatchObject({ done: false, coins: 10, progress: { current: 9, target: 12 } });
+
+    await actions.updateOwnProfileAction({ ...filledBase, ...birthCert });
+    const after = await oneTimeTasks(student._id.toString());
+    expect(after[0].done).toBe(true);
+    expect((await User.findById(student._id).lean())?.spendableBalance).toBe(10);
+  });
+});

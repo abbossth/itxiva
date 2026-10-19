@@ -8,7 +8,7 @@ import { StudentProfile, type Gender } from "@/lib/db/models/student-profile.mod
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { getAppSettings } from "@/lib/settings";
-import { decryptField, encryptField } from "@/lib/field-crypto";
+import { encryptField } from "@/lib/field-crypto";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { ownProfileSchema, studentProfileSchema, type OwnProfileInput, type StudentProfileInput } from "@/lib/validations/student-profile.schema";
 import { getMyReport, getStudentReport, type StudentReport } from "@/actions/report.actions";
@@ -24,14 +24,14 @@ import { groupMonthAttendance } from "@/lib/gamification/achievements";
 import { formatSchedule, getNextLesson } from "@/lib/schedule";
 import { describeAudit } from "@/lib/audit-format";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { awardCoins } from "@/lib/gamification/award";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
-import { PROFILE_COMPLETE_REWARD, profileCompleteness, profileRewardKey } from "@/lib/profile-completeness";
+import { PROFILE_COMPLETE_REWARD, profileRewardKey } from "@/lib/profile-completeness";
+import { loadProfile, toOwnData } from "@/lib/student-profile-data";
+import { rewardCompleteProfile } from "@/lib/onboarding-rewards";
 import type { ActionResult } from "./auth.actions";
 
 /** Faqat sana ("YYYY-MM-DD") sifatida saqlanadigan maydonlar: UTC yarim tunda yoziladi, vaqt zonasiga bog'liq emas */
 const toDate = (key: string) => (key ? new Date(`${key}T00:00:00Z`) : null);
-const toKey = (d?: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
 export type StudentPersonalData = Omit<StudentProfileInput, "fullName">;
 
@@ -52,33 +52,6 @@ export interface StudentProfileData {
   createdAt: string | null;
   mustChangePassword: boolean;
   telegramLinked: boolean;
-}
-
-type ProfileLean = Awaited<ReturnType<typeof loadProfile>>;
-const loadProfile = (studentId: string) => StudentProfile.findOne({ studentId }).lean();
-
-/** Bazadagi hujjatdan forma qiymatlari (mentor izohisiz) */
-function toOwnData(profile: ProfileLean): OwnProfileInput {
-  return {
-    birthDate: toKey(profile?.birthDate),
-    gender: profile?.gender ?? "",
-    phone: profile?.phone ?? "",
-    address: profile?.address ?? "",
-    school: profile?.school ?? "",
-    fatherName: profile?.fatherName ?? "",
-    fatherPhone: profile?.fatherPhone ?? "",
-    motherName: profile?.motherName ?? "",
-    motherPhone: profile?.motherPhone ?? "",
-    documentType: profile?.documentType ?? "",
-    birthCertNumber: decryptField(profile?.birthCertNumberEnc),
-    birthCertIssuedAt: toKey(profile?.birthCertIssuedAt),
-    birthCertIssuedBy: profile?.birthCertIssuedBy ?? "",
-    passportNumber: decryptField(profile?.passportNumberEnc),
-    passportIssuedAt: toKey(profile?.passportIssuedAt),
-    passportExpiresAt: toKey(profile?.passportExpiresAt),
-    passportIssuedBy: profile?.passportIssuedBy ?? "",
-    pinfl: decryptField(profile?.pinflEnc),
-  };
 }
 
 /** Forma qiymatlaridan bazaga yoziladigan maydonlar (hujjat raqamlari shifrlanadi) */
@@ -103,24 +76,6 @@ function toStoredFields(d: OwnProfileInput) {
     passportIssuedBy: d.passportIssuedBy,
     pinflEnc: encryptField(d.pinfl),
   };
-}
-
-/**
- * Profil 100% to'ldirilgan bo'lsa o'quvchiga bir marta coin beriladi (kalit bilan — qayta saqlash yoki
- * qayta ochish ikkinchi marta bermaydi). Kim to'ldirgani muhim emas: tahrirlash yopiq bo'lsa mentor to'ldiradi.
- * Qaytaradi: hozir berildimi.
- */
-async function rewardCompleteProfile(studentId: string, data: OwnProfileInput): Promise<boolean> {
-  if (!profileCompleteness(data).complete) return false;
-  const res = await awardCoins({
-    studentId,
-    coin: PROFILE_COMPLETE_REWARD,
-    type: "bonus",
-    description: "Profil 100% to'ldirildi",
-    idempotencyKey: profileRewardKey(studentId),
-    notifyReason: "Profil 100% to'ldirildi",
-  });
-  return res.ok && res.applied;
 }
 
 async function photoUrlOf(key?: string | null): Promise<string | null> {
