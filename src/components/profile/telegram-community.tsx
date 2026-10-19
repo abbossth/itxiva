@@ -48,24 +48,7 @@ export function TelegramCommunityBadge({
         className
       )}
     >
-      <div className="flex shrink-0 -space-x-1.5" aria-hidden>
-        {recent.map((initials, i) => (
-          <span
-            key={i}
-            className={cn(
-              "flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br text-[10px] font-bold tracking-tight text-white ring-2 ring-white dark:ring-surface",
-              AVATAR_TONES[i % AVATAR_TONES.length]
-            )}
-          >
-            {initials}
-          </span>
-        ))}
-        {others > 0 && (
-          <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-bold tabular-nums text-slate-700 ring-2 ring-white dark:bg-slate-800 dark:text-slate-200 dark:ring-surface">
-            +{others}
-          </span>
-        )}
-      </div>
+      <TelegramAvatarStack recent={recent} others={others} />
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
           <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
@@ -93,6 +76,38 @@ export function TelegramCommunityBadge({
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Oxirgi ulaganlarning bosh harflari ustma-ust doirachalarda, qolganlari "+N" */
+export function TelegramAvatarStack({ recent, others, size = "sm" }: { recent: string[]; others: number; size?: "sm" | "md" }) {
+  const box = size === "md" ? "h-9 w-9 text-[11px]" : "h-8 w-8 text-[10px]";
+  return (
+    <div className="flex shrink-0 -space-x-1.5" aria-hidden>
+      {recent.map((initials, i) => (
+        <span
+          key={i}
+          className={cn(
+            "flex items-center justify-center rounded-full bg-linear-to-br font-bold tracking-tight text-white ring-2 ring-white dark:ring-surface",
+            box,
+            AVATAR_TONES[i % AVATAR_TONES.length]
+          )}
+        >
+          {initials}
+        </span>
+      ))}
+      {others > 0 && (
+        <span
+          className={cn(
+            "flex min-w-8 items-center justify-center rounded-full bg-slate-100 px-1.5 font-bold tabular-nums text-slate-700 ring-2 ring-white dark:bg-slate-800 dark:text-slate-200 dark:ring-surface",
+            box,
+            "w-auto"
+          )}
+        >
+          +{others}
+        </span>
+      )}
     </div>
   );
 }

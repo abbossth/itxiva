@@ -34,16 +34,27 @@ export async function telegramCommunity(groupId?: string | mongoose.Types.Object
     User.countDocuments(active),
     groupId ? User.countDocuments({ role: "student", groupId, ...LINKED }) : 0,
     groupId ? User.countDocuments({ role: "student", groupId }) : 0,
-    User.find({ ...active, ...LINKED, isHiddenFromLeaderboard: { $ne: true } })
-      .sort({ "telegram.linkedAt": -1 })
-      .limit(RECENT_LIMIT)
-      .select("fullName")
-      .lean(),
+    recentLinkedInitials(),
   ]);
   return {
     linked,
     total,
     group: groupId && groupTotal > 0 ? { linked: groupLinked, total: groupTotal } : null,
-    recent: recent.map((u) => initialsOf(u.fullName ?? "")).filter(Boolean),
+    recent,
   };
+}
+
+/** Oxirgi ulaganlarning bosh harflari (reytingdan yashirilganlar chiqmaydi). groupIds — faqat shu guruhlardan */
+export async function recentLinkedInitials(groupIds?: mongoose.Types.ObjectId[]): Promise<string[]> {
+  const users = await User.find({
+    role: "student",
+    groupId: groupIds ? { $in: groupIds } : { $ne: null },
+    ...LINKED,
+    isHiddenFromLeaderboard: { $ne: true },
+  })
+    .sort({ "telegram.linkedAt": -1 })
+    .limit(RECENT_LIMIT)
+    .select("fullName")
+    .lean();
+  return users.map((u) => initialsOf(u.fullName ?? "")).filter(Boolean);
 }

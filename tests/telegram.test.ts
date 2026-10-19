@@ -367,3 +367,28 @@ describe("telegram: nechta o'quvchi ulagan", () => {
     expect(status.community).toEqual({ linked: 0, total: 0, group: null, recent: [] });
   });
 });
+
+describe("mentor bosh sahifasi: Telegram ulaganlar", () => {
+  it("faol guruhlar bo'yicha ulaganlar sonini beradi", async () => {
+    const { Group } = await import("@/lib/db/models/group.model");
+    const { getMentorDashboard } = await import("@/actions/dashboard.actions");
+    const mk = (name: string, isActive = true) =>
+      Group.create({ name, shortName: name, grade: 8, academicYear: "2026-2027", isActive });
+    const [a, b, old] = await Promise.all([mk("A"), mk("B"), mk("OLD", false)]);
+    const tg = (chatId: string) => ({ telegram: { chatId, username: null, linkedAt: new Date() } });
+    await User.create([
+      { login: "a1", fullName: "Aliyev Vali", role: "student", passwordHash: "x", groupId: a._id, ...tg("1") },
+      { login: "a2", fullName: "Boboyev Sardor", role: "student", passwordHash: "x", groupId: a._id, ...tg("2") },
+      { login: "b1", fullName: "Karimova Nodira", role: "student", passwordHash: "x", groupId: b._id },
+      { login: "o1", fullName: "Eski Talaba", role: "student", passwordHash: "x", groupId: old._id, ...tg("3") },
+    ]);
+    const mentor = await mkUser("ustoz", "mentor");
+    actAs(sessionFor(mentor));
+
+    const data = await getMentorDashboard();
+    expect(data.telegram).toMatchObject({ linked: 2, total: 3 });
+    expect(data.telegram!.recent.sort()).toEqual(["AV", "BS"]);
+    const byName = Object.fromEntries(data.groups.map((g) => [g.name, [g.telegram, g.students]]));
+    expect(byName).toEqual({ A: [2, 2], B: [0, 1] });
+  });
+});

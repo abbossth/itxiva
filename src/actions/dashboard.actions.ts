@@ -13,6 +13,8 @@ import { HomeworkSubmission, HomeworkStatus } from "@/lib/db/models/homework-sub
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { formatSchedule, getNextLesson, hasLessonOn } from "@/lib/schedule";
 import { getAppSettings } from "@/lib/settings";
+import { getBotUsername, isTelegramConfigured } from "@/lib/telegram/api";
+import { recentLinkedInitials } from "@/lib/telegram/community";
 import { CoinLedger, type CoinTransactionType } from "@/lib/db/models/coin-ledger.model";
 import { QuizSubmission } from "@/lib/db/models/quiz-submission.model";
 import { Product } from "@/lib/db/models/product.model";
@@ -284,8 +286,12 @@ export interface MentorDashboard {
     hasLessonToday: boolean;
     todayTime: string | null;
     lessons: number;
+    /** Telegram'ni ulagan o'quvchilar */
+    telegram: number;
   }[];
   totals: { students: number; groups: number; lessons: number };
+  /** Telegram'ni ulaganlar (bot sozlanmagan bo'lsa null): faol guruhlardagi o'quvchilar bo'yicha */
+  telegram: { linked: number; total: number; recent: string[] } | null;
 }
 
 export async function getMentorDashboard(): Promise<MentorDashboard> {
@@ -294,9 +300,15 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
 
   const [groups, studentCounts, lessonCounts, ungradedByLesson, pendingOrders, orders, activeSessions] = await Promise.all([
     Group.find({ isActive: true }).select("name shortName grade schedule").sort({ grade: 1, name: 1 }).lean(),
-    User.aggregate<{ _id: mongoose.Types.ObjectId | null; count: number }>([
+    User.aggregate<{ _id: mongoose.Types.ObjectId | null; count: number; telegram: number }>([
       { $match: { role: "student" } },
-      { $group: { _id: "$groupId", count: { $sum: 1 } } },
+      {
+        $group: {
+          _id: "$groupId",
+          count: { $sum: 1 },
+          telegram: { $sum: { $cond: [{ $eq: [{ $type: "$telegram.chatId" }, "string"] }, 1, 0] } },
+        },
+      },
     ]),
     Lesson.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([{ $group: { _id: "$groupId", count: { $sum: 1 } } }]),
     HomeworkSubmission.aggregate<{ _id: mongoose.Types.ObjectId; count: number; oldest: Date }>([
@@ -320,6 +332,10 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
   const studentName = new Map(orderStudents.map((u) => [u._id.toString(), u.fullName]));
   const studentsIn = new Map(studentCounts.map((c) => [String(c._id), c.count]));
   const lessonsIn = new Map(lessonCounts.map((c) => [c._id.toString(), c.count]));
+  const telegramIn = new Map(studentCounts.map((c) => [String(c._id), c.telegram]));
+  const totalStudents = [...studentsIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0);
+  const telegramAvailable = isTelegramConfigured() && Boolean(getBotUsername());
+  const recentTelegram = telegramAvailable ? await recentLinkedInitials(groups.map((g) => g._id)) : [];
 
   return {
     firstName: session.fullName.trim().split(/\s+/)[0] || session.fullName,
@@ -352,14 +368,22 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
           hasLessonToday: today,
           todayTime: today && g.schedule ? `${g.schedule.startTime}–${g.schedule.endTime}` : null,
           lessons: lessonsIn.get(g._id.toString()) ?? 0,
+          telegram: telegramIn.get(g._id.toString()) ?? 0,
         };
       })
       // Bugun darsi borlar tepada, vaqt bo'yicha
       .sort((a, b) => Number(b.hasLessonToday) - Number(a.hasLessonToday) || (a.todayTime ?? "").localeCompare(b.todayTime ?? "")),
     totals: {
-      students: [...studentsIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0),
+      students: totalStudents,
       groups: groups.length,
       lessons: [...lessonsIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0),
     },
+    telegram: telegramAvailable
+      ? {
+          linked: [...telegramIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0),
+          total: totalStudents,
+          recent: recentTelegram,
+        }
+      : null,
   };
 }

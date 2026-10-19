@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { DashCard, DashEmpty, Greeting, StatLink } from "@/components/dashboard/dashboard-parts";
+import { TelegramAdoptionCard } from "@/components/dashboard/telegram-adoption";
 
 export function MentorDashboardView({ data }: { data: MentorDashboard }) {
   const todayGroups = data.groups.filter((g) => g.hasLessonToday);
@@ -62,6 +63,8 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
         <StatLink href="/mentor/groups" label="O'quvchilar" icon={Users} value={data.totals.students} hint={`${data.totals.groups} ta guruhda`} />
         <StatLink href="/mentor/lessons" label="Darslar" icon={BookOpen} value={data.totals.lessons} hint="jami yaratilgan" />
       </div>
+
+      {data.telegram && <TelegramAdoptionCard telegram={data.telegram} groups={data.groups} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <DashCard title="Tekshirilishi kerak vazifalar" icon={ClipboardCheck} href="/mentor/homework">
