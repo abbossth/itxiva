@@ -5,7 +5,7 @@ export const productSchema = z.object({
   description: z.string().trim().max(500).optional().default(""),
   price: z.coerce.number().int("Narx butun son bo'lishi kerak").min(1, "Narx kamida 1 coin").max(100000),
   // Hayotdagi narxi (so'm), faqat mentor uchun. Berilmasa o'zgarmaydi; null — o'chiriladi
-  realPrice: z.union([z.coerce.number().int().min(0).max(1_000_000_000), z.null()]).optional(),
+  realPrice: z.union([z.null(), z.coerce.number().int().min(0).max(1_000_000_000)]).optional(),
   // Vaqtinchalik chegirma: berilmasa o'zgarmaydi; null — chegirma olib tashlanadi
   // null avval tekshiriladi: coerce null'ni 0 yoki 1970-yilga aylantirib yubormasin
   salePrice: z.union([z.null(), z.coerce.number().int("Chegirma narxi butun son bo'lsin").min(1, "Chegirma narxi kamida 1 coin")]).optional(),
@@ -13,8 +13,9 @@ export const productSchema = z.object({
   category: z.string().trim().max(30).optional().default(""),
   kind: z.enum(["item", "privilege", "streak_shield"]).optional().default("item"),
   imageKey: z.string().max(300).nullable().optional(),
+  // null — cheklanmagan; null avval turadi, aks holda coerce uni 0 ga aylantiradi
   stock: z
-    .union([z.coerce.number().int().min(0).max(100000), z.null()])
+    .union([z.null(), z.coerce.number().int().min(0).max(100000)])
     .optional()
     .default(null),
   isActive: z.boolean().default(true),
