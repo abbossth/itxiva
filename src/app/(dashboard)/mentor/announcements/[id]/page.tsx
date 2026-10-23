@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BarChart3, Edit3, ExternalLink, FileText, ImageIcon } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getAnnouncementPreviewUrls, getAnnouncementStats } from "@/actions/announcement.actions";

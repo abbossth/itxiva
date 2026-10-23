@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ClipboardCheck } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { HomeworkJournal as JournalData } from "@/actions/homework.actions";

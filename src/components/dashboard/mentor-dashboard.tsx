@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BookOpen, CalendarClock, ClipboardCheck, PackageCheck, Plus, QrCode, Users } from "lucide-react";
 import type { MentorDashboard } from "@/actions/dashboard.actions";
 import { Badge } from "@/components/ui/badge";

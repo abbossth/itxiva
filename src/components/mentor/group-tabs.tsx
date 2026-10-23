@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { usePathname } from "next/navigation";
 import { QrCode, Users } from "lucide-react";
 import { NavPending } from "@/components/layout/nav-pending";

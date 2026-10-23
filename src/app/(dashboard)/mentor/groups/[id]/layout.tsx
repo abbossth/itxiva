@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarClock, Users } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";

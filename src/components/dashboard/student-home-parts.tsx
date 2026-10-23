@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Award, CalendarCheck, Check, Coins, Flame, Gift, PieChart, Target, TrendingUp, Trophy, Users, Zap } from "lucide-react";
 import type { StudentHomeStats } from "@/actions/dashboard.actions";
 import type { StudentQuestsData } from "@/actions/student-quest.actions";

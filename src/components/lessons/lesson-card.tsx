@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Sparkles, Video, FileText, ChevronRight, Eye, EyeOff, ClipboardCheck, Link2 } from "lucide-react";
 import { HOMEWORK_STATE_BADGE, HOMEWORK_STATE_LABELS, type HomeworkState } from "@/lib/homework-status";
 import { ILessonData } from "@/lib/db/models/lesson.model";

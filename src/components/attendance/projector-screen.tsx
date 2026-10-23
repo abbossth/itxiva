@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -183,8 +183,16 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
 
   useEffect(() => {
     if (isClosed) return;
-    const pollTimer = setInterval(refreshData, 3000);
-    return () => clearInterval(pollTimer);
+    // Yashirin tabda serverga so'rov ketmaydi; tabga qaytilganda darhol yangilanadi
+    const poll = () => {
+      if (document.visibilityState === "visible") void refreshData();
+    };
+    const pollTimer = setInterval(poll, 3000);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      clearInterval(pollTimer);
+      document.removeEventListener("visibilitychange", poll);
+    };
   }, [isClosed, refreshData]);
 
   // Local 1-second countdown tick (pure state update, zero side-effects inside updater)

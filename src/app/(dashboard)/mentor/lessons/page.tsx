@@ -6,7 +6,7 @@ import { getHomeworkJournal, getHomeworkOverviewForMentor, getHomeworkStatsForLe
 import { LessonsManager } from "@/components/mentor/lessons-manager";
 import { pickNearestLessonGroup } from "@/lib/schedule";
 import { EmptyState } from "@/components/shared/empty-state";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 

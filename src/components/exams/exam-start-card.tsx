@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { IExamData } from "@/lib/db/models/exam.model";
 import { startExamAttemptAction } from "@/actions/exam.actions";
 import { Button } from "@/components/ui/button";

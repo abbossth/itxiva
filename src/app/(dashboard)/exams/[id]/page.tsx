@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { getExamForStudent } from "@/actions/exam.actions";
 import { ExamTaker } from "@/components/exams/exam-taker";

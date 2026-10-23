@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import { ShoppingBag, Sparkles, PackageCheck, ArrowRight, Flame, Users } from "lucide-react";
 import { fireConfetti } from "@/lib/confetti";

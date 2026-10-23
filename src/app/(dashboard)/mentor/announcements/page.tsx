@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BarChart3, Edit3, Megaphone, Plus } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getAnnouncementsForMentor } from "@/actions/announcement.actions";

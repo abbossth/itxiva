@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Check, Eye, MousePointerClick } from "lucide-react";
 import type { AnnouncementStats } from "@/actions/announcement.actions";
 import { SegmentedControl } from "@/components/ui/segmented-control";

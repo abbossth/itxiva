@@ -7,7 +7,7 @@ import { getMyHomeworkStates } from "@/actions/homework.actions";
 import { LessonCard } from "@/components/lessons/lesson-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { BookOpen } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { cn } from "@/lib/utils";
 
 export const metadata = {

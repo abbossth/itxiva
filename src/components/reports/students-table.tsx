@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ReportSection, ScoreLegend } from "@/components/reports/report-parts";

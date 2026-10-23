@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ClipboardCheck, Flame, GraduationCap, QrCode, Sparkles, Target, Trophy, TrendingUp, Users } from "lucide-react";
 import type { LeaderboardData, LeaderboardEntry } from "@/actions/leaderboard.actions";
 import { Podium } from "@/components/leaderboard/podium";

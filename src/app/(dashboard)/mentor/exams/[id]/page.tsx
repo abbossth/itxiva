@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requireMentorPage } from "@/lib/auth/guards";
 import {
   getExamByIdForMentor,

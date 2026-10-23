@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BookOpen, Check, ChevronRight, Clock, Flame, LogIn, Send, ShieldCheck, Sparkles, Target, UserRoundCheck, Zap } from "lucide-react";
 import type { MilestoneView, StudentQuestCard, StudentQuestsData } from "@/actions/student-quest.actions";
 import type { OneTimeTask } from "@/lib/onboarding-rewards";

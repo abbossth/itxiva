@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { IExamData } from "@/lib/db/models/exam.model";
 import { IExamSubmissionData } from "@/lib/db/models/exam-submission.model";
 import { Card } from "@/components/ui/card";

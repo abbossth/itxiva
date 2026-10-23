@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ArrowLeft } from "lucide-react";
 import { getLessonById } from "@/actions/lesson.actions";
 import { getQuizForLesson } from "@/actions/quiz.actions";

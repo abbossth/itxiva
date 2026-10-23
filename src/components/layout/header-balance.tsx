@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { CoinIcon } from "@/components/shop/price-tag";
 import { BALANCE_EVENT } from "@/lib/rewards-client";
 import { COIN_HIT_EVENT } from "@/lib/coin-flight";

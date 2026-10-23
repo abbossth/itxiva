@@ -2,7 +2,7 @@ import { requireMentorPage } from "@/lib/auth/guards";
 import { getAppSettings, parseQuarter } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { LessonEditorForm } from "@/components/mentor/lesson-editor-form";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ArrowLeft } from "lucide-react";
 
 interface NewLessonPageProps {

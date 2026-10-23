@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { CheckCircle2, AlertCircle, Loader2, ArrowRight, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { CheckCircle2, Coins, Send } from "lucide-react";
 import type { MentorDashboard } from "@/actions/dashboard.actions";
 import { DashCard } from "@/components/dashboard/dashboard-parts";

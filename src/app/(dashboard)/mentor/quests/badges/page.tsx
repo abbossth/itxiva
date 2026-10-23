@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Medal } from "lucide-react";
 import { requireMentorPage } from "@/lib/auth/guards";
 import { getBadgeStats } from "@/actions/quest.actions";

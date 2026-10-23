@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { BookOpen, CalendarClock, ClipboardCheck, Clock, Coins, PackageCheck, QrCode, Trophy } from "lucide-react";
 import type { StudentDashboard, StudentHomeStats } from "@/actions/dashboard.actions";
 import type { StudentQuestsData } from "@/actions/student-quest.actions";

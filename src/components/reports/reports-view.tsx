@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, Users, CalendarCheck, Percent, Coins, ShoppingBag, PackageCheck, ClipboardCheck, GraduationCap } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import { Plus, Users, Trash2, CalendarClock, Pencil, Play, QrCode, Percent } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";

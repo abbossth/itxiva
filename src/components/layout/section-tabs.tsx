@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { usePathname } from "next/navigation";
 import { isNavLinkActive, sectionsFor, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";

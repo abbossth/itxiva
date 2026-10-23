@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { ArrowRight, History, Search, UserRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AUDIT_CATEGORY_LABELS, type AuditCategory, type AuditRow, type AuditTone } from "@/lib/audit-format";

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { LogOut, Settings, User as UserIcon, ShieldCheck } from "lucide-react";
 import { selectLessonTab } from "@/components/lessons/lesson-tabs";
 import { Logo } from "@/components/layout/logo";

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toExternalUrl } from "@/lib/open-tab";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { IExamData } from "@/lib/db/models/exam.model";
 import { IExamSubmissionData } from "@/lib/db/models/exam-submission.model";
 import { gradeExamSubmissionAction } from "@/actions/exam.actions";

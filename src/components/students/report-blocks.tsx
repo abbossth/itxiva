@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Coins, Wallet, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReportSection, ScoreBar, StatTile } from "@/components/reports/report-parts";

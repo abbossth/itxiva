@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { Check, Lock } from "lucide-react";
 import type { AchievementsData } from "@/actions/student-quest.actions";
 import { LevelBadge, XpBar, levelColor } from "@/components/gamification/level-badge";

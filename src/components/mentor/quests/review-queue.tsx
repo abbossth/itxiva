@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import { Award, Check, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, ExternalLink, FileText, Inbox, Info, Send, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
