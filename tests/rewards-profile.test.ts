@@ -155,10 +155,11 @@ describe("bosh sahifa statistikasi", () => {
 });
 
 describe("reyting o'lchovi", () => {
-  it("sukutda XP, metric=coin — jami coin bo'yicha; gamifikatsiya o'chiq bo'lsa doim coin", async () => {
+  it("sukutda XP, metric=coin — balans bo'yicha; gamifikatsiya o'chiq bo'lsa doim jami coin", async () => {
     const { me } = await seed();
-    // ali: XP 120, lekin coin eng ko'p
-    await User.updateOne({ _id: me._id }, { $set: { totalCoins: 900 } });
+    // ali: XP 120, jami yig'ilgan kam, lekin balansi eng ko'p
+    await User.updateOne({ _id: me._id }, { $set: { spendableBalance: 900 } });
+    await User.updateOne({ login: "vali" }, { $set: { spendableBalance: 50 } });
     await AppSettings.create({ key: "global", gamification: { enabled: true } });
     actAs(sessionFor(me));
     const byXp = await leaderboard.getLeaderboardAction({ type: "all" });
@@ -167,8 +168,26 @@ describe("reyting o'lchovi", () => {
     const byCoin = await leaderboard.getLeaderboardAction({ type: "all", metric: "coin" });
     expect(byCoin.unit).toBe("coin");
     expect(byCoin.top3[0]).toMatchObject({ displayName: "ALI", totalCoins: 900 });
+    expect(byCoin.top3[1]).toMatchObject({ displayName: "VALI", totalCoins: 50 });
+    expect(byCoin.totalCoins).toBe(950);
 
     await AppSettings.updateOne({ key: "global" }, { $set: { "gamification.enabled": false } });
-    expect(await leaderboard.getLeaderboardAction({ type: "all" })).toMatchObject({ unit: "coin", canSwitch: false });
+    const noGamification = await leaderboard.getLeaderboardAction({ type: "all", metric: "coin" });
+    expect(noGamification).toMatchObject({ unit: "coin", canSwitch: false });
+    expect(noGamification.top3[0]).toMatchObject({ displayName: "VALI", totalCoins: 300 });
+  });
+
+  it("balans ko'rinishida haftalik o'sishdan xaridlar ayiriladi, XP ko'rinishida — yo'q", async () => {
+    const { me } = await seed();
+    await AppSettings.create({ key: "global", gamification: { enabled: true } });
+    await CoinLedger.create([
+      { studentId: me._id, amount: 50, xp: 50, type: "homework", description: "Vazifa" },
+      { studentId: me._id, amount: -30, xp: 0, type: "purchase", description: "Xarid" },
+    ]);
+    actAs(sessionFor(me));
+    const byCoin = await leaderboard.getLeaderboardAction({ type: "all", metric: "coin" });
+    expect(byCoin.currentUserEntry?.weekCoins).toBe(20);
+    const byXp = await leaderboard.getLeaderboardAction({ type: "all" });
+    expect(byXp.currentUserEntry?.weekCoins).toBe(50);
   });
 });

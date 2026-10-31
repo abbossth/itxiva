@@ -39,7 +39,10 @@ export interface LeaderboardData {
   weekStars: LeaderboardEntry[];
   /** Ro'yxatdagi jami coin */
   totalCoins: number;
-  /** Reyting o'lchovi: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin. `totalCoins`/`weekCoins` shu birlikda */
+  /**
+   * Reyting o'lchovi: gamifikatsiya yoqilgan bo'lsa XP, aks holda coin. `totalCoins`/`weekCoins` shu birlikda.
+   * "Coin bo'yicha" ko'rinishida (canSwitch + coin) `totalCoins` — hozirgi balans, gamifikatsiya o'chiq bo'lsa — jami yig'ilgan.
+   */
   unit: "coin" | "XP";
   /** XP va coin o'rtasida almashtirish mumkinmi (gamifikatsiya yoqilgan bo'lsa) */
   canSwitch: boolean;
@@ -54,7 +57,7 @@ export async function getLeaderboardAction({
   type?: "all" | "group" | "grade";
   groupId?: string;
   grade?: number;
-  /** Reyting o'lchovi: sukutda gamifikatsiya yoqilgan bo'lsa XP; "coin" — jami yig'ilgan coin bo'yicha */
+  /** Reyting o'lchovi: sukutda gamifikatsiya yoqilgan bo'lsa XP; "coin" — hozirgi balansdagi coin bo'yicha */
   metric?: "xp" | "coin";
   period?: "all" | "month" | "week";
 }): Promise<LeaderboardData> {
@@ -86,18 +89,21 @@ export async function getLeaderboardAction({
   const gamificationOn = gamification.enabled;
   const levels = gamificationOn ? buildLevels(gamification.levelThresholds) : null;
   const xpMode = gamificationOn && metric !== "coin";
-  const field = xpMode ? "xp" : "totalCoins";
+  // XP reytingi sarflanmaydi, shuning uchun "Coin bo'yicha" ko'rinish balansni ko'rsata oladi.
+  // Gamifikatsiya o'chiq bo'lsa coin yagona reyting: u do'kon xaridi bilan tushmasligi kerak
+  const balanceMode = gamificationOn && metric === "coin";
+  const field = xpMode ? "xp" : balanceMode ? "spendableBalance" : "totalCoins";
   const students = (
     (await User.find(userQuery)
       .select("fullName groupId totalCoins xp spendableBalance")
       .sort({ [field]: -1, createdAt: 1 })
       .lean()) as unknown as IUser[]
-  ).map((st) => ({ ...st, totalCoins: (xpMode ? st.xp : st.totalCoins) ?? 0, xp: st.xp ?? 0 }));
+  ).map((st) => ({ ...st, totalCoins: st[field] ?? 0, xp: st.xp ?? 0 }));
 
-  // Oxirgi 7 kundagi o'sish: do'kon xaridlari reytingga ta'sir qilmaydi, shuning uchun hisobga olinmaydi
+  // Oxirgi 7 kundagi o'sish: do'kon xaridlari faqat balansni kamaytiradi, shuning uchun boshqa o'lchovlarda hisobga olinmaydi
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
-    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $nin: ["purchase", "xp_align"] } } },
+    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $nin: balanceMode ? ["xp_align"] : ["purchase", "xp_align"] } } },
     {
       $group: {
         _id: "$studentId",
