@@ -40,6 +40,7 @@ import {
   HOMEWORK_MAX_TEXT,
   HOMEWORK_STATE_BADGE,
   HOMEWORK_STATE_LABELS,
+  parseLinkDraft,
 } from "@/lib/homework-status";
 import { uploadFileToStorage } from "@/lib/upload-client";
 import { fireConfetti } from "@/lib/confetti";
@@ -53,19 +54,11 @@ interface HomeworkPanelProps {
   readOnly?: boolean;
 }
 
-function isValidUrl(value: string): boolean {
-  try {
-    const u = new URL(value);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: HomeworkPanelProps) {
   const router = useRouter();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
 
   const state = submission ? submission.status : "missing";
   const isGraded = state === "graded";
@@ -95,22 +88,27 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
     if ((submission?.score ?? 0) >= 60) fireConfetti({ particleCount: 70, spread: 60 });
   }, [gradedKey, readOnly, submission?.score]);
 
-  const addLink = () => {
-    const value = linkDraft.trim();
-    if (!value) return;
-    const normalized = /^https?:\/\//i.test(value) ? value : `https://${value}`;
-    if (!isValidUrl(normalized)) {
-      setErrorMsg("Havola noto'g'ri. Masalan: https://github.com/ism/loyiha");
-      return;
+  /** Maydondagi havola(lar)ni ro'yxatga qo'shadi. Yangi ro'yxatni qaytaradi; xato bo'lsa — null */
+  const commitLinkDraft = (): string[] | null => {
+    const { links: parsed, invalid } = parseLinkDraft(linkDraft);
+    if (invalid.length > 0) {
+      setErrorMsg(`Havola noto'g'ri: ${invalid[0]}. Masalan: https://github.com/ism/loyiha`);
+      return null;
     }
-    if (links.length >= HOMEWORK_MAX_LINKS) {
+    const next = [...links, ...parsed.filter((l) => !links.includes(l))];
+    if (next.length > HOMEWORK_MAX_LINKS) {
       setErrorMsg(`Ko'pi bilan ${HOMEWORK_MAX_LINKS} ta havola qo'shiladi`);
-      return;
+      return null;
     }
-    if (!links.includes(normalized)) setLinks([...links, normalized]);
+    setLinks(next);
     setLinkDraft("");
-    setShowLinkInput(false);
     setErrorMsg(null);
+    return next;
+  };
+
+  // Maydon ochiq qoladi — keyingi havolani darhol qo'shish mumkin
+  const addLink = () => {
+    if (commitLinkDraft()) linkInputRef.current?.focus();
   };
 
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,14 +149,21 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
   };
 
   const handleSubmit = async () => {
-    if (!text.trim() && links.length === 0 && files.length === 0) {
+    // Yozilgan, lekin "Qo'shish" bosilmagan havola ham javobga kiradi
+    let linksToSend = links;
+    if (linkDraft.trim()) {
+      const next = commitLinkDraft();
+      if (!next) return;
+      linksToSend = next;
+    }
+    if (!text.trim() && linksToSend.length === 0 && files.length === 0) {
       setErrorMsg("Javob bo'sh: matn yozing, havola qo'shing yoki fayl yuklang");
       return;
     }
     try {
       setIsSending(true);
       setErrorMsg(null);
-      const res = await submitHomeworkAction({ lessonId, text, links, files });
+      const res = await submitHomeworkAction({ lessonId, text, links: linksToSend, files });
       if (res.success) {
         toast.success(res.message || "Javob yuborildi");
         setEditing(false);
@@ -327,6 +332,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
           {showLinkInput && (
             <div className="flex items-center gap-2 px-3 pb-2 animate-in fade-in">
               <Input
+                ref={linkInputRef}
                 id="hw-link"
                 type="url"
                 inputMode="url"
@@ -342,7 +348,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
                     setShowLinkInput(false);
                   }
                 }}
-                placeholder="https://github.com/... yoki Scratch, Google Drive havolasi"
+                placeholder="Havolani joylang — bir nechtasini bo'sh joy bilan ajrating"
               />
               <Button type="button" variant="secondary" onClick={addLink} disabled={!linkDraft.trim()} className="shrink-0 gap-1.5 min-h-[44px]">
                 <Plus className="w-4 h-4" />
@@ -369,10 +375,10 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
               onClick={() => setShowLinkInput((v) => !v)}
               disabled={links.length >= HOMEWORK_MAX_LINKS}
               className="gap-1.5 min-h-[44px]"
-              title={`Ko'pi bilan ${HOMEWORK_MAX_LINKS} ta havola`}
+              title="GitHub, Scratch, Google Drive... — xohlagancha havola qo'shish mumkin"
             >
               <LinkIcon className="w-4 h-4" />
-              Havola
+              Havola{links.length > 0 ? ` (${links.length})` : ""}
             </Button>
             <Button
               type="button"

@@ -64,6 +64,14 @@ describe("uyga vazifa: yuborish", () => {
     expect(sub).toMatchObject({ status: "submitted", isLate: false, attempt: 1 });
   });
 
+  it("bir nechta havola (eski 5 ta chegaradan ko'p) birga saqlanadi", async () => {
+    const { student, lessonId } = await seed();
+    actAs(sessionFor(student));
+    const links = Array.from({ length: 12 }, (_, i) => `https://github.com/ali/loyiha-${i}`);
+    expect((await hw.submitHomeworkAction({ lessonId, text: "", links, files: [] })).success).toBe(true);
+    expect((await HomeworkSubmission.findOne({ studentId: student._id }).lean())?.links).toEqual(links);
+  });
+
   it("bo'sh javob, noto'g'ri havola va begona fayl kaliti rad etiladi", async () => {
     const { student, outsider, lessonId } = await seed();
     actAs(sessionFor(student));

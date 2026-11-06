@@ -20,7 +20,8 @@ export const HOMEWORK_STATE_BADGE: Record<HomeworkState, "secondary" | "warning"
 /** 100 ball uchun beriladigan coin — sukut qiymati */
 export const DEFAULT_HOMEWORK_COINS = 20;
 export const HOMEWORK_MAX_TEXT = 20000;
-export const HOMEWORK_MAX_LINKS = 5;
+/** Havolalar soni amalda cheklanmaydi: bu faqat suiiste'molga qarshi yuqori chegara */
+export const HOMEWORK_MAX_LINKS = 50;
 export const HOMEWORK_MAX_FILES = 5;
 /** O'quvchi yuklaydigan har qanday fayl (vazifa javobi, imtihon loyihasi) uchun yuqori chegara */
 export const STUDENT_MAX_UPLOAD_MB = 5;
@@ -29,6 +30,36 @@ export const HOMEWORK_MAX_FILE_MB = STUDENT_MAX_UPLOAD_MB;
 export const HOMEWORK_BLOCKED_EXTENSIONS = [".exe", ".bat", ".cmd", ".msi", ".scr", ".apk", ".sh", ".com", ".vbs"];
 
 /** Ballga mutanosib coin taklifi; kechikkan javobga sukut bo'yicha coin berilmaydi */
+function isHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * O'quvchi maydonga yozgan yoki joylagan havola(lar): bo'sh joy, yangi qator yoki vergul bilan ajratilgan bir nechta
+ * havola bo'lishi mumkin. Protokolsiz yozilgani https:// bilan to'ldiriladi, takrorlari olib tashlanadi.
+ */
+export function parseLinkDraft(raw: string): { links: string[]; invalid: string[] } {
+  const links: string[] = [];
+  const invalid: string[] = [];
+  const tokens = raw
+    .split(/\s+/)
+    // "a.com,https://b.com" — vergul faqat keyingi havoladan oldin bo'lsa ajratadi (havola ichidagi vergul saqlanadi)
+    .flatMap((t) => t.split(/,(?=(?:https?:\/\/|www\.))/i))
+    .map((t) => t.replace(/[,;]+$/, ""))
+    .filter(Boolean);
+  for (const token of tokens) {
+    const url = /^https?:\/\//i.test(token) ? token : `https://${token}`;
+    if (!isHttpUrl(url)) invalid.push(token);
+    else if (!links.includes(url)) links.push(url);
+  }
+  return { links, invalid };
+}
+
 export function suggestHomeworkCoins(score: number, coinsReward: number, isLate: boolean): number {
   if (isLate) return 0;
   const safeScore = Math.max(0, Math.min(100, score));
