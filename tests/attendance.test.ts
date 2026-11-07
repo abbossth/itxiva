@@ -305,12 +305,17 @@ describe("davomat: jarima dars tugagach", () => {
     const { data } = await actions.startAttendanceSessionAction(gid);
     const sid = data!.sessionId;
 
-    const res = await actions.bulkSetAttendanceStatusAction({
-      sessionId: sid,
-      studentIds: [vali._id.toString(), guli._id.toString(), stranger._id.toString()],
-      status: "excused",
-    });
+    const ids = [vali._id.toString(), guli._id.toString(), stranger._id.toString()];
+    // Sababsiz "sababli" qilib bo'lmaydi
+    for (const notes of [undefined, "", "  a "]) {
+      const refused = await actions.bulkSetAttendanceStatusAction({ sessionId: sid, studentIds: ids, status: "excused", notes });
+      expect(refused).toMatchObject({ success: false, message: "Sababini yozing" });
+    }
+    expect(await AttendanceRecord.countDocuments({ sessionId: sid, status: "excused" })).toBe(0);
+
+    const res = await actions.bulkSetAttendanceStatusAction({ sessionId: sid, studentIds: ids, status: "excused", notes: " Kasal " });
     expect(res.success).toBe(true);
+    expect((await AttendanceRecord.findOne({ sessionId: sid, studentId: vali._id }).lean())?.notes).toBe("Kasal");
     expect(res.data?.changed).toBe(2); // boshqa guruh o'quvchisi o'tkazib yuboriladi
     expect(await AttendanceRecord.countDocuments({ studentId: stranger._id })).toBe(0);
 
@@ -335,7 +340,7 @@ describe("davomat: jarima dars tugagach", () => {
     expect(await AttendanceSession.findById(sid).lean()).toMatchObject({ summary: { totalPresent: 1, totalExcused: 1, totalAbsent: 1 } });
 
     actAs(sessionFor(vali));
-    await expect(actions.bulkSetAttendanceStatusAction({ sessionId: sid, studentIds: [ali._id.toString()], status: "excused" })).rejects.toThrow();
+    await expect(actions.bulkSetAttendanceStatusAction({ sessionId: sid, studentIds: [ali._id.toString()], status: "excused", notes: "Kasal" })).rejects.toThrow();
   });
 });
 

@@ -41,6 +41,8 @@ import {
 /** Darsda qatnashgan deb hisoblanadigan holatlar */
 const ATTENDED: AttendanceStatus[] = ["present", "late"];
 const STATUS_VALUES: AttendanceStatus[] = ["present", "late", "excused", "absent"];
+/** "Sababli" qilishda sabab matnining eng kam uzunligi */
+const EXCUSE_REASON_MIN = 3;
 
 export interface ProjectorSessionData {
   _id: string;
@@ -636,10 +638,17 @@ export async function bulkSetAttendanceStatusAction(params: {
   sessionId: string;
   studentIds: string[];
   status: AttendanceStatus;
+  /** "Sababli" uchun majburiy: nima sababdan kelmagani (yozuv izohiga saqlanadi) */
+  notes?: string;
 }): Promise<ActionResult<{ changed: number }>> {
   const session = await requireMentor();
   if (!mongoose.isValidObjectId(params?.sessionId) || !STATUS_VALUES.includes(params.status)) {
     return { success: false, message: "Sessiya topilmadi" };
+  }
+  const notes = typeof params.notes === "string" ? params.notes.trim().slice(0, 300) : "";
+  // Jarimadan ozod qilish sababsiz bo'lmasin
+  if (params.status === "excused" && notes.length < EXCUSE_REASON_MIN) {
+    return { success: false, message: "Sababini yozing" };
   }
   const ids = Array.isArray(params.studentIds) ? [...new Set(params.studentIds.filter((id) => mongoose.isValidObjectId(id)))] : [];
   if (ids.length === 0) return { success: false, message: "O'quvchi tanlanmagan" };
@@ -658,14 +667,14 @@ export async function bulkSetAttendanceStatusAction(params: {
   let changed = 0;
   for (const id of ids) {
     if (!allowed.has(id)) continue;
-    const { oldStatus } = await applyAttendanceStatus(attSession, id, params.status);
+    const { oldStatus } = await applyAttendanceStatus(attSession, id, params.status, notes ? { notes } : {});
     if (oldStatus !== params.status) changed++;
   }
   await recomputeSummary(attSession._id);
   await AuditLog.create({
     actorId: session.userId,
     action: "MANUAL_ATTENDANCE",
-    details: { sessionId: params.sessionId, newStatus: params.status, students: changed, bulk: true },
+    details: { sessionId: params.sessionId, newStatus: params.status, students: changed, bulk: true, ...(notes ? { notes } : {}) },
   });
   return { success: true, message: `${changed} ta o'quvchi «${ATTENDANCE_STATUS_META[params.status].label.toLowerCase()}» deb belgilandi`, data: { changed } };
 }

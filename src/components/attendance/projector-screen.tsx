@@ -49,6 +49,7 @@ interface AttendeeRecord {
   method: "qr" | "code" | "manual";
   markedAt: string;
   coinsAwarded: number;
+  notes?: string;
 }
 
 interface ProjectorScreenProps {
@@ -80,7 +81,8 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
   const [isClosing, setIsClosing] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [isExcuseOpen, setIsExcuseOpen] = useState(false);
+  // Ochiq "sababli qilish" oynasi: qatordan ochilsa — o'sha o'quvchi, sarlavhadagi tugmadan — hech kim tanlanmagan
+  const [excuseFor, setExcuseFor] = useState<string[] | null>(null);
   const [undoingId, setUndoingId] = useState<string | null>(null);
 
   const [soundOn, setSoundOn] = useState(true);
@@ -552,8 +554,8 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                 <span className="text-xs font-bold font-mono text-rose-600 dark:text-rose-400">{waiting.length}</span>
               </h2>
               {waiting.length > 0 && (
-                <Button variant="secondary" size="sm" onClick={() => setIsExcuseOpen(true)} className="shrink-0 text-blue-700 dark:text-blue-300">
-                  Sababli qilish
+                <Button variant="ghost" size="sm" onClick={() => setExcuseFor([])} className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                  Bir nechtasini
                 </Button>
               )}
             </div>
@@ -574,12 +576,22 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
               ) : (
                 <>
                   {waiting.map((st) => (
-                    <div key={st.id} className="flex items-center gap-2.5 py-2.5 px-2 min-w-0">
-                      <Avatar name={st.fullName} size="sm" />
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{st.fullName}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{st.login}</div>
+                    <div key={st.id} className="flex items-center justify-between gap-2 py-2.5 px-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Avatar name={st.fullName} size="sm" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{st.fullName}</div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">@{st.login}</div>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setExcuseFor([st.id])}
+                        aria-label={`${st.fullName}ni sababli qilish`}
+                        className="shrink-0 min-h-[36px] rounded-lg border border-blue-500/30 px-2.5 text-[11px] font-bold text-blue-700 hover:bg-blue-500/10 dark:text-blue-300 cursor-pointer"
+                      >
+                        Sababli
+                      </button>
                     </div>
                   ))}
                   {excused.map((r) => (
@@ -588,7 +600,9 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
                         <Avatar name={r.studentId.fullName} size="sm" />
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{r.studentId.fullName}</div>
-                          <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300">Sababli</div>
+                          <div className="text-[10px] font-bold text-blue-700 dark:text-blue-300 truncate" title={r.notes || undefined}>
+                            Sababli{r.notes ? ` · ${r.notes}` : ""}
+                          </div>
                         </div>
                       </div>
                       <button
@@ -608,11 +622,12 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
         </div>
       </div>
 
-      {isExcuseOpen && (
+      {excuseFor && (
         <ExcuseStudentsDialog
           sessionId={sessionId}
           students={waiting}
-          onClose={() => setIsExcuseOpen(false)}
+          initialSelected={excuseFor}
+          onClose={() => setExcuseFor(null)}
           onDone={() => void refreshData()}
         />
       )}
