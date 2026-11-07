@@ -4,11 +4,12 @@ import { getAppSettings, parseQuarter } from "@/lib/settings";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getGroupById } from "@/actions/group.actions";
 import { getMyHomeworkStates } from "@/actions/homework.actions";
-import { LessonCard } from "@/components/lessons/lesson-card";
+import { LessonRow, TodayLessonCard } from "@/components/lessons/lesson-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { BookOpen } from "lucide-react";
 import Link from "@/components/ui/link";
 import { cn } from "@/lib/utils";
+import { isLessonNow, isValidSchedule, toDateKey } from "@/lib/schedule";
 
 export const metadata = {
   title: "Darslarim — ITXiva",
@@ -47,6 +48,16 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
   const homeworkStates = homeworkLessonIds.length > 0 ? await getMyHomeworkStates(homeworkLessonIds) : {};
 
   const quarters = [1, 2, 3, 4];
+
+  // Bugungi dars(lar): mentor belgilagan dars sanasi Toshkent bo'yicha bugunga to'g'ri keladi
+  const todayKey = toDateKey();
+  const isTodayLesson = (l: (typeof lessons)[number]) => Boolean(l.date) && toDateKey(l.date!) === todayKey;
+  const todayLessons = lessons.filter(isTodayLesson);
+  const schedule = group?.schedule;
+  const timeLabel = isValidSchedule(schedule) ? `${schedule.startTime}–${schedule.endTime}` : undefined;
+  const lessonNow = isLessonNow(schedule);
+  const stateOf = (l: (typeof lessons)[number]) =>
+    l.homework?.isEnabled ? homeworkStates[l._id.toString()] ?? "missing" : undefined;
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -91,18 +102,34 @@ export default async function LessonsPage({ searchParams }: LessonsPageProps) {
           description="Hozircha mentor tomonidan bu chorak uchun darslar nashr etilmagan."
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {lessons.map((lesson) => (
-            <LessonCard
-              key={lesson._id.toString()}
-              lesson={lesson}
-              isMentor={false}
-              homeworkState={
-                lesson.homework?.isEnabled ? homeworkStates[lesson._id.toString()] ?? "missing" : undefined
-              }
-            />
-          ))}
-        </div>
+        <>
+          {todayLessons.length > 0 && (
+            <section aria-label="Bugungi dars" className="space-y-3">
+              {todayLessons.map((lesson) => (
+                <TodayLessonCard
+                  key={lesson._id.toString()}
+                  lesson={lesson}
+                  homeworkState={stateOf(lesson)}
+                  timeLabel={timeLabel}
+                  isNow={lessonNow}
+                />
+              ))}
+            </section>
+          )}
+
+          <section aria-label="Barcha darslar" className="space-y-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Barcha darslar <span className="font-mono">({lessons.length})</span>
+            </h2>
+            <ul className="space-y-2">
+              {lessons.map((lesson) => (
+                <li key={lesson._id.toString()}>
+                  <LessonRow lesson={lesson} homeworkState={stateOf(lesson)} isToday={isTodayLesson(lesson)} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { LessonCardSkeleton, Skeleton } from "@/components/shared/skeletons";
+import { Skeleton } from "@/components/shared/skeletons";
 
 export default function LessonsLoading() {
   return (
@@ -11,11 +11,12 @@ export default function LessonsLoading() {
         <Skeleton className="h-10 w-64 rounded-2xl" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <LessonCardSkeleton />
-        <LessonCardSkeleton />
-        <LessonCardSkeleton />
-        <LessonCardSkeleton />
+      <Skeleton className="h-44 w-full rounded-3xl" />
+
+      <div className="space-y-2">
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-[72px] w-full rounded-2xl" />
+        ))}
       </div>
     </div>
   );
