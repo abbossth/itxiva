@@ -456,6 +456,25 @@ h1,
 }
 .reward-shine { animation: reward-shine 2.6s ease-in-out 1s infinite; }
 
+/* Jarima oynasi: tanga tushib keladi, tangalar unga tekkanda titraydi va yorilib qoladi */
+@keyframes penalty-coin {
+  0% { transform: translateY(-40px) scale(0.3); opacity: 0; }
+  40% { transform: translateY(4px) scale(1.08); opacity: 1; }
+  55% { transform: none; }
+  62%, 70%, 78%, 86% { transform: translateX(-5px) rotate(-6deg); }
+  66%, 74%, 82%, 90% { transform: translateX(5px) rotate(6deg); }
+  100% { transform: none; }
+}
+.penalty-coin { animation: penalty-coin 2.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards; }
+@keyframes penalty-crack {
+  from { stroke-dasharray: 120; stroke-dashoffset: 120; opacity: 0; }
+  to { stroke-dasharray: 120; stroke-dashoffset: 0; opacity: 1; }
+}
+.penalty-crack path { animation: penalty-crack 0.45s ease-out 1.5s backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .penalty-coin, .penalty-crack path { animation: none; }
+}
+
 /* Uchib kelgan tanga header balansiga tekkanda: tanga belgisi sakraydi, ostida "+N" ko'tarilib yo'qoladi */
 @keyframes coin-hit {
   0% { transform: scale(1); }

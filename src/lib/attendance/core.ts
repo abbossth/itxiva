@@ -8,18 +8,20 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { ATTENDANCE_COINS, coinRulesOf } from "@/lib/attendance-status";
 import { addDaysToKey, dateFromKey, isValidSchedule, toDateKey, type GroupSchedule } from "@/lib/schedule";
 import { notify } from "@/lib/notifications/notify";
+import { Penalty } from "@/lib/db/models/penalty.model";
+import { ensurePenalty } from "@/lib/penalties";
 import { syncLevel } from "@/lib/gamification/award";
 
 // Davomatning coin hisobi va sessiyani yakunlash. Server action'lar va cron shu yerdan foydalanadi
 // (bu fayl "use server" emas — funksiyalarni brauzerdan chaqirib bo'lmaydi).
 
-type SessionLike = Pick<IAttendanceSession, "_id" | "groupId" | "coinRules" | "defaultCoinsReward" | "finalizedAt">;
+type SessionLike = Pick<IAttendanceSession, "_id" | "groupId" | "date" | "coinRules" | "defaultCoinsReward" | "finalizedAt">;
 
 const REASONS: Record<AttendanceStatus, string> = {
   present: "Darsga kelgani uchun",
   late: "Darsga kechikib kelgani uchun",
   excused: "Davomat «sababli» deb belgilandi",
-  absent: "Darsga kelmagani uchun",
+  absent: "Darsga sababsiz kelmagani uchun",
 };
 
 /** Kelmaganlarga jarima qo'llanadigan holatmi (eski, qoidasiz sessiyalarda jarima yo'q — doim "yakunlangan") */
@@ -90,8 +92,18 @@ export async function settleRecordCoins(
   opts: { silent?: boolean; description?: string } = {}
 ): Promise<number> {
   const rules = coinRulesOf(session);
+  const finalized = isSessionFinalized(session);
+  // Yakunlangan darsda sababsiz kelmaganga oy ichidagi zinapoya: −10 / −30 / −50 (tartib birinchi qo'llanganda belgilanadi)
+  const penalized = record.status === "absent" && finalized && Boolean(rules.absentLadder);
+  const penaltyRes = penalized
+    ? await ensurePenalty({ studentId: record.studentId, kind: "absence", refId: session._id, at: session.date })
+    : null;
   // Yakunlanmagan darsda "kelmagan" hali jarima emas: mentor belgilab bo'lguncha kutiladi
-  const target = record.status === "absent" && !isSessionFinalized(session) ? Math.max(rules.absent, 0) : rules[record.status];
+  const target = penaltyRes
+    ? -penaltyRes.penalty.wanted
+    : record.status === "absent" && !finalized
+    ? Math.max(rules.absent, 0)
+    : rules[record.status];
   const prevTotal = record.coinsAwarded ?? 0;
   const prevBalance = record.balanceDelta ?? prevTotal;
 
@@ -101,19 +113,40 @@ export async function settleRecordCoins(
   await record.save();
 
   const amount = moved.dTotal || moved.dBalance;
+  const reason = penaltyRes?.penalty.reason ?? REASONS[record.status];
+  if (penaltyRes) {
+    const applied = Math.max(-(record.balanceDelta ?? 0), 0);
+    if (applied !== penaltyRes.penalty.applied) {
+      await Penalty.updateOne({ _id: penaltyRes.penalty._id }, { $set: { applied } });
+    }
+  } else if (!penalized) {
+    // "Kelmagan" boshqa holatga o'zgardi (masalan, sababli): jarima yozuvi ham bekor
+    await Penalty.deleteOne({ kind: "absence", refId: session._id, studentId: record.studentId });
+  }
+
   if (amount !== 0) {
     await CoinLedger.create({
       studentId: record.studentId,
       amount,
       xp: moved.dXp,
-      type: amount > 0 ? "attendance" : "adjustment",
+      type: amount > 0 ? "attendance" : penaltyRes ? "penalty" : "adjustment",
       referenceId: session._id,
-      description: opts.description ?? REASONS[record.status],
+      description: opts.description ?? reason,
       balanceAfter: moved.totalAfter,
     });
-    if (!opts.silent) {
-      notify(record.studentId, "coins_changed", { amount, reason: REASONS[record.status], balance: moved.balanceAfter });
-    }
+  }
+  if (!opts.silent && penaltyRes?.created) {
+    // Yangi jarima haqida doim xabar: balansda coin bo'lmasa ham (olingan miqdor kamroq bo'lishi mumkin)
+    const penalty = penaltyRes.penalty;
+    const balance = moved.balanceAfter ?? (await User.findById(record.studentId).select("spendableBalance").lean())?.spendableBalance;
+    notify(record.studentId, "coins_changed", {
+      amount,
+      reason,
+      balance,
+      penalty: { wanted: penalty.wanted, no: penalty.no },
+    });
+  } else if (!opts.silent && amount !== 0) {
+    notify(record.studentId, "coins_changed", { amount, reason, balance: moved.balanceAfter });
   }
   return amount;
 }
@@ -337,6 +370,7 @@ export async function deleteSessionWithCoins(sessionId: string | mongoose.Types.
     }
   }
   await AttendanceRecord.deleteMany({ sessionId: session._id });
+  await Penalty.deleteMany({ kind: "absence", refId: session._id });
   await AttendanceSession.deleteOne({ _id: session._id });
   return { records: records.length, reverted };
 }

@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { AttendanceJournal } from "@/components/mentor/attendance-journal";
 import { startAttendanceSessionAction, createManualSessionAction } from "@/actions/attendance.actions";
 import { toDateKey, isLessonNow, getNextLesson, formatSchedule, type GroupSchedule } from "@/lib/schedule";
-import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, coinRuleLabel } from "@/lib/attendance-status";
 import { formatTimeUz } from "@/lib/utils";
 
 interface GroupAttendanceViewProps {
@@ -133,7 +133,7 @@ export function GroupAttendanceView({ groupId, schedule, activeSession, todaySes
             {ATTENDANCE_STATUS_ORDER.map((st) => (
               <span key={st}>
                 {ATTENDANCE_STATUS_META[st].label.toLowerCase()}{" "}
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatCoinDelta(ATTENDANCE_COINS[st])}</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{coinRuleLabel(ATTENDANCE_COINS, st)}</span>
               </span>
             ))}
           </span>

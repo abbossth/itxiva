@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CoinBadge } from "@/components/ui/coin-badge";
 import { OTPInput } from "@/components/ui/otp-input";
-import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, coinRuleLabel, formatCoinDelta } from "@/lib/attendance-status";
 import { useToast } from "@/components/ui/toast";
 import { markAttendanceAction } from "@/actions/attendance.actions";
 import { formatDateUz } from "@/lib/utils";
@@ -90,7 +90,7 @@ export function StudentAttendanceView({
 
       if (res.success) {
         setAlreadyMarked(true);
-        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
+        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || ATTENDANCE_COINS.present;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "Davomat muvaffaqiyatli belgilandi!");
         // Katta mukofot oynasi (coin va XP) shu yerda chiqadi
@@ -135,7 +135,7 @@ export function StudentAttendanceView({
 
       if (res.success) {
         setAlreadyMarked(true);
-        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || 5;
+        const earned = res.data?.coinsEarned || activeSession?.defaultCoinsReward || ATTENDANCE_COINS.present;
         setSuccessInfo({ coinsEarned: earned });
         toast.success(res.message || "QR Davomat muvaffaqiyatli belgilandi!");
         // Katta mukofot oynasi (coin va XP) shu yerda chiqadi
@@ -200,7 +200,7 @@ export function StudentAttendanceView({
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <Badge variant="teal" className="gap-1.5 py-1 px-3">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>+{activeSession?.defaultCoinsReward || 5} coin</span>
+                <span>+{activeSession?.defaultCoinsReward || ATTENDANCE_COINS.present} coin</span>
               </Badge>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function StudentAttendanceView({
                   isLoading={isSubmitting}
                   className="w-full font-semibold shadow-md shadow-teal-500/20 min-h-[48px]"
                 >
-                  Davomatni tasdiqlash (+{activeSession?.defaultCoinsReward || 5} coin)
+                  Davomatni tasdiqlash (+{activeSession?.defaultCoinsReward || ATTENDANCE_COINS.present} coin)
                 </Button>
               </div>
             </div>
@@ -365,13 +365,14 @@ export function StudentAttendanceView({
           {ATTENDANCE_STATUS_ORDER.map((st) => (
             <li key={st} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${ATTENDANCE_STATUS_META[st].className}`}>
               <span className="text-xs font-semibold">{ATTENDANCE_STATUS_META[st].label}</span>
-              <span className="font-mono text-sm font-black tabular-nums">{formatCoinDelta(ATTENDANCE_COINS[st])}</span>
+              <span className="font-mono text-sm font-black tabular-nums">{coinRuleLabel(ATTENDANCE_COINS, st)}</span>
             </li>
           ))}
         </ul>
         <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-          Darsga kela olmasangiz, sababini mentorga ayting — &quot;sababli&quot; deb belgilansa coin olinmaydi. Balans 0 dan pastga
-          tushmaydi.
+          Sababsiz qoldirilgan dars uchun jarima oy ichida oshib boradi: 1-marta −10, 2-marta −30, 3-martadan boshlab har safar −50.
+          Uyga vazifani muddatida topshirmaslik ham xuddi shunday hisoblanadi. Darsga kela olmasangiz, sababini mentorga ayting —
+          &quot;sababli&quot; deb belgilansa coin olinmaydi. Balans 0 dan pastga tushmaydi.
         </p>
       </div>
 

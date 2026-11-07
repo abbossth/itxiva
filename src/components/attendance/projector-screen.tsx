@@ -34,7 +34,7 @@ import {
   ProjectorSessionData,
 } from "@/actions/attendance.actions";
 import { formatTimeUz } from "@/lib/utils";
-import { ATTENDANCE_COINS, formatCoinDelta } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, coinRuleLabel } from "@/lib/attendance-status";
 import { ExcuseStudentsDialog, type ExcuseCandidate } from "./excuse-students-dialog";
 import { playCheckInSound, unlockSound } from "@/lib/sound";
 
@@ -559,7 +559,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
             </div>
             {waiting.length > 0 && (
               <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                {formatCoinDelta(ATTENDANCE_COINS.absent)} coin faqat dars tugagach ({lessonEndLabel}) olinadi. Kechikib kelganlar shu orada
+                Jarima ({coinRuleLabel(ATTENDANCE_COINS, "absent")} coin) faqat dars tugagach ({lessonEndLabel}) olinadi. Kechikib kelganlar shu orada
                 davomatdan o&apos;tsa, jarima olinmaydi.
               </p>
             )}
@@ -632,7 +632,8 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
               Sessiyani yopmoqchimisiz? Davomatdan o&apos;tmaganlar <strong>&quot;Kelmagan&quot;</strong> deb belgilanadi.
             </p>
             <p>
-              {formatCoinDelta(ATTENDANCE_COINS.absent)} coin ulardan <strong>dars tugagach ({lessonEndLabel})</strong> olinadi. Kechikib kelganlarni
+              Jarima ({coinRuleLabel(ATTENDANCE_COINS, "absent")} coin, oy ichida nechanchi marta qoldirganiga qarab) ulardan{" "}
+              <strong>dars tugagach ({lessonEndLabel})</strong> olinadi. Kechikib kelganlarni
               shu orada dars sahifasida &quot;Kechikkan&quot; deb belgilasangiz, jarima olinmaydi.
             </p>
           </div>

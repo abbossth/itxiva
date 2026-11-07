@@ -141,7 +141,7 @@ export interface StudentHomeStats {
   rankGap: { position: number; total: number; gap: number; aheadName: string | null } | null;
 }
 
-const NOT_EARNING: CoinTransactionType[] = ["purchase", "adjustment", "xp_align"];
+const NOT_EARNING: CoinTransactionType[] = ["purchase", "adjustment", "penalty", "xp_align"];
 const UZ_WEEKDAY_SHORT = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
 
 export async function getStudentHomeStats(): Promise<StudentHomeStats> {

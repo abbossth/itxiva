@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "@/components/ui/link";
 import { CoinIcon } from "@/components/shop/price-tag";
 import { BALANCE_EVENT } from "@/lib/rewards-client";
-import { COIN_HIT_EVENT } from "@/lib/coin-flight";
+import { COIN_HIT_EVENT, COIN_LOSS_EVENT } from "@/lib/coin-flight";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 /**
@@ -18,6 +18,8 @@ export function HeaderBalance({ initial }: { initial: number }) {
   // Uchib kelgan tanga tekkanda kichik "tebranish" va "+N" yozuvi
   const [hits, setHits] = useState(0);
   const [gain, setGain] = useState<{ amount: number; key: number } | null>(null);
+  // Jarima: balans yonida qizil "−N"
+  const [loss, setLoss] = useState<{ amount: number; key: number } | null>(null);
   const targetRef = useRef(initial);
 
   useEffect(() => {
@@ -29,13 +31,25 @@ export function HeaderBalance({ initial }: { initial: number }) {
       setTarget(value);
     };
     const onHit = () => setHits((n) => n + 1);
+    const onLoss = (e: Event) => {
+      const amount = (e as CustomEvent<number>).detail;
+      if (Number.isFinite(amount) && amount > 0) setLoss({ amount, key: Date.now() });
+    };
     window.addEventListener(BALANCE_EVENT, onBalance);
     window.addEventListener(COIN_HIT_EVENT, onHit);
+    window.addEventListener(COIN_LOSS_EVENT, onLoss);
     return () => {
       window.removeEventListener(BALANCE_EVENT, onBalance);
       window.removeEventListener(COIN_HIT_EVENT, onHit);
+      window.removeEventListener(COIN_LOSS_EVENT, onLoss);
     };
   }, []);
+
+  useEffect(() => {
+    if (!loss) return;
+    const t = setTimeout(() => setLoss(null), 2200);
+    return () => clearTimeout(t);
+  }, [loss]);
 
   useEffect(() => {
     if (!gain) return;
@@ -85,6 +99,15 @@ export function HeaderBalance({ initial }: { initial: number }) {
           className="coin-gain pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 px-2 py-0.5 font-mono text-xs font-black text-amber-950 shadow-lg shadow-amber-500/40"
         >
           +{formatNumberUz(gain.amount)}
+        </span>
+      )}
+      {loss && (
+        <span
+          key={loss.key}
+          aria-hidden
+          className="coin-gain pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-red-600 px-2 py-0.5 font-mono text-xs font-black text-white shadow-lg shadow-red-600/40"
+        >
+          −{formatNumberUz(loss.amount)}
         </span>
       )}
       <span className="font-mono text-sm sm:text-base font-black tabular-nums text-amber-800 dark:text-amber-300">{formatNumberUz(shown)}</span>

@@ -16,6 +16,7 @@ import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
 import { RewardCelebration } from "@/components/gamification/reward-celebration";
+import { PenaltyNotice } from "@/components/gamification/penalty-notice";
 import { accentCss } from "@/lib/theme-accents";
 import { resolveAmbience } from "@/lib/ambience";
 import { toDateKey } from "@/lib/schedule";
@@ -96,6 +97,8 @@ export default async function DashboardLayout({
       {levelState?.levelUp && <LevelUpModal key={levelState.levelUp.level} info={levelState.levelUp} />}
 
       {/* Coin yoki XP olinganda: o'yindagidek tabrik (daraja oynasidan keyin) */}
+      {/* Jarima (sababsiz qoldirish, topshirilmagan vazifa): qancha coin olingani va sababi — tabrikdan oldin */}
+      {session.role === "student" && <PenaltyNotice waitForLevelUp={Boolean(levelState?.levelUp)} />}
       {session.role === "student" && <RewardCelebration waitForLevelUp={Boolean(levelState?.levelUp)} />}
 
       {/* Mentor e'lonlari: kirishda modal oynada (daraja va mukofot oynalari bilan navbat bilan) */}

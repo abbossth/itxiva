@@ -187,7 +187,7 @@ export async function suggestProductPriceAction(input: { realPrice: number; prod
       .select("title price realPrice")
       .lean(),
     CoinLedger.aggregate<{ sum: number }>([
-      { $match: { createdAt: { $gte: since }, amount: { $gt: 0 }, type: { $nin: ["purchase", "adjustment", "xp_align"] } } },
+      { $match: { createdAt: { $gte: since }, amount: { $gt: 0 }, type: { $nin: ["purchase", "adjustment", "penalty", "xp_align"] } } },
       { $group: { _id: null, sum: { $sum: "$amount" } } },
     ]),
     User.countDocuments({ role: "student", groupId: { $ne: null } }),

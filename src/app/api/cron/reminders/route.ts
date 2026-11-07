@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron-auth";
 import { sendLessonReminders } from "@/lib/notifications/scheduled";
 import { closeExpiredSessions } from "@/lib/attendance/core";
+import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
 import { connectToDatabase } from "@/lib/db/connect";
 
 // Har 5 daqiqada GitHub Actions chaqiradi (.github/workflows/lesson-reminders.yml):
@@ -18,7 +19,12 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     // Mentor yopishni unutgan davomat sessiyalari shu yerda yopiladi
     const [lessons, closedSessions] = await Promise.all([sendLessonReminders(), closeExpiredSessions()]);
-    return NextResponse.json({ ok: true, lessons, closedSessions });
+    // Muddati o'tgan uyga vazifalar: topshirmaganlarga jarima (xatosi boshqa ishlarga ta'sir qilmaydi)
+    const homeworkPenalties = await applyMissedHomeworkPenalties().catch((error) => {
+      console.error("Homework penalty error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

@@ -16,7 +16,7 @@ import type { GamificationSettings } from "@/lib/gamification/config";
 // Coin iqtisodiyoti (11): coin qanchalik tez yig'iladi va do'kon narxlari bilan muvozanat.
 
 /** Manfiy davomat yozuvlari va do'kon qaytarishlari "adjustment" — ular daromad emas */
-const EARNING_EXCLUDE: CoinTransactionType[] = ["purchase", "adjustment"];
+const EARNING_EXCLUDE: CoinTransactionType[] = ["purchase", "adjustment", "penalty"];
 
 export interface CoinEconomy {
   days: number;

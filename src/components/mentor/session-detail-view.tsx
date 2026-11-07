@@ -18,7 +18,8 @@ import {
   SessionDetail,
   SessionRosterRow,
 } from "@/actions/attendance.actions";
-import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, formatCoinDelta } from "@/lib/attendance-status";
+import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, ATTENDANCE_STATUS_ORDER, coinRuleLabel, formatCoinDelta } from "@/lib/attendance-status";
+import { PENALTY_LADDER_LABEL } from "@/lib/penalty-ladder";
 import { triggerDownload } from "@/lib/xlsx-client";
 import { cn, formatDateUz, formatTimeUz } from "@/lib/utils";
 import { UZ_WEEKDAYS, getTashkentParts } from "@/lib/schedule";
@@ -162,7 +163,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         title={`${detail.group?.name ?? "Guruh"} — ${formatDateUz(detail.session.date)}`}
         subtitle={`${weekday}, ${formatTimeUz(detail.session.startTime)}${
           detail.session.endTime ? `–${formatTimeUz(detail.session.endTime)}` : ""
-        } · coin: ${ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${formatCoinDelta(rules[st])}`).join(", ")}`}
+        } · coin: ${ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${coinRuleLabel(rules, st)}`).join(", ")}`}
         backHref={groupHref}
         backLabel="Guruh davomatiga qaytish"
         actions={
@@ -185,7 +186,8 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           <div className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-300">
             <span className="font-bold text-slate-900 dark:text-slate-100">Bu dars eski coin qoidasida olingan</span> (qatnashganga{" "}
             {formatCoinDelta(rules.present)}, jarimasiz). Joriy qoida:{" "}
-            {ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${formatCoinDelta(ATTENDANCE_COINS[st])}`).join(", ")}.
+            {ATTENDANCE_STATUS_ORDER.map((st) => `${ATTENDANCE_STATUS_META[st].label.toLowerCase()} ${coinRuleLabel(ATTENDANCE_COINS, st)}`).join(", ")}{" "}
+            (sababsiz qoldirish — kalendar oy ichida 1-, 2- va 3-marta).
           </div>
           <Button variant="secondary" onClick={() => setIsConvertOpen(true)} className="shrink-0">
             Yangi qoidaga o&apos;tkazish
@@ -199,7 +201,7 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           <Clock className="w-5 h-5 shrink-0 text-blue-700 dark:text-blue-300" />
           <div className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">
             <span className="font-bold">Jarima dars tugagach ({formatTimeUz(penaltyAt)}) olinadi.</span> Kechikib kelganlarni
-            &quot;Kechikkan&quot; deb belgilang — ulardan {formatCoinDelta(rules.absent)} coin olinmaydi.
+            &quot;Kechikkan&quot; deb belgilang — ulardan jarima ({coinRuleLabel(rules, "absent")} coin) olinmaydi.
           </div>
           <Button variant="secondary" onClick={handleFinalize} isLoading={isFinalizing} className="shrink-0 min-h-[44px]">
             Hozir yakunlash
@@ -213,7 +215,8 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
           <AlertTriangle className="w-5 h-5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-200">
             <span className="font-bold">Davomat hali yakunlanmagan.</span> Kelganlarni belgilab chiqing, so&apos;ng yakunlang:
-            shunda &quot;kelmagan&quot; bo&apos;lib qolganlardan {formatCoinDelta(rules.absent)} coin olinadi.
+            shunda &quot;kelmagan&quot; bo&apos;lib qolganlardan {coinRuleLabel(rules, "absent")} coin olinadi
+            {rules.absentLadder ? " (oy ichida nechanchi marta qoldirganiga qarab)" : ""}.
           </div>
           <Button variant="primary" onClick={handleFinalize} isLoading={isFinalizing} className="shrink-0 min-h-[44px]">
             Davomatni yakunlash
@@ -293,6 +296,12 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
                         : `${row.method ? METHOD_LABEL[row.method] : ""}${
                             row.markedAt && row.method !== "manual" ? ` · ${formatTimeUz(row.markedAt)}` : ""
                           }`}
+                      {row.penalty && (
+                        <span className="ml-1 font-semibold text-rose-700 dark:text-rose-400">
+                          · jarima: bu oyda {row.penalty.no}-marta, −{row.penalty.applied}
+                          {row.penalty.applied < row.penalty.wanted ? ` (${row.penalty.wanted} dan)` : ""}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -321,7 +330,11 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
                       >
                         <span className="block leading-tight">{ATTENDANCE_STATUS_META[s].label}</span>
                         <span className={cn("block font-mono text-[10px] leading-tight", active ? "opacity-90" : "opacity-70")}>
-                          {formatCoinDelta(rules[s])}
+                          {s === "absent" && rules.absentLadder
+                            ? active && row.penalty
+                              ? `−${row.penalty.wanted}`
+                              : "−10…50"
+                            : formatCoinDelta(rules[s])}
                         </span>
                       </button>
                     );
@@ -354,8 +367,9 @@ export function SessionDetailView({ detail }: { detail: SessionDetail }) {
         description={
           <>
             Shu darsdagi har bir o&apos;quvchining coini joriy qoida bo&apos;yicha qayta hisoblanadi: kelganlarniki{" "}
-            {formatCoinDelta(rules.present)} dan {formatCoinDelta(ATTENDANCE_COINS.present)} ga tushadi, kelmaganlardan{" "}
-            {formatCoinDelta(ATTENDANCE_COINS.absent)} olinadi (balans 0 dan pastga tushmaydi). O&apos;quvchilarga xabar yuborilmaydi.
+            {formatCoinDelta(rules.present)} dan {formatCoinDelta(ATTENDANCE_COINS.present)} ga o&apos;zgaradi, kelmaganlardan oy ichidagi
+            zinapoya bo&apos;yicha {PENALTY_LADDER_LABEL} olinadi (balans 0 dan pastga tushmaydi). Telegram xabari yuborilmaydi, saytda
+            jarima oynasi chiqadi.
             Ortga qaytarib bo&apos;lmaydi.
           </>
         }

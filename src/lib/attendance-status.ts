@@ -1,4 +1,5 @@
 import type { AttendanceStatus } from "@/lib/db/models/attendance-record.model";
+import { PENALTY_LADDER_LABEL } from "@/lib/penalty-ladder";
 
 export const ATTENDANCE_STATUS_META: Record<
   AttendanceStatus,
@@ -32,10 +33,16 @@ export const ATTENDANCE_STATUS_META: Record<
 
 export const ATTENDANCE_STATUS_ORDER: AttendanceStatus[] = ["present", "late", "excused", "absent"];
 
-export type AttendanceCoinRules = Record<AttendanceStatus, number>;
+export type AttendanceCoinRules = Record<AttendanceStatus, number> & {
+  /** Sababsiz kelmaganga oy ichidagi zinapoya: 1-marta −10, 2-marta −30, 3-martadan −50 (`absent` — birinchi pog'ona) */
+  absentLadder?: boolean;
+};
 
-/** Sukutdagi coin qoidasi: kelgan +5, kechikkan +3, sababli 0, kelmagan −5 */
-export const ATTENDANCE_COINS: AttendanceCoinRules = { present: 5, late: 3, excused: 0, absent: -5 };
+/**
+ * Sukutdagi coin qoidasi: kelgan +10, kechikkan +5, sababli 0,
+ * sababsiz kelmagan — kalendar oy ichida −10 / −30 / −50 (src/lib/penalties.ts)
+ */
+export const ATTENDANCE_COINS: AttendanceCoinRules = { present: 10, late: 5, excused: 0, absent: -10, absentLadder: true };
 
 /**
  * Sessiyaning coin qoidasi. Qoida saqlanmagan eski sessiyalar o'z davridagi hisobda qoladi:
@@ -47,7 +54,7 @@ export function coinRulesOf(session: {
 }): AttendanceCoinRules {
   const r = session.coinRules;
   if (r && typeof r.present === "number") {
-    return { present: r.present, late: r.late ?? 0, excused: r.excused ?? 0, absent: r.absent ?? 0 };
+    return { present: r.present, late: r.late ?? 0, excused: r.excused ?? 0, absent: r.absent ?? 0, absentLadder: Boolean(r.absentLadder) };
   }
   const reward = session.defaultCoinsReward ?? 10;
   return { present: reward, late: reward, excused: 0, absent: 0 };
@@ -58,4 +65,9 @@ export function formatCoinDelta(amount: number): string {
   if (amount > 0) return `+${amount}`;
   if (amount < 0) return `−${Math.abs(amount)}`;
   return "0";
+}
+
+/** Holat uchun coin qoidasi matni: "+10", sababsiz kelmaganda zinapoya bo'lsa "−10 / −30 / −50" */
+export function coinRuleLabel(rules: AttendanceCoinRules, status: AttendanceStatus): string {
+  return status === "absent" && rules.absentLadder ? PENALTY_LADDER_LABEL : formatCoinDelta(rules[status]);
 }

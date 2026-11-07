@@ -12,7 +12,7 @@ import { buildLevels, levelProgress } from "@/lib/gamification/levels";
 // Manbadan qat'i nazar ishlaydi: davomat, test, vazifa bahosi, topshiriq tasdig'i, nishon, kunlik kirish.
 
 /** Mukofot emas: xarid, qaytarish/jarima, XP tenglashtirish. Daraja bonusini daraja oynasi ko'rsatadi */
-const NOT_REWARD: CoinTransactionType[] = ["purchase", "adjustment", "xp_align", "level"];
+const NOT_REWARD: CoinTransactionType[] = ["purchase", "adjustment", "penalty", "xp_align", "level"];
 
 export interface RewardSummary {
   coins: number;

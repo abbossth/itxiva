@@ -263,7 +263,7 @@ export async function getQuestFormContext(): Promise<QuestFormContext> {
 
   const since = new Date(Date.now() - 30 * 86_400_000);
   const [earned] = await CoinLedger.aggregate<{ sum: number }>([
-    { $match: { createdAt: { $gte: since }, amount: { $gt: 0 }, type: { $nin: ["purchase", "adjustment"] } } },
+    { $match: { createdAt: { $gte: since }, amount: { $gt: 0 }, type: { $nin: ["purchase", "adjustment", "penalty"] } } },
     { $group: { _id: null, sum: { $sum: "$amount" } } },
   ]);
   return {

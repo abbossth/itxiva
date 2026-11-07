@@ -21,7 +21,14 @@ export interface IAttendanceSessionData {
   previousTokens: IPreviousToken[];
   defaultCoinsReward: number;
   /** Shu dars uchun coin qoidasi (holat -> coin). Eski sessiyalarda yo'q */
-  coinRules?: { present: number; late: number; excused: number; absent: number } | null;
+  coinRules?: {
+    present: number;
+    late: number;
+    excused: number;
+    absent: number;
+    /** Sababsiz kelmaganga oy ichidagi zinapoya (−10 / −30 / −50) qo'llanadi; `absent` o'rniga */
+    absentLadder?: boolean;
+  } | null;
   /** Kelmaganlarga jarima qo'llangan vaqt; null — hali yakunlanmagan */
   finalizedAt?: Date | string | null;
   /** QR'siz, mentor qo'lda kiritgan dars */
@@ -109,6 +116,7 @@ const AttendanceSessionSchema = new Schema<IAttendanceSession>(
           late: { type: Number, required: true },
           excused: { type: Number, required: true },
           absent: { type: Number, required: true },
+          absentLadder: { type: Boolean, default: false },
         },
         { _id: false }
       ),

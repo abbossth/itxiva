@@ -6,6 +6,7 @@ import { escapeHtml, isTelegramConfigured, sendTelegramMessage, type MessageButt
 import { isNotificationEnabled, type NotificationType } from "./types";
 import { formatDateTimeUz } from "@/lib/utils";
 import { LEVEL_EMOJI } from "@/lib/gamification/levels";
+import { penaltyAmount } from "@/lib/penalty-ladder";
 
 // Barcha Telegram bildirishnomalari shu modul orqali ketadi.
 // Yangi tur qo'shish: types.ts ga tur va sozlama yorlig'i, shu yerga payload va matn shabloni.
@@ -16,7 +17,13 @@ export interface NotificationPayloads {
   material_new: { lessonId: string; lessonTitle: string; materialTitle: string };
   exam_new: { kind: "quiz" | "exam"; title: string; href: string; startsAt?: string | null };
   homework_due: { lessonId: string; lessonTitle: string; dueLabel: string; /** Mentor qo'lda yuborgan eslatma */ fromMentor?: boolean };
-  coins_changed: { amount: number; reason: string; balance?: number };
+  coins_changed: {
+    amount: number;
+    reason: string;
+    balance?: number;
+    /** Jarima (sababsiz qoldirish, topshirilmagan vazifa): zinapoya bo'yicha summa va oydagi tartibi */
+    penalty?: { wanted: number; no: number };
+  };
   order_status: { productTitle: string; status: "accepted" | "rejected" | "handed_over"; note?: string; refunded?: number };
   product_new: { title: string; price: number; /** Chegirma boshlanganda: asl narx va tugash vaqti */ oldPrice?: number; saleEndsAt?: string };
   level_up: { level: number; name: string; bonus: number };
@@ -132,16 +139,35 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     text: `⏰ ${b(p.fromMentor ? "Uyga vazifani topshirish esingizdan chiqmasin" : "Vazifa muddati yaqin")}\n${escapeHtml(p.lessonTitle)}\n\nMuddat: ${b(p.dueLabel)}`,
     button: link("Vazifani topshirish", `/lessons/${p.lessonId}?tab=homework`),
   }),
-  coins_changed: (p) => ({
-    text: [
-      `🪙 ${b(p.amount >= 0 ? `+${p.amount} coin berildi` : `${p.amount} coin olindi`)}`,
-      `Sabab: ${escapeHtml(p.reason)}`,
-      typeof p.balance === "number" ? `Balans: ${b(p.balance)}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    button: link("Balansni ko'rish", "/profile"),
-  }),
+  coins_changed: (p) => {
+    if (p.penalty) {
+      const taken = Math.abs(p.amount);
+      return {
+        text: [
+          `⚠️ ${b(`−${p.penalty.wanted} coin jarima`)}`,
+          `Sabab: ${escapeHtml(p.reason)}`,
+          taken < p.penalty.wanted
+            ? `\nBalansda yetarli coin yo'q edi: ${taken > 0 ? `${b(taken)} coin olindi` : "hech narsa olinmadi"}.`
+            : "",
+          typeof p.balance === "number" ? `Balans: ${b(p.balance)}` : "",
+          p.penalty.no < 3 ? `\nShu oyda yana takrorlansa: −${penaltyAmount(p.penalty.no + 1)} coin.` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        button: link("Coin tarixini ko'rish", "/profile"),
+      };
+    }
+    return {
+      text: [
+        `🪙 ${b(p.amount >= 0 ? `+${p.amount} coin berildi` : `${p.amount} coin olindi`)}`,
+        `Sabab: ${escapeHtml(p.reason)}`,
+        typeof p.balance === "number" ? `Balans: ${b(p.balance)}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      button: link("Balansni ko'rish", "/profile"),
+    };
+  },
   order_status: (p) => {
     const head = {
       accepted: `👍 ${b("Buyurtma qabul qilindi")}`,

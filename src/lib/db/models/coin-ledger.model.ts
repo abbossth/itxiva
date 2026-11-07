@@ -8,6 +8,8 @@ export type CoinTransactionType =
   | "bonus"
   | "purchase"
   | "adjustment"
+  // Sababsiz dars qoldirish va topshirilmagan uyga vazifa uchun jarima (zinapoya: −10 / −30 / −50)
+  | "penalty"
   // Gamifikatsiya
   | "quest"
   | "level"
@@ -26,6 +28,7 @@ export const COIN_TRANSACTION_TYPES: CoinTransactionType[] = [
   "bonus",
   "purchase",
   "adjustment",
+  "penalty",
   "quest",
   "level",
   "login",

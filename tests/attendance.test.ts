@@ -73,22 +73,22 @@ describe("davomat: sessiyani ochish", () => {
 });
 
 describe("davomat: coin qoidasi", () => {
-  it("kelgan +5; yopilganda kelmaganga −5, lekin balans 0 dan pastga tushmaydi", async () => {
+  it("kelgan +10; yopilganda kelmaganga −10, lekin balans 0 dan pastga tushmaydi", async () => {
     const { gid, ali, vali, guli } = await setup();
     const { data } = await actions.startAttendanceSessionAction(gid);
     const session = await AttendanceSession.findById(data!.sessionId);
 
     actAs(sessionFor(ali));
     const marked = await actions.markAttendanceAction({ code: session!.currentCode });
-    expect(marked.data?.coinsEarned).toBe(5);
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(marked.data?.coinsEarned).toBe(10);
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
 
     actAs(sessionFor(await User.findOne({ login: "ustoz" }).orFail()));
     setNow("18:05"); // dars tugagan
     await actions.closeAttendanceSessionAction(data!.sessionId);
 
     expect(await coinsOf(vali._id)).toEqual([0, 0]); // 3 coini bor edi — faqat 3 tasi olindi
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
     const closed = await AttendanceSession.findById(data!.sessionId).lean();
     expect(closed?.summary).toMatchObject({ totalPresent: 1, totalAbsent: 2 });
     expect(closed?.finalizedAt).toBeTruthy();
@@ -104,20 +104,21 @@ describe("davomat: coin qoidasi", () => {
       actions.manualUpdateAttendanceAction({ sessionId: sid, studentId: String(studentId), status });
 
     await set(vali._id, "excused");
-    expect(await coinsOf(vali._id)).toEqual([3, 3]); // 5 emas, olingan 3 qaytdi
+    expect(await coinsOf(vali._id)).toEqual([3, 3]); // 10 emas, olingan 3 qaytdi
     await set(guli._id, "excused");
     expect(await coinsOf(guli._id)).toEqual([20, 20]);
 
     await set(guli._id, "present");
-    expect(await coinsOf(guli._id)).toEqual([25, 25]);
+    expect(await coinsOf(guli._id)).toEqual([30, 30]);
     await set(guli._id, "late");
-    expect(await coinsOf(guli._id)).toEqual([23, 23]);
+    expect(await coinsOf(guli._id)).toEqual([25, 25]);
     await set(guli._id, "late"); // o'zgarmagan holat — coin qimirlamaydi
-    expect(await coinsOf(guli._id)).toEqual([23, 23]);
+    expect(await coinsOf(guli._id)).toEqual([25, 25]);
+    // "Sababli" qilinganda jarima bekor bo'lgan — qayta "kelmagan" yana oydagi 1-jarima (−10)
+    await set(guli._id, "absent"); // +5 qaytariladi va −10 jarima
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
     await set(guli._id, "absent");
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
-    await set(guli._id, "absent");
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
   });
 
   it("do'konda sarflangan balans alohida hisoblanadi", async () => {
@@ -126,7 +127,7 @@ describe("davomat: coin qoidasi", () => {
     const { data } = await actions.startAttendanceSessionAction(gid);
     setNow("18:05");
     await actions.closeAttendanceSessionAction(data!.sessionId);
-    expect(await coinsOf(guli._id)).toEqual([15, 0]);
+    expect(await coinsOf(guli._id)).toEqual([10, 0]);
 
     await actions.manualUpdateAttendanceAction({ sessionId: data!.sessionId, studentId: guli._id.toString(), status: "excused" });
     expect(await coinsOf(guli._id)).toEqual([20, 2]);
@@ -148,7 +149,7 @@ describe("davomat: coin qoidasi", () => {
 });
 
 describe("davomat: eski darsni yangi qoidaga o'tkazish", () => {
-  it("kelgan +10 → +5, kelmagan 0 → −5; ikkinchi marta o'tkazib bo'lmaydi", async () => {
+  it("kelgan +10 o'zgarmaydi, kelmagan 0 → −10; ikkinchi marta o'tkazib bo'lmaydi", async () => {
     const { group, mentor, ali, guli } = await setup({ ali: 10, vali: 3, guli: 20 });
     const old = await AttendanceSession.create({
       groupId: group._id, mentorId: mentor._id, date: at("16:30", "05"), startTime: at("16:30", "05"),
@@ -158,12 +159,12 @@ describe("davomat: eski darsni yangi qoidaga o'tkazish", () => {
     await AttendanceRecord.create({ sessionId: old._id, studentId: guli._id, groupId: group._id, status: "absent", method: "manual", coinsAwarded: 0 });
 
     const res = await actions.convertAttendanceRulesAction(old._id.toString());
-    expect(res.data).toEqual({ changed: 2 });
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(res.data).toEqual({ changed: 1 });
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
 
     expect((await actions.convertAttendanceRulesAction(old._id.toString())).success).toBe(false);
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
 
     // Endi yangi qoida ishlaydi: kelmagan → sababli jarimani qaytaradi
     await actions.manualUpdateAttendanceAction({ sessionId: old._id.toString(), studentId: guli._id.toString(), status: "excused" });
@@ -199,15 +200,15 @@ describe("davomat: qo'lda kiritish", () => {
     expect(await coinsOf(guli._id)).toEqual([20, 20]); // hali jarima yo'q
 
     await actions.manualUpdateAttendanceAction({ sessionId: sid, studentId: ali._id.toString(), status: "present" });
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
 
     expect((await actions.finalizeAttendanceSessionAction(sid)).success).toBe(true);
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
 
     // Ikkinchi marta yakunlash hech narsani o'zgartirmaydi
     await actions.finalizeAttendanceSessionAction(sid);
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
   });
 });
 
@@ -218,7 +219,7 @@ describe("davomat: o'chirish va avtomatik yopilish", () => {
     await actions.manualUpdateAttendanceAction({ sessionId: data!.sessionId, studentId: ali._id.toString(), status: "present" });
     setNow("18:05");
     await actions.closeAttendanceSessionAction(data!.sessionId);
-    expect(await coinsOf(ali._id)).toEqual([5, 5]);
+    expect(await coinsOf(ali._id)).toEqual([10, 10]);
 
     const res = await actions.deleteAttendanceSessionAction(data!.sessionId);
     expect(res.success).toBe(true);
@@ -251,12 +252,12 @@ describe("davomat: o'chirish va avtomatik yopilish", () => {
     expect(await closeExpiredSessions(at("18:31"))).toBe(1);
     const s = await AttendanceSession.findById(data!.sessionId).lean();
     expect(s?.status).toBe("closed");
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
   });
 });
 
 describe("davomat: jarima dars tugagach", () => {
-  it("dars boshida yopilgan sessiyada jarima darhol olinmaydi; kechikkan faqat +3 oladi; dars tugagach qolganlardan −5", async () => {
+  it("dars boshida yopilgan sessiyada jarima darhol olinmaydi; kechikkan faqat +5 oladi; dars tugagach qolganlardan −10", async () => {
     const { gid, vali, guli } = await setup();
     const { data } = await actions.startAttendanceSessionAction(gid);
     const sid = data!.sessionId;
@@ -274,7 +275,7 @@ describe("davomat: jarima dars tugagach", () => {
     // Dars o'rtasida kelgan o'quvchi
     setNow("17:10");
     await actions.manualUpdateAttendanceAction({ sessionId: sid, studentId: guli._id.toString(), status: "late" });
-    expect(await coinsOf(guli._id)).toEqual([23, 23]);
+    expect(await coinsOf(guli._id)).toEqual([25, 25]);
     expect(await CoinLedger.countDocuments({ studentId: guli._id, amount: { $lt: 0 } })).toBe(0);
 
     // Dars tugashidan oldin cron jarima qo'llamaydi, tugagach qo'llaydi
@@ -282,7 +283,7 @@ describe("davomat: jarima dars tugagach", () => {
     expect(await coinsOf(vali._id)).toEqual([3, 3]);
     await closeExpiredSessions(at("18:00"));
     expect(await coinsOf(vali._id)).toEqual([0, 0]);
-    expect(await coinsOf(guli._id)).toEqual([23, 23]);
+    expect(await coinsOf(guli._id)).toEqual([25, 25]);
     expect((await AttendanceSession.findById(sid).lean())?.finalizedAt).toBeTruthy();
     expect((await actions.getAttendanceSessionDetail(sid))?.session.penaltyAt).toBeNull();
 
@@ -294,7 +295,7 @@ describe("davomat: jarima dars tugagach", () => {
     await actions.closeAttendanceSessionAction(data!.sessionId);
     expect(await coinsOf(guli._id)).toEqual([20, 20]);
     expect((await actions.finalizeAttendanceSessionAction(data!.sessionId)).success).toBe(true);
-    expect(await coinsOf(guli._id)).toEqual([15, 15]);
+    expect(await coinsOf(guli._id)).toEqual([10, 10]);
   });
 
   it("kelmaganlarni birdan sababli qilish; sababli o'quvchi keyin kelsa QR bilan 'kelgan' bo'ladi", async () => {
@@ -323,7 +324,7 @@ describe("davomat: jarima dars tugagach", () => {
     actAs(sessionFor(guli));
     const marked = await actions.markAttendanceAction({ code: session!.currentCode });
     expect(marked.success).toBe(true);
-    expect(await coinsOf(guli._id)).toEqual([25, 25]);
+    expect(await coinsOf(guli._id)).toEqual([30, 30]);
     expect((await actions.markAttendanceAction({ code: session!.currentCode })).success).toBe(false);
 
     actAs(sessionFor(mentor));

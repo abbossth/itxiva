@@ -23,6 +23,7 @@ import {
   getTashkentParts,
 } from "@/lib/schedule";
 import mongoose from "mongoose";
+import { Penalty } from "@/lib/db/models/penalty.model";
 import { ATTENDANCE_COINS, ATTENDANCE_STATUS_META, coinRulesOf, type AttendanceCoinRules } from "@/lib/attendance-status";
 import {
   applyAttendanceStatus,
@@ -678,6 +679,8 @@ export interface SessionRosterRow {
   markedAt: string | null;
   coinsAwarded: number;
   notes: string;
+  /** Sababsiz kelmagani uchun jarima: oydagi tartibi va summasi */
+  penalty: { no: number; wanted: number; applied: number } | null;
 }
 
 export interface SessionDetail {
@@ -713,11 +716,13 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
   const attSession = await AttendanceSession.findById(sessionId).lean();
   if (!attSession) return null;
 
-  const [group, students, records] = await Promise.all([
+  const [group, students, records, penalties] = await Promise.all([
     Group.findById(attSession.groupId).select("name grade schedule").lean(),
     User.find({ groupId: attSession.groupId, role: "student" }).select("fullName login").lean(),
     AttendanceRecord.find({ sessionId }).populate("studentId", "fullName login").lean(),
+    Penalty.find({ kind: "absence", refId: attSession._id }).select("studentId no wanted applied").lean(),
   ]);
+  const penaltyOf = new Map(penalties.map((p) => [p.studentId.toString(), { no: p.no, wanted: p.wanted, applied: p.applied ?? 0 }]));
 
   const rows = new Map<string, SessionRosterRow>();
   for (const st of students) {
@@ -730,6 +735,7 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
       markedAt: null,
       coinsAwarded: 0,
       notes: "",
+      penalty: null,
     });
   }
   for (const r of records) {
@@ -745,6 +751,7 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
       markedAt: r.markedAt ? new Date(r.markedAt).toISOString() : null,
       coinsAwarded: r.coinsAwarded ?? 0,
       notes: r.notes ?? "",
+      penalty: r.status === "absent" ? penaltyOf.get(st._id.toString()) ?? null : null,
     });
   }
 
