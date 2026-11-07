@@ -1,4 +1,5 @@
 import {
+  Gamepad2,
   Users,
   BookOpen,
   Trophy,
@@ -58,6 +59,7 @@ export const MENTOR_LINKS: NavLink[] = [
   // Uyga vazifalar darsning bir qismi: tekshirish sahifalari (/mentor/homework/...) ham shu bo'limga kiradi
   { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", badgeHref: "/mentor/homework", match: ["/mentor/homework"] },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
+  { href: "/mentor/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2 },
   { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/mentor/announcements", label: "E'lonlar", shortLabel: "E'lon", icon: Megaphone },

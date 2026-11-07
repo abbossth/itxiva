@@ -16,6 +16,7 @@ import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
 import { RewardCelebration } from "@/components/gamification/reward-celebration";
+import { LiveGameNotice } from "@/components/live/live-game-notice";
 import { PenaltyNotice } from "@/components/gamification/penalty-notice";
 import { accentCss } from "@/lib/theme-accents";
 import { resolveAmbience } from "@/lib/ambience";
@@ -98,6 +99,8 @@ export default async function DashboardLayout({
 
       {/* Coin yoki XP olinganda: o'yindagidek tabrik (daraja oynasidan keyin) */}
       {/* Jarima (sababsiz qoldirish, topshirilmagan vazifa): qancha coin olingani va sababi — tabrikdan oldin */}
+      {/* Guruhda jonli o'yin ochilganda: ekran o'rtasida "Qo'shilish" (header tugmasi ham shu holatdan) */}
+      {session.role === "student" && <LiveGameNotice />}
       {session.role === "student" && <PenaltyNotice waitForLevelUp={Boolean(levelState?.levelUp)} />}
       {session.role === "student" && <RewardCelebration waitForLevelUp={Boolean(levelState?.levelUp)} />}
 

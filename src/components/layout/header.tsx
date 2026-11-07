@@ -13,6 +13,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/actions/auth.actions";
 import { HeaderBalance } from "@/components/layout/header-balance";
+import { LiveGameHeaderButton } from "@/components/live/live-game-notice";
 import { HeaderAmbience } from "@/components/layout/ambience";
 import { LevelHeaderLine } from "@/components/layout/level-ambience";
 import { levelColor } from "@/components/gamification/level-badge";
@@ -52,6 +53,7 @@ export function Header({ user, balance = null, ambience, level = null }: HeaderP
             <ThemeToggle />
           </div>
           {/* Server qiymati o'zgarsa (sahifa yangilanganda) komponent yangidan boshlanadi */}
+          {user.role === "student" && <LiveGameHeaderButton />}
           {balance !== null && <HeaderBalance key={balance} initial={balance} />}
 
           {/* Desktop: ism va rol — bosilsa profil ochiladi (mobilda pastki varaqdan) */}

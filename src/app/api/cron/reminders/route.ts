@@ -3,6 +3,7 @@ import { isCronAuthorized } from "@/lib/cron-auth";
 import { sendLessonReminders } from "@/lib/notifications/scheduled";
 import { closeExpiredSessions } from "@/lib/attendance/core";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
+import { finishStaleLiveGames } from "@/lib/live-game/finish";
 import { connectToDatabase } from "@/lib/db/connect";
 
 // Har 5 daqiqada GitHub Actions chaqiradi (.github/workflows/lesson-reminders.yml):
@@ -24,7 +25,12 @@ export async function GET(req: NextRequest) {
       console.error("Homework penalty error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties });
+    // Mentor yopishni unutgan jonli o'yinlar
+    const liveGames = await finishStaleLiveGames().catch((error) => {
+      console.error("Live game cron error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });
