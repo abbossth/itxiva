@@ -14,6 +14,16 @@ export interface IQuizAnswer {
   correctAnswer?: string;
 }
 
+export interface IQuizGameResult {
+  score: number;
+  correct: number;
+  total: number;
+  /** To'g'ri javoblarning o'rtacha vaqti (ms) */
+  avgMs: number;
+  maxStreak: number;
+  finishedAt: Date | string;
+}
+
 export interface IQuizSubmissionData {
   _id: string | mongoose.Types.ObjectId;
   quizId: string | mongoose.Types.ObjectId;
@@ -24,6 +34,8 @@ export interface IQuizSubmissionData {
   maxScore: number;
   status: QuizSubmissionStatus;
   submittedAt?: Date | string;
+  /** O'yin rejimida o'ynalgan bo'lsa: reyting uchun ochko (eski usulda topshirilganda yo'q) */
+  game?: IQuizGameResult | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -100,6 +112,20 @@ const QuizSubmissionSchema = new Schema<IQuizSubmission>(
     submittedAt: {
       type: Date,
       default: Date.now,
+    },
+    game: {
+      type: new Schema<IQuizGameResult>(
+        {
+          score: { type: Number, default: 0 },
+          correct: { type: Number, default: 0 },
+          total: { type: Number, default: 0 },
+          avgMs: { type: Number, default: 0 },
+          maxStreak: { type: Number, default: 0 },
+          finishedAt: { type: Date, default: Date.now },
+        },
+        { _id: false }
+      ),
+      default: null,
     },
   },
   {

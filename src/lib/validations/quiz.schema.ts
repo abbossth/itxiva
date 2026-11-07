@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { QUIZ_TIME_LIMITS } from "@/lib/quiz-game";
 
 export const quizQuestionSchema = z.object({
   _id: z.string().optional(),
@@ -9,6 +10,8 @@ export const quizQuestionSchema = z.object({
   points: z.coerce.number().min(1, "Ball kamida 1 bo'lishi kerak").default(1),
   explanation: z.string().optional(),
   grading: z.enum(["auto", "manual"]).optional().default("auto"),
+  /** O'yin rejimida savolga vaqt (soniya) */
+  timeLimit: z.coerce.number().refine((n) => QUIZ_TIME_LIMITS.includes(n), "Vaqt noto'g'ri tanlangan").optional(),
 }).superRefine((q, ctx) => {
   if (q.type === "single_choice" || q.type === "multiple_choice") {
     if (q.options.length < 2) {

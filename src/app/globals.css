@@ -456,6 +456,34 @@ h1,
 }
 .reward-shine { animation: reward-shine 2.6s ease-in-out 1s infinite; }
 
+/* Test o'yini: 3-2-1 sanog'i, savol kartasi va variant tugmalari chiqib keladi, oxirgi soniyalarda taymer titraydi */
+@keyframes quiz-count {
+  0% { opacity: 0; transform: scale(2.4); }
+  40% { opacity: 1; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.quiz-count { animation: quiz-count 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes quiz-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.quiz-pop { animation: quiz-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.quiz-tile { animation: quiz-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes quiz-shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-6deg); }
+  75% { transform: rotate(6deg); }
+}
+.quiz-shake { animation: quiz-shake 0.4s ease-in-out infinite; }
+@keyframes quiz-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.45); }
+  50% { box-shadow: 0 0 0 12px rgba(45, 212, 191, 0); }
+}
+.quiz-pulse { animation: quiz-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .quiz-count, .quiz-pop, .quiz-tile, .quiz-shake, .quiz-pulse { animation: none; }
+}
+
 /* Jarima oynasi: tanga tushib keladi, tangalar unga tekkanda titraydi va yorilib qoladi */
 @keyframes penalty-coin {
   0% { transform: translateY(-40px) scale(0.3); opacity: 0; }

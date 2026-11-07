@@ -4,6 +4,7 @@ import { notifyFinishedExams, sendHomeworkDueReminders } from "@/lib/notificatio
 import { runGamificationCron } from "@/lib/gamification/cron";
 import { retryFailedAiWork } from "@/lib/ai/retry";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
+import { awardQuizPlaces } from "@/lib/quiz-places";
 
 // Vercel Cron kuniga bir marta chaqiradi (vercel.json). Vercel so'rovga
 // `Authorization: Bearer <CRON_SECRET>` sarlavhasini o'zi qo'shadi.
@@ -32,7 +33,12 @@ export async function GET(req: NextRequest) {
       console.error("Homework penalty cron error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties });
+    // Test reytingi yakunlangan darslar: 1–3 o'ringa bonus coin
+    const quizPlaces = await awardQuizPlaces().catch((error) => {
+      console.error("Quiz places cron error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties, quizPlaces });
   } catch (error) {
     console.error("Daily cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

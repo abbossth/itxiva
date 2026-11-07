@@ -9,12 +9,11 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireAuth, requireMentor, requireStudent, requireGroupAccess } from "@/lib/auth/guards";
 import { quizUpsertSchema, quizSubmitSchema, quizGradeSchema } from "@/lib/validations/quiz.schema";
 import { autoGradeQuiz, isAutoOpenQuestion } from "@/lib/grading";
-import { aiGradePending, aiGradeQuizSubmission, pendingAiAnswers } from "@/lib/auto-grade";
-import { after } from "next/server";
+import { aiGradePending } from "@/lib/auto-grade";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { notifyGroup } from "@/lib/notifications/notify";
-import { rewardQuizAnswers } from "@/lib/gamification/quiz-rewards";
+import { finalizeQuizAnswers } from "@/lib/quiz-finalize";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -162,74 +161,17 @@ export async function submitQuizAction(
       questions,
       submittedAnswers: parsed.data.answers,
     });
-    const { hasOpenEnded } = graded;
-
-    let submission: { _id: mongoose.Types.ObjectId; answers: IQuizAnswer[]; totalScore: number; maxScore: number; status: string };
-    if (existing) {
-      // Shartli yangilash: ikki marta bosilsa ham yangi savollar bir marta qo'shiladi
-      const updated = await QuizSubmission.findOneAndUpdate(
-        { _id: existing._id, "answers.questionId": { $nin: questions.map((q) => String(q._id)) } },
-        {
-          $push: { answers: { $each: graded.answers } },
-          $inc: { totalScore: graded.totalScore, maxScore: graded.maxScore },
-          $set: { status: hasOpenEnded || existing.status === "submitted" ? "submitted" : "graded" },
-        },
-        { returnDocument: "after" }
-      ).lean();
-      if (!updated) {
-        return { success: false, error: "Siz bu testni allaqachon topshirgansiz" };
-      }
-      submission = updated as typeof submission;
-    } else {
-      submission = await QuizSubmission.create({
-        quizId: quiz._id,
-        lessonId: lesson._id,
-        studentId: user.userId,
-        answers: graded.answers,
-        totalScore: graded.totalScore,
-        maxScore: graded.maxScore,
-        status: hasOpenEnded ? "submitted" : "graded",
-        submittedAt: new Date(),
-      });
+    const result = await finalizeQuizAnswers({
+      quizId: quiz._id,
+      lessonId: lesson._id,
+      studentId: user.userId,
+      questions,
+      graded,
+    });
+    if (!result) {
+      return { success: false, error: "Siz bu testni allaqachon topshirgansiz" };
     }
-    const { totalScore, maxScore, status } = submission;
-    const answers = submission.answers.map((a) => ({
-      questionId: a.questionId,
-      value: a.value,
-      isCorrect: a.isCorrect,
-      pointsAwarded: a.pointsAwarded,
-      mentorFeedback: a.mentorFeedback,
-      aiGraded: a.aiGraded,
-      correctAnswer: a.correctAnswer,
-    }));
-
-    // Gamifikatsiya: javob berilgan savollar kunlik topshiriqqa sanaladi, to'g'ri javoblar coin beradi (javobdan keyin)
-    const answered = graded.answers
-      .filter((a) => (Array.isArray(a.value) ? a.value.length > 0 : String(a.value ?? "").trim() !== ""))
-      .map((a) => ({ questionId: a.questionId, isCorrect: a.isCorrect }));
-    if (answered.length > 0) {
-      const studentId = user.userId;
-      after(() => rewardQuizAnswers(studentId, answered).then(() => undefined).catch((error) => console.error("Quiz reward error:", error)));
-    }
-
-    // Ochiq javoblar javob qaytarilgandan keyin AI bilan tekshiriladi; mentor belgilagan savollar unga qoladi
-    const aiPending = hasOpenEnded && pendingAiAnswers(questions, graded.answers).length > 0;
-    if (aiPending) {
-      const submissionId = submission._id.toString();
-      const lessonId = lesson._id.toString();
-      after(async () => {
-        try {
-          await aiGradeQuizSubmission(submissionId);
-          revalidatePath(`/lessons/${lessonId}`);
-        } catch (error) {
-          console.error("Quiz AI grading error:", error);
-        }
-      });
-    }
-    const needsMentor = questions.some((q) => q.type === "open_ended" && !isAutoOpenQuestion(q));
-
-    revalidatePath(`/lessons/${lesson._id}`);
-    revalidatePath(`/mentor/lessons/${lesson._id}`);
+    const { hasOpenEnded, needsMentor, aiPending, totalScore, maxScore, status, answers } = result;
 
     return {
       success: true,

@@ -161,3 +161,36 @@ export function playRewardSound(volume = 1): void {
     })
     .catch(() => {});
 }
+
+function running(): AudioContext | null {
+  const audio = getContext();
+  if (!audio) return null;
+  if (audio.state === "suspended") audio.resume().catch(() => {});
+  return audio;
+}
+
+/** Test o'yini: to'g'ri javob — ko'tariluvchi uch nota */
+export function playCorrectSound(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "triangle", 659.25, t, 0.14, 0.25);
+  tone(audio, "triangle", 830.6, t + 0.09, 0.14, 0.25);
+  tone(audio, "triangle", 987.8, t + 0.18, 0.32, 0.3);
+}
+
+/** Test o'yini: xato javob yoki vaqt tugadi — pasayuvchi past ovoz */
+export function playWrongSound(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "sawtooth", 220, t, 0.18, 0.12);
+  tone(audio, "sawtooth", 164.8, t + 0.16, 0.34, 0.12);
+}
+
+/** Test o'yini: oxirgi soniyalarda taymer "tiq" etadi */
+export function playTickSound(): void {
+  const audio = running();
+  if (!audio) return;
+  tone(audio, "square", 1200, audio.currentTime, 0.05, 0.06);
+}

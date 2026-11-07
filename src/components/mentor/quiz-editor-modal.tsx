@@ -4,6 +4,7 @@ import { useState } from "react";
 import { OpenQuestionGrading } from "@/components/mentor/open-question-grading";
 import { IQuizData, IQuizQuestion, QuizQuestionType } from "@/lib/db/models/quiz.model";
 import { upsertQuizAction } from "@/actions/quiz.actions";
+import { QUIZ_TIME_LIMITS, questionTimeLimit } from "@/lib/quiz-game";
 import { generateQuizAction, LessonContextInput } from "@/actions/ai.actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -304,6 +305,20 @@ export function QuizEditorModal({
                         className="w-14 h-9 px-1.5 text-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                       />
                     </div>
+                    <label className="flex items-center gap-1 text-xs" title="O'yin rejimida savolga beriladigan vaqt">
+                      <span className="text-slate-500">Vaqt:</span>
+                      <select
+                        value={questionTimeLimit(q)}
+                        onChange={(e) => updateQuestion(qIdx, { timeLimit: Number(e.target.value) })}
+                        className="h-9 px-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                      >
+                        {QUIZ_TIME_LIMITS.map((s) => (
+                          <option key={s} value={s}>
+                            {s % 60 === 0 ? `${s / 60} daq` : `${s} s`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <button
                       type="button"
                       onClick={() => removeQuestion(qIdx)}

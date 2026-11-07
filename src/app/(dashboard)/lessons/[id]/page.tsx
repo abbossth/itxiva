@@ -9,7 +9,7 @@ import { HomeworkPanel } from "@/components/homework/homework-panel";
 import { hasLessonMain, LessonHeader, LessonMain, LessonPanelCard, lessonFiles } from "@/components/lessons/lesson-body";
 import { FilePreview } from "@/components/lessons/file-preview";
 import { LessonTabPanel, LessonTabs, type LessonTabDef } from "@/components/lessons/lesson-tabs";
-import { QuizView } from "@/components/quiz/quiz-view";
+import { QuizGame } from "@/components/quiz/quiz-game";
 
 interface LessonDetailPageProps {
   params: Promise<{ id: string }>;
@@ -122,7 +122,7 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
 
           {quizData?.quiz && (
             <LessonTabPanel id="quiz">
-              <QuizView lessonId={lessonId} quiz={quizData.quiz} initialSubmission={quizData.submission} role="student" />
+              <QuizGame lessonId={lessonId} quiz={quizData.quiz} submission={quizData.submission} />
             </LessonTabPanel>
           )}
         </LessonTabs>

@@ -12,6 +12,8 @@ export interface IQuizQuestion {
   explanation?: string;
   /** Ochiq savolni kim tekshiradi: "auto" — namunaviy javob va AI, "manual" — mentor. Yozilmagan bo'lsa — "auto" */
   grading?: "auto" | "manual";
+  /** O'yin rejimida savolga beriladigan vaqt (soniya). Yo'q bo'lsa — sukutdagi (src/lib/quiz-game.ts) */
+  timeLimit?: number;
 }
 
 export interface IQuizData {
@@ -22,6 +24,8 @@ export interface IQuizData {
   questions: IQuizQuestion[];
   isPublished: boolean;
   passingScore?: number;
+  /** Guruh reytingidagi 1–3 o'ringa bonus berilgan vaqt */
+  placesAwardedAt?: Date | string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -61,6 +65,7 @@ const QuizQuestionSchema = new Schema<IQuizQuestion>(
       trim: true,
     },
     grading: { type: String, enum: ["auto", "manual"], default: "auto" },
+    timeLimit: { type: Number, default: undefined },
   },
   { _id: true }
 );
@@ -95,6 +100,7 @@ const QuizSchema = new Schema<IQuiz>(
       type: Number,
       default: 60,
     },
+    placesAwardedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
