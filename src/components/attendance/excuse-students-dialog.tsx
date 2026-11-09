@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Check, ShieldCheck } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -19,12 +19,14 @@ export interface ExcuseCandidate {
 const REASONS = ["Kasal", "Oilaviy sabab", "Musobaqa yoki tadbir", "Shifokor qabulida"] as const;
 const OTHER = "Boshqa";
 const REASON_MIN = 3;
-/** Tasdiqlash tugmasini shuncha vaqt bosib turish kerak */
-const HOLD_MS = 1500;
+/** Tasdiqlash bosqichida tugma shuncha soniyadan keyin faollashadi (shoshilib bosilmasin) */
+const CONFIRM_DELAY_S = 3;
 
 /**
  * Kelmaganlarni "sababli" qilish — ataylab qiyinroq: o'quvchi o'zi tanlanadi (hech kim oldindan belgilanmagan,
- * qatordagi tugmadan ochilsa — faqat o'sha o'quvchi), sabab majburiy va tasdiqlash tugmasini bosib ushlab turish kerak.
+ * qatordagi tugmadan ochilsa — faqat o'sha o'quvchi), sabab majburiy va ikkinchi bosqichda kim va qaysi sabab bilan
+ * belgilanayotgani ko'rsatilib, tasdiqlash tugmasi bir necha soniyadan keyin faollashadi.
+ * (Avval bosib ushlab turish bor edi — oddiy bosishda hech narsa bo'lmagani va telefonda uzilib qolgani uchun almashtirildi.)
  * Ochilganda holat yangidan boshlanishi uchun ota komponent uni faqat ochiq paytda chizadi.
  */
 export function ExcuseStudentsDialog({
@@ -46,6 +48,8 @@ export function ExcuseStudentsDialog({
   const [reasonChoice, setReasonChoice] = useState<string | null>(null);
   const [otherText, setOtherText] = useState("");
   const [saving, setSaving] = useState(false);
+  // Ikkinchi bosqich: qolgan soniyalar (null — hali birinchi bosqichda)
+  const [confirmIn, setConfirmIn] = useState<number | null>(null);
   const single = initialSelected.length === 1 ? students.find((s) => s.id === initialSelected[0]) : undefined;
   const list = single ? [single] : students;
 
@@ -73,15 +77,26 @@ export function ExcuseStudentsDialog({
         onClose();
       } else {
         toast.error(res.message || "Belgilab bo'lmadi");
+        setConfirmIn(null);
       }
     } catch {
       toast.error("Belgilab bo'lmadi");
+      setConfirmIn(null);
     } finally {
       setSaving(false);
     }
   };
 
   const hint = selected.size === 0 ? "Avval o'quvchini tanlang" : !reasonOk ? "Sababini tanlang yoki yozing" : null;
+
+  // Tasdiqlash tugmasi sanog'i
+  useEffect(() => {
+    if (confirmIn === null || confirmIn <= 0) return;
+    const t = setTimeout(() => setConfirmIn((n) => (n === null ? null : n - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [confirmIn]);
+
+  const names = students.filter((s) => selected.has(s.id)).map((s) => s.fullName);
 
   return (
     <Modal
@@ -172,92 +187,49 @@ export function ExcuseStudentsDialog({
           )}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-end">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Bekor qilish
-          </Button>
-          <HoldToConfirm
-            disabled={!ready}
-            loading={saving}
-            onConfirm={submit}
-            label={selected.size > 1 ? `${selected.size} ta o'quvchini sababli qilish` : "Sababli qilish"}
-          />
-        </div>
-        <p className="text-right text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
-          {hint ?? "Tasdiqlash uchun tugmani bosib ushlab turing"}
-        </p>
+        {confirmIn === null ? (
+          <>
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-end">
+              <Button variant="secondary" onClick={onClose} disabled={saving}>
+                Bekor qilish
+              </Button>
+              <Button
+                onClick={() => {
+                  haptic([30]);
+                  setConfirmIn(CONFIRM_DELAY_S);
+                }}
+                disabled={!ready}
+                className="gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {selected.size > 1 ? `${selected.size} ta o'quvchini sababli qilish` : "Sababli qilish"}
+              </Button>
+            </div>
+            {hint && (
+              <p className="text-right text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
+                {hint}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="space-y-3 rounded-2xl border border-blue-500/40 bg-blue-50 p-4 dark:bg-blue-500/10" aria-live="polite">
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Tasdiqlaysizmi?</p>
+            <p className="text-sm text-slate-700 dark:text-slate-300">
+              <strong>{names.length > 3 ? `${names.slice(0, 3).join(", ")} va yana ${names.length - 3} kishi` : names.join(", ")}</strong>{" "}
+              &laquo;{reason}&raquo; sababi bilan &quot;Sababli&quot; deb belgilanadi — jarima olinmaydi.
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="secondary" onClick={() => setConfirmIn(null)} disabled={saving} className="gap-1.5">
+                <ArrowLeft className="h-4 w-4" /> Orqaga
+              </Button>
+              <Button onClick={submit} isLoading={saving} disabled={confirmIn > 0 || saving} className="min-w-[180px] gap-2 bg-blue-600 hover:bg-blue-700">
+                <Check className="h-4 w-4" />
+                {confirmIn > 0 ? `Tasdiqlash (${confirmIn})` : "Ha, tasdiqlayman"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </Modal>
-  );
-}
-
-/** Bosib ushlab turiladigan tugma: tasodifiy bosish bilan ishlamaydi (sichqoncha, barmoq va Space/Enter) */
-function HoldToConfirm({
-  label,
-  disabled,
-  loading,
-  onConfirm,
-}: {
-  label: string;
-  disabled: boolean;
-  loading: boolean;
-  onConfirm: () => void;
-}) {
-  const [progress, setProgress] = useState(0);
-  const raf = useRef(0);
-  const start = useRef(0);
-
-  const stop = () => {
-    cancelAnimationFrame(raf.current);
-    raf.current = 0;
-    setProgress(0);
-  };
-
-  const begin = () => {
-    if (disabled || raf.current) return;
-    start.current = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start.current) / HOLD_MS);
-      setProgress(p);
-      if (p < 1) {
-        raf.current = requestAnimationFrame(tick);
-      } else {
-        raf.current = 0;
-        haptic([40]);
-        onConfirm();
-      }
-    };
-    raf.current = requestAnimationFrame(tick);
-  };
-
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
-
-  return (
-    <button
-      type="button"
-      disabled={disabled || loading}
-      onPointerDown={begin}
-      onPointerUp={() => progress < 1 && stop()}
-      onPointerLeave={() => progress < 1 && stop()}
-      onPointerCancel={stop}
-      onKeyDown={(e) => {
-        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
-          e.preventDefault();
-          begin();
-        }
-      }}
-      onKeyUp={(e) => (e.key === " " || e.key === "Enter") && progress < 1 && stop()}
-      onContextMenu={(e) => e.preventDefault()}
-      className={cn(
-        "relative min-h-[48px] select-none overflow-hidden rounded-xl px-5 text-sm font-bold text-white transition-colors touch-none",
-        disabled || loading ? "cursor-not-allowed bg-slate-300 dark:bg-slate-700" : "cursor-pointer bg-blue-600 hover:bg-blue-700"
-      )}
-    >
-      <span aria-hidden className="absolute inset-y-0 left-0 bg-blue-900/50" style={{ width: `${progress * 100}%` }} />
-      <span className="relative flex items-center justify-center gap-2">
-        <ShieldCheck className="h-4 w-4" />
-        {loading ? "Saqlanmoqda…" : progress > 0 ? "Ushlab turing…" : label}
-      </span>
-    </button>
   );
 }
