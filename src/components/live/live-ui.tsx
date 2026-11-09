@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Jonli o'yin ekranlari uchun umumiy ranglar va kichik bo'laklar (proyektor va o'quvchi telefoni).
@@ -87,5 +87,95 @@ export function Lives({ lives, max = 3, className }: { lives: number; max?: numb
         <Heart key={i} className={cn("h-4 w-4", i < lives ? "fill-rose-500 text-rose-500" : "text-white/25")} />
       ))}
     </span>
+  );
+}
+
+/**
+ * O'yin ochilishi bilan butun oynani egallaydi (sidebar, header va pastki menyu yopiladi).
+ * Brauzerning haqiqiy to'liq ekranini sahifa o'zi yoqa olmaydi — foydalanuvchi o'yin ichida birinchi marta bosganda yoqiladi.
+ * Foydalanuvchi Esc bilan chiqsa, qayta majburlanmaydi (o'yin oynani egallab turaveradi).
+ */
+export function ImmersiveFrame({ children, leading, toolbar }: { children: React.ReactNode; leading?: React.ReactNode; toolbar?: React.ReactNode }) {
+  const [immersive, setImmersive] = useState(true);
+  const entered = useRef(false);
+  const declined = useRef(false);
+
+  // Orqadagi sahifa aylanmasin
+  useEffect(() => {
+    if (!immersive) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [immersive]);
+
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && entered.current) declined.current = true;
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      // O'yindan chiqib ketilganda brauzer to'liq ekrani ham yopiladi
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+
+  const tryNative = () => {
+    if (declined.current || typeof document === "undefined" || document.fullscreenElement || !document.fullscreenEnabled) return;
+    entered.current = true;
+    document.documentElement.requestFullscreen().catch(() => {
+      declined.current = true;
+    });
+  };
+
+  const exit = () => {
+    declined.current = true;
+    setImmersive(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
+  const enter = () => {
+    declined.current = false;
+    setImmersive(true);
+    tryNative();
+  };
+
+  const bar = (
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0">{leading}</div>
+      <div className="flex flex-wrap items-center gap-2">
+        {toolbar}
+        <button
+          type="button"
+          onClick={immersive ? exit : enter}
+          className={cn(
+            "inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition-colors",
+            immersive ? "bg-white/10 text-white hover:bg-white/20" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+          )}
+          title={immersive ? "Oddiy ko'rinishga qaytish" : "O'yinni to'liq ekranda ochish"}
+        >
+          {immersive ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          <span className="hidden sm:inline">{immersive ? "Kichraytirish" : "To'liq ekran"}</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!immersive) {
+    return (
+      <div>
+        {bar}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950 text-white" onClickCapture={tryNative}>
+      <div className="mx-auto flex min-h-full max-w-6xl flex-col p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+        {bar}
+        <div className="flex flex-1 flex-col [&>*]:flex-1">{children}</div>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Crown, Expand, Play, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ArrowLeft, Check, Crown, Pause, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -17,16 +17,50 @@ import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
 import { fireConfetti } from "@/lib/confetti";
 import { playCheckInSound, playFireworksSound, playTickSound, unlockSound } from "@/lib/sound";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
-import { LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
+import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 const POLL_MS = 1000;
+
+/** Avto rejimda natija shuncha soniya ko'rsatiladi (xazinada — sandiq ochishga ulgurish uchun ko'proq) */
+const autoDelayFor = (mode: LiveHostState["mode"]) => (mode === "chest" ? 10 : 6);
+
+// "Avto" tanlovi brauzerda eslab qolinadi (keyingi o'yinda ham yoqilgan bo'ladi)
+const AUTO_KEY = "itxiva:live-autoplay";
+const AUTO_EVENT = "itxiva:live-autoplay";
+function readAuto(): boolean {
+  try {
+    return localStorage.getItem(AUTO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeAuto(on: boolean) {
+  try {
+    localStorage.setItem(AUTO_KEY, on ? "1" : "0");
+  } catch {
+    // Saqlab bo'lmasa ham shu sahifada ishlaydi
+  }
+  window.dispatchEvent(new Event(AUTO_EVENT));
+}
+function subscribeAuto(cb: () => void) {
+  window.addEventListener(AUTO_EVENT, cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener(AUTO_EVENT, cb);
+    window.removeEventListener("storage", cb);
+  };
+}
 
 export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const { toast } = useToast();
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(true);
+  const autoplay = useSyncExternalStore(subscribeAuto, readAuto, () => false);
+  // Avto rejim sanog'i: qaysi savol natijasi uchun va necha soniya qoldi
+  const [auto, setAuto] = useState<{ index: number; left: number } | null>(null);
+  const autoFired = useRef<number | null>(null);
   const revealing = useRef<number | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
   const celebrated = useRef(false);
@@ -90,30 +124,63 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     }
   };
 
-  const fullscreen = () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-    else document.exitFullscreen().catch(() => {});
-  };
+  // Avto rejim: natija ko'rsatilgach sanoq, keyin keyingi savol (oxirgisida — g'oliblar)
+  const actRef = useRef(act);
+  useEffect(() => {
+    actRef.current = act;
+  });
+  useEffect(() => {
+    if (!autoplay || state.status !== "reveal" || autoFired.current === state.index) return;
+    const index = state.index;
+    const last = index + 1 >= state.total;
+    const deadline = Date.now() + autoDelayFor(state.mode) * 1000;
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setAuto({ index, left });
+      if (left > 0) return;
+      clearInterval(id);
+      autoFired.current = index;
+      void actRef.current(() => (last ? finishLiveGameAction(state.id) : startLiveQuestionAction(state.id)));
+    }, 250);
+    return () => clearInterval(id);
+  }, [autoplay, state.status, state.index, state.total, state.mode, state.id]);
+  const autoLeft = autoplay && state.status === "reveal" && auto?.index === state.index ? auto.left : null;
 
   const Icon = MODE_ICONS[state.mode];
   const isLast = state.index + 1 >= state.total;
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href="/mentor/live" className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-slate-600 hover:text-teal-600 dark:text-slate-400">
+    <ImmersiveFrame
+      leading={
+        <Link href="/mentor/live" className="inline-flex min-h-[40px] items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> Jonli o&apos;yinlar
         </Link>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setSound((s) => !s)} className="gap-1.5" aria-pressed={sound}>
-            {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />} Ovoz
-          </Button>
-          <Button variant="secondary" size="sm" onClick={fullscreen} className="gap-1.5">
-            <Expand className="h-4 w-4" /> To&apos;liq ekran
-          </Button>
-        </div>
-      </div>
-
+      }
+      toolbar={
+        <>
+          <button
+            type="button"
+            onClick={() => writeAuto(!autoplay)}
+            aria-pressed={autoplay}
+            title="Natijadan keyin keyingi savol o'zi boshlanadi"
+            className={cn(
+              "inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition-colors",
+              autoplay ? "bg-emerald-500 text-white hover:bg-emerald-400" : "bg-white/10 text-slate-200 hover:bg-white/20"
+            )}
+          >
+            <Repeat className="h-4 w-4" /> Avto {autoplay ? "yoqilgan" : "o'chiq"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSound((v) => !v)}
+            aria-pressed={sound}
+            className="inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-slate-200 hover:bg-white/20"
+          >
+            {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />} <span className="hidden sm:inline">Ovoz</span>
+          </button>
+        </>
+      }
+    >
       <LiveShell className="min-h-[70vh]">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -148,13 +215,15 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
             state={state}
             busy={busy}
             isLast={isLast}
+            autoLeft={autoLeft}
+            onStopAuto={() => writeAuto(false)}
             onNext={() => act(() => startLiveQuestionAction(state.id))}
             onFinish={() => act(() => finishLiveGameAction(state.id))}
           />
         )}
         {state.status === "finished" && <Podium state={state} />}
       </LiveShell>
-    </div>
+    </ImmersiveFrame>
   );
 }
 
@@ -253,12 +322,17 @@ function RevealView({
   state,
   busy,
   isLast,
+  autoLeft,
+  onStopAuto,
   onNext,
   onFinish,
 }: {
   state: LiveHostState;
   busy: boolean;
   isLast: boolean;
+  /** Avto rejimda keyingi qadamgacha qolgan soniya */
+  autoLeft: number | null;
+  onStopAuto: () => void;
   onNext: () => void;
   onFinish: () => void;
 }) {
@@ -298,14 +372,19 @@ function RevealView({
 
       <ModePanel state={state} />
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {autoLeft !== null && (
+          <Button variant="ghost" onClick={onStopAuto} className="gap-1.5 text-slate-300 hover:text-white">
+            <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
+          </Button>
+        )}
         {isLast ? (
           <button type="button" onClick={onFinish} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-amber-400 px-8 text-lg font-black text-slate-900 disabled:opacity-60">
-            <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish
+            <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish{autoLeft !== null ? ` (${autoLeft})` : ""}
           </button>
         ) : (
           <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-white px-8 text-lg font-black text-slate-900 disabled:opacity-60">
-            Keyingi savol <SkipForward className="h-5 w-5" />
+            Keyingi savol{autoLeft !== null ? ` (${autoLeft})` : ""} <SkipForward className="h-5 w-5" />
           </button>
         )}
         {!isLast && (

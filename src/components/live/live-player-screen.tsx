@@ -15,7 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { fireConfetti } from "@/lib/confetti";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
-import { LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
+import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 const POLL_MS = 1500;
@@ -93,7 +93,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
   const me = state.me;
 
   return (
-    <div className="mx-auto max-w-xl">
+    <ImmersiveFrame>
+      <div className="mx-auto flex w-full max-w-xl flex-col [&>*]:flex-1">
       <LiveShell className="min-h-[75vh]">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -161,7 +162,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           <FinishedView state={state} />
         )}
       </LiveShell>
-    </div>
+      </div>
+    </ImmersiveFrame>
   );
 }
 
