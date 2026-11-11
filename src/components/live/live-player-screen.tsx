@@ -15,6 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { fireConfetti } from "@/lib/confetti";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
+import { MinigamePlayer } from "./live-minigame";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -156,6 +157,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           ) : (
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
+        ) : state.status === "minigame" && state.minigame ? (
+          <MinigamePlayer key={state.minigame.round} gameId={state.id} m={state.minigame} />
         ) : state.status === "reveal" ? (
           <RevealView state={state} chest={chest} busy={busy} onOpenChest={openChest} />
         ) : (
@@ -241,6 +244,7 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
 
   return (
     <div className="space-y-3 lg:space-y-5">
+      {state.bonus && <p className="live-pop mx-auto w-fit rounded-xl bg-amber-400 px-4 py-1.5 text-sm font-black text-slate-950 lg:text-lg">⚡ BONUS: ochko ×2</p>}
       <div className="flex items-start gap-3 lg:gap-5">
         <p className="min-w-0 flex-1 whitespace-pre-wrap rounded-2xl bg-white px-4 py-3 text-base font-black text-slate-900 sm:text-xl md:px-6 md:py-5 lg:text-4xl lg:leading-snug">{q.prompt}</p>
         <span className="lg:hidden">

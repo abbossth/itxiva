@@ -21,7 +21,7 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
   team: "from-sky-500 to-indigo-600",
 };
 
-const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", finished: "Yakunlangan" } as const;
+const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", finished: "Yakunlangan" } as const;
 
 export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
   const [open, setOpen] = useState(false);
@@ -115,6 +115,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [count, setCount] = useState(10);
   const [teams, setTeams] = useState(2);
   const [prizes, setPrizes] = useState([30, 20, 10]);
+  const [minigames, setMinigames] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Guruhlar va ulardagi savollar soni oyna ochilganda bir marta olinadi
@@ -145,7 +146,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -251,6 +252,16 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
               <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Faqat {available} ta savol bor — hammasi tasodifiy tartibda tushadi.</p>
             )}
           </Field>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+            <input type="checkbox" checked={minigames} onChange={(e) => setMinigames(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
+            <span>
+              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Savollar orasida qisqa o&apos;yinlar</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                Har 3 savoldan keyin tasodifiy: tezkor bosish, mo&apos;ljalga otish, omad g&apos;ildiragi yoki bonus raund (×2)
+              </span>
+            </span>
+          </label>
 
           <Field label={mode === "team" ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
             <div className="flex gap-2">

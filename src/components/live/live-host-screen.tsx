@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Check, Crown, Music, Pause, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, Crown, Music, Pause, Settings2, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import {
   cancelLiveGameAction,
+  endMinigameAction,
   finishLiveGameAction,
   getLiveHostStateAction,
   revealLiveQuestionAction,
@@ -18,6 +19,8 @@ import { playCheckInSound, playTickSound, unlockSound } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
+import { YoutubeMusic, setYoutubeLink, useYoutubeLink, youtubeId } from "./live-youtube";
+import { MinigameHost } from "./live-minigame";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -63,12 +66,19 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(true);
   const [music, setMusic] = useState(true);
+  const [musicMenu, setMusicMenu] = useState(false);
+  // YouTube havolasi tanlangan bo'lsa — o'sha chalinadi (original kuy o'chadi)
+  const ytLink = useYoutubeLink(initial.mode);
+  const ytId = youtubeId(ytLink);
+  const synthOn = music && !ytId;
   // Natijaning ikkinchi qadami (reyting) qaysi savol uchun ochilgan
   const [boardFor, setBoardFor] = useState<number | null>(null);
   const autoplay = useSyncExternalStore(subscribeAuto, readAuto, () => false);
   // Avto rejim sanog'i: qaysi savol natijasi uchun va necha soniya qoldi
-  const [auto, setAuto] = useState<{ index: number; left: number } | null>(null);
-  const autoFired = useRef<number | null>(null);
+  const [auto, setAuto] = useState<{ key: string; left: number } | null>(null);
+  const autoFired = useRef<string | null>(null);
+  const minigameEnding = useRef<number | null>(null);
+  const minigameEndsAt = useRef<{ round: number; at: number } | null>(null);
   const revealing = useRef<number | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
 
@@ -123,10 +133,12 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
 
   // Fon musiqasi: holatga qarab kuy (g'oliblar musiqasini shohsupa o'zi boshqaradi)
   useEffect(() => {
-    liveMusic.setEnabled(music);
-    if (!music || state.status === "finished") return;
-    liveMusic.play(state.status === "lobby" ? "lobby" : state.status === "question" ? "question" : "board");
-  }, [music, state.status]);
+    liveMusic.setEnabled(synthOn);
+    if (!synthOn || state.status === "finished") return;
+    liveMusic.play(
+      state.status === "lobby" ? "lobby" : state.status === "question" || (state.status === "minigame" && !state.minigame?.ended) ? "question" : "board"
+    );
+  }, [synthOn, state.status, state.minigame?.ended]);
   useEffect(() => {
     liveMusic.setBoost(state.status === "question" && remaining > 0 && remaining <= 5000);
   }, [remaining, state.status]);
@@ -149,22 +161,39 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   useEffect(() => {
     actRef.current = act;
   });
+  // Avto rejim kaliti: natija ("r3") yoki tugagan qisqa o'yin ("m3")
+  const autoKey =
+    state.status === "reveal" ? `r${state.index}` : state.status === "minigame" && state.minigame?.ended ? `m${state.index}` : null;
   useEffect(() => {
-    if (!autoplay || state.status !== "reveal" || autoFired.current === state.index) return;
-    const index = state.index;
-    const last = index + 1 >= state.total;
-    const deadline = Date.now() + autoDelayFor(state.mode) * 1000;
+    if (!autoplay || !autoKey || autoFired.current === autoKey) return;
+    const key = autoKey;
+    const last = key.startsWith("r") && state.index + 1 >= state.total;
+    const deadline = Date.now() + (key.startsWith("m") ? 6 : autoDelayFor(state.mode)) * 1000;
     const id = setInterval(() => {
       const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-      setAuto({ index, left });
+      setAuto({ key, left });
       if (left > 0) return;
       clearInterval(id);
-      autoFired.current = index;
+      autoFired.current = key;
       void actRef.current(() => (last ? finishLiveGameAction(state.id) : startLiveQuestionAction(state.id)));
     }, 250);
     return () => clearInterval(id);
-  }, [autoplay, state.status, state.index, state.total, state.mode, state.id]);
-  const autoLeft = autoplay && state.status === "reveal" && auto?.index === state.index ? auto.left : null;
+  }, [autoplay, autoKey, state.index, state.total, state.mode, state.id]);
+  const autoLeft = autoplay && autoKey && auto?.key === autoKey ? auto.left : null;
+
+  // Qisqa o'yin vaqti tugasa — natija hisoblanadi (oxirgi natijalar yetib kelishi uchun biroz kutiladi)
+  useEffect(() => {
+    const m = state.minigame;
+    if (state.status !== "minigame" || !m || m.ended || minigameEnding.current === m.round) return;
+    // Tugash vaqti bir marta eslab qolinadi — har yangilanishda taymer qaytadan cho'zilmasin
+    if (minigameEndsAt.current?.round !== m.round) minigameEndsAt.current = { round: m.round, at: Date.now() + m.startsInMs + m.remainingMs };
+    const wait = Math.max(0, minigameEndsAt.current.at + 1500 - Date.now());
+    const t = setTimeout(() => {
+      minigameEnding.current = m.round;
+      void endMinigameAction(state.id).then(() => refresh());
+    }, wait);
+    return () => clearTimeout(t);
+  }, [state.status, state.minigame, state.id, refresh]);
 
   const Icon = MODE_ICONS[state.mode];
   const isLast = state.index + 1 >= state.total;
@@ -205,6 +234,16 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
           >
             <Music className="h-4 w-4" /> <span className="hidden sm:inline">Musiqa</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setMusicMenu((v) => !v)}
+            title="Musiqani tanlash (YouTube havola yoki original kuy)"
+            aria-expanded={musicMenu}
+            className="inline-flex min-h-[40px] cursor-pointer items-center rounded-xl bg-white/10 px-2.5 text-slate-200 hover:bg-white/20"
+          >
+            <Settings2 className="h-4 w-4" />
+          </button>
+          {musicMenu && <MusicMenu mode={state.mode} link={ytLink} onClose={() => setMusicMenu(false)} />}
           <button
             type="button"
             onClick={() => setSound((v) => !v)}
@@ -259,8 +298,32 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
             onFinish={() => act(() => finishLiveGameAction(state.id))}
           />
         )}
-        {state.status === "finished" && <LivePodium state={state} sound={sound} music={music} />}
+        {state.status === "minigame" && state.minigame && (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1">
+              <MinigameHost key={state.minigame.round} m={state.minigame} sound={sound} />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
+              {autoLeft !== null && (
+                <Button variant="ghost" onClick={() => writeAuto(false)} className="gap-1.5 text-slate-300 hover:text-white">
+                  <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => act(() => startLiveQuestionAction(state.id))}
+                disabled={busy}
+                className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-white px-8 text-lg font-black text-slate-900 disabled:opacity-60"
+              >
+                {state.minigame.ended ? "Keyingi savol" : "O'tkazib yuborish"}
+                {autoLeft !== null ? ` (${autoLeft})` : ""} <SkipForward className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+        {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
       </LiveShell>
+      {music && ytId && <YoutubeMusic videoId={ytId} playing={music} />}
     </ImmersiveFrame>
   );
 }
@@ -321,6 +384,9 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
   const q = state.question!;
   return (
     <div className="space-y-5">
+      {state.bonus && (
+        <p className="live-banner mx-auto w-fit rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-300 px-6 py-2 text-xl font-black text-slate-950">⚡ BONUS RAUND — ochko ×2</p>
+      )}
       <div className="flex items-start gap-4">
         <div className="quiz-pop min-w-0 flex-1 rounded-3xl bg-white px-5 py-6 text-center text-slate-900 shadow-xl sm:px-8 sm:py-10">
           <p className="whitespace-pre-wrap text-2xl font-black leading-snug sm:text-4xl">{q.prompt}</p>
@@ -521,5 +587,49 @@ function ChestFeed({ events }: { events: LiveHostState["events"] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Musiqa tanlash: shu o'yin turi uchun YouTube havola yoki original (sintez) kuy */
+function MusicMenu({ mode, link, onClose }: { mode: LiveHostState["mode"]; link: string; onClose: () => void }) {
+  const [value, setValue] = useState(link);
+  const valid = value.trim() === "" || Boolean(youtubeId(value));
+  return (
+    <div className="absolute right-3 top-14 z-20 w-[min(92vw,380px)] space-y-3 rounded-2xl bg-slate-900 p-4 text-left shadow-2xl ring-1 ring-white/15 sm:right-6">
+      <p className="text-sm font-black">{LIVE_MODES[mode].title} uchun musiqa</p>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="https://www.youtube.com/watch?v=…"
+        className="w-full min-h-[44px] rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white placeholder:text-slate-500 focus:border-fuchsia-400 focus:outline-hidden"
+      />
+      {!valid && <p className="text-xs font-semibold text-rose-300">YouTube havolasi noto&apos;g&apos;ri</p>}
+      <p className="text-[11px] leading-relaxed text-slate-400">
+        YouTube pleeri burchakda ko&apos;rinib turadi va qo&apos;shiq takrorlanadi. Bo&apos;sh qoldirsangiz — o&apos;yinning original kuylari chalinadi.
+      </p>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setYoutubeLink(mode, "");
+            onClose();
+          }}
+          className="min-h-[40px] cursor-pointer rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10"
+        >
+          Original kuy
+        </button>
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={() => {
+            setYoutubeLink(mode, value);
+            onClose();
+          }}
+          className="min-h-[40px] cursor-pointer rounded-xl bg-fuchsia-500 px-4 text-sm font-bold text-white hover:bg-fuchsia-400 disabled:opacity-50"
+        >
+          Saqlash
+        </button>
+      </div>
+    </div>
   );
 }

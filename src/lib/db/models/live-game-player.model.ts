@@ -36,6 +36,8 @@ export interface ILiveGamePlayerData {
   /** Oxirgi natijadagi o'rni va undan oldingisi (reyting animatsiyasi uchun); 0 — hali yo'q */
   rank: number;
   prevRank: number;
+  /** Qisqa o'yinlar natijasi: round — savol raqami, value — bosish/nishon soni, points — olingan ochko */
+  minigames: { round: number; value: number; points: number }[];
   createdAt?: Date | string;
 }
 
@@ -76,6 +78,10 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     coins: { type: Number, default: 0 },
     rank: { type: Number, default: 0 },
     prevRank: { type: Number, default: 0 },
+    minigames: {
+      type: [new Schema({ round: Number, value: { type: Number, default: 0 }, points: { type: Number, default: 0 } }, { _id: false })],
+      default: [],
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

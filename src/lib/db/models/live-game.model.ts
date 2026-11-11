@@ -5,7 +5,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type LiveGameMode = "classic" | "survival" | "chest" | "team";
 export type LiveGameSource = "today" | "all";
-export type LiveGameStatus = "lobby" | "question" | "reveal" | "finished";
+export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "finished";
 export type LiveQuestionType = "single_choice" | "multiple_choice" | "short_answer";
 
 export interface ILiveQuestion {
@@ -25,6 +25,18 @@ export interface ILiveEvent {
   at: Date | string;
 }
 
+export interface ILiveMinigame {
+  /** Qaysi savol natijasidan keyin (savol raqami) */
+  round: number;
+  kind: "tap" | "target" | "wheel" | "bonus";
+  /** O'yin boshlanadigan vaqt (sanoqdan keyin) va tugash vaqti */
+  startedAt: Date | string;
+  endsAt: Date | string;
+  endedAt?: Date | string | null;
+  /** Omad g'ildiragi: server tanlagan segment, o'yinchi va natija */
+  wheel?: { segment: number; effect: string; playerId: string; name: string } | null;
+}
+
 export interface ILiveGameData {
   _id: string | mongoose.Types.ObjectId;
   mentorId: string | mongoose.Types.ObjectId;
@@ -39,6 +51,14 @@ export interface ILiveGameData {
   questionStartedAt?: Date | string | null;
   questions: ILiveQuestion[];
   events: ILiveEvent[];
+  /** Yaratishda tanlangan qo'shimchalar */
+  options: { minigames: boolean; arena: boolean };
+  /** Joriy yoki oxirgi qisqa o'yin */
+  minigame?: ILiveMinigame | null;
+  /** O'tkazilgan qisqa o'yinlar (savol raqamlari) */
+  minigameRounds: number[];
+  /** Bonus raund: shu savolda ochko ×2 */
+  bonusIndex?: number | null;
   finishedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
@@ -79,11 +99,31 @@ const LiveGameSchema = new Schema<ILiveGame>(
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
     prizes: { type: [Number], default: [30, 20, 10] },
-    status: { type: String, enum: ["lobby", "question", "reveal", "finished"], default: "lobby" },
+    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "finished"], default: "lobby" },
     index: { type: Number, default: -1 },
     questionStartedAt: { type: Date, default: null },
     questions: { type: [LiveQuestionSchema], default: [] },
     events: { type: [LiveEventSchema], default: [] },
+    options: {
+      type: new Schema({ minigames: { type: Boolean, default: true }, arena: { type: Boolean, default: false } }, { _id: false }),
+      default: () => ({ minigames: true, arena: false }),
+    },
+    minigame: {
+      type: new Schema(
+        {
+          round: Number,
+          kind: { type: String, enum: ["tap", "target", "wheel", "bonus"] },
+          startedAt: Date,
+          endsAt: Date,
+          endedAt: { type: Date, default: null },
+          wheel: { type: new Schema({ segment: Number, effect: String, playerId: String, name: String }, { _id: false }), default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    minigameRounds: { type: [Number], default: [] },
+    bonusIndex: { type: Number, default: null },
     finishedAt: { type: Date, default: null },
     rewardedAt: { type: Date, default: null },
   },

@@ -54,20 +54,22 @@ export interface AnswerOutcome {
 export function scoreAnswer(
   mode: LiveGameMode,
   player: PlayerLike,
-  a: { isCorrect: boolean; elapsedMs: number; limitSec: number }
+  a: { isCorrect: boolean; elapsedMs: number; limitSec: number; /** Bonus raund: ochko ×2 */ bonus?: boolean }
 ): AnswerOutcome {
   const streak = a.isCorrect ? player.streak + 1 : 0;
   const base = { points: 0, streak, lives: player.lives, eliminated: player.eliminated, chests: 0, double: player.double };
+  // ×2 (sandiq yoki omad g'ildiragidan) keyingi to'g'ri javobda ishlatiladi; bonus raund bilan qo'shiladi
+  const mult = (a.isCorrect && player.double ? 2 : 1) * (a.bonus ? 2 : 1);
   if (mode === "chest") {
     if (!a.isCorrect) return base;
-    return { ...base, points: player.double ? CHEST_CORRECT_POINTS * 2 : CHEST_CORRECT_POINTS, chests: 1, double: false };
+    return { ...base, points: CHEST_CORRECT_POINTS * mult, chests: 1, double: false };
   }
-  const pts = answerPoints({ isCorrect: a.isCorrect, elapsedMs: a.elapsedMs, limitSec: a.limitSec, streak }).total;
+  const pts = answerPoints({ isCorrect: a.isCorrect, elapsedMs: a.elapsedMs, limitSec: a.limitSec, streak }).total * mult;
   if (mode === "survival" && !a.isCorrect) {
     const lives = Math.max(player.lives - 1, 0);
     return { ...base, lives, eliminated: lives === 0 };
   }
-  return { ...base, points: pts };
+  return { ...base, points: pts, double: a.isCorrect ? false : player.double };
 }
 
 /** Javob bermay qolgan o'yinchi: xato bilan teng */

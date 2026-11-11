@@ -23,6 +23,20 @@ import {
   teamStandings,
 } from "@/lib/live-game/modes";
 import { LIVE_GAME_MAX_MS, finishLiveGame } from "@/lib/live-game/finish";
+import {
+  MINIGAMES,
+  MINIGAME_GRACE_MS,
+  MINIGAME_INTRO_S,
+  clampMinigameValue,
+  minigameDue,
+  minigamePoints,
+  pickMinigame,
+  spinWheel,
+  wheelPoints,
+  wheelText,
+  type MinigameKind,
+  type WheelEffect,
+} from "@/lib/live-game/minigames";
 
 // Jonli o'yin: mentor proyektorda boshqaradi, o'quvchilar telefondan qo'shiladi. Holat qisqa so'rovlar bilan olinadi.
 
@@ -85,6 +99,8 @@ export async function createLiveGameAction(input: {
   count: number;
   teams?: number;
   prizes?: number[];
+  /** Savollar orasida qisqa o'yinlar (sukutda yoqilgan) */
+  minigames?: boolean;
 }): Promise<Result<{ gameId: string; existing: boolean }>> {
   try {
     const mentor = await requireMentor();
@@ -115,6 +131,7 @@ export async function createLiveGameAction(input: {
       teams,
       prizes,
       questions,
+      options: { minigames: input.minigames !== false, arena: false },
     });
     return { success: true, data: { gameId: game._id.toString(), existing: false } };
   } catch (err) {
@@ -128,9 +145,16 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("status index questions").lean();
+    const game = await LiveGame.findById(gameId).select("status index questions options minigame minigameRounds").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
+    // Har 3 savoldan keyin — qisqa o'yin (bir marta)
+    if (game.status === "reveal" && game.options?.minigames !== false && minigameDue(game.index, game.questions.length, game.minigameRounds ?? [])) {
+      await startMinigame(game._id, game.index, (game.minigame?.kind as MinigameKind | undefined) ?? null);
+      return { success: true, data: { finished: false } };
+    }
+    // Qisqa o'yindan keyin: tugamagan bo'lsa — avval natijasi hisoblanadi
+    if (game.status === "minigame" && !game.minigame?.endedAt) await endMinigame(game._id);
     const next = game.index + 1;
     if (next >= game.questions.length) {
       await finishLiveGame(game._id);
@@ -177,6 +201,74 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
     return { success: true, data: { revealed: true } };
   } catch (err) {
     return errorOf(err, "Natijani ochib bo'lmadi");
+  }
+}
+
+async function startMinigame(gameId: mongoose.Types.ObjectId, round: number, previous: MinigameKind | null) {
+  const kind = pickMinigame(previous);
+  const startedAt = new Date(Date.now() + MINIGAME_INTRO_S * 1000);
+  const endsAt = new Date(startedAt.getTime() + MINIGAMES[kind].seconds * 1000);
+  let wheel: { segment: number; effect: string; playerId: string; name: string } | null = null;
+  if (kind === "wheel") {
+    const players = await LiveGamePlayer.find({ gameId, eliminated: false }).select("_id name").lean();
+    if (players.length > 0) {
+      const spin = spinWheel(players.length);
+      const p = players[spin.player];
+      wheel = { segment: spin.segment, effect: spin.effect, playerId: p._id.toString(), name: p.name };
+    }
+  }
+  await LiveGame.updateOne(
+    { _id: gameId, status: "reveal", minigameRounds: { $ne: round } },
+    {
+      $set: {
+        status: "minigame",
+        minigame: { round, kind, startedAt, endsAt, endedAt: null, wheel },
+        questionStartedAt: null,
+        ...(kind === "bonus" ? { bonusIndex: round + 1 } : {}),
+      },
+      $push: { minigameRounds: round },
+    }
+  );
+}
+
+/** Qisqa o'yin natijasi: ochkolar qo'shiladi (bir marta) */
+async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
+  const game = await LiveGame.findOneAndUpdate(
+    { _id: gameId, status: "minigame", "minigame.endedAt": null },
+    { $set: { "minigame.endedAt": new Date() } },
+    { returnDocument: "after" }
+  );
+  if (!game?.minigame) return false;
+  const { kind, round, wheel } = game.minigame;
+  if (kind === "tap" || kind === "target") {
+    const players = await LiveGamePlayer.find({ gameId: game._id, "minigames.round": round }).select("minigames").lean();
+    const values = players.map((p) => ({ id: p._id.toString(), value: p.minigames.find((m) => m.round === round)?.value ?? 0 }));
+    const points = minigamePoints(kind, values);
+    await Promise.all(
+      [...points].map(([id, pts]) =>
+        LiveGamePlayer.updateOne({ _id: id, "minigames.round": round }, { $inc: { score: pts }, $set: { "minigames.$.points": pts } })
+      )
+    );
+  } else if (kind === "wheel" && wheel) {
+    const effect = wheel.effect as WheelEffect;
+    if (effect === "all100") await LiveGamePlayer.updateMany({ gameId: game._id }, { $inc: { score: 100 } });
+    else if (effect === "double") await LiveGamePlayer.updateOne({ _id: wheel.playerId }, { $set: { double: true } });
+    else await LiveGamePlayer.updateOne({ _id: wheel.playerId }, { $inc: { score: wheelPoints(effect) } });
+    await pushEvents(game._id, [{ text: wheelText(effect, wheel.name), kind: "info" }]);
+  }
+  await saveRanks(game._id, game.mode);
+  return true;
+}
+
+/** Qisqa o'yin vaqti tugadi: natija ko'rsatiladi (proyektor vaqt tugaganda o'zi chaqiradi) */
+export async function endMinigameAction(gameId: string): Promise<Result<{ ended: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: { ended: await endMinigame(gameId) } };
+  } catch (err) {
+    return errorOf(err, "Natijani hisoblab bo'lmadi");
   }
 }
 
@@ -254,6 +346,39 @@ export interface LiveQuestionView {
   timeLimit: number;
 }
 
+export interface LiveMinigameView {
+  kind: MinigameKind;
+  round: number;
+  /** Boshlanishigacha (ms); 0 — boshlandi */
+  startsInMs: number;
+  /** Tugashigacha (ms) */
+  remainingMs: number;
+  ended: boolean;
+  /** Tezkor bosish va mo'ljal: kim nechta (kamayish tartibida) */
+  progress: { id: string; name: string; value: number; points: number }[];
+  wheel: { segment: number; name: string; effect: WheelEffect; text: string } | null;
+}
+
+function minigameView(game: Pick<ILiveGame, "minigame" | "status">, players: ILiveGamePlayer[]): LiveMinigameView | null {
+  const m = game.minigame;
+  if (game.status !== "minigame" || !m) return null;
+  const now = Date.now();
+  return {
+    kind: m.kind,
+    round: m.round,
+    startsInMs: Math.max(0, new Date(m.startedAt).getTime() - now),
+    remainingMs: Math.max(0, new Date(m.endsAt).getTime() - now),
+    ended: Boolean(m.endedAt),
+    progress: players
+      .map((p) => {
+        const r = p.minigames?.find((x) => x.round === m.round);
+        return { id: p._id.toString(), name: p.name, value: r?.value ?? 0, points: r?.points ?? 0 };
+      })
+      .sort((a, b) => b.value - a.value),
+    wheel: m.wheel ? { segment: m.wheel.segment, name: m.wheel.name, effect: m.wheel.effect as WheelEffect, text: wheelText(m.wheel.effect as WheelEffect, m.wheel.name) } : null,
+  };
+}
+
 export interface LiveHostState {
   id: string;
   mode: LiveGameMode;
@@ -274,6 +399,9 @@ export interface LiveHostState {
   players: LivePlayerRow[];
   standings: ReturnType<typeof teamStandings>;
   events: { text: string; kind: string }[];
+  minigame: LiveMinigameView | null;
+  /** Joriy savol — bonus raund (×2) */
+  bonus: boolean;
 }
 
 const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): LivePlayerRow[] =>
@@ -342,6 +470,8 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
         players: toRows(players, game.mode, game.index),
         standings: game.mode === "team" ? teamStandings(players, game.teams) : [],
         events: [...game.events].reverse().slice(0, 8).map((e) => ({ text: e.text, kind: e.kind })),
+        minigame: minigameView(game, players),
+        bonus: game.bonusIndex === game.index && game.index >= 0,
       },
     };
   } catch (err) {
@@ -477,7 +607,7 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
       submittedAnswers: [{ questionId: "q", value: clean }],
     });
     const isCorrect = Boolean(graded.answers[0]?.isCorrect);
-    const o = scoreAnswer(game.mode, player, { isCorrect, elapsedMs: elapsed, limitSec: q.timeLimit });
+    const o = scoreAnswer(game.mode, player, { isCorrect, elapsedMs: elapsed, limitSec: q.timeLimit, bonus: game.bonusIndex === index });
 
     // Shartli: bitta savolga ikki marta javob yozilmaydi
     const res = await LiveGamePlayer.updateOne(
@@ -591,6 +721,8 @@ export interface LivePlayerState {
   } | null;
   standings: ReturnType<typeof teamStandings>;
   top: { name: string; score: number; coins: number }[];
+  minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number; wheelIsMe: boolean }) | null;
+  bonus: boolean;
 }
 
 export async function getLivePlayerStateAction(gameId: string): Promise<Result<LivePlayerState>> {
@@ -646,9 +778,48 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
           : null,
         standings: game.mode === "team" ? teamStandings(players, game.teams) : [],
         top: game.status === "finished" ? rows.slice(0, 5).map((r) => ({ name: r.name, score: r.score, coins: r.coins })) : [],
+        minigame: (() => {
+          const view = minigameView(game, players);
+          if (!view) return null;
+          const { progress, ...rest } = view;
+          const myIndex = progress.findIndex((p) => p.id === mine?._id.toString());
+          const my = myIndex >= 0 ? progress[myIndex] : null;
+          return {
+            ...rest,
+            myValue: my?.value ?? 0,
+            myPoints: my?.points ?? 0,
+            place: my && my.value > 0 ? myIndex + 1 : 0,
+            wheelIsMe: Boolean(mine && game.minigame?.wheel?.playerId === mine._id.toString()),
+          };
+        })(),
+        bonus: game.bonusIndex === game.index && game.index >= 0,
       },
     };
   } catch (err) {
     return errorOf(err, "Holatni olib bo'lmadi");
+  }
+}
+
+/** Qisqa o'yin natijasi (o'yin davomida bir necha marta yuboriladi — eng kattasi olinadi) */
+export async function submitMinigameAction(gameId: string, round: number, value: number): Promise<Result<{ value: number }>> {
+  try {
+    const user = await requireStudent();
+    await connectDB();
+    const game = await loadGameForStudent(gameId, user.groupId);
+    const m = game?.minigame;
+    if (!game || game.status !== "minigame" || !m || m.round !== round || m.endedAt) return fail("O'yin tugagan");
+    if (m.kind !== "tap" && m.kind !== "target") return fail("Bu o'yinda natija yuborilmaydi");
+    const now = Date.now();
+    if (now < new Date(m.startedAt).getTime() - 500 || now > new Date(m.endsAt).getTime() + MINIGAME_GRACE_MS) return fail("Vaqt tugadi");
+    const v = clampMinigameValue(m.kind, value);
+    const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId }).select("_id").lean();
+    if (!player) return fail("Avval o'yinga qo'shiling");
+    const res = await LiveGamePlayer.updateOne({ _id: player._id, "minigames.round": round }, { $max: { "minigames.$.value": v } });
+    if (res.matchedCount === 0) {
+      await LiveGamePlayer.updateOne({ _id: player._id, "minigames.round": { $ne: round } }, { $push: { minigames: { round, value: v, points: 0 } } });
+    }
+    return { success: true, data: { value: v } };
+  } catch (err) {
+    return errorOf(err, "Natijani yuborib bo'lmadi");
   }
 }
