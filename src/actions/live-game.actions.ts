@@ -31,11 +31,10 @@ import {
   minigameDue,
   minigamePoints,
   pickMinigame,
+  WHEEL,
   spinWheel,
   wheelPoints,
-  wheelText,
   type MinigameKind,
-  type WheelEffect,
 } from "@/lib/live-game/minigames";
 import { ARENA_INTRO_S, ARENA_SECONDS, ARENA_TOTAL_DRONES, WAVES, arenaBonus, arenaLoadout } from "@/lib/live-game/arena-engine";
 
@@ -217,27 +216,29 @@ async function startMinigame(gameId: mongoose.Types.ObjectId, round: number, pre
   const kind = pickMinigame(previous);
   const startedAt = new Date(Date.now() + MINIGAME_INTRO_S * 1000);
   const endsAt = new Date(startedAt.getTime() + MINIGAMES[kind].seconds * 1000);
-  let wheel: { segment: number; effect: string; playerId: string; name: string } | null = null;
-  if (kind === "wheel") {
-    const players = await LiveGamePlayer.find({ gameId, eliminated: false }).select("_id name").lean();
-    if (players.length > 0) {
-      const spin = spinWheel(players.length);
-      const p = players[spin.player];
-      wheel = { segment: spin.segment, effect: spin.effect, playerId: p._id.toString(), name: p.name };
-    }
-  }
   await LiveGame.updateOne(
     { _id: gameId, status: "reveal", minigameRounds: { $ne: round } },
     {
       $set: {
         status: "minigame",
-        minigame: { round, kind, startedAt, endsAt, endedAt: null, wheel },
+        minigame: { round, kind, startedAt, endsAt, endedAt: null, wheel: null },
         questionStartedAt: null,
         ...(kind === "bonus" ? { bonusIndex: round + 1 } : {}),
       },
       $push: { minigameRounds: round },
     }
   );
+  // Omad g'ildiragi: har bir o'quvchi o'z g'ildiragini aylantiradi — natija (segment) shu yerda tanlanadi
+  if (kind === "wheel") {
+    const players = await LiveGamePlayer.find({ gameId, "minigames.round": { $ne: round } }).select("_id").lean();
+    if (players.length > 0) {
+      await LiveGamePlayer.bulkWrite(
+        players.map((p) => ({
+          updateOne: { filter: { _id: p._id, "minigames.round": { $ne: round } }, update: { $push: { minigames: { round, value: spinWheel(), points: 0 } } } },
+        }))
+      );
+    }
+  }
 }
 
 /** Qisqa o'yin natijasi: ochkolar qo'shiladi (bir marta) */
@@ -248,7 +249,7 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
     { returnDocument: "after" }
   );
   if (!game?.minigame) return false;
-  const { kind, round, wheel } = game.minigame;
+  const { kind, round } = game.minigame;
   if (kind === "tap" || kind === "target") {
     const players = await LiveGamePlayer.find({ gameId: game._id, "minigames.round": round }).select("minigames").lean();
     const values = players.map((p) => ({ id: p._id.toString(), value: p.minigames.find((m) => m.round === round)?.value ?? 0 }));
@@ -258,12 +259,21 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
         LiveGamePlayer.updateOne({ _id: id, "minigames.round": round }, { $inc: { score: pts }, $set: { "minigames.$.points": pts } })
       )
     );
-  } else if (kind === "wheel" && wheel) {
-    const effect = wheel.effect as WheelEffect;
-    if (effect === "all100") await LiveGamePlayer.updateMany({ gameId: game._id }, { $inc: { score: 100 } });
-    else if (effect === "double") await LiveGamePlayer.updateOne({ _id: wheel.playerId }, { $set: { double: true } });
-    else await LiveGamePlayer.updateOne({ _id: wheel.playerId }, { $inc: { score: wheelPoints(effect) } });
-    await pushEvents(game._id, [{ text: wheelText(effect, wheel.name), kind: "info" }]);
+  } else if (kind === "wheel") {
+    const players = await LiveGamePlayer.find({ gameId: game._id, "minigames.round": round }).select("minigames name").lean();
+    const big: string[] = [];
+    await Promise.all(
+      players.map((p) => {
+        const seg = WHEEL[p.minigames.find((m) => m.round === round)?.value ?? WHEEL.length - 1] ?? WHEEL[WHEEL.length - 1];
+        const pts = wheelPoints(seg.effect);
+        if (seg.effect === "p500") big.push(p.name);
+        return LiveGamePlayer.updateOne(
+          { _id: p._id, "minigames.round": round },
+          { $inc: { score: pts }, $set: { "minigames.$.points": pts, ...(seg.effect === "double" ? { double: true } : {}) } }
+        );
+      })
+    );
+    if (big.length > 0) await pushEvents(game._id, big.map((n) => ({ text: `${n} g'ildirakdan +500 yutdi!`, kind: "info" as const })));
   }
   await saveRanks(game._id, game.mode);
   return true;
@@ -419,8 +429,7 @@ export interface LiveMinigameView {
   remainingMs: number;
   ended: boolean;
   /** Tezkor bosish va mo'ljal: kim nechta (kamayish tartibida) */
-  progress: { id: string; name: string; value: number; points: number }[];
-  wheel: { segment: number; name: string; effect: WheelEffect; text: string } | null;
+  progress: { id: string; name: string; value: number; points: number; played: boolean }[];
 }
 
 function minigameView(game: Pick<ILiveGame, "minigame" | "status">, players: ILiveGamePlayer[]): LiveMinigameView | null {
@@ -436,10 +445,9 @@ function minigameView(game: Pick<ILiveGame, "minigame" | "status">, players: ILi
     progress: players
       .map((p) => {
         const r = p.minigames?.find((x) => x.round === m.round);
-        return { id: p._id.toString(), name: p.name, value: r?.value ?? 0, points: r?.points ?? 0 };
+        return { id: p._id.toString(), name: p.name, value: r?.value ?? 0, points: r?.points ?? 0, played: Boolean(r) };
       })
       .sort((a, b) => b.value - a.value),
-    wheel: m.wheel ? { segment: m.wheel.segment, name: m.wheel.name, effect: m.wheel.effect as WheelEffect, text: wheelText(m.wheel.effect as WheelEffect, m.wheel.name) } : null,
   };
 }
 
@@ -822,7 +830,7 @@ export interface LivePlayerState {
   } | null;
   standings: ReturnType<typeof teamStandings>;
   top: { name: string; score: number; coins: number }[];
-  minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number; wheelIsMe: boolean }) | null;
+  minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number }) | null;
   bonus: boolean;
   arena: {
     startsInMs: number;
@@ -928,10 +936,9 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
           const my = myIndex >= 0 ? progress[myIndex] : null;
           return {
             ...rest,
-            myValue: my?.value ?? 0,
+            myValue: my?.played ? my.value : -1,
             myPoints: my?.points ?? 0,
             place: my && my.value > 0 ? myIndex + 1 : 0,
-            wheelIsMe: Boolean(mine && game.minigame?.wheel?.playerId === mine._id.toString()),
           };
         })(),
         bonus: game.bonusIndex === game.index && game.index >= 0,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crosshair, Gift, Hand, Sparkles, Zap } from "lucide-react";
 import { submitMinigameAction, type LiveMinigameView, type LivePlayerState } from "@/actions/live-game.actions";
-import { MINIGAMES, WHEEL, type MinigameKind } from "@/lib/live-game/minigames";
+import { MINIGAMES, WHEEL, wheelPoints, wheelText, type MinigameKind } from "@/lib/live-game/minigames";
 import { haptic } from "@/lib/haptics";
 import { playCheckInSound, playFanfare, playTickSound } from "@/lib/sound";
 import { useCountdown } from "./live-ui";
@@ -165,32 +165,54 @@ export function MinigameHost({ m, sound }: { m: LiveMinigameView; sound: boolean
 
 function WheelHost({ m, sound }: { m: LiveMinigameView; sound: boolean }) {
   const [done, setDone] = useState(false);
+  // Natijalar: eng katta sovg'alar oldinda
+  const results = m.progress
+    .filter((p) => p.played)
+    .map((p) => ({ ...p, seg: WHEEL[p.value] ?? WHEEL[WHEEL.length - 1] }))
+    .sort((a, b) => wheelPoints(b.seg.effect) - wheelPoints(a.seg.effect) || Number(b.seg.effect === "double") - Number(a.seg.effect === "double"));
+  // Bezak uchun proyektordagi g'ildirak eng katta yutuqqa to'xtaydi
+  const showcase = results[0]?.value ?? 0;
   useEffect(() => {
-    if (sound) {
-      // Aylanayotganda tiqillash, sekinlashib boradi
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      let t = 0;
-      for (let i = 0; i < 26; i++) {
-        t += 60 + i * i * 0.45;
-        timers.push(setTimeout(() => playCheckInSound(1), t));
-        if (t > WHEEL_SPIN_MS - 200) break;
-      }
-      return () => timers.forEach(clearTimeout);
+    if (!sound) return;
+    // Aylanayotganda tiqillash, sekinlashib boradi
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let t = 0;
+    for (let i = 0; i < 26; i++) {
+      t += 60 + i * i * 0.45;
+      if (t > WHEEL_SPIN_MS - 200) break;
+      timers.push(setTimeout(() => playCheckInSound(1), t));
     }
+    return () => timers.forEach(clearTimeout);
   }, [sound]);
   useEffect(() => {
     const t = setTimeout(() => setDone(true), WHEEL_SPIN_MS + 200);
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 py-4 lg:flex-row lg:gap-14">
-      <Wheel segment={m.wheel?.segment ?? 0} spinning size={300} />
-      <div className="text-center lg:text-left">
-        <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Omad g&apos;ildiragi</p>
-        {done || m.ended ? (
-          <p className="live-banner mt-3 max-w-md rounded-2xl bg-white px-6 py-4 text-2xl font-black text-slate-900 sm:text-3xl">{m.wheel?.text ?? "Omad keyingi safar!"}</p>
+    <div className="flex h-full flex-col items-center gap-5 py-2 lg:flex-row lg:items-start lg:gap-10">
+      <div className="flex shrink-0 flex-col items-center gap-3">
+        <Wheel segment={showcase} spinning size={260} />
+        <p className="max-w-xs text-center text-sm text-slate-300">Har kim telefonida o&apos;z g&apos;ildiragini aylantirmoqda — sovg&apos;alar har xil!</p>
+      </div>
+      <div className="min-h-0 w-full flex-1">
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Kimga nima tushdi</p>
+        {!done && !m.ended ? (
+          <p className="animate-pulse text-3xl font-black">Aylanmoqda…</p>
         ) : (
-          <p className="mt-3 animate-pulse text-3xl font-black">Aylanmoqda…</p>
+          <ul className="live-noscroll grid max-h-full gap-2 overflow-y-auto sm:grid-cols-2">
+            {results.map((r, i) => (
+              <li
+                key={r.id}
+                className={cn("live-pop flex items-center gap-3 rounded-2xl px-4 py-2.5", r.seg.effect === "p500" ? "bg-gradient-to-r from-rose-500 to-amber-400 text-slate-950" : "bg-white/10")}
+                style={{ animationDelay: `${Math.min(i, 12) * 120}ms` }}
+              >
+                <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: r.seg.color }} />
+                <span className="min-w-0 flex-1 truncate text-lg font-black">{r.name}</span>
+                <span className="font-mono text-lg font-black">{r.seg.label}</span>
+              </li>
+            ))}
+            {results.length === 0 && <li className="text-slate-400">Hali hech kim yo&apos;q</li>}
+          </ul>
         )}
       </div>
     </div>
@@ -226,20 +248,7 @@ export function MinigamePlayer({ gameId, m }: { gameId: string; m: PlayerMinigam
     );
   }
   if (m.kind === "wheel") {
-    return (
-      <div className="flex flex-col items-center gap-5 py-8 text-center">
-        <Wheel segment={m.wheel?.segment ?? 0} spinning size={220} />
-        {m.ended ? (
-          m.wheelIsMe ? (
-            <p className="live-banner rounded-2xl bg-white px-5 py-3 text-2xl font-black text-slate-900">🎉 Sizga tushdi! {m.wheel?.text}</p>
-          ) : (
-            <p className="text-lg font-black">{m.wheel?.text}</p>
-          )
-        ) : (
-          <p className="animate-pulse text-xl font-black">G&apos;ildirak aylanmoqda… proyektorga qarang!</p>
-        )}
-      </div>
-    );
+    return <WheelPlayer m={m} />;
   }
   if (m.ended || remaining <= 0) {
     return (
@@ -353,6 +362,34 @@ function TargetGame({ gameId, round, remaining, active }: { gameId: string; roun
           style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function WheelPlayer({ m }: { m: PlayerMinigame }) {
+  const [stopped, setStopped] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setStopped(true), WHEEL_SPIN_MS + 200);
+    return () => clearTimeout(t);
+  }, []);
+  // Kech qo'shilgan o'quvchida bu round uchun g'ildirak yo'q
+  if (m.myValue < 0) {
+    return <p className="py-14 text-center text-xl font-black">Omad g&apos;ildiragi aylanmoqda — keyingi safar siz ham qatnashasiz!</p>;
+  }
+  const seg = WHEEL[m.myValue] ?? WHEEL[WHEEL.length - 1];
+  const big = seg.effect === "p500";
+  return (
+    <div className="flex flex-col items-center gap-5 py-6 text-center">
+      <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Sizning g&apos;ildiragingiz</p>
+      <Wheel segment={m.myValue} spinning size={240} />
+      {stopped ? (
+        <p className={cn("live-banner rounded-2xl px-6 py-3 text-2xl font-black lg:text-4xl", seg.effect === "none" ? "bg-white/15 text-white" : big ? "bg-gradient-to-r from-rose-500 to-amber-400 text-slate-950" : "bg-white text-slate-900")}>
+          {seg.effect === "none" ? "😅 " : "🎉 "}
+          {wheelText(seg.effect)}
+        </p>
+      ) : (
+        <p className="animate-pulse text-xl font-black">Aylanmoqda…</p>
+      )}
     </div>
   );
 }

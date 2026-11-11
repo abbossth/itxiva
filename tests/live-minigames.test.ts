@@ -153,19 +153,33 @@ describe("o'yin ichida", () => {
     expect((await LiveGamePlayer.findOne({ studentId: ali._id }).lean())?.answers.find((a) => a.index === 3)?.points).toBe(2000);
   });
 
-  it("omad g'ildiragi: natija serverda tanlanadi va tugaganda qo'llanadi", async () => {
-    const { mentor, id } = await seed();
+  it("omad g'ildiragi: har kim o'z g'ildiragini aylantiradi — natija har xil, tugaganda har kimga o'ziniki qo'llanadi", async () => {
+    const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
-    // tur: wheel (0.5 → 3-tur ichidan), segment 0 (+500), o'yinchi 0
-    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.5).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    // tur: wheel (0.5), keyin o'yinchilar uchun: 0.01 → +500, 0.5 → +100
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.5).mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
     await live.startLiveQuestionAction(id);
     spy.mockRestore();
-    const g = (await LiveGame.findById(id).lean())!;
-    expect(g.minigame).toMatchObject({ kind: "wheel", wheel: { effect: "p500" } });
-    const lucky = g.minigame!.wheel!.playerId;
-    expect((await LiveGamePlayer.findById(lucky).lean())?.score).toBe(0);
+    expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("wheel");
+    const segs = await Promise.all([ali, vali].map(async (u) => (await LiveGamePlayer.findOne({ studentId: u._id }).lean())!.minigames.find((m) => m.round === 2)!.value));
+    expect(new Set(segs.map((v) => mg.WHEEL[v].effect))).toEqual(new Set(["p500", "p100"]));
+
+    // O'quvchi o'z natijasini ko'radi
+    as(ali);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.minigame?.myValue).toBe(segs[0]);
+
+    as(mentor);
     await live.endMinigameAction(id);
-    expect((await LiveGamePlayer.findById(lucky).lean())?.score).toBe(500);
+    for (const [i, u] of [ali, vali].entries()) {
+      const p = (await LiveGamePlayer.findOne({ studentId: u._id }).lean())!;
+      expect(p.score).toBe(mg.wheelPoints(mg.WHEEL[segs[i]].effect));
+    }
+  });
+
+  it("g'ildirak: vaznli tasodif chegaralarda to'g'ri segment beradi", () => {
+    expect(mg.WHEEL[mg.spinWheel(0)].effect).toBe("p500");
+    expect(mg.WHEEL[mg.spinWheel(0.9999)].effect).toBe("none");
   });
 
   it("qisqa o'yinlar o'chirilgan bo'lsa — to'g'ridan-to'g'ri keyingi savol", async () => {

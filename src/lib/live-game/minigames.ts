@@ -53,38 +53,47 @@ export function minigamePoints(kind: MinigameKind, values: { id: string; value: 
   return out;
 }
 
-export type WheelEffect = "p500" | "p300" | "p200" | "double" | "all100";
-export const WHEEL: { effect: WheelEffect; label: string; color: string }[] = [
-  { effect: "p500", label: "+500", color: "#f43f5e" },
-  { effect: "double", label: "×2", color: "#8b5cf6" },
-  { effect: "p200", label: "+200", color: "#0ea5e9" },
-  { effect: "all100", label: "+100 👥", color: "#10b981" },
-  { effect: "p300", label: "+300", color: "#f59e0b" },
-  { effect: "double", label: "×2", color: "#d946ef" },
+export type WheelEffect = "p500" | "p300" | "p200" | "p100" | "double" | "none";
+
+/** Har bir o'quvchi o'z g'ildiragini aylantiradi: segmentlar va ularning tushish ehtimoli (vazn) */
+export const WHEEL: { effect: WheelEffect; label: string; color: string; weight: number }[] = [
+  { effect: "p500", label: "+500", color: "#f43f5e", weight: 6 },
+  { effect: "double", label: "×2", color: "#8b5cf6", weight: 12 },
+  { effect: "p200", label: "+200", color: "#0ea5e9", weight: 25 },
+  { effect: "p100", label: "+100", color: "#10b981", weight: 30 },
+  { effect: "p300", label: "+300", color: "#f59e0b", weight: 15 },
+  { effect: "none", label: "😅", color: "#64748b", weight: 12 },
 ];
 
-export function wheelText(effect: WheelEffect, name: string): string {
+/** O'quvchining o'z natijasi (ikkinchi shaxsda) */
+export function wheelText(effect: WheelEffect): string {
   switch (effect) {
     case "p500":
-      return `${name} +500 ochko yutdi!`;
+      return "+500 ochko — katta yutuq!";
     case "p300":
-      return `${name} +300 ochko yutdi!`;
+      return "+300 ochko!";
     case "p200":
-      return `${name} +200 ochko yutdi!`;
+      return "+200 ochko!";
+    case "p100":
+      return "+100 ochko";
     case "double":
-      return `${name}: keyingi to'g'ri javob ×2!`;
-    case "all100":
-      return `${name} hammaga +100 ochko sovg'a qildi!`;
+      return "Keyingi to'g'ri javob ×2!";
+    case "none":
+      return "Bu safar omad kulib boqmadi";
   }
 }
 
 export function wheelPoints(effect: WheelEffect): number {
-  return effect === "p500" ? 500 : effect === "p300" ? 300 : effect === "p200" ? 200 : effect === "all100" ? 100 : 0;
+  return effect === "p500" ? 500 : effect === "p300" ? 300 : effect === "p200" ? 200 : effect === "p100" ? 100 : 0;
 }
 
-/** G'ildirak segmenti va kim omadli — server tanlaydi */
-export function spinWheel(playerCount: number, rngSegment = Math.random(), rngPlayer = Math.random()) {
-  const segment = Math.min(WHEEL.length - 1, Math.floor(rngSegment * WHEEL.length));
-  const player = Math.min(Math.max(playerCount - 1, 0), Math.floor(rngPlayer * playerCount));
-  return { segment, effect: WHEEL[segment].effect, player };
+/** Bitta o'quvchi uchun segment (vaznli tasodif) — server tanlaydi */
+export function spinWheel(rng: number = Math.random()): number {
+  const total = WHEEL.reduce((sum, w) => sum + w.weight, 0);
+  let x = Math.min(Math.max(rng, 0), 0.999999) * total;
+  for (let i = 0; i < WHEEL.length; i++) {
+    if (x < WHEEL[i].weight) return i;
+    x -= WHEEL[i].weight;
+  }
+  return WHEEL.length - 1;
 }
