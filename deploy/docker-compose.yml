@@ -1,0 +1,19 @@
+# VPS'da: /opt/itxiva/docker-compose.yml. Image tegi deploy.sh orqali beriladi (IMAGE_TAG).
+services:
+  app:
+    image: itxiva:${IMAGE_TAG:-latest}
+    container_name: itxiva-app
+    restart: unless-stopped
+    env_file: /etc/itxiva/app.env
+    environment:
+      NODE_OPTIONS: --max-old-space-size=1536
+    # Faqat serverning o'zidan (Caddy) ochiq — internetdan to'g'ridan-to'g'ri emas
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 2g
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, JetBrains_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 import { VersionWatcher } from "@/components/version-watcher";
@@ -86,7 +85,6 @@ export default function RootLayout({
       <body className="font-sans min-h-screen bg-slate-50 text-slate-900 dark:bg-bg dark:text-slate-100 selection:bg-teal-500/20 selection:text-teal-600 dark:selection:text-teal-400">
         <ToastProvider>{children}</ToastProvider>
         <VersionWatcher />
-        <Analytics />
       </body>
     </html>
   );

@@ -1,0 +1,10 @@
+[Unit]
+Description=ITXiva: dars eslatmalari (har 5 daqiqa)
+
+[Timer]
+OnCalendar=*:0/5
+Unit=itxiva-cron@reminders.service
+Persistent=false
+
+[Install]
+WantedBy=timers.target

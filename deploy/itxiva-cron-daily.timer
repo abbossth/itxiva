@@ -1,0 +1,10 @@
+[Unit]
+Description=ITXiva: kunlik vazifalar (04:00 UTC, avval Vercel Cron qilardi)
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+Unit=itxiva-cron@daily.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

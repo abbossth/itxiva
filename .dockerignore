@@ -1,0 +1,17 @@
+.git
+.github
+.next
+.vercel
+.mongo-data
+node_modules
+realtime
+tests
+docs
+deploy
+problem-screenshots
+coverage
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+npm-debug.log*

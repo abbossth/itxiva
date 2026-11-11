@@ -1,0 +1,77 @@
+name: Deploy (VPS)
+
+# main'ga har push: tekshiruv (lint, tsc, testlar) → Docker image → VPS'ga yuborish → ishga tushirish va tekshirish.
+# Yangi versiya javob bermasa, VPS o'zi avvalgi versiyaga qaytadi va bu job xato bilan tugaydi.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # Brauzerga build vaqtida kiradigan qiymatlar (maxfiy emas)
+  NEXT_PUBLIC_APP_URL: https://itxiva.uz
+  NEXT_PUBLIC_ARENA_WS_URL: wss://itxiva-arena.itxiva-arena.workers.dev
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    needs: check
+    if: vars.VPS_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: itxiva:${{ github.sha }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_APP_URL=${{ env.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_ARENA_WS_URL=${{ env.NEXT_PUBLIC_ARENA_WS_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload image to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: docker save "itxiva:${GITHUB_SHA}" | gzip -1 | ssh "deploy@${VPS_HOST}" 'gunzip | docker load'
+
+      - name: Start and verify
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: ssh "deploy@${VPS_HOST}" "/opt/itxiva/deploy.sh ${GITHUB_SHA}"

@@ -1,0 +1,7 @@
+[Unit]
+Description=ITXiva cron: %i
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/itxiva/cron.sh %i
