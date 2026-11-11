@@ -484,6 +484,46 @@ h1,
   .quiz-count, .quiz-pop, .quiz-tile, .quiz-shake, .quiz-pulse { animation: none; }
 }
 
+/* Jonli o'yin: yangi yetakchi banneri, belgilar sakrab chiqadi, "+ochko" ko'tarilib yo'qoladi, shohsupaga g'olib tushadi */
+@keyframes live-banner {
+  0% { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+  55% { opacity: 1; transform: scale(1.12) rotate(2deg); }
+  75% { transform: scale(0.97) rotate(-1deg); }
+  100% { opacity: 1; transform: none; }
+}
+.live-banner { animation: live-banner 0.8s cubic-bezier(0.22, 1, 0.36, 1) 1.2s backwards, live-glow 1.6s ease-in-out 2s infinite; }
+@keyframes live-glow {
+  0%, 100% { box-shadow: 0 0 30px rgba(251, 191, 36, 0.35); }
+  50% { box-shadow: 0 0 60px rgba(251, 191, 36, 0.75); }
+}
+@keyframes live-pop {
+  0% { opacity: 0; transform: scale(0.2); }
+  60% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 1; transform: none; }
+}
+.live-pop { animation: live-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes live-float {
+  0% { opacity: 0; transform: translateY(8px); }
+  20% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0.85; transform: translateY(-4px); }
+}
+.live-float { animation: live-float 1.6s ease-out backwards; }
+@keyframes live-drop {
+  0% { opacity: 0; transform: translateY(-120px) scale(0.6); }
+  60% { opacity: 1; transform: translateY(10px) scale(1.06); }
+  80% { transform: translateY(-4px) scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+.live-drop { animation: live-drop 0.75s cubic-bezier(0.22, 1, 0.36, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .live-banner, .live-pop, .live-float, .live-drop { animation: none; }
+}
+
+/* Jonli o'yin to'liq ekranda: juda kichik ekranda mazmun sig'masa ham aylantirish chizig'i ko'rinmaydi */
+.live-noscroll { scrollbar-width: none; }
+.live-noscroll::-webkit-scrollbar { display: none; }
+
 /* Jarima oynasi: tanga tushib keladi, tangalar unga tekkanda titraydi va yorilib qoladi */
 @keyframes penalty-coin {
   0% { transform: translateY(-40px) scale(0.3); opacity: 0; }

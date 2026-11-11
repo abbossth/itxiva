@@ -33,6 +33,9 @@ export interface ILiveGamePlayerData {
   answers: ILiveAnswer[];
   /** Yakunda berilgan coin */
   coins: number;
+  /** Oxirgi natijadagi o'rni va undan oldingisi (reyting animatsiyasi uchun); 0 — hali yo'q */
+  rank: number;
+  prevRank: number;
   createdAt?: Date | string;
 }
 
@@ -71,6 +74,8 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     },
     answers: { type: [LiveAnswerSchema], default: [] },
     coins: { type: Number, default: 0 },
+    rank: { type: Number, default: 0 },
+    prevRank: { type: Number, default: 0 },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

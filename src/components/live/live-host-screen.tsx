@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Check, Crown, Pause, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, Crown, Music, Pause, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -14,8 +14,10 @@ import {
   type LiveHostState,
 } from "@/actions/live-game.actions";
 import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
-import { fireConfetti } from "@/lib/confetti";
-import { playCheckInSound, playFireworksSound, playTickSound, unlockSound } from "@/lib/sound";
+import { playCheckInSound, playTickSound, unlockSound } from "@/lib/sound";
+import { liveMusic } from "@/lib/live-game/music";
+import { LiveLeaderboard } from "./live-leaderboard";
+import { LivePodium } from "./live-podium";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -23,7 +25,10 @@ import { cn, formatNumberUz } from "@/lib/utils";
 const POLL_MS = 1000;
 
 /** Avto rejimda natija shuncha soniya ko'rsatiladi (xazinada — sandiq ochishga ulgurish uchun ko'proq) */
-const autoDelayFor = (mode: LiveHostState["mode"]) => (mode === "chest" ? 10 : 6);
+/** Avto rejimda natijadan keyingi kutish: to'g'ri javob (~3,5 s) + reyting sahnasi; xazinada sandiq ochishga ko'proq */
+const autoDelayFor = (mode: LiveHostState["mode"]) => (mode === "chest" ? 14 : 10);
+/** Natijada to'g'ri javob shuncha ko'rsatilgach reyting sahnasiga o'tiladi */
+const ANSWER_STEP_MS = 3500;
 
 // "Avto" tanlovi brauzerda eslab qolinadi (keyingi o'yinda ham yoqilgan bo'ladi)
 const AUTO_KEY = "itxiva:live-autoplay";
@@ -57,13 +62,15 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(true);
+  const [music, setMusic] = useState(true);
+  // Natijaning ikkinchi qadami (reyting) qaysi savol uchun ochilgan
+  const [boardFor, setBoardFor] = useState<number | null>(null);
   const autoplay = useSyncExternalStore(subscribeAuto, readAuto, () => false);
   // Avto rejim sanog'i: qaysi savol natijasi uchun va necha soniya qoldi
   const [auto, setAuto] = useState<{ index: number; left: number } | null>(null);
   const autoFired = useRef<number | null>(null);
   const revealing = useRef<number | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
-  const celebrated = useRef(false);
 
   const refresh = useCallback(async () => {
     const res = await getLiveHostStateAction(initial.id);
@@ -105,12 +112,25 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     void revealLiveQuestionAction(state.id).then(() => refresh());
   }, [remaining, state, refresh]);
 
+  // Natija: avval to'g'ri javob, bir necha soniyadan keyin reyting sahnasi
   useEffect(() => {
-    if (state.status !== "finished" || celebrated.current) return;
-    celebrated.current = true;
-    if (sound) playFireworksSound([0, 0.5, 1.1]);
-    void fireConfetti({ particleCount: 160, spread: 100, origin: { y: 0.45 }, zIndex: 80 });
-  }, [state.status, sound]);
+    if (state.status !== "reveal") return;
+    const index = state.index;
+    const t = setTimeout(() => setBoardFor(index), ANSWER_STEP_MS);
+    return () => clearTimeout(t);
+  }, [state.status, state.index]);
+  const revealStep: "answer" | "board" = boardFor === state.index ? "board" : "answer";
+
+  // Fon musiqasi: holatga qarab kuy (g'oliblar musiqasini shohsupa o'zi boshqaradi)
+  useEffect(() => {
+    liveMusic.setEnabled(music);
+    if (!music || state.status === "finished") return;
+    liveMusic.play(state.status === "lobby" ? "lobby" : state.status === "question" ? "question" : "board");
+  }, [music, state.status]);
+  useEffect(() => {
+    liveMusic.setBoost(state.status === "question" && remaining > 0 && remaining <= 5000);
+  }, [remaining, state.status]);
+  useEffect(() => () => liveMusic.stop(), []);
 
   const act = async (fn: () => Promise<{ success: boolean; error?: string }>) => {
     unlockSound();
@@ -172,6 +192,21 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
           </button>
           <button
             type="button"
+            onClick={() => {
+              unlockSound();
+              setMusic((v) => !v);
+            }}
+            aria-pressed={music}
+            title="Fon musiqasi"
+            className={cn(
+              "inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition-colors",
+              music ? "bg-fuchsia-500/80 text-white hover:bg-fuchsia-500" : "bg-white/10 text-slate-200 hover:bg-white/20"
+            )}
+          >
+            <Music className="h-4 w-4" /> <span className="hidden sm:inline">Musiqa</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setSound((v) => !v)}
             aria-pressed={sound}
             className="inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-slate-200 hover:bg-white/20"
@@ -215,13 +250,16 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
             state={state}
             busy={busy}
             isLast={isLast}
+            step={revealStep}
+            sound={sound}
+            onShowBoard={() => setBoardFor(state.index)}
             autoLeft={autoLeft}
             onStopAuto={() => writeAuto(false)}
             onNext={() => act(() => startLiveQuestionAction(state.id))}
             onFinish={() => act(() => finishLiveGameAction(state.id))}
           />
         )}
-        {state.status === "finished" && <Podium state={state} />}
+        {state.status === "finished" && <LivePodium state={state} sound={sound} music={music} />}
       </LiveShell>
     </ImmersiveFrame>
   );
@@ -322,6 +360,9 @@ function RevealView({
   state,
   busy,
   isLast,
+  step,
+  sound,
+  onShowBoard,
   autoLeft,
   onStopAuto,
   onNext,
@@ -330,6 +371,10 @@ function RevealView({
   state: LiveHostState;
   busy: boolean;
   isLast: boolean;
+  /** answer — to'g'ri javob va taqsimot, board — reyting sahnasi */
+  step: "answer" | "board";
+  sound: boolean;
+  onShowBoard: () => void;
   /** Avto rejimda keyingi qadamgacha qolgan soniya */
   autoLeft: number | null;
   onStopAuto: () => void;
@@ -340,6 +385,16 @@ function RevealView({
   const max = Math.max(1, ...state.distribution.map((d) => d.count));
   return (
     <div className="space-y-5">
+      {step === "board" ? (
+        <>
+          <p className="text-center text-sm font-black uppercase tracking-[0.35em] text-fuchsia-300">
+            {state.mode === "team" ? "Jamoalar poygasi" : `${state.index + 1}-savoldan keyin reyting`}
+          </p>
+          {state.mode === "team" ? <ModePanel state={state} /> : <LiveLeaderboard key={state.index} players={state.players} mode={state.mode} sound={sound} index={state.index} />}
+          {state.mode === "chest" && state.events.length > 0 && <ChestFeed events={state.events} />}
+        </>
+      ) : (
+        <>
       <div className="rounded-3xl bg-white/[0.06] px-5 py-4 text-center">
         <p className="text-lg font-black sm:text-2xl">{q.prompt}</p>
         <p className="mt-1 text-sm text-slate-300">
@@ -369,10 +424,15 @@ function RevealView({
       ) : (
         <p className="rounded-2xl bg-emerald-600 px-4 py-3 text-center text-xl font-black">To&apos;g&apos;ri javob: {state.correctAnswers.join(" / ")}</p>
       )}
-
-      <ModePanel state={state} />
+        </>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {step === "answer" && (
+          <Button variant="ghost" onClick={onShowBoard} className="gap-1.5 text-slate-300 hover:text-white">
+            Reytingni ko&apos;rsatish
+          </Button>
+        )}
         {autoLeft !== null && (
           <Button variant="ghost" onClick={onStopAuto} className="gap-1.5 text-slate-300 hover:text-white">
             <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
@@ -452,54 +512,14 @@ function ModePanel({ state }: { state: LiveHostState }) {
   );
 }
 
-const PODIUM = [
-  { place: 2, h: "h-28", color: "bg-slate-300 text-slate-900" },
-  { place: 1, h: "h-40", color: "bg-amber-400 text-amber-950" },
-  { place: 3, h: "h-20", color: "bg-orange-400 text-orange-950" },
-];
-
-function Podium({ state }: { state: LiveHostState }) {
-  if (state.mode === "team") {
-    const winner = state.standings[0];
-    const members = state.players.filter((p) => p.team === winner?.team);
-    return (
-      <div className="flex flex-col items-center gap-5 py-8 text-center">
-        <Crown className="h-14 w-14 text-amber-300" />
-        <p className="text-xs font-black uppercase tracking-[0.35em] text-amber-200">G&apos;olib jamoa</p>
-        <h2 className="text-5xl font-black">{winner?.name ?? "—"}</h2>
-        <p className="text-slate-300">O&apos;rtacha {formatNumberUz(winner?.average ?? 0)} ochko</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {members.map((m) => (
-            <span key={m.id} className="rounded-2xl bg-white px-4 py-2 font-black text-slate-900">
-              {m.name}
-              {m.coins > 0 && <span className="ml-1.5 text-amber-600">+{m.coins}</span>}
-            </span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  const top = state.players.slice(0, 3);
+function ChestFeed({ events }: { events: LiveHostState["events"] }) {
   return (
-    <div className="flex flex-col items-center gap-6 py-6 text-center">
-      <p className="text-xs font-black uppercase tracking-[0.35em] text-amber-200">G&apos;oliblar</p>
-      <div className="flex w-full max-w-2xl items-end justify-center gap-3">
-        {PODIUM.map(({ place, h, color }) => {
-          const p = top[place - 1];
-          if (!p) return <div key={place} className="flex-1" />;
-          return (
-            <div key={place} className="quiz-pop flex flex-1 flex-col items-center gap-2" style={{ animationDelay: `${(3 - place) * 250}ms` }}>
-              <span className="max-w-full truncate text-lg font-black sm:text-2xl">{p.name}</span>
-              <span className="font-mono text-sm text-slate-300">{formatNumberUz(p.score)}</span>
-              {p.coins > 0 && <span className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-black text-amber-200">+{p.coins} coin</span>}
-              <div className={cn("flex w-full items-start justify-center rounded-t-2xl pt-3 font-mono text-4xl font-black", h, color)}>{place}</div>
-            </div>
-          );
-        })}
-      </div>
-      <Link href="/mentor/live" className="inline-flex min-h-[48px] items-center rounded-2xl bg-white/10 px-6 font-bold hover:bg-white/20">
-        Yangi o&apos;yin
-      </Link>
-    </div>
+    <ul className="mx-auto grid max-w-3xl gap-1.5 sm:grid-cols-2">
+      {events.slice(0, 4).map((e, i) => (
+        <li key={i} className="quiz-pop rounded-xl bg-amber-400/15 px-3 py-2 text-sm font-bold text-amber-100" style={{ animationDelay: `${1.4 + i * 0.15}s` }}>
+          {e.text}
+        </li>
+      ))}
+    </ul>
   );
 }

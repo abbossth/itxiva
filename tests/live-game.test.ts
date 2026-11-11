@@ -131,17 +131,29 @@ describe("o'yin jarayoni", () => {
     const host = await live.getLiveHostStateAction(id);
     expect(host.success && host.data.players.map((p) => p.name)).toEqual(["ALI", "VALI", "GULI"]);
     expect(host.success && host.data.correctAnswers).toEqual([ok]);
+    // Reyting animatsiyasi uchun o'rinlar saqlanadi
+    expect(host.success && host.data.players.map((p) => [p.name, p.rank, p.prevRank])).toEqual([
+      ["ALI", 1, 0],
+      ["VALI", 2, 0],
+      ["GULI", 3, 0],
+    ]);
 
-    // 2-savol: hech kim javob bermaydi
+    // 2-savol: faqat Guli javob beradi va Valini quvib o'tadi
     await live.startLiveQuestionAction(id);
+    as(guli);
+    tick(500);
+    await live.answerLiveQuestionAction(id, 1, await correctOf(id));
+    as(mentor);
     await live.revealLiveQuestionAction(id);
+    const host2 = await live.getLiveHostStateAction(id);
+    expect(host2.success && host2.data.players.find((p) => p.name === "GULI")).toMatchObject({ prevRank: 3 });
+    expect(host2.success && host2.data.players.find((p) => p.name === "GULI")!.rank).toBeLessThan(3);
     const fin = await live.startLiveQuestionAction(id);
     expect(fin.success && fin.data.finished).toBe(true);
 
     const coins = async (u: { _id: import("mongoose").Types.ObjectId }) => (await CoinLedger.find({ studentId: u._id, idempotencyKey: /^live:/ }).lean()).map((l) => l.amount);
-    expect(await coins(ali)).toEqual([30]);
-    expect(await coins(vali)).toEqual([20]);
-    expect(await coins(guli)).toEqual([]); // 0 ochko — mukofot yo'q
+    // Guli 2-savolda tez javob berib birinchi o'ringa chiqdi: 1–3 o'rinlar 30 / 20 / 10
+    expect([...(await coins(guli)), ...(await coins(ali)), ...(await coins(vali))]).toEqual([30, 20, 10]);
     as(ali);
     expect(await live.getMyActiveLiveGameAction()).toBeNull();
   });

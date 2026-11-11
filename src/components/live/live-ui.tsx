@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Heart, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,14 +23,30 @@ export const TEAM_STYLES = [
   { bar: "bg-emerald-500", soft: "bg-emerald-500/15 text-emerald-200 ring-emerald-400/40", dot: "bg-emerald-500" },
 ];
 
+/** To'liq ekran rejimida LiveShell foni ramkaning o'zida — chetlarda bo'shliq qolmaydi */
+const ImmersiveContext = createContext(false);
+
 /** O'yin ekranlari foni (yorug' mavzuda ham to'q — proyektorda yaxshi ko'rinadi) */
 export function LiveShell({ children, className }: { children: React.ReactNode; className?: string }) {
+  const immersive = useContext(ImmersiveContext);
+  if (immersive) {
+    // Butun ekran: fon ramkada, bu yerda faqat mazmun (balandlik ekranga sig'adi)
+    return <div className="relative flex min-h-0 flex-1 flex-col px-3 pb-3 sm:px-6 sm:pb-5 [&>*:last-child]:min-h-0">{children}</div>;
+  }
   return (
     <div className={cn("relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 text-white shadow-xl sm:p-6", className)}>
-      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-fuchsia-500/15 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-sky-500/15 blur-3xl" />
+      <ShellGlow />
       <div className="relative">{children}</div>
     </div>
+  );
+}
+
+function ShellGlow() {
+  return (
+    <>
+      <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-fuchsia-500/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-sky-500/15 blur-3xl" />
+    </>
   );
 }
 
@@ -142,7 +158,7 @@ export function ImmersiveFrame({ children, leading, toolbar }: { children: React
   };
 
   const bar = (
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <div className={cn("flex flex-wrap items-center justify-between gap-2", immersive ? "relative z-10 px-3 pt-2 sm:px-6 sm:pt-3" : "mb-2")}>
       <div className="min-w-0">{leading}</div>
       <div className="flex flex-wrap items-center gap-2">
         {toolbar}
@@ -170,12 +186,27 @@ export function ImmersiveFrame({ children, leading, toolbar }: { children: React
       </div>
     );
   }
+  // Chetdan-chetgacha: fon butun ekranni qoplaydi, aylantirish chizig'i yo'q (juda kichik ekranda ham chiziq ko'rinmaydi)
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950 text-white" onClickCapture={tryNative}>
-      <div className="mx-auto flex min-h-full max-w-6xl flex-col p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:p-4">
+    <ImmersiveContext.Provider value>
+      <div
+        className="fixed inset-0 z-[60] flex h-dvh w-screen flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 pb-[env(safe-area-inset-bottom)] text-white"
+        onClickCapture={tryNative}
+      >
+        <ShellGlow />
         {bar}
-        <div className="flex flex-1 flex-col [&>*]:flex-1">{children}</div>
+        <div className="live-noscroll relative flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </ImmersiveContext.Provider>
   );
+}
+
+function subscribeResize(cb: () => void) {
+  window.addEventListener("resize", cb);
+  return () => window.removeEventListener("resize", cb);
+}
+
+/** Oyna balandligi (reyting qatorlari soni ekranga sig'ishi uchun) */
+export function useViewportHeight(): number {
+  return useSyncExternalStore(subscribeResize, () => window.innerHeight, () => 900);
 }

@@ -2,6 +2,10 @@
 
 let ctx: AudioContext | null = null;
 
+export function getAudioContext(): AudioContext | null {
+  return getContext();
+}
+
 function getContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   if (!ctx) {
@@ -193,4 +197,93 @@ export function playTickSound(): void {
   const audio = running();
   if (!audio) return;
   tone(audio, "square", 1200, audio.currentTime, 0.05, 0.06);
+}
+
+/** Reyting: qatorlar surilganda "whoosh" (filtrlangan shovqin) */
+export function playWhoosh(volume = 0.5): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const src = audio.createBufferSource();
+  src.buffer = getNoise(audio);
+  const filter = audio.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 1.2;
+  filter.frequency.setValueAtTime(400, t);
+  filter.frequency.exponentialRampToValueAtTime(3200, t + 0.35);
+  const gain = audio.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.4 * volume, t + 0.12);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  src.connect(filter).connect(gain).connect(audio.destination);
+  src.start(t);
+  src.stop(t + 0.5);
+}
+
+/** Reyting: kimdir o'rin ko'targanda — qisqa ko'tariluvchi "ding" */
+export function playRankUp(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "triangle", 880, t, 0.12, 0.18);
+  tone(audio, "triangle", 1318.5, t + 0.07, 0.22, 0.18);
+}
+
+/** G'oliblar e'loni oldidan baraban sadosi (`seconds` davomida kuchayib boradi) */
+export function playDrumroll(seconds = 1.6): void {
+  const audio = running();
+  if (!audio) return;
+  const t0 = audio.currentTime;
+  const hits = Math.round(seconds * 22);
+  for (let i = 0; i < hits; i++) {
+    const t = t0 + (i / hits) * seconds;
+    const src = audio.createBufferSource();
+    src.buffer = getNoise(audio);
+    const filter = audio.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 1800;
+    const gain = audio.createGain();
+    const level = 0.08 + 0.22 * (i / hits);
+    gain.gain.setValueAtTime(level, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    src.connect(filter).connect(gain).connect(audio.destination);
+    src.start(t);
+    src.stop(t + 0.06);
+  }
+  // Oxirida zarbli "bum"
+  const end = t0 + seconds;
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.frequency.setValueAtTime(140, end);
+  osc.frequency.exponentialRampToValueAtTime(45, end + 0.35);
+  g.gain.setValueAtTime(0.6, end);
+  g.gain.exponentialRampToValueAtTime(0.0001, end + 0.45);
+  osc.connect(g).connect(audio.destination);
+  osc.start(end);
+  osc.stop(end + 0.5);
+}
+
+/** Yetakchi almashdi yoki 1-o'rin e'loni — tantanali fanfara (`grand` — kattaroq, final uchun) */
+export function playFanfare(grand = false): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const notes = grand
+    ? [
+        [523.25, 0, 0.18],
+        [659.25, 0.16, 0.18],
+        [783.99, 0.32, 0.18],
+        [1046.5, 0.5, 0.7],
+        [783.99, 0.5, 0.7],
+        [659.25, 0.5, 0.7],
+      ]
+    : [
+        [587.33, 0, 0.12],
+        [739.99, 0.1, 0.12],
+        [880, 0.2, 0.4],
+      ];
+  for (const [f, at, dur] of notes) {
+    tone(audio, "sawtooth", f, t + at, dur, grand ? 0.09 : 0.07);
+    tone(audio, "triangle", f * 2, t + at, dur, 0.05);
+  }
 }

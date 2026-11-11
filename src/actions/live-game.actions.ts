@@ -173,6 +173,7 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
       if (res.modifiedCount > 0 && o.eliminated) outs.push(p.name);
     }
     if (outs.length > 0) await pushEvents(game._id, outs.map((n) => ({ text: `${n} o'yindan chiqdi`, kind: "out" as const })));
+    await saveRanks(game._id, game.mode);
     return { success: true, data: { revealed: true } };
   } catch (err) {
     return errorOf(err, "Natijani ochib bo'lmadi");
@@ -206,6 +207,21 @@ export async function cancelLiveGameAction(gameId: string): Promise<Result<{ can
   }
 }
 
+/** Natija paytidagi o'rinlar: reyting animatsiyasi kim necha o'rin ko'tarilganini shundan biladi */
+async function saveRanks(gameId: mongoose.Types.ObjectId, mode: LiveGameMode) {
+  const players = await LiveGamePlayer.find({ gameId }).select("score eliminated eliminatedAt team createdAt rank").lean();
+  const ranked = rankPlayers(
+    mode,
+    players.map((p) => ({ p, id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime() }))
+  );
+  if (ranked.length === 0) return;
+  await LiveGamePlayer.bulkWrite(
+    ranked.map(({ p }, i) => ({
+      updateOne: { filter: { _id: p._id }, update: { $set: { prevRank: p.rank ?? 0, rank: i + 1 } } },
+    }))
+  );
+}
+
 async function pushEvents(gameId: mongoose.Types.ObjectId, events: { text: string; kind: ILiveGame["events"][number]["kind"] }[]) {
   await LiveGame.updateOne(
     { _id: gameId },
@@ -217,6 +233,10 @@ export interface LivePlayerRow {
   id: string;
   name: string;
   score: number;
+  /** Oxirgi natijadagi o'rni va undan oldingisi (0 — yo'q) */
+  rank: number;
+  prevRank: number;
+  streak: number;
   lives: number;
   eliminated: boolean;
   team: number;
@@ -266,6 +286,9 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): 
       id: p._id.toString(),
       name: p.name,
       score: p.score,
+      rank: p.rank ?? 0,
+      prevRank: p.prevRank ?? 0,
+      streak: p.streak,
       lives: p.lives,
       eliminated: p.eliminated,
       team: p.team,
@@ -546,6 +569,9 @@ export interface LivePlayerState {
     name: string;
     score: number;
     rank: number;
+    /** Oxirgi natijadagi o'rni va undan oldingisi (animatsiya uchun) */
+    lastRank: number;
+    prevRank: number;
     players: number;
     lives: number;
     eliminated: boolean;
@@ -600,6 +626,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               name: mine.name,
               score: mine.score,
               rank: rows.findIndex((r) => r.id === mine._id.toString()) + 1,
+              lastRank: mine.rank ?? 0,
+              prevRank: mine.prevRank ?? 0,
               players: rows.length,
               lives: mine.lives,
               eliminated: mine.eliminated,
