@@ -46,6 +46,11 @@ export function useLivePoll<T>(url: string, intervalMs: number, active: boolean,
     const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
       const r = await fetch(url, { cache: "no-store", signal: ctrl.signal, headers: { accept: "application/json" } });
+      // Sessiya tugagan — sahifa yangilanadi (server login sahifasiga yo'naltiradi)
+      if (r.status === 401) {
+        window.location.reload();
+        return false;
+      }
       if (!r.ok) return false;
       const j = (await r.json()) as Res<T>;
       if (!j.success) return false;

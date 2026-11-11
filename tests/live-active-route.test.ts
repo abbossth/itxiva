@@ -14,6 +14,9 @@ const { Lesson } = await import("@/lib/db/models/lesson.model");
 const { Quiz } = await import("@/lib/db/models/quiz.model");
 const live = await import("@/actions/live-game.actions");
 const route = await import("@/app/api/live/active/route");
+const stateRoute = await import("@/app/api/live/state/route");
+const hostRoute = await import("@/app/api/live/host/route");
+const { NextRequest } = await import("next/server");
 
 type U = Parameters<typeof sessionFor>[0];
 const as = (u: U) => actAs(sessionFor(u));
@@ -68,5 +71,32 @@ describe("/api/live/active (header tugmasi va o'yin oynasi)", () => {
     expect(await read()).toBeNull();
     actAs(null);
     expect(await read()).toBeNull();
+  });
+
+  it("holat API'lari: o'quvchi/ustoz o'z holatini oladi, sessiyasiz yoki boshqa rol — 401 (redirect emas)", async () => {
+    const { mentor, group, ali } = await seed();
+    as(mentor);
+    const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "classic", source: "all", count: 3, minigames: false, arena: false });
+    if (!res.success) throw new Error(res.error);
+    const id = res.data.gameId;
+    const get = (r: typeof stateRoute, path: string) => r.GET(new NextRequest(`http://t${path}?gameId=${id}`));
+
+    as(ali);
+    await live.joinLiveGameAction(id);
+    const s = await get(stateRoute, "/api/live/state");
+    expect(s.status).toBe(200);
+    const sj = (await s.json()) as { success: boolean; data: { id: string; joined: boolean; status: string } };
+    expect(sj).toMatchObject({ success: true, data: { id, joined: true, status: "lobby" } });
+    expect((await get(hostRoute, "/api/live/host")).status).toBe(401);
+
+    as(mentor);
+    const h = await get(hostRoute, "/api/live/host");
+    expect(h.status).toBe(200);
+    expect(((await h.json()) as { data: { players: unknown[] } }).data.players).toHaveLength(1);
+    expect((await get(stateRoute, "/api/live/state")).status).toBe(401);
+
+    actAs(null);
+    expect((await get(stateRoute, "/api/live/state")).status).toBe(401);
+    expect((await get(hostRoute, "/api/live/host")).status).toBe(401);
   });
 });
