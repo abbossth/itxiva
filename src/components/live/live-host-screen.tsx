@@ -100,6 +100,15 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     setState
   );
 
+  // Deploydan keyingi avtomatik yangilanish savol/jang/mini-o'yin o'rtasida bo'lmasin (VersionWatcher kutadi)
+  useEffect(() => {
+    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame";
+    document.documentElement.dataset.liveBusy = busy ? "1" : "0";
+    return () => {
+      delete document.documentElement.dataset.liveBusy;
+    };
+  }, [state.status]);
+
   // Yangi qo'shilgan o'quvchi — "ding"
   useEffect(() => {
     const fresh = state.players.filter((p) => !known.current.has(p.id));

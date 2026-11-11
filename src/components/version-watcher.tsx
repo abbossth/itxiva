@@ -41,8 +41,15 @@ export function VersionWatcher() {
     };
   }, []);
 
+  // Jonli o'yinda: 100 ta telefon bir lahzada qayta yuklanmasin (tasodifiy 2–25 s), savol/jang/mini-o'yin
+  // davomida esa kutadi — sahifa <html data-live-busy="1"> belgisini qo'ygan bo'ladi
   useEffect(() => {
-    if (stale && live) window.location.reload();
+    if (!stale || !live) return;
+    const at = Date.now() + 2000 + Math.random() * 23_000;
+    const t = setInterval(() => {
+      if (Date.now() >= at && document.documentElement.dataset.liveBusy !== "1") window.location.reload();
+    }, 1000);
+    return () => clearInterval(t);
   }, [stale, live]);
 
   if (!stale || live) return null;

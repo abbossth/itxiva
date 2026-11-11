@@ -67,6 +67,15 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
     apply
   );
 
+  // Deploydan keyingi avtomatik yangilanish savol/jang/mini-o'yin o'rtasida bo'lmasin (VersionWatcher kutadi)
+  useEffect(() => {
+    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame";
+    document.documentElement.dataset.liveBusy = busy ? "1" : "0";
+    return () => {
+      delete document.documentElement.dataset.liveBusy;
+    };
+  }, [state.status]);
+
   // Natija ochilganda — titrash (sinfda ovoz chiqarmaymiz)
   useEffect(() => {
     if (state.status !== "reveal" || seenReveal.current === state.index || !state.me) return;

@@ -25,9 +25,13 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   }
 
   if (!cached!.promise) {
+    // VPS: 2 ta doimiy server nusxasi. Har biriga 30 ta ulanish (jami 60, Atlas M0 chegarasi 500):
+    // savol paytida 100 ta javob birdan kelganda so'rovlar ulanish kutib navbatda turmaydi.
+    // minPoolSize — bir nechta ulanish doim tayyor (birinchi so'rovda TLS ulanishini kutmaslik uchun)
     const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
-      maxPoolSize: 10,
+      maxPoolSize: Number(process.env.MONGODB_POOL_SIZE) || 30,
+      minPoolSize: 2,
       serverSelectionTimeoutMS: 5000,
     };
 
