@@ -30,9 +30,11 @@ const COLUMN = [
 ];
 
 export function LivePodium({ state, sound, music }: { state: LiveHostState; sound: boolean; music: boolean }) {
+  // Shohsupa va ro'yxatda faqat ochko to'plaganlar (jamoaviyda — ochkosi bor jamoalar)
+  const scored = state.players.filter((p) => p.score > 0);
   const places: Place[] =
     state.mode === "team"
-      ? state.standings.slice(0, 3).map((s) => ({
+      ? state.standings.filter((s) => s.average > 0).slice(0, 3).map((s) => ({
           key: `t${s.team}`,
           name: s.name,
           score: s.average,
@@ -40,10 +42,10 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
           members: state.players.filter((p) => p.team === s.team).map((p) => p.name),
           team: s.team,
         }))
-      : state.players.slice(0, 3).map((p) => ({ key: p.id, name: p.name, score: p.score, coins: p.coins }));
+      : scored.slice(0, 3).map((p) => ({ key: p.id, name: p.name, score: p.score, coins: p.coins }));
 
   // 0 — kutish, 3 → 3-o'rin ochildi, 2 → 2-o'rin, 1 → 1-o'rin, -1 — hammasi va ro'yxat
-  const [shown, setShown] = useState<number>(4);
+  const [shown, setShown] = useState<number>(() => (places.length === 0 ? -1 : 4));
 
   // Effekt qayta ishga tushsa (masalan, React dev rejimi), taymerlar tozalanib e'lon qaytadan boshlanadi
   useEffect(() => {
@@ -60,6 +62,8 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
     step(3, 1.3);
     step(2, 1.3);
     step(1, 2.1);
+    // Hech kim ochko to'plamagan bo'lsa — tantana yo'q
+    if (places.length === 0) return;
     timers.push(
       setTimeout(() => {
         if (sound) {
@@ -130,9 +134,11 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
         })}
       </div>
 
-      {shown === -1 && state.mode !== "team" && state.players.length > 3 && (
+      {shown === -1 && places.length === 0 && <p className="text-lg font-bold text-slate-300">Bu o&apos;yinda hech kim ochko to&apos;plamadi.</p>}
+
+      {shown === -1 && state.mode !== "team" && scored.length > 3 && (
         <ol className="live-pop grid w-full max-w-3xl gap-1.5 sm:grid-cols-2">
-          {state.players.slice(3, 10).map((p, i) => (
+          {scored.slice(3, 10).map((p, i) => (
             <li key={p.id} className="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-left">
               <span className="w-6 font-mono font-black text-slate-400">{i + 4}</span>
               <span className="min-w-0 flex-1 truncate font-bold">{p.name}</span>
