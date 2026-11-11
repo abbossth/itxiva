@@ -1,0 +1,11 @@
+[Unit]
+Description=ITXiva: GitHub main'dagi yangi commitni build qilib deploy qilish
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+TimeoutStartSec=20min
+ExecStart=/opt/itxiva/autodeploy.sh

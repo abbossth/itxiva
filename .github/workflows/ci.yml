@@ -1,0 +1,31 @@
+name: CI
+
+# main'ga har push va PR: lint, tsc, testlar. Deploy'ni VPS'ning o'zi qiladi (deploy/autodeploy.sh):
+# u har daqiqada main'ni tekshiradi, yangi commitni build qiladi va sayt to'xtamasdan yangilaydi.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test

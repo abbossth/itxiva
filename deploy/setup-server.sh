@@ -53,9 +53,7 @@ touch /home/deploy/.ssh/authorized_keys && chown deploy:deploy /home/deploy/.ssh
 # Ilova papkasi va maxfiy sozlamalar
 install -d -m 0755 -o deploy -g deploy /opt/itxiva
 install -m 0644 -o deploy -g deploy "$HERE/docker-compose.yml" /opt/itxiva/docker-compose.yml
-install -m 0755 -o deploy -g deploy "$HERE/deploy.sh" "$HERE/rollback.sh" /opt/itxiva/
-# GitHub Actions kaliti faqat shu skript orqali ishlaydi (root egasi — deploy o'zgartira olmaydi)
-install -m 0755 -o root -g root "$HERE/ssh-gate.sh" /usr/local/bin/itxiva-ssh-gate
+install -m 0755 -o deploy -g deploy "$HERE/deploy.sh" "$HERE/rollback.sh" "$HERE/autodeploy.sh" /opt/itxiva/
 install -m 0755 "$HERE/cron.sh" /opt/itxiva/cron.sh
 install -d -m 0750 -o root -g deploy /etc/itxiva
 [ -f /etc/itxiva/app.env ] || install -m 0640 -o root -g deploy /dev/null /etc/itxiva/app.env
@@ -64,7 +62,11 @@ install -d -m 0750 -o root -g deploy /etc/itxiva
 #   systemctl enable --now itxiva-cron-reminders.timer itxiva-cron-daily.timer
 # (aks holda eslatmalar ikki joydan — Vercel'dan ham, VPS'dan ham — ketib qoladi)
 install -m 0644 "$HERE/itxiva-cron@.service" "$HERE/itxiva-cron-reminders.timer" "$HERE/itxiva-cron-daily.timer" /etc/systemd/system/
+
+# Avtomatik deploy (CD): main'ga push → shu server build qiladi va yangilaydi
+install -m 0644 "$HERE/itxiva-autodeploy.service" "$HERE/itxiva-autodeploy.timer" /etc/systemd/system/
 systemctl daemon-reload
+systemctl enable --now itxiva-autodeploy.timer
 
 # SSH: faqat kalit bilan
 cat > /etc/ssh/sshd_config.d/10-itxiva.conf <<'CONF'
