@@ -39,6 +39,7 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { PVP_INTRO_S, PVP_SECONDS, pvpStandings } from "@/lib/live-game/pvp";
+import { liveSnapshot } from "@/lib/live-game/live-cache";
 import { INTRO_MS, bridgeLength, emptyCells, isAdventure, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
 
 /** "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang, oxirida final */
@@ -674,7 +675,7 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
     const game = await LiveGame.findById(gameId).lean();
     if (!game) return fail("O'yin topilmadi");
     const [players, group] = await Promise.all([
-      LiveGamePlayer.find({ gameId: game._id }),
+      LiveGamePlayer.find({ gameId: game._id }).lean<(ILiveGamePlayer & { _id: mongoose.Types.ObjectId })[]>(),
       Group.findById(game.groupId).select("name").lean(),
     ]);
     const q = game.index >= 0 ? game.questions[game.index] : null;
@@ -838,14 +839,23 @@ function cleanValue(value: unknown): string | string[] {
 export async function answerLiveQuestionAction(gameId: string, index: number, value: unknown): Promise<Result<{ accepted: boolean }>> {
   try {
     const user = await requireStudent();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId) || !Number.isInteger(index) || index < 0) {
+      return fail("Bu savolga hozir javob berib bo'lmaydi");
+    }
     await connectDB();
-    const game = await loadGameForStudent(gameId, user.groupId);
-    if (!game || game.status !== "question" || game.index !== index || !game.questionStartedAt) return fail("Bu savolga hozir javob berib bo'lmaydi");
-    const q = game.questions[index];
+    // 100 o'quvchi bir vaqtda javob beradi: butun o'yin emas, faqat tekshiruv uchun kerakli maydonlar va shu savol
+    const [game, player] = await Promise.all([
+      LiveGame.findById(gameId)
+        .select({ groupId: 1, status: 1, index: 1, questionStartedAt: 1, mode: 1, bonusIndex: 1, questions: { $slice: [index, 1] } })
+        .lean<Pick<ILiveGame, "groupId" | "status" | "index" | "questionStartedAt" | "mode" | "bonusIndex" | "questions"> & { _id: mongoose.Types.ObjectId }>(),
+      LiveGamePlayer.findOne({ gameId, studentId: user.userId }).select("-minigames -arena").lean<ILiveGamePlayer & { _id: mongoose.Types.ObjectId }>(),
+    ]);
+    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("Bu savolga hozir javob berib bo'lmaydi");
+    if (game.status !== "question" || game.index !== index || !game.questionStartedAt || !game.questions[0]) return fail("Bu savolga hozir javob berib bo'lmaydi");
+    const q = game.questions[0];
     const elapsed = Date.now() - new Date(game.questionStartedAt).getTime();
     if (elapsed > q.timeLimit * 1000 + LIVE_GRACE_MS) return fail("Vaqt tugadi");
 
-    const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId });
     if (!player) return fail("Avval o'yinga qo'shiling");
     if (player.eliminated) return fail("Siz o'yindan chiqqansiz");
     if (player.answers.some((a) => a.index === index)) return fail("Bu savolga javob berdingiz");
@@ -1012,14 +1022,23 @@ export interface LivePlayerState {
 export async function getLivePlayerStateAction(gameId: string): Promise<Result<LivePlayerState>> {
   try {
     const user = await requireStudent();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await loadGameForStudent(gameId, user.groupId);
-    if (!game) return fail("O'yin topilmadi");
-    const [players, group] = await Promise.all([
-      LiveGamePlayer.find({ gameId: game._id }),
-      Group.findById(game.groupId).select("name").lean(),
-    ]);
-    const mine = players.find((p) => p.studentId.toString() === user.userId);
+    // Umumiy holat — qisqa keshdan (hamma o'quvchi uchun bitta yuklash, ≤400 ms eski). Yuborilgan javobni
+    // ekran o'zi eslab qoladi; o'z yozuvi faqat keshda hali bo'lmasa (hozirgina qo'shilgan) alohida o'qiladi
+    const snap = await liveSnapshot(gameId);
+    if (!snap || snap.game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    const game = snap.game;
+    const group = { name: snap.groupName };
+    const players: ILiveGamePlayer[] = [...snap.players];
+    let mine = players.find((p) => p.studentId.toString() === user.userId);
+    if (!mine) {
+      const fresh = await LiveGamePlayer.findOne({ gameId, studentId: user.userId }).lean<ILiveGamePlayer & { _id: mongoose.Types.ObjectId }>();
+      if (fresh) {
+        players.push(fresh);
+        mine = fresh;
+      }
+    }
     const q = game.index >= 0 ? game.questions[game.index] : null;
     const revealed = game.status === "reveal" || game.status === "finished";
     const ans = mine?.answers.find((a) => a.index === game.index);

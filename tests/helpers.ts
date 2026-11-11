@@ -32,6 +32,7 @@ export function sessionFor(user: {
 export const sessionMock = { getSession: async () => currentSession };
 
 export const guardsMock = {
+  forgetUserFacts: () => {},
   getCurrentUser: async () => currentSession,
   requireAuth: async () => {
     if (!currentSession) throw new Error("Tizimga kirilmagan");

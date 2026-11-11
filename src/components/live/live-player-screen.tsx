@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Crown, Gem, Hourglass, Shield, Sparkles, X, Zap } from "lucide-react";
 import Link from "@/components/ui/link";
+import { useLivePoll, withRetry } from "./use-live-poll";
 import {
   answerLiveQuestionAction,
-  getLivePlayerStateAction,
   joinLiveGameAction,
   openLiveChestAction,
   type LivePlayerState,
@@ -51,18 +51,21 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
   }, [state.status, state.introMs]);
   const celebrated = useRef(false);
 
-  const refresh = useCallback(async () => {
-    const res = await getLivePlayerStateAction(initial.id);
-    if (res.success) setState(res.data);
-  }, [initial.id]);
-
-  useEffect(() => {
-    if (state.status === "finished") return;
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh, state.status]);
+  // Shu savolga yuborilgan javob: server javobi kelguncha ham "qabul qilindi" holati saqlanadi
+  const myAnswer = useRef<{ index: number; value: string | string[] } | null>(null);
+  const apply = useCallback((next: LivePlayerState) => {
+    const a = myAnswer.current;
+    if (a && next.me && next.index === a.index && next.status === "question" && !next.me.answered) {
+      next = { ...next, me: { ...next.me, answered: true, value: a.value } };
+    }
+    setState(next);
+  }, []);
+  const { refresh, discardPending, weak } = useLivePoll<LivePlayerState>(
+    `/api/live/state?gameId=${encodeURIComponent(initial.id)}`,
+    POLL_MS,
+    state.status !== "finished",
+    apply
+  );
 
   // Natija ochilganda — titrash (sinfda ovoz chiqarmaymiz)
   useEffect(() => {
@@ -79,37 +82,65 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
     if (state.me.coins > 0) void fireConfetti({ particleCount: 120, spread: 90, origin: { y: 0.4 }, zIndex: 80 });
   }, [state.status, state.me]);
 
+  const NET_ERROR = "Internet aloqasi uzildi — qayta urinib ko'ring";
+
   const join = async () => {
+    if (busy) return;
     setBusy(true);
     setError(null);
-    const res = await joinLiveGameAction(state.id);
-    if (!res.success) setError(res.error);
-    await refresh();
-    setBusy(false);
+    try {
+      // Qo'shilish takrorlansa ham bitta yozuv bo'ladi (server tekshiradi)
+      const res = await withRetry(() => joinLiveGameAction(state.id));
+      if (!res.success) setError(res.error);
+    } catch {
+      setError(NET_ERROR);
+    } finally {
+      await refresh();
+      setBusy(false);
+    }
   };
 
   const answer = async (value: string | string[]) => {
     if (busy) return;
     setBusy(true);
     setError(null);
-    // Darhol "qabul qilindi" ko'rinsin
+    // Darhol "qabul qilindi" ko'rinsin; yo'ldagi eski holat so'rovlari buni bekor qilmasin
+    myAnswer.current = { index: state.index, value };
+    discardPending();
     setState((s) => (s.me ? { ...s, me: { ...s.me, answered: true, value } } : s));
-    const res = await answerLiveQuestionAction(state.id, state.index, value);
-    if (!res.success) setError(res.error);
-    await refresh();
-    setBusy(false);
+    try {
+      // Sekin internetda so'rov yo'qolsa — qayta yuboriladi. Server bitta savolga ikkinchi javobni yozmaydi,
+      // shuning uchun "javob berdingiz" degani birinchisi yetib borganini bildiradi
+      const res = await withRetry(() => answerLiveQuestionAction(state.id, state.index, value));
+      if (!res.success && res.error !== "Bu savolga javob berdingiz") {
+        setError(res.error);
+        myAnswer.current = null;
+      }
+    } catch {
+      setError(NET_ERROR);
+      myAnswer.current = null;
+    } finally {
+      await refresh();
+      setBusy(false);
+    }
   };
 
   const openChest = async () => {
     if (busy) return;
     setBusy(true);
-    const res = await openLiveChestAction(state.id);
-    if (res.success) {
-      setChest({ kind: res.data.kind, text: res.data.text, key: Date.now() });
-      haptic(res.data.kind === "empty" ? [60] : [30, 50, 30, 50]);
-    } else setError(res.error);
-    await refresh();
-    setBusy(false);
+    try {
+      // Takrorlanmaydi: har chaqiruv yangi sandiq ochadi
+      const res = await openLiveChestAction(state.id);
+      if (res.success) {
+        setChest({ kind: res.data.kind, text: res.data.text, key: Date.now() });
+        haptic(res.data.kind === "empty" ? [60] : [30, 50, 30, 50]);
+      } else setError(res.error);
+    } catch {
+      setError(NET_ERROR);
+    } finally {
+      await refresh();
+      setBusy(false);
+    }
   };
 
   const Icon = MODE_ICONS[state.mode];
@@ -166,6 +197,11 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           </div>
         )}
 
+        {weak && (
+          <p role="status" className="mb-3 flex items-center justify-center gap-2 rounded-xl bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-200">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" /> Internet sust — ulanish tiklanmoqda…
+          </p>
+        )}
         {error && <p className="mb-3 rounded-xl bg-rose-500/20 px-3 py-2 text-center text-sm font-semibold text-rose-200">{error}</p>}
 
         {!state.joined && state.status !== "finished" ? (

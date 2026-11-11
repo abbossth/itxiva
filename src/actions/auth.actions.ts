@@ -6,7 +6,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { setSessionCookie, clearSessionCookie } from "@/lib/auth/session";
-import { getCurrentUser } from "@/lib/auth/guards";
+import { forgetUserFacts, getCurrentUser } from "@/lib/auth/guards";
 import { consumeRateLimit, clearRateLimit, formatWait } from "@/lib/rate-limit-db";
 import { loginSchema, changePasswordSchema } from "@/lib/validations/auth.schema";
 
@@ -90,6 +90,7 @@ export async function loginAction(
   // Update last login timestamp
   user.lastLoginAt = new Date();
   await user.save();
+  forgetUserFacts(user._id.toString());
 
   // Set session cookie
   await setSessionCookie({
@@ -188,6 +189,7 @@ export async function changePasswordAction(
   // Eski parol bilan ochilgan boshqa barcha sessiyalar (boshqa qurilmalar) yaroqsiz bo'ladi
   user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   await user.save();
+  forgetUserFacts(user._id.toString());
   if (!wasForced) await clearRateLimit(`pwd-change:${session.userId}`);
 
   // Shu qurilma uchun yangi versiyadagi cookie

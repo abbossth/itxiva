@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Check, Crown, Music, Pause, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import {
   endMinigameAction,
   endArenaAction,
   finishLiveGameAction,
-  getLiveHostStateAction,
   revealLiveQuestionAction,
   startLiveIntroAction,
   startLiveQuestionAction,
@@ -19,6 +18,7 @@ import {
 import { isAdventure } from "@/lib/live-game/adventures";
 import { MODE_THEMES } from "@/lib/live-game/themes";
 import { AdventureBoard } from "./adventure-boards";
+import { useLivePoll } from "./use-live-poll";
 import { ModeIntro } from "./live-intro";
 import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
 import { playCheckInSound, playGameStart, playTickSound, unlockSound } from "@/lib/sound";
@@ -91,19 +91,14 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const revealing = useRef<number | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
 
-  const refresh = useCallback(async () => {
-    const res = await getLiveHostStateAction(initial.id);
-    if (res.success) setState(res.data);
-  }, [initial.id]);
-
-  // Holat har soniyada yangilanadi (tab yashirin bo'lsa — to'xtaydi)
-  useEffect(() => {
-    if (state.status === "finished") return;
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh, state.status]);
+  // Holat har soniyada yangilanadi (tab yashirin bo'lsa — to'xtaydi). Oddiy GET: ustoz tugmalari
+  // (server action) holat so'rovlari ortida navbatda kutib qolmaydi, sekin internetda so'rovlar to'planmaydi.
+  const { refresh } = useLivePoll<LiveHostState>(
+    `/api/live/host?gameId=${encodeURIComponent(initial.id)}`,
+    POLL_MS,
+    state.status !== "finished",
+    setState
+  );
 
   // Yangi qo'shilgan o'quvchi — "ding"
   useEffect(() => {
@@ -127,8 +122,15 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     // Vaqt — server qiymati bo'yicha (mahalliy taymer faqat ko'rsatish uchun)
     const timeUp = state.remainingMs <= 0 || (remaining <= 0 && state.remainingMs < 1500);
     if (!timeUp && !allDone) return;
-    revealing.current = state.index;
-    void revealLiveQuestionAction(state.id).then(() => refresh());
+    const index = state.index;
+    revealing.current = index;
+    // Tarmoq xatosida belgi qaytariladi — keyingi yangilanishda yana urinadi (aks holda savol ochilmay qolardi)
+    void revealLiveQuestionAction(state.id).then(
+      () => refresh(),
+      () => {
+        if (revealing.current === index) revealing.current = null;
+      }
+    );
   }, [remaining, state, refresh]);
 
   // Jang vaqti tugasa (yoki bitta o'yinchi qolsa) — bonus hisoblanadi
@@ -148,7 +150,13 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     const wait = Math.max(0, deadline - Date.now());
     const t = setTimeout(() => {
       arenaEnding.current = a.round;
-      void endArenaAction(state.id).then(() => refresh());
+      void endArenaAction(state.id).then(
+        () => refresh(),
+        () => {
+          if (arenaEnding.current === a.round) arenaEnding.current = null;
+          void refresh();
+        }
+      );
     }, wait);
     return () => clearTimeout(t);
   }, [state.status, state.arena, state.id, refresh]);
@@ -193,8 +201,10 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     try {
       const res = await fn();
       if (!res.success) toast.error(res.error ?? "Xatolik");
-      await refresh();
+    } catch {
+      toast.error("Internet aloqasi uzildi — qayta bosing");
     } finally {
+      await refresh();
       setBusy(false);
     }
   };
@@ -263,7 +273,13 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     const wait = Math.max(0, minigameEndsAt.current.at + 1500 - Date.now());
     const t = setTimeout(() => {
       minigameEnding.current = m.round;
-      void endMinigameAction(state.id).then(() => refresh());
+      void endMinigameAction(state.id).then(
+        () => refresh(),
+        () => {
+          if (minigameEnding.current === m.round) minigameEnding.current = null;
+          void refresh();
+        }
+      );
     }, wait);
     return () => clearTimeout(t);
   }, [state.status, state.minigame, state.id, refresh]);

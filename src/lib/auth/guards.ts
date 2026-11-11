@@ -12,12 +12,46 @@ import { getSession, SessionPayload } from "./session";
  * bazadan olinadi — aks holda u eski guruhining darslarini ko'rib qolardi.
  * `cache` bitta so'rov davomida bazaga faqat bir marta murojaat qilinishini ta'minlaydi.
  */
+// Foydalanuvchi holati server nusxasida 5 soniya saqlanadi: jonli o'yinda 100 o'quvchi har 1,5 s so'raganda
+// har so'rovga alohida baza murojaati ketmasin. Parol/rol/guruh o'zgarishi ko'pi bilan 5 soniyada kuchga kiradi.
+type UserFacts = { groupId?: { toString(): string } | null; role: string; mustChangePassword?: boolean; sessionVersion?: number } | null;
+const USER_TTL_MS = process.env.VITEST ? 0 : 5000;
+const userFacts = new Map<string, { at: number; p: Promise<UserFacts> }>();
+
+function loadUserFacts(userId: string, fresh = false): Promise<UserFacts> {
+  const now = Date.now();
+  const c = userFacts.get(userId);
+  if (!fresh && c && now - c.at < USER_TTL_MS) return c.p;
+  const p = (async () => {
+    await connectToDatabase();
+    return User.findById(userId).select("groupId role mustChangePassword sessionVersion").lean<UserFacts>();
+  })().catch((err) => {
+    userFacts.delete(userId);
+    throw err;
+  });
+  if (userFacts.size > 5000) userFacts.clear();
+  userFacts.set(userId, { at: now, p });
+  return p;
+}
+
+/** Shu server nusxasida foydalanuvchi holatini darhol qayta o'qish (parol, rol yoki guruh o'zgarganda) */
+export function forgetUserFacts(userId: string) {
+  userFacts.delete(String(userId));
+}
+
 export const getCurrentUser = cache(async (): Promise<SessionPayload | null> => {
   const session = await getSession();
   if (!session) return null;
 
-  await connectToDatabase();
-  const user = await User.findById(session.userId).select("groupId role mustChangePassword sessionVersion").lean();
+  let user = await loadUserFacts(session.userId);
+  // Kesh cookie'dan eskiroq bo'lishi mumkin (masalan, parol hozirgina boshqa server nusxasida almashtirildi) —
+  // mos kelmasa, bazadan qayta o'qiladi; haqiqatan bekor qilingan sessiya baribir rad etiladi
+  if (
+    user &&
+    ((user.sessionVersion ?? 0) !== (session.sessionVersion ?? 0) || Boolean(user.mustChangePassword) !== Boolean(session.mustChangePassword))
+  ) {
+    user = await loadUserFacts(session.userId, true);
+  }
   // O'chirilgan yoki roli o'zgargan foydalanuvchining eski cookie'si endi yaroqsiz (mentor uchun ham)
   if (!user || user.role !== session.role) return null;
   // Parol almashtirilgan yoki mentor tiklagan: undan oldin berilgan barcha sessiyalar bekor bo'ladi

@@ -7,7 +7,7 @@ import mongoose from "mongoose";
 import { archiveEntity } from "@/lib/archive";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
-import { requireMentor } from "@/lib/auth/guards";
+import { forgetUserFacts, requireMentor } from "@/lib/auth/guards";
 import { hashPassword, verifyPassword, generateRandomPassword } from "@/lib/auth/password";
 import { encryptTempPassword, decryptTempPassword } from "@/lib/auth/temp-password";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -178,6 +178,7 @@ export async function resetPasswordAction(userId: string): Promise<{
   // Eski parol bilan ochilgan sessiyalar (masalan, begona qurilmada qolgani) shu zahoti yopiladi
   user.sessionVersion = (user.sessionVersion ?? 0) + 1;
   await user.save();
+  forgetUserFacts(user._id.toString());
 
   await AuditLog.create({
     actorId: mentor.userId,
@@ -220,6 +221,7 @@ export async function moveStudentAction({
   const oldGroupId = user.groupId;
   user.groupId = newGroupId as unknown as typeof user.groupId;
   await user.save();
+  forgetUserFacts(user._id.toString());
 
   // Update counts for both old and new groups
   if (oldGroupId) {

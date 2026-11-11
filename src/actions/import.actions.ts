@@ -7,7 +7,7 @@ import { User } from "@/lib/db/models/user.model";
 import { Group } from "@/lib/db/models/group.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getAppSettings } from "@/lib/settings";
-import { requireMentor } from "@/lib/auth/guards";
+import { forgetUserFacts, requireMentor } from "@/lib/auth/guards";
 import { hashPassword, generateRandomPassword } from "@/lib/auth/password";
 import { encryptTempPassword } from "@/lib/auth/temp-password";
 import { slugifyLogin } from "@/lib/utils";
@@ -243,6 +243,7 @@ export async function applyExcelImportAction(
     }
     if (user.groupId) touchedGroupIds.add(user.groupId.toString());
     await User.updateOne({ _id: d.userId, role: "student" }, { $set: { groupId } });
+    forgetUserFacts(String(d.userId));
     result.moved++;
   }
 
