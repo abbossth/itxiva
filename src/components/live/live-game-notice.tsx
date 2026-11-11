@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { usePathname } from "next/navigation";
 import { Gamepad2, X } from "lucide-react";
 import Link from "@/components/ui/link";
-import { getMyActiveLiveGameAction } from "@/actions/live-game.actions";
 import { LIVE_MODES } from "@/lib/live-game/modes";
 import type { LiveGameMode, LiveGameStatus } from "@/lib/db/models/live-game.model";
 import { OVERLAY_FREE_EVENT, claimOverlay, overlayBusy, releaseOverlay } from "@/lib/rewards-client";
@@ -58,10 +57,15 @@ export function LiveGameNotice() {
   const shownFor = useRef<string | null>(null);
 
   const check = useCallback(async () => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
     try {
-      setActive(await getMyActiveLiveGameAction());
+      const res = await fetch("/api/live/active", { cache: "no-store", signal: ctrl.signal });
+      if (res.ok) setActive(((await res.json()) as { game: ActiveGame }).game ?? null);
     } catch {
       // Tarmoq xatosi — keyingi tekshiruvda
+    } finally {
+      clearTimeout(t);
     }
   }, []);
 
@@ -73,10 +77,14 @@ export function LiveGameNotice() {
   useEffect(() => {
     const id = setInterval(() => document.visibilityState === "visible" && void check(), POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && void check();
+    // iOS Safari/Chrome sahifani orqaga qaytishda keshdan (bfcache) tiklaydi — shunda ham darhol tekshiriladi
+    const onPageShow = (e: PageTransitionEvent) => e.persisted && void check();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [check]);
 
