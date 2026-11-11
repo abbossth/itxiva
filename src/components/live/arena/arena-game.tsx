@@ -37,6 +37,8 @@ interface Hud {
   wave: number;
   kills: number;
   left: number;
+  group: number;
+  peers: number;
 }
 
 export interface ArenaResult {
@@ -52,9 +54,12 @@ export function ArenaGame({
   startsInMs,
   remainingMs,
   sound = true,
+  myName,
   onDone,
 }: {
   gameId: string;
+  /** O'z roboti tepasidagi ism */
+  myName: string;
   loadout: { ammo: number; armor: number };
   startsInMs: number;
   remainingMs: number;
@@ -63,7 +68,7 @@ export function ArenaGame({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [hud, setHud] = useState<Hud>({ hp: 100, armor: loadout.armor, ammo: loadout.ammo, wave: 1, kills: 0, left: Math.ceil(remainingMs / 1000) });
+  const [hud, setHud] = useState<Hud>({ hp: 100, armor: loadout.armor, ammo: loadout.ammo, wave: 1, kills: 0, left: Math.ceil(remainingMs / 1000), group: 0, peers: 0 });
   const [phase, setPhase] = useState<"intro" | "play" | "done">(startsInMs > 0 ? "intro" : "play");
   const [intro, setIntro] = useState(Math.ceil(startsInMs / 1000));
   const [banner, setBanner] = useState<string | null>(null);
@@ -92,6 +97,10 @@ export function ArenaGame({
 
     const state: ArenaState = createArena(loadout, Math.floor(Math.random() * 1e9));
     const particles: Particle[] = [];
+    // Boshqa ishtirokchilar: server bergan joylashuvga silliq yetib boriladi
+    const peers = new Map<string, { name: string; x: number; y: number; a: number; tx: number; ty: number; ta: number; hp: number; dead: boolean; color: string }>();
+    let groupKills = 0;
+    let reporting = false;
     const input: ArenaInput = { mx: 0, my: 0, aimX: null, aimY: null, fire: false };
     const keys = new Set<string>();
     let mouseFire = false;
@@ -128,7 +137,27 @@ export function ArenaGame({
 
     const report = (final: boolean) => {
       const res: ArenaResult = { kills: state.kills, waves: state.wavesCleared, finished: state.won, dead: state.dead };
-      void reportArenaAction(gameId, res, final).catch(() => {});
+      if (reporting && !final) return res;
+      reporting = true;
+      const p = state.player;
+      void reportArenaAction(gameId, { ...res, x: Math.round(p.x), y: Math.round(p.y), a: Number(p.angle.toFixed(2)), hp: Math.round(p.hp) }, final)
+        .then((r) => {
+          if (!r.success) return;
+          groupKills = r.data.groupKills;
+          const seen = new Set<string>();
+          for (const o of r.data.peers) {
+            if (o.isMe) continue;
+            seen.add(o.id);
+            const cur = peers.get(o.id);
+            if (cur) Object.assign(cur, { tx: o.x, ty: o.y, ta: o.a, hp: o.hp, dead: o.dead, name: o.name });
+            else peers.set(o.id, { name: o.name, x: o.x, y: o.y, a: o.a, tx: o.x, ty: o.y, ta: o.a, hp: o.hp, dead: o.dead, color: colorFor(o.id) });
+          }
+          for (const id of [...peers.keys()]) if (!seen.has(id)) peers.delete(id);
+        })
+        .catch(() => {})
+        .finally(() => {
+          reporting = false;
+        });
       return res;
     };
 
@@ -315,6 +344,32 @@ export function ArenaGame({
         ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
       }
       ctx.globalAlpha = 1;
+      // Boshqa ishtirokchilar (sheriklar): o'z rangida, tepasida ismi
+      for (const o of peers.values()) {
+        ctx.save();
+        ctx.translate(o.x, o.y);
+        ctx.globalAlpha = o.dead ? 0.35 : 0.9;
+        ctx.rotate(o.a);
+        ctx.shadowColor = o.color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = o.dead ? "#475569" : o.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, 17, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(13, -4, 14, 8);
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 11, -0.6, 0.6);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        nameTag(ctx, o.dead ? `💀 ${o.name}` : o.name, o.x, o.y - 34, o.color, o.hp);
+      }
+      ctx.globalAlpha = 1;
+
       // O'yinchi: visorli robot
       const pl = state.player;
       ctx.save();
@@ -343,6 +398,7 @@ export function ArenaGame({
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+      nameTag(ctx, `${myName} (siz)`, pl.x, pl.y - 36, "#22d3ee", pl.hp);
       // Sensorli joystik
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (stick) {
@@ -438,6 +494,15 @@ export function ArenaGame({
       }
       for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
 
+      // Sheriklar silliq harakatlanadi
+      const k = Math.min(1, dt * 8);
+      for (const o of peers.values()) {
+        o.x += (o.tx - o.x) * k;
+        o.y += (o.ty - o.y) * k;
+        // Burchak — eng qisqa yo'l bilan (±π chegarasida aylanib ketmasin)
+        const da = Math.atan2(Math.sin(o.ta - o.a), Math.cos(o.ta - o.a));
+        o.a += da * k;
+      }
       draw();
       if (now - lastHud > 100) {
         lastHud = now;
@@ -448,9 +513,12 @@ export function ArenaGame({
           wave: Math.min(state.wave + 1, WAVES.length),
           kills: state.kills,
           left: Math.max(0, Math.ceil((t.end - now) / 1000)),
+          group: Math.max(groupKills, state.kills),
+          peers: peers.size,
         });
       }
-      if (now - lastReport > 3000) {
+      // Joylashuv va natija har yarim soniyada (javobda — boshqalarning joylashuvi)
+      if (now - lastReport > 500) {
         lastReport = now;
         report(false);
       }
@@ -497,6 +565,9 @@ export function ArenaGame({
           )}
         </div>
         <div className="flex items-center gap-2 text-sm font-black">
+          <span className="hidden rounded-xl bg-black/50 px-3 py-1.5 text-emerald-300 backdrop-blur sm:inline">
+            Guruh: {hud.group} dron{hud.peers > 0 ? ` · ${hud.peers + 1} kishi` : ""}
+          </span>
           <span className="rounded-xl bg-black/50 px-3 py-1.5 backdrop-blur">{hud.wave}/{WAVES.length}-to&apos;lqin</span>
           <span className="inline-flex items-center gap-1 rounded-xl bg-black/50 px-3 py-1.5 backdrop-blur">
             <Skull className="h-4 w-4" /> {hud.kills}
@@ -533,4 +604,37 @@ export function ArenaGame({
       )}
     </div>
   );
+}
+
+const PEER_COLORS = ["#f472b6", "#a78bfa", "#fb923c", "#4ade80", "#facc15", "#60a5fa", "#f87171", "#2dd4bf", "#e879f9", "#a3e635"];
+
+function colorFor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return PEER_COLORS[h % PEER_COLORS.length];
+}
+
+/** Robot tepasidagi ism va kichik sog'liq chizig'i */
+export function nameTag(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, hp: number) {
+  ctx.save();
+  ctx.font = "bold 21px ui-sans-serif, system-ui, sans-serif";
+  const label = text.length > 18 ? `${text.slice(0, 17)}…` : text;
+  const w = ctx.measureText(label).width + 18;
+  ctx.fillStyle = "rgba(2,6,23,0.75)";
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - 16, w, 28, 9);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, x, y - 2);
+  // Sog'liq
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(x - 20, y + 15, 40, 5);
+  ctx.fillStyle = hp > 50 ? "#4ade80" : hp > 25 ? "#facc15" : "#f87171";
+  ctx.fillRect(x - 20, y + 15, (40 * Math.max(0, hp)) / 100, 5);
+  ctx.restore();
 }

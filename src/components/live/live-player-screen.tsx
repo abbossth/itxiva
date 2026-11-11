@@ -159,7 +159,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
         ) : state.status === "arena" && state.arena ? (
-          <ArenaPlayer gameId={state.id} arena={state.arena} />
+          <ArenaPlayer gameId={state.id} arena={state.arena} myName={state.me?.name ?? "Siz"} />
         ) : state.status === "minigame" && state.minigame ? (
           <MinigamePlayer key={state.minigame.round} gameId={state.id} m={state.minigame} />
         ) : state.status === "reveal" ? (

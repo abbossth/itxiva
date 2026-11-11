@@ -85,7 +85,14 @@ describe("arena bosqichi", () => {
     await live.reportArenaAction(id, { kills: 1, waves: 0, finished: false, dead: false }, true);
     expect((await player(ali)).arena?.kills).toBe(ARENA_TOTAL_DRONES);
     as(vali);
-    await live.reportArenaAction(id, { kills: 5, waves: 0, finished: true, dead: true }, true);
+    const rep = await live.reportArenaAction(id, { kills: 5, waves: 0, finished: true, dead: true, x: 400, y: 300, a: 1, hp: 0 }, true);
+    // Javobda — hammaning joylashuvi (ismi bilan) va guruh jami
+    expect(rep.success && rep.data.peers.map((p) => [p.name, p.isMe]).sort()).toEqual([
+      ["ALI", false],
+      ["VALI", true],
+    ]);
+    expect(rep.success && rep.data.peers.find((p) => p.isMe)).toMatchObject({ x: 400, y: 300, hp: 0 });
+    expect(rep.success && rep.data.groupKills).toBe(ARENA_TOTAL_DRONES + 5);
     expect((await player(vali)).arena).toMatchObject({ kills: 5, finished: false, dead: true });
 
     as(mentor);

@@ -466,6 +466,9 @@ export interface LiveArenaView {
   remainingMs: number;
   ended: boolean;
   rows: LiveArenaRow[];
+  /** Proyektordagi jonli xarita uchun */
+  peers: ArenaPeer[];
+  groupKills: number;
 }
 
 function arenaView(game: Pick<ILiveGame, "arena" | "status">, players: ILiveGamePlayer[]): LiveArenaView | null {
@@ -480,6 +483,8 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status">, players: ILiveGame
       .filter((p) => p.arena)
       .map((p) => ({ id: p._id.toString(), name: p.name, kills: p.arena!.kills, waves: p.arena!.waves, finished: p.arena!.finished, dead: p.arena!.dead, points: p.arena!.points }))
       .sort((x, y) => Number(y.finished) - Number(x.finished) || y.waves - x.waves || y.kills - x.kills),
+    peers: arenaPeers(players),
+    groupKills: players.reduce((n, p) => n + (p.arena?.kills ?? 0), 0),
   };
 }
 
@@ -995,11 +1000,41 @@ export async function submitMinigameAction(gameId: string, round: number, value:
  * Arena natijasi (o'yin davomida har necha soniyada va oxirida). Eng yaxshi natija saqlanadi,
  * qiymatlar chegaralanadi: o'ldirishlar o'q sonidan (va dronlar sonidan) oshmaydi, "tugatdi" — faqat 3 to'lqinda.
  */
+export interface ArenaPeer {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  a: number;
+  hp: number;
+  dead: boolean;
+  finished: boolean;
+  kills: number;
+  isMe: boolean;
+}
+
+function arenaPeers(players: ILiveGamePlayer[] | { _id: unknown; name: string; arena?: ILiveGamePlayer["arena"] }[], meId?: string): ArenaPeer[] {
+  return players
+    .filter((p) => p.arena)
+    .map((p) => ({
+      id: String(p._id),
+      name: p.name,
+      x: p.arena!.x ?? 800,
+      y: p.arena!.y ?? 780,
+      a: p.arena!.a ?? 0,
+      hp: p.arena!.hp ?? 100,
+      dead: p.arena!.dead,
+      finished: p.arena!.finished,
+      kills: p.arena!.kills,
+      isMe: String(p._id) === meId,
+    }));
+}
+
 export async function reportArenaAction(
   gameId: string,
-  progress: { kills: number; waves: number; finished: boolean; dead: boolean },
+  progress: { kills: number; waves: number; finished: boolean; dead: boolean; x?: number; y?: number; a?: number; hp?: number },
   final: boolean
-): Promise<Result<{ ok: boolean }>> {
+): Promise<Result<{ ok: boolean; peers: ArenaPeer[]; groupKills: number }>> {
   try {
     const user = await requireStudent();
     await connectDB();
@@ -1010,7 +1045,21 @@ export async function reportArenaAction(
     if (now < new Date(a.startedAt).getTime() - 1000 || now > new Date(a.endsAt).getTime() + 5000) return fail("Vaqt tugadi");
     const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId }).select("arena").lean();
     if (!player?.arena) return fail("Avval o'yinga qo'shiling");
-    if (player.arena.final) return { success: true, data: { ok: true } };
+    const num = (v: unknown, min: number, max: number, def: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+    };
+    const pos = {
+      "arena.x": num(progress?.x, 0, 1600, player.arena.x ?? 800),
+      "arena.y": num(progress?.y, 0, 900, player.arena.y ?? 780),
+      "arena.a": num(progress?.a, -10, 10, 0),
+      "arena.hp": num(progress?.hp, 0, 100, player.arena.hp ?? 100),
+    };
+    const peersNow = async () => {
+      const all = await LiveGamePlayer.find({ gameId: game._id, arena: { $ne: null } }).select("name arena").lean();
+      return { peers: arenaPeers(all, player._id.toString()), groupKills: all.reduce((n, p) => n + (p.arena?.kills ?? 0), 0) };
+    };
+    if (player.arena.final) return { success: true, data: { ok: true, ...(await peersNow()) } };
     // Arenadagi qutilardan ham o'q chiqadi — shuning uchun chegara yuklamadan biroz kengroq
     const maxKills = Math.min(ARENA_TOTAL_DRONES, player.arena.ammo + 40);
     const kills = Math.max(player.arena.kills, Math.min(maxKills, Math.max(0, Math.floor(Number(progress?.kills) || 0))));
@@ -1019,9 +1068,9 @@ export async function reportArenaAction(
     const dead = player.arena.dead || Boolean(progress?.dead);
     await LiveGamePlayer.updateOne(
       { _id: player._id },
-      { $set: { "arena.kills": kills, "arena.waves": waves, "arena.finished": finished, "arena.dead": dead, "arena.final": Boolean(final) } }
+      { $set: { "arena.kills": kills, "arena.waves": waves, "arena.finished": finished, "arena.dead": dead, "arena.final": Boolean(final), ...pos } }
     );
-    return { success: true, data: { ok: true } };
+    return { success: true, data: { ok: true, ...(await peersNow()) } };
   } catch (err) {
     return errorOf(err, "Natijani yuborib bo'lmadi");
   }
