@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Check, Crown, Music, Pause, Settings2, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, Crown, Music, Pause, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import {
   cancelLiveGameAction,
   endMinigameAction,
+  endArenaAction,
   finishLiveGameAction,
   getLiveHostStateAction,
   revealLiveQuestionAction,
@@ -21,6 +22,7 @@ import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
 import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, useMusicChoice, type MusicChoice } from "./live-track";
 import { MinigameHost } from "./live-minigame";
+import { ArenaHost } from "./arena/arena-screens";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -122,6 +124,22 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     void revealLiveQuestionAction(state.id).then(() => refresh());
   }, [remaining, state, refresh]);
 
+  // Arena vaqti tugasa (yoki hamma tugatsa) — bonus hisoblanadi
+  const arenaEnding = useRef(false);
+  const arenaEndsAt = useRef<number | null>(null);
+  useEffect(() => {
+    const a = state.arena;
+    if (state.status !== "arena" || !a || a.ended || arenaEnding.current) return;
+    if (arenaEndsAt.current === null) arenaEndsAt.current = Date.now() + a.startsInMs + a.remainingMs;
+    const allDone = a.rows.length > 0 && a.startsInMs === 0 && a.rows.every((r) => r.finished || r.dead);
+    const wait = allDone ? 2500 : Math.max(0, arenaEndsAt.current + 5000 - Date.now());
+    const t = setTimeout(() => {
+      arenaEnding.current = true;
+      void endArenaAction(state.id).then(() => refresh());
+    }, wait);
+    return () => clearTimeout(t);
+  }, [state.status, state.arena, state.id, refresh]);
+
   // Natija: avval to'g'ri javob, bir necha soniyadan keyin reyting sahnasi
   useEffect(() => {
     if (state.status !== "reveal") return;
@@ -136,7 +154,11 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     liveMusic.setEnabled(synthOn);
     if (!synthOn || state.status === "finished") return;
     liveMusic.play(
-      state.status === "lobby" ? "lobby" : state.status === "question" || (state.status === "minigame" && !state.minigame?.ended) ? "question" : "board"
+      state.status === "lobby"
+        ? "lobby"
+        : state.status === "question" || state.status === "arena" || (state.status === "minigame" && !state.minigame?.ended)
+        ? "question"
+        : "board"
     );
   }, [synthOn, state.status, state.minigame?.ended]);
   useEffect(() => {
@@ -163,11 +185,18 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   });
   // Avto rejim kaliti: natija ("r3") yoki tugagan qisqa o'yin ("m3")
   const autoKey =
-    state.status === "reveal" ? `r${state.index}` : state.status === "minigame" && state.minigame?.ended ? `m${state.index}` : null;
+    state.status === "reveal"
+      ? `r${state.index}`
+      : state.status === "minigame" && state.minigame?.ended
+      ? `m${state.index}`
+      : state.status === "arena" && state.arena?.ended
+      ? "a"
+      : null;
   useEffect(() => {
     if (!autoplay || !autoKey || autoFired.current === autoKey) return;
     const key = autoKey;
-    const last = key.startsWith("r") && state.index + 1 >= state.total;
+    // Oxirgi savoldan keyin: arena bo'lsa — arenaga, aks holda g'oliblar
+    const last = key.startsWith("r") && state.index + 1 >= state.total && !state.arenaNext;
     const deadline = Date.now() + (key.startsWith("m") ? 6 : autoDelayFor(state.mode)) * 1000;
     const id = setInterval(() => {
       const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
@@ -178,7 +207,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       void actRef.current(() => (last ? finishLiveGameAction(state.id) : startLiveQuestionAction(state.id)));
     }, 250);
     return () => clearInterval(id);
-  }, [autoplay, autoKey, state.index, state.total, state.mode, state.id]);
+  }, [autoplay, autoKey, state.index, state.total, state.mode, state.id, state.arenaNext]);
   const autoLeft = autoplay && autoKey && auto?.key === autoKey ? auto.left : null;
 
   // Qisqa o'yin vaqti tugasa — natija hisoblanadi (oxirgi natijalar yetib kelishi uchun biroz kutiladi)
@@ -317,6 +346,28 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
               >
                 {state.minigame.ended ? "Keyingi savol" : "O'tkazib yuborish"}
                 {autoLeft !== null ? ` (${autoLeft})` : ""} <SkipForward className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
+        {state.status === "arena" && state.arena && (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1">
+              <ArenaHost arena={state.arena} />
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
+              {autoLeft !== null && (
+                <Button variant="ghost" onClick={() => writeAuto(false)} className="gap-1.5 text-slate-300 hover:text-white">
+                  <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => act(() => startLiveQuestionAction(state.id))}
+                disabled={busy}
+                className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-amber-400 px-8 text-lg font-black text-slate-900 disabled:opacity-60"
+              >
+                <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish{autoLeft !== null ? ` (${autoLeft})` : ""}
               </button>
             </div>
           </div>
@@ -504,7 +555,11 @@ function RevealView({
             <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
           </Button>
         )}
-        {isLast ? (
+        {isLast && state.arenaNext ? (
+          <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 px-8 text-lg font-black text-white disabled:opacity-60">
+            <Swords className="h-5 w-5" /> Arenaga o&apos;tish{autoLeft !== null ? ` (${autoLeft})` : ""}
+          </button>
+        ) : isLast ? (
           <button type="button" onClick={onFinish} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-amber-400 px-8 text-lg font-black text-slate-900 disabled:opacity-60">
             <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish{autoLeft !== null ? ` (${autoLeft})` : ""}
           </button>

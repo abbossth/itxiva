@@ -116,6 +116,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [teams, setTeams] = useState(2);
   const [prizes, setPrizes] = useState([30, 20, 10]);
   const [minigames, setMinigames] = useState(true);
+  const [arena, setArena] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Guruhlar va ulardagi savollar soni oyna ochilganda bir marta olinadi
@@ -146,7 +147,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, arena });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -259,6 +260,16 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
               <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Savollar orasida qisqa o&apos;yinlar</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 Har 3 savoldan keyin tasodifiy: tezkor bosish, mo&apos;ljalga otish, omad g&apos;ildiragi yoki bonus raund (×2)
+              </span>
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+            <input type="checkbox" checked={arena} onChange={(e) => setArena(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
+            <span>
+              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Oxirida &quot;Kiber arena&quot; (otishma)</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                90 soniyalik mini-o&apos;yin: to&apos;g&apos;ri javoblar — o&apos;q va zirh, dronlarni yo&apos;q qilganlarga bonus ochko (1300 gacha)
               </span>
             </span>
           </label>

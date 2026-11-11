@@ -472,14 +472,15 @@ export function ArenaGame({
       canvas.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
-      if (!finished) report(true);
+      // Yopilganda faqat oraliq natija: yakuniy natija o'yin haqiqatan tugaganda (g'alaba, yiqilish yoki vaqt) yuboriladi
+      if (!finished && state.t > 0) report(false);
     };
     // O'yin bir marta yaratiladi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative h-full min-h-[320px] w-full select-none overflow-hidden touch-none">
+    <div ref={wrapRef} className="relative h-full min-h-[280px] w-full flex-1 select-none overflow-hidden rounded-2xl touch-none">
       <canvas ref={canvasRef} className="absolute inset-0 block cursor-crosshair" />
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 p-2 text-white sm:p-3">

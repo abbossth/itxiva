@@ -74,8 +74,8 @@ describe("arena bosqichi", () => {
     const r = await live.startLiveQuestionAction(id);
     expect(r.success && r.data.finished).toBe(false);
     expect((await LiveGame.findById(id).lean())?.status).toBe("arena");
-    expect((await player(ali)).arena).toMatchObject({ ammo: 35, armor: 30 });
-    expect((await player(vali)).arena).toMatchObject({ ammo: 15, armor: 0 });
+    expect((await player(ali)).arena).toMatchObject({ ammo: 49, armor: 30 });
+    expect((await player(vali)).arena).toMatchObject({ ammo: 25, armor: 0 });
 
     tick(5000); // sanoq tugadi
     as(ali);

@@ -16,6 +16,7 @@ import { fireConfetti } from "@/lib/confetti";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { MinigamePlayer } from "./live-minigame";
+import { ArenaPlayer } from "./arena/arena-screens";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -95,7 +96,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
 
   return (
     <ImmersiveFrame>
-      <div className="mx-auto flex w-full max-w-xl flex-col md:max-w-3xl lg:max-w-5xl [&>*]:flex-1">
+      <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col [&>*]:flex-1", state.status === "arena" ? "max-w-none" : "max-w-xl md:max-w-3xl lg:max-w-5xl")}>
       <LiveShell className="min-h-[75vh]">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -157,6 +158,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           ) : (
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
+        ) : state.status === "arena" && state.arena ? (
+          <ArenaPlayer gameId={state.id} arena={state.arena} />
         ) : state.status === "minigame" && state.minigame ? (
           <MinigamePlayer key={state.minigame.round} gameId={state.id} m={state.minigame} />
         ) : state.status === "reveal" ? (

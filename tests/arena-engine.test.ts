@@ -19,8 +19,8 @@ const run = (s: ReturnType<typeof createArena>, input: ArenaInput, seconds: numb
 
 describe("arena dvigateli", () => {
   it("yuklama va bonus: to'g'ri javoblar o'q va zirhga aylanadi, bonus 1300 bilan chegaralangan", () => {
-    expect(arenaLoadout(0)).toEqual({ ammo: 15, armor: 0 });
-    expect(arenaLoadout(4)).toEqual({ ammo: 55, armor: 60 });
+    expect(arenaLoadout(0)).toEqual({ ammo: 25, armor: 0 });
+    expect(arenaLoadout(4)).toEqual({ ammo: 73, armor: 60 });
     expect(arenaLoadout(20).armor).toBe(150);
     expect(arenaBonus(10, 1, false)).toBe(300);
     expect(arenaBonus(ARENA_TOTAL_DRONES, 3, true)).toBe(1300);

@@ -112,7 +112,7 @@ export type ArenaEvent = "shot" | "hit" | "kill" | "hurt" | "wave" | "pickup" | 
 
 const PLAYER_SPEED = 260;
 const BULLET_SPEED = 950;
-const FIRE_COOLDOWN = 0.14;
+const FIRE_COOLDOWN = 0.2;
 const SPAWN_GAP = 0.55;
 const WAVE_BREAK = 2.2;
 
@@ -138,7 +138,7 @@ function queueFor(wave: number, s: ArenaState): DroneKind[] {
 /** Yuklama: to'g'ri javoblar soniga qarab */
 export function arenaLoadout(correct: number): { ammo: number; armor: number } {
   const c = Math.max(0, Math.floor(correct));
-  return { ammo: 15 + c * 10, armor: Math.min(150, c * 15) };
+  return { ammo: 25 + c * 12, armor: Math.min(150, c * 15) };
 }
 
 /** Bonus ochko: dron × 20 + to'lqin × 100 + hammasini tugatsa 500, ko'pi bilan 1300 */
