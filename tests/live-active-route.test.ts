@@ -79,7 +79,7 @@ describe("/api/live/active (header tugmasi va o'yin oynasi)", () => {
     const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "classic", source: "all", count: 3, minigames: false, arena: false });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
-    const get = (r: typeof stateRoute, path: string) => r.GET(new NextRequest(`http://t${path}?gameId=${id}`));
+    const get = (r: { GET: (req: InstanceType<typeof NextRequest>) => Promise<Response> }, path: string) => r.GET(new NextRequest(`http://t${path}?gameId=${id}`));
 
     as(ali);
     await live.joinLiveGameAction(id);
