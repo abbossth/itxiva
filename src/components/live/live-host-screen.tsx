@@ -124,15 +124,20 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     void revealLiveQuestionAction(state.id).then(() => refresh());
   }, [remaining, state, refresh]);
 
-  // Arena vaqti tugasa (yoki hamma tugatsa) — bonus hisoblanadi
+  // Jang vaqti tugasa (yoki bitta o'yinchi qolsa) — bonus hisoblanadi
   const arenaEnding = useRef(false);
   const arenaEndsAt = useRef<number | null>(null);
+  const arenaDecidedAt = useRef<number | null>(null);
   useEffect(() => {
     const a = state.arena;
     if (state.status !== "arena" || !a || a.ended || arenaEnding.current) return;
     if (arenaEndsAt.current === null) arenaEndsAt.current = Date.now() + a.startsInMs + a.remainingMs;
-    const allDone = a.rows.length > 0 && a.startsInMs === 0 && a.rows.every((r) => r.finished || r.dead);
-    const wait = allDone ? 2500 : Math.max(0, arenaEndsAt.current + 5000 - Date.now());
+    // Bittadan boshqa hamma chiqib ketsa — g'olib aniq, jang tugaydi
+    const decided = a.rows.length >= 2 && a.startsInMs === 0 && a.alive <= 1;
+    // Mutlaq muddat: har soniyalik so'rov taymerni qaytadan boshlamasin
+    if (decided && arenaDecidedAt.current === null) arenaDecidedAt.current = Date.now() + 3000;
+    const deadline = decided ? arenaDecidedAt.current! : arenaEndsAt.current + 2000;
+    const wait = Math.max(0, deadline - Date.now());
     const t = setTimeout(() => {
       arenaEnding.current = true;
       void endArenaAction(state.id).then(() => refresh());
@@ -353,7 +358,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         {state.status === "arena" && state.arena && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1">
-              <ArenaHost arena={state.arena} />
+              <ArenaHost gameId={state.id} arena={state.arena} sound={sound} />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
               {autoLeft !== null && (

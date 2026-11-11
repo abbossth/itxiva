@@ -305,7 +305,7 @@ export function playShot(): void {
   osc.stop(t + 0.1);
 }
 
-/** Arena: dron portlashi */
+/** Arena: portlash */
 export function playBoom(): void {
   const audio = running();
   if (!audio) return;

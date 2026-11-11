@@ -60,11 +60,38 @@ export interface ILiveGameData {
   /** Bonus raund: shu savolda ochko ×2 */
   bonusIndex?: number | null;
   /** Oxirgi bosqich — otishmali arena */
-  arena?: { startedAt: Date | string; endsAt: Date | string; endedAt?: Date | string | null } | null;
+  arena?: ILiveArena | null;
   finishedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
   createdAt?: Date | string;
+}
+
+export interface ILiveArenaPickup {
+  id: number;
+  kind: "heart" | "shield" | "speed" | "rapid" | "triple";
+  x: number;
+  y: number;
+}
+
+export interface ILiveArenaFeed {
+  at: number;
+  kind: "kill" | "pickup";
+  a: string;
+  b?: string | null;
+  power?: string | null;
+}
+
+export interface ILiveArena {
+  startedAt: Date | string;
+  endsAt: Date | string;
+  endedAt?: Date | string | null;
+  /** Xaritadagi sovg'alar (birinchi yetib kelgan oladi) */
+  pickups: ILiveArenaPickup[];
+  nextPickupAt: number;
+  seq: number;
+  /** Kim kimni yiqitdi, kim nima oldi */
+  feed: ILiveArenaFeed[];
 }
 
 export interface ILiveGame extends Document, Omit<ILiveGameData, "_id"> {
@@ -127,7 +154,24 @@ const LiveGameSchema = new Schema<ILiveGame>(
     minigameRounds: { type: [Number], default: [] },
     bonusIndex: { type: Number, default: null },
     arena: {
-      type: new Schema({ startedAt: Date, endsAt: Date, endedAt: { type: Date, default: null } }, { _id: false }),
+      type: new Schema(
+        {
+          startedAt: Date,
+          endsAt: Date,
+          endedAt: { type: Date, default: null },
+          pickups: {
+            type: [new Schema({ id: Number, kind: String, x: Number, y: Number }, { _id: false })],
+            default: [],
+          },
+          nextPickupAt: { type: Number, default: 0 },
+          seq: { type: Number, default: 0 },
+          feed: {
+            type: [new Schema({ at: Number, kind: String, a: String, b: { type: String, default: null }, power: { type: String, default: null } }, { _id: false })],
+            default: [],
+          },
+        },
+        { _id: false }
+      ),
       default: null,
     },
     finishedAt: { type: Date, default: null },

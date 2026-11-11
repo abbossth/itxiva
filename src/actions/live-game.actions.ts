@@ -38,7 +38,8 @@ import {
   wheelPoints,
   type MinigameKind,
 } from "@/lib/live-game/minigames";
-import { ARENA_INTRO_S, ARENA_SECONDS, ARENA_TOTAL_DRONES, WAVES, arenaBonus, arenaLoadout } from "@/lib/live-game/arena-engine";
+import { PVP_INTRO_S, PVP_SECONDS, pvpStandings } from "@/lib/live-game/pvp";
+import { finishPvp, loadPvpGame, pvpTick, setupPvp, watchPvp, type PvpTickInput, type PvpTickResult, type PvpWorld } from "@/lib/live-game/pvp-server";
 
 // Jonli o'yin: mentor proyektorda boshqaradi, o'quvchilar telefondan qo'shiladi. Holat qisqa so'rovlar bilan olinadi.
 
@@ -287,27 +288,15 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
 }
 
 async function startArena(gameId: mongoose.Types.ObjectId) {
-  const startedAt = new Date(Date.now() + ARENA_INTRO_S * 1000);
-  const endsAt = new Date(startedAt.getTime() + ARENA_SECONDS * 1000);
+  const startedAt = new Date(Date.now() + PVP_INTRO_S * 1000);
+  const endsAt = new Date(startedAt.getTime() + PVP_SECONDS * 1000);
   const res = await LiveGame.updateOne(
     { _id: gameId, arena: null, status: { $in: ["reveal", "minigame"] } },
-    { $set: { status: "arena", arena: { startedAt, endsAt, endedAt: null }, questionStartedAt: null } }
+    { $set: { status: "arena", arena: { startedAt, endsAt, endedAt: null, pickups: [], nextPickupAt: 0, seq: 0, feed: [] }, questionStartedAt: null } }
   );
   if (res.modifiedCount === 0) return;
-  // Yuklama: to'g'ri javoblar soniga qarab o'q va zirh
-  const players = await LiveGamePlayer.find({ gameId }).select("answers").lean();
-  if (players.length === 0) return;
-  await LiveGamePlayer.bulkWrite(
-    players.map((p) => {
-      const { ammo, armor } = arenaLoadout(p.answers.filter((a) => a.isCorrect).length);
-      return {
-        updateOne: {
-          filter: { _id: p._id },
-          update: { $set: { arena: { ammo, armor, kills: 0, waves: 0, finished: false, dead: false, final: false, points: 0 } } },
-        },
-      };
-    })
-  );
+  // Jon, qurol, qahramon va joy — to'g'ri javoblarga qarab
+  await setupPvp(gameId, startedAt);
 }
 
 /** Arena tugadi: bonus ochkolar qo'shiladi (bir marta) */
@@ -318,14 +307,7 @@ async function endArena(gameId: mongoose.Types.ObjectId | string): Promise<boole
     { returnDocument: "after" }
   );
   if (!game) return false;
-  const players = await LiveGamePlayer.find({ gameId: game._id, arena: { $ne: null } }).select("arena").lean();
-  await Promise.all(
-    players.map((p) => {
-      const a = p.arena!;
-      const pts = arenaBonus(a.kills, a.waves, a.finished);
-      return LiveGamePlayer.updateOne({ _id: p._id }, { $inc: { score: pts }, $set: { "arena.points": pts } });
-    })
-  );
+  await finishPvp(game._id);
   await saveRanks(game._id, game.mode);
   return true;
 }
@@ -461,11 +443,14 @@ function minigameView(game: Pick<ILiveGame, "minigame" | "status">, players: ILi
 export interface LiveArenaRow {
   id: string;
   name: string;
+  skin: string;
   kills: number;
-  waves: number;
-  finished: boolean;
-  dead: boolean;
+  lives: number;
+  maxLives: number;
+  out: boolean;
+  killedBy: string | null;
   points: number;
+  place: number;
 }
 
 export interface LiveArenaView {
@@ -473,25 +458,36 @@ export interface LiveArenaView {
   remainingMs: number;
   ended: boolean;
   rows: LiveArenaRow[];
-  /** Proyektordagi jonli xarita uchun */
-  peers: ArenaPeer[];
-  groupKills: number;
+  alive: number;
 }
 
 function arenaView(game: Pick<ILiveGame, "arena" | "status">, players: ILiveGamePlayer[]): LiveArenaView | null {
   const a = game.arena;
   if (game.status !== "arena" || !a) return null;
   const now = Date.now();
+  const rows = pvpStandings(
+    players
+      .filter((p) => p.arena && typeof p.arena.lives === "number")
+      .map((p) => ({
+        id: p._id.toString(),
+        name: p.name,
+        skin: p.arena!.skin,
+        kills: p.arena!.kills,
+        lives: p.arena!.lives,
+        maxLives: p.arena!.maxLives,
+        out: p.arena!.out,
+        outAt: p.arena!.outAt ?? 0,
+        killedBy: p.arena!.killedBy ?? null,
+        points: p.arena!.points,
+        place: p.arena!.place,
+      }))
+  ).map(({ outAt: _o, ...r }) => r);
   return {
     startsInMs: Math.max(0, new Date(a.startedAt).getTime() - now),
     remainingMs: Math.max(0, new Date(a.endsAt).getTime() - now),
     ended: Boolean(a.endedAt),
-    rows: players
-      .filter((p) => p.arena)
-      .map((p) => ({ id: p._id.toString(), name: p.name, kills: p.arena!.kills, waves: p.arena!.waves, finished: p.arena!.finished, dead: p.arena!.dead, points: p.arena!.points }))
-      .sort((x, y) => Number(y.finished) - Number(x.finished) || y.waves - x.waves || y.kills - x.kills),
-    peers: arenaPeers(players),
-    groupKills: players.reduce((n, p) => n + (p.arena?.kills ?? 0), 0),
+    rows,
+    alive: rows.filter((r) => !r.out).length,
   };
 }
 
@@ -848,14 +844,17 @@ export interface LivePlayerState {
     startsInMs: number;
     remainingMs: number;
     ended: boolean;
-    ammo: number;
-    armor: number;
+    alive: number;
+    total: number;
+    lives: number;
+    maxLives: number;
+    weapon: string;
+    skin: string;
     kills: number;
-    waves: number;
-    finished: boolean;
-    dead: boolean;
-    final: boolean;
+    out: boolean;
+    killedBy: string | null;
     points: number;
+    place: number;
   } | null;
 }
 
@@ -962,14 +961,17 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             startsInMs: v.startsInMs,
             remainingMs: v.remainingMs,
             ended: v.ended,
-            ammo: a?.ammo ?? arenaLoadout(0).ammo,
-            armor: a?.armor ?? 0,
+            alive: v.alive,
+            total: v.rows.length,
+            lives: a?.lives ?? 0,
+            maxLives: a?.maxLives ?? 3,
+            weapon: a?.weapon ?? "Lazer-1",
+            skin: a?.skin ?? "bolt",
             kills: a?.kills ?? 0,
-            waves: a?.waves ?? 0,
-            finished: a?.finished ?? false,
-            dead: a?.dead ?? false,
-            final: a?.final ?? false,
+            out: a?.out ?? true,
+            killedBy: a?.killedBy ?? null,
             points: a?.points ?? 0,
+            place: a?.place ?? 0,
           };
         })(),
       },
@@ -1004,81 +1006,33 @@ export async function submitMinigameAction(gameId: string, round: number, value:
 }
 
 /**
- * Arena natijasi (o'yin davomida har necha soniyada va oxirida). Eng yaxshi natija saqlanadi,
- * qiymatlar chegaralanadi: o'ldirishlar o'q sonidan (va dronlar sonidan) oshmaydi, "tugatdi" — faqat 3 to'lqinda.
+ * "Kiber jang" qadami: o'quvchi ~5 marta/soniyada joylashuvi, otgan o'qlari va tekkizganlarini yuboradi.
+ * Javobda — butun maydon (boshqalar, o'qlar, sovg'alar, kim kimni yiqitdi) va o'z holati (jon, kuchlar).
  */
-export interface ArenaPeer {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  a: number;
-  hp: number;
-  dead: boolean;
-  finished: boolean;
-  kills: number;
-  isMe: boolean;
-}
-
-function arenaPeers(players: ILiveGamePlayer[] | { _id: unknown; name: string; arena?: ILiveGamePlayer["arena"] }[], meId?: string): ArenaPeer[] {
-  return players
-    .filter((p) => p.arena)
-    .map((p) => ({
-      id: String(p._id),
-      name: p.name,
-      x: p.arena!.x ?? 800,
-      y: p.arena!.y ?? 780,
-      a: p.arena!.a ?? 0,
-      hp: p.arena!.hp ?? 100,
-      dead: p.arena!.dead,
-      finished: p.arena!.finished,
-      kills: p.arena!.kills,
-      isMe: String(p._id) === meId,
-    }));
-}
-
-export async function reportArenaAction(
-  gameId: string,
-  progress: { kills: number; waves: number; finished: boolean; dead: boolean; x?: number; y?: number; a?: number; hp?: number },
-  final: boolean
-): Promise<Result<{ ok: boolean; peers: ArenaPeer[]; groupKills: number }>> {
+export async function pvpTickAction(gameId: string, input: PvpTickInput): Promise<Result<PvpTickResult>> {
   try {
     const user = await requireStudent();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await loadGameForStudent(gameId, user.groupId);
-    const a = game?.arena;
-    if (!game || game.status !== "arena" || !a || a.endedAt) return fail("Arena tugagan");
-    const now = Date.now();
-    if (now < new Date(a.startedAt).getTime() - 1000 || now > new Date(a.endsAt).getTime() + 5000) return fail("Vaqt tugadi");
-    const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId }).select("arena").lean();
-    if (!player?.arena) return fail("Avval o'yinga qo'shiling");
-    const num = (v: unknown, min: number, max: number, def: number) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
-    };
-    const pos = {
-      "arena.x": num(progress?.x, 0, 1600, player.arena.x ?? 800),
-      "arena.y": num(progress?.y, 0, 900, player.arena.y ?? 780),
-      "arena.a": num(progress?.a, -10, 10, 0),
-      "arena.hp": num(progress?.hp, 0, 100, player.arena.hp ?? 100),
-    };
-    const peersNow = async () => {
-      const all = await LiveGamePlayer.find({ gameId: game._id, arena: { $ne: null } }).select("name arena").lean();
-      return { peers: arenaPeers(all, player._id.toString()), groupKills: all.reduce((n, p) => n + (p.arena?.kills ?? 0), 0) };
-    };
-    if (player.arena.final) return { success: true, data: { ok: true, ...(await peersNow()) } };
-    // Arenadagi qutilardan ham o'q chiqadi — shuning uchun chegara yuklamadan biroz kengroq
-    const maxKills = Math.min(ARENA_TOTAL_DRONES, player.arena.ammo + 40);
-    const kills = Math.max(player.arena.kills, Math.min(maxKills, Math.max(0, Math.floor(Number(progress?.kills) || 0))));
-    const waves = Math.max(player.arena.waves, Math.min(WAVES.length, Math.max(0, Math.floor(Number(progress?.waves) || 0))));
-    const finished = player.arena.finished || (Boolean(progress?.finished) && waves === WAVES.length);
-    const dead = player.arena.dead || Boolean(progress?.dead);
-    await LiveGamePlayer.updateOne(
-      { _id: player._id },
-      { $set: { "arena.kills": kills, "arena.waves": waves, "arena.finished": finished, "arena.dead": dead, "arena.final": Boolean(final), ...pos } }
-    );
-    return { success: true, data: { ok: true, ...(await peersNow()) } };
+    const game = await loadPvpGame(gameId);
+    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (game.status !== "arena" || !game.arena) return fail("Arena tugagan");
+    const res = await pvpTick(game, user.userId, input);
+    if (!res) return fail("Avval o'yinga qo'shiling");
+    return { success: true, data: res };
   } catch (err) {
-    return errorOf(err, "Natijani yuborib bo'lmadi");
+    return errorOf(err, "Arenaga ulanib bo'lmadi");
+  }
+}
+
+/** Proyektor: butun maydon jonli (tez so'rovlar bilan) */
+export async function watchArenaAction(gameId: string): Promise<Result<PvpWorld | null>> {
+  try {
+    await requireMentor();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: await watchPvp(gameId) };
+  } catch (err) {
+    return errorOf(err, "Arenani olib bo'lmadi");
   }
 }

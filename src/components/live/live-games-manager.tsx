@@ -268,9 +268,9 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={arena} onChange={(e) => setArena(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
             <span>
-              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Oxirida &quot;Kiber arena&quot; (otishma)</span>
+              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Oxirida &quot;Kiber jang&quot; (hamma hammaga qarshi otishma)</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
-                90 soniyalik mini-o&apos;yin: to&apos;g&apos;ri javoblar — o&apos;q va zirh, dronlarni yo&apos;q qilganlarga bonus ochko (1300 gacha)
+                2 daqiqalik jang: har kimda 3 jon, 3 o&apos;q yegan chiqadi. 3+ to&apos;g&apos;ri javob — qo&apos;shimcha jon va tezroq qurol. Yiqitganlar va oxirgi qolganga bonus ochko
               </span>
             </span>
           </label>

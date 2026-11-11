@@ -39,22 +39,49 @@ export interface ILiveGamePlayerData {
   /** Qisqa o'yinlar natijasi: round — savol raqami, value — bosish/nishon soni, points — olingan ochko */
   minigames: { round: number; value: number; points: number }[];
   /** Arena: yuklama va natija (o'yin davomida yangilanadi, eng yaxshisi saqlanadi) */
-  arena?: {
-    ammo: number;
-    armor: number;
-    kills: number;
-    waves: number;
-    finished: boolean;
-    dead: boolean;
-    final: boolean;
-    points: number;
-    /** Arenadagi joylashuvi (boshqalar va proyektor ko'rishi uchun) */
-    x?: number;
-    y?: number;
-    a?: number;
-    hp?: number;
-  } | null;
+  /** "Kiber jang" (hamma hammaga qarshi) holati */
+  arena?: ILiveArenaPlayer | null;
   createdAt?: Date | string;
+}
+
+export interface ILiveArenaShot {
+  id: number;
+  x: number;
+  y: number;
+  a: number;
+  /** Server qabul qilgan vaqt (ms) */
+  at: number;
+}
+
+export interface ILiveArenaPlayer {
+  lives: number;
+  maxLives: number;
+  kills: number;
+  /** Raqibga tekkan o'qlar */
+  hits: number;
+  hitsTaken: number;
+  out: boolean;
+  outAt?: number | null;
+  killedBy?: string | null;
+  skin: string;
+  weapon: string;
+  /** Qurolning otish oralig'i (soniya) */
+  cooldown: number;
+  x: number;
+  y: number;
+  a: number;
+  /** Kuchlar tugash vaqti (ms) */
+  shieldUntil: number;
+  speedUntil: number;
+  rapidUntil: number;
+  tripleUntil: number;
+  hitUntil: number;
+  /** Oxirgi otilgan o'qlar (boshqalar ko'rishi va tekkanini tekshirish uchun) */
+  shots: ILiveArenaShot[];
+  /** Tekkan deb hisoblangan o'qlar (ikki marta hisoblanmasin) */
+  used: number[];
+  points: number;
+  place: number;
 }
 
 export interface ILiveGamePlayer extends Document, Omit<ILiveGamePlayerData, "_id"> {
@@ -101,18 +128,32 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     arena: {
       type: new Schema(
         {
-          ammo: { type: Number, default: 0 },
-          armor: { type: Number, default: 0 },
+          lives: { type: Number, default: 3 },
+          maxLives: { type: Number, default: 3 },
           kills: { type: Number, default: 0 },
-          waves: { type: Number, default: 0 },
-          finished: { type: Boolean, default: false },
-          dead: { type: Boolean, default: false },
-          final: { type: Boolean, default: false },
-          points: { type: Number, default: 0 },
-          x: { type: Number, default: 800 },
-          y: { type: Number, default: 780 },
+          hits: { type: Number, default: 0 },
+          hitsTaken: { type: Number, default: 0 },
+          out: { type: Boolean, default: false },
+          outAt: { type: Number, default: null },
+          killedBy: { type: String, default: null },
+          skin: { type: String, default: "bolt" },
+          weapon: { type: String, default: "Lazer-1" },
+          cooldown: { type: Number, default: 0.36 },
+          x: { type: Number, default: 0 },
+          y: { type: Number, default: 0 },
           a: { type: Number, default: 0 },
-          hp: { type: Number, default: 100 },
+          shieldUntil: { type: Number, default: 0 },
+          speedUntil: { type: Number, default: 0 },
+          rapidUntil: { type: Number, default: 0 },
+          tripleUntil: { type: Number, default: 0 },
+          hitUntil: { type: Number, default: 0 },
+          shots: {
+            type: [new Schema({ id: Number, x: Number, y: Number, a: Number, at: Number }, { _id: false })],
+            default: [],
+          },
+          used: { type: [Number], default: [] },
+          points: { type: Number, default: 0 },
+          place: { type: Number, default: 0 },
         },
         { _id: false }
       ),

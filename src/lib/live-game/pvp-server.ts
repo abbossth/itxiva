@@ -1,0 +1,445 @@
+// "Kiber jang" server qismi: har o'yinchi ~4-5 marta/soniyada o'z joylashuvi, otgan o'qlari va tekkizganlarini yuboradi.
+// Jonni faqat server ayiradi (atomik shartli yangilash: qalqon, daxlsizlik, tiriklik tekshiriladi).
+// Sovg'alarni birinchi yetib kelgan oladi. Bir zumda ko'p so'rov bo'lgani uchun o'yin va o'yinchilar qisqa keshlanadi.
+
+import mongoose from "mongoose";
+import { LiveGame, type ILiveArena, type ILiveArenaFeed, type ILiveArenaPickup } from "@/lib/db/models/live-game.model";
+import { LiveGamePlayer, type ILiveArenaPlayer } from "@/lib/db/models/live-game-player.model";
+import {
+  BULLET_RANGE,
+  HIT_GRACE_MS,
+  MAP_H,
+  MAP_W,
+  MAX_LIVES,
+  MAX_PICKUPS,
+  PICKUP_EVERY_MS,
+  PICKUP_R,
+  PLAYER_R,
+  POWERS,
+  SKINS,
+  SPAWN_SHIELD_MS,
+  freeSpot,
+  pvpBonus,
+  pvpLoadout,
+  pvpStandings,
+  rollPower,
+  spawnPoint,
+  type PowerKind,
+} from "./pvp";
+
+type Id = mongoose.Types.ObjectId | string;
+
+export interface PvpShotView {
+  id: number;
+  x: number;
+  y: number;
+  a: number;
+  /** Necha ms oldin otilgan */
+  age: number;
+}
+
+export interface PvpPeer {
+  id: string;
+  name: string;
+  skin: string;
+  x: number;
+  y: number;
+  a: number;
+  lives: number;
+  maxLives: number;
+  out: boolean;
+  kills: number;
+  /** Qalqon (yoki boshlanishdagi himoya) bor — o'q tegmaydi */
+  shield: boolean;
+  powers: PowerKind[];
+  shots: PvpShotView[];
+  isMe: boolean;
+}
+
+export interface PvpFeedView {
+  key: string;
+  kind: "kill" | "pickup";
+  a: string;
+  b: string | null;
+  power: PowerKind | null;
+  ago: number;
+}
+
+export interface PvpWorld {
+  startsInMs: number;
+  remainingMs: number;
+  ended: boolean;
+  peers: PvpPeer[];
+  pickups: ILiveArenaPickup[];
+  feed: PvpFeedView[];
+  alive: number;
+  total: number;
+}
+
+export interface PvpMe {
+  id: string;
+  name: string;
+  skin: string;
+  weapon: string;
+  cooldown: number;
+  lives: number;
+  maxLives: number;
+  out: boolean;
+  killedBy: string | null;
+  kills: number;
+  hits: number;
+  x: number;
+  y: number;
+  /** Qolgan ms: qalqon, tezlik, tez otish, uchtalik */
+  powers: Record<Exclude<PowerKind, "heart">, number>;
+  points: number;
+  place: number;
+}
+
+export interface PvpTickInput {
+  x?: number;
+  y?: number;
+  a?: number;
+  shots?: { id: number; x: number; y: number; a: number }[];
+  hits?: { target: string; shot: number }[];
+  claim?: number | null;
+}
+
+export interface PvpTickResult {
+  world: PvpWorld;
+  me: PvpMe;
+  /** Shu so'rovda qabul qilingan tekkizishlar */
+  accepted: number;
+  claimed: PowerKind | null;
+}
+
+// ---- Qisqa kesh (bir vaqtda o'nlab so'rov keladi) ----
+const TTL = process.env.VITEST ? 0 : 150;
+type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; status: string; arena?: ILiveArena | null };
+type CachedPlayer = { _id: mongoose.Types.ObjectId; name: string; studentId: mongoose.Types.ObjectId; arena?: ILiveArenaPlayer | null; createdAt?: Date | string };
+const gameCache = new Map<string, { at: number; v: CachedGame | null }>();
+const playersCache = new Map<string, { at: number; v: CachedPlayer[] }>();
+
+function sweep() {
+  const old = Date.now() - 60_000;
+  for (const [k, v] of gameCache) if (v.at < old) gameCache.delete(k);
+  for (const [k, v] of playersCache) if (v.at < old) playersCache.delete(k);
+}
+
+export function invalidatePvp(gameId: Id) {
+  gameCache.delete(String(gameId));
+  playersCache.delete(String(gameId));
+}
+
+export async function loadPvpGame(gameId: Id): Promise<CachedGame | null> {
+  const k = String(gameId);
+  const c = gameCache.get(k);
+  if (c && Date.now() - c.at < TTL) return c.v;
+  const v = (await LiveGame.findById(gameId).select("groupId status arena").lean()) as CachedGame | null;
+  if (gameCache.size > 200) sweep();
+  gameCache.set(k, { at: Date.now(), v });
+  return v;
+}
+
+async function loadPlayers(gameId: Id): Promise<CachedPlayer[]> {
+  const k = String(gameId);
+  const c = playersCache.get(k);
+  if (c && Date.now() - c.at < TTL) return c.v;
+  const v = (await LiveGamePlayer.find({ gameId, arena: { $ne: null } }).select("name studentId arena createdAt").lean()) as CachedPlayer[];
+  playersCache.set(k, { at: Date.now(), v });
+  return v;
+}
+
+const num = (v: unknown, min: number, max: number, def: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+};
+
+const POWER_FIELDS: Record<Exclude<PowerKind, "heart">, "shieldUntil" | "speedUntil" | "rapidUntil" | "tripleUntil"> = {
+  shield: "shieldUntil",
+  speed: "speedUntil",
+  rapid: "rapidUntil",
+  triple: "tripleUntil",
+};
+
+function activePowers(a: ILiveArenaPlayer, now: number): PowerKind[] {
+  return (Object.keys(POWER_FIELDS) as (keyof typeof POWER_FIELDS)[]).filter((k) => (a[POWER_FIELDS[k]] ?? 0) > now);
+}
+
+// ---- Boshlash va yakunlash ----
+
+/** Arena boshlanadi: har o'yinchiga jon (to'g'ri javoblarga qarab), qurol, qahramon va joy beriladi */
+export async function setupPvp(gameId: Id, startedAt: Date) {
+  const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt").sort({ createdAt: 1 }).lean();
+  const start = startedAt.getTime();
+  if (players.length > 0) {
+    await LiveGamePlayer.bulkWrite(
+      players.map((p, i) => {
+        const load = pvpLoadout(p.answers.filter((a) => a.isCorrect).length);
+        const pos = spawnPoint(i);
+        const arena: ILiveArenaPlayer = {
+          lives: load.lives,
+          maxLives: load.lives,
+          kills: 0,
+          hits: 0,
+          hitsTaken: 0,
+          out: false,
+          outAt: null,
+          killedBy: null,
+          skin: SKINS[i % SKINS.length].id,
+          weapon: load.weapon,
+          cooldown: load.cooldown,
+          x: pos.x,
+          y: pos.y,
+          a: Math.atan2(MAP_H / 2 - pos.y, MAP_W / 2 - pos.x),
+          shieldUntil: start + SPAWN_SHIELD_MS,
+          speedUntil: 0,
+          rapidUntil: 0,
+          tripleUntil: 0,
+          hitUntil: 0,
+          shots: [],
+          used: [],
+          points: 0,
+          place: 0,
+        };
+        return { updateOne: { filter: { _id: p._id }, update: { $set: { arena } } } };
+      })
+    );
+  }
+  // Boshida uchta sovg'a: markazda va yon tomonlarda
+  const pickups: ILiveArenaPickup[] = [
+    { id: 1, kind: "triple", x: 1200, y: 700 },
+    { id: 2, kind: "shield", x: 600, y: 700 },
+    { id: 3, kind: "speed", x: 1800, y: 700 },
+  ];
+  await LiveGame.updateOne({ _id: gameId }, { $set: { "arena.pickups": pickups, "arena.seq": pickups.length, "arena.nextPickupAt": start + PICKUP_EVERY_MS, "arena.feed": [] } });
+  invalidatePvp(gameId);
+}
+
+/** Yakun: o'rinlar va bonus ochkolar (bir marta — chaqiruvchi shartli yangilash bilan kafolatlaydi) */
+export async function finishPvp(gameId: Id): Promise<void> {
+  const players = await LiveGamePlayer.find({ gameId, arena: { $ne: null } }).select("arena").lean();
+  const rows = players.map((p) => ({ id: p._id, lives: p.arena!.lives, out: p.arena!.out, outAt: p.arena!.outAt ?? 0, kills: p.arena!.kills }));
+  const alive = rows.filter((r) => !r.out).length;
+  const ordered = pvpStandings(rows);
+  await Promise.all(
+    ordered.map((r, i) => {
+      const pts = pvpBonus(r.kills, !r.out, alive === 1 && !r.out && rows.length >= 2);
+      return LiveGamePlayer.updateOne({ _id: r.id }, { $inc: { score: pts }, $set: { "arena.points": pts, "arena.place": i + 1 } });
+    })
+  );
+  invalidatePvp(gameId);
+}
+
+// ---- Ko'rinish ----
+
+export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string | null, now = Date.now()): PvpWorld {
+  const a = game.arena!;
+  const start = new Date(a.startedAt).getTime();
+  const peers: PvpPeer[] = players
+    .filter((p) => p.arena)
+    .map((p) => {
+      const s = p.arena!;
+      const isMe = String(p._id) === meId;
+      return {
+        id: String(p._id),
+        name: p.name,
+        skin: s.skin,
+        x: s.x,
+        y: s.y,
+        a: s.a,
+        lives: s.lives,
+        maxLives: s.maxLives,
+        out: s.out,
+        kills: s.kills,
+        shield: s.shieldUntil > now,
+        powers: activePowers(s, now),
+        shots: isMe ? [] : (s.shots ?? []).filter((x) => now - x.at < 900).map((x) => ({ id: x.id, x: x.x, y: x.y, a: x.a, age: Math.max(0, now - x.at) })),
+        isMe,
+      };
+    });
+  return {
+    startsInMs: Math.max(0, start - now),
+    remainingMs: Math.max(0, new Date(a.endsAt).getTime() - now),
+    ended: Boolean(a.endedAt),
+    peers,
+    pickups: a.pickups ?? [],
+    feed: (a.feed ?? [])
+      .slice(-8)
+      .reverse()
+      .map((f: ILiveArenaFeed) => ({ key: `${f.at}:${f.kind}:${f.a}:${f.b ?? f.power}`, kind: f.kind, a: f.a, b: f.b ?? null, power: (f.power as PowerKind) ?? null, ago: now - f.at })),
+    alive: peers.filter((p) => !p.out).length,
+    total: peers.length,
+  };
+}
+
+export function pvpMeOf(p: CachedPlayer, now = Date.now()): PvpMe {
+  const s = p.arena!;
+  const left = (until: number) => Math.max(0, (until ?? 0) - now);
+  return {
+    id: String(p._id),
+    name: p.name,
+    skin: s.skin,
+    weapon: s.weapon,
+    cooldown: s.cooldown,
+    lives: s.lives,
+    maxLives: s.maxLives,
+    out: s.out,
+    killedBy: s.killedBy ?? null,
+    kills: s.kills,
+    hits: s.hits,
+    x: s.x,
+    y: s.y,
+    powers: { shield: left(s.shieldUntil), speed: left(s.speedUntil), rapid: left(s.rapidUntil), triple: left(s.tripleUntil) },
+    points: s.points,
+    place: s.place,
+  };
+}
+
+/** Proyektor uchun butun maydon */
+export async function watchPvp(gameId: Id): Promise<PvpWorld | null> {
+  const game = await loadPvpGame(gameId);
+  if (!game?.arena || game.status !== "arena") return null;
+  return pvpWorld(game, await loadPlayers(gameId), null);
+}
+
+// ---- Bir qadam ----
+
+export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInput): Promise<PvpTickResult | null> {
+  const a = game.arena!;
+  const now = Date.now();
+  const start = new Date(a.startedAt).getTime();
+  const end = new Date(a.endsAt).getTime();
+  const playing = !a.endedAt && now >= start - 300 && now <= end + 2000;
+
+  const x = num(input?.x, PLAYER_R, MAP_W - PLAYER_R, MAP_W / 2);
+  const y = num(input?.y, PLAYER_R, MAP_H - PLAYER_R, MAP_H / 2);
+  const ang = num(input?.a, -7, 7, 0);
+  const incoming = (Array.isArray(input?.shots) ? input.shots : [])
+    .slice(0, 10)
+    .filter((s) => Number.isInteger(s?.id))
+    .map((s) => ({ id: s.id, x: num(s.x, 0, MAP_W, x), y: num(s.y, 0, MAP_H, y), a: num(s.a, -7, 7, 0), at: now }));
+
+  let before: CachedPlayer | null = null;
+  if (playing && now >= start) {
+    before = (await LiveGamePlayer.findOneAndUpdate(
+      { gameId: game._id, studentId, arena: { $ne: null }, "arena.out": false },
+      {
+        $set: { "arena.x": Math.round(x), "arena.y": Math.round(y), "arena.a": Number(ang.toFixed(2)) },
+        ...(incoming.length > 0 ? { $push: { "arena.shots": { $each: incoming, $slice: -24 } } } : {}),
+      },
+      { returnDocument: "before", projection: { name: 1, studentId: 1, arena: 1 } }
+    ).lean()) as CachedPlayer | null;
+  }
+  const meDoc = before ?? ((await LiveGamePlayer.findOne({ gameId: game._id, studentId }).select("name studentId arena").lean()) as CachedPlayer | null);
+  if (!meDoc?.arena) return null;
+  const meId = String(meDoc._id);
+
+  let accepted = 0;
+  let kills = 0;
+  let claimed: PowerKind | null = null;
+  let changed = false;
+  const feed: ILiveArenaFeed[] = [];
+
+  if (before) {
+    changed = true;
+    const players = await loadPlayers(game._id);
+    // ---- Tekkizishlar ----
+    const hits = (Array.isArray(input?.hits) ? input.hits : []).slice(0, 8);
+    if (hits.length > 0) {
+      const recent = new Map<number, { x: number; y: number }>();
+      for (const s of before.arena!.shots ?? []) if (now - s.at < 1500) recent.set(s.id, s);
+      for (const s of incoming) recent.set(s.id, s);
+      const used = new Set(before.arena!.used ?? []);
+      const spent: number[] = [];
+      for (const h of hits) {
+        const shot = recent.get(Number(h?.shot));
+        if (!shot || used.has(Number(h.shot)) || typeof h.target !== "string" || h.target === meId) continue;
+        const target = players.find((p) => String(p._id) === h.target);
+        if (!target?.arena || target.arena.out) continue;
+        // Kechikish hisobga olingan holda: o'q chiqqan joydan nishongacha masofa o'q uchadigan masofadan oshmasin
+        if (Math.hypot(target.arena.x - shot.x, target.arena.y - shot.y) > BULLET_RANGE + 260) continue;
+        used.add(Number(h.shot));
+        spent.push(Number(h.shot));
+        const hit = await LiveGamePlayer.findOneAndUpdate(
+          {
+            _id: target._id,
+            gameId: game._id,
+            "arena.out": false,
+            "arena.lives": { $gt: 0 },
+            "arena.shieldUntil": { $lt: now },
+            "arena.hitUntil": { $lt: now },
+          },
+          { $inc: { "arena.lives": -1, "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS } },
+          { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
+        ).lean();
+        if (!hit) continue;
+        accepted++;
+        if ((hit.arena?.lives ?? 1) <= 0) {
+          const out = await LiveGamePlayer.updateOne(
+            { _id: hit._id, "arena.out": false },
+            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": meDoc.name } }
+          );
+          if (out.modifiedCount > 0) {
+            kills++;
+            feed.push({ at: now, kind: "kill", a: meDoc.name, b: hit.name });
+          }
+        }
+      }
+      if (spent.length > 0) {
+        await LiveGamePlayer.updateOne(
+          { _id: meDoc._id },
+          { $push: { "arena.used": { $each: spent, $slice: -80 } }, $inc: { "arena.hits": accepted, "arena.kills": kills } }
+        );
+      }
+    }
+
+    // ---- Sovg'ani olish: birinchi yetib kelgan ----
+    const claimId = Number(input?.claim);
+    if (Number.isInteger(claimId)) {
+      const pick = (a.pickups ?? []).find((p) => p.id === claimId);
+      if (pick && Math.hypot(pick.x - x, pick.y - y) <= PICKUP_R + PLAYER_R + 50) {
+        const pulled = await LiveGame.updateOne({ _id: game._id, "arena.pickups.id": claimId }, { $pull: { "arena.pickups": { id: claimId } } });
+        if (pulled.modifiedCount > 0) {
+          claimed = pick.kind;
+          if (pick.kind === "heart") {
+            await LiveGamePlayer.updateOne(
+              { _id: meDoc._id, "arena.lives": { $lt: MAX_LIVES }, "arena.out": false },
+              { $inc: { "arena.lives": 1 }, $max: { "arena.maxLives": Math.min(MAX_LIVES, before.arena!.lives + 1) } }
+            );
+          } else {
+            await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { [`arena.${POWER_FIELDS[pick.kind]}`]: now + POWERS[pick.kind].ms } });
+          }
+          feed.push({ at: now, kind: "pickup", a: meDoc.name, power: pick.kind });
+        }
+      }
+    }
+
+    // ---- Yangi sovg'a ----
+    const pickups = a.pickups ?? [];
+    if (now >= (a.nextPickupAt ?? 0) && pickups.length < MAX_PICKUPS) {
+      const spot = freeSpot(pickups);
+      if (spot) {
+        await LiveGame.updateOne(
+          { _id: game._id, "arena.nextPickupAt": a.nextPickupAt ?? 0, "arena.endedAt": null },
+          {
+            $set: { "arena.nextPickupAt": now + PICKUP_EVERY_MS },
+            $inc: { "arena.seq": 1 },
+            $push: { "arena.pickups": { id: (a.seq ?? 0) + 1, kind: rollPower(), x: spot.x, y: spot.y } },
+          }
+        );
+      }
+    }
+    if (feed.length > 0) await LiveGame.updateOne({ _id: game._id }, { $push: { "arena.feed": { $each: feed, $slice: -20 } } });
+    if (accepted > 0 || claimed || feed.length > 0) invalidatePvp(game._id);
+  }
+
+  const fresh = changed && (accepted > 0 || claimed)
+    ? ((await LiveGamePlayer.findById(meDoc._id).select("name studentId arena").lean()) as CachedPlayer | null) ?? meDoc
+    : before
+    ? { ...meDoc, arena: { ...meDoc.arena!, x: Math.round(x), y: Math.round(y), a: ang } }
+    : meDoc;
+  const latestGame = accepted > 0 || claimed ? (await loadPvpGame(game._id)) ?? game : game;
+  const players = (await loadPlayers(game._id)).map((p) => (String(p._id) === meId ? fresh : p));
+  return { world: pvpWorld(latestGame, players, meId, now), me: pvpMeOf(fresh, now), accepted, claimed };
+}
