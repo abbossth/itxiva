@@ -1,0 +1,17 @@
+# "Kiber jang" real vaqt xonasi. Deploy: `npx wrangler deploy` (avval `npx wrangler login`).
+# Maxfiy kalit: `npx wrangler secret put ARENA_SECRET` (Vercel'dagi ARENA_SECRET bilan bir xil).
+name = "itxiva-arena"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+RESULT_URL = "https://www.itxiva.uz/api/live/pvp/result"
+
+[[durable_objects.bindings]]
+name = "ARENA_ROOM"
+class_name = "ArenaRoom"
+
+# Bepul tarifda faqat SQLite asosidagi Durable Object'lar
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ArenaRoom"]

@@ -330,6 +330,8 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       }
     >
       <LiveShell className="min-h-[70vh]">
+        {/* Jangda sarlavha yashiriladi — xaritaga ko'proq joy */}
+        {state.status !== "arena" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className={cn("flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br", MODE_COLORS[state.mode])}>
@@ -351,6 +353,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
             </span>
           </div>
         </div>
+        )}
 
         {state.status === "lobby" && (
           <Lobby state={state} busy={busy || introOn} onStart={() => {
@@ -400,33 +403,38 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         )}
         {state.status === "arena" && state.arena && (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1">
-              <ArenaHost key={state.arena.round} gameId={state.id} arena={state.arena} sound={sound} />
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
-              {autoLeft !== null && (
-                <Button variant="ghost" onClick={() => writeAuto(false)} className="gap-1.5 text-slate-300 hover:text-white">
-                  <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
-                </Button>
-              )}
-              <button
-                type="button"
-                onClick={() => act(() => startLiveQuestionAction(state.id))}
-                disabled={busy}
-                className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-amber-400 px-8 text-lg font-black text-slate-900 disabled:opacity-60"
-              >
-                {state.arena.final ? (
-                  <>
-                    <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish
-                  </>
-                ) : (
-                  <>
-                    Keyingi savol <SkipForward className="h-5 w-5" />
-                  </>
-                )}
-                {autoLeft !== null ? ` (${autoLeft})` : ""}
-              </button>
-            </div>
+            <ArenaHost
+              key={state.arena.round}
+              gameId={state.id}
+              arena={state.arena}
+              sound={sound}
+              actions={
+                <>
+                  {autoLeft !== null && (
+                    <Button variant="ghost" onClick={() => writeAuto(false)} className="gap-1.5 text-slate-300 hover:text-white">
+                      <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
+                    </Button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => act(() => startLiveQuestionAction(state.id))}
+                    disabled={busy}
+                    className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl bg-amber-400 px-5 text-base font-black text-slate-900 disabled:opacity-60"
+                  >
+                    {state.arena.final ? (
+                      <>
+                        <Crown className="h-5 w-5" /> G&apos;oliblar
+                      </>
+                    ) : (
+                      <>
+                        Keyingi savol <SkipForward className="h-5 w-5" />
+                      </>
+                    )}
+                    {autoLeft !== null ? ` (${autoLeft})` : ""}
+                  </button>
+                </>
+              }
+            />
           </div>
         )}
         {intro !== null && <ModeIntro mode={state.mode} ms={intro} sound={sound} />}

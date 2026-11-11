@@ -8,6 +8,8 @@ import { BULLET_RANGE, BULLET_SPEED, MAP_H, MAP_W, PLAYER_R, POWERS, inBush, ski
 import { playBoom } from "@/lib/sound";
 import { useCountdown } from "../live-ui";
 import { PvpGame, pvpFetch } from "./pvp-game";
+import { Smoother } from "./interp";
+import { decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
 import {
   burst,
   colorFor,
@@ -30,7 +32,18 @@ import { cn, formatNumberUz } from "@/lib/utils";
 
 const WATCH_MS = 250;
 
-export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; arena: LiveArenaView; sound?: boolean }) {
+export function ArenaHost({
+  gameId,
+  arena,
+  sound = true,
+  actions,
+}: {
+  gameId: string;
+  arena: LiveArenaView;
+  sound?: boolean;
+  /** Boshqaruv tugmalari (sarlavha qatorida — xaritaga ko'proq joy qoladi) */
+  actions?: React.ReactNode;
+}) {
   const starts = useCountdown(arena.startsInMs, arena.startsInMs > 0);
   const left = useCountdown(arena.remainingMs, !arena.ended && arena.startsInMs === 0);
   const [world, setWorld] = useState<PvpWorld | null>(null);
@@ -41,31 +54,39 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
     soundRef.current = sound;
   }, [sound]);
 
-  // Tez so'rovlar: butun maydon
+  // Butun maydon: real vaqt xonasidan (tomoshabin), bo'lmasa — tez so'rovlar
+  const wsUrl = arena.ws ?? null;
   useEffect(() => {
     let alive = true;
     let busy = false;
     const seen = new Set<string>();
     let first = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastUi = 0;
+    const onWorld = (w: PvpWorld) => {
+      worldRef.current = w;
+      // Jadval va lenta uchun React holati — soniyasiga ~4 marta yetadi (xarita canvas'da har kadrda)
+      const now = performance.now();
+      if (now - lastUi > 250) {
+        lastUi = now;
+        setWorld(w);
+      }
+      for (const f of [...w.feed].reverse()) {
+        if (seen.has(f.key)) continue;
+        seen.add(f.key);
+        if (!first && f.kind === "kill" && f.ago < 3000) {
+          setShout(f);
+          if (soundRef.current) playBoom();
+        }
+      }
+      first = false;
+    };
     const poll = async () => {
       if (!busy) {
         busy = true;
         try {
           const r = await pvpFetch<PvpWorld | null>(`/api/live/pvp?gameId=${gameId}`);
-          if (alive && r.success && r.data) {
-            worldRef.current = r.data;
-            setWorld(r.data);
-            for (const f of [...r.data.feed].reverse()) {
-              if (seen.has(f.key)) continue;
-              seen.add(f.key);
-              if (!first && f.kind === "kill" && f.ago < 3000) {
-                setShout(f);
-                if (soundRef.current) playBoom();
-              }
-            }
-            first = false;
-          }
+          if (alive && r.success && r.data) onWorld(r.data);
         } catch {
           // keyingi so'rovda
         } finally {
@@ -74,12 +95,33 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
       }
       if (alive) timer = setTimeout(poll, WATCH_MS);
     };
-    void poll();
+    let sock: WebSocket | null = null;
+    if (wsUrl) {
+      const room = newClientState();
+      let opened = false;
+      sock = new WebSocket(wsUrl);
+      const fallback = setTimeout(() => {
+        if (!opened) sock?.close();
+      }, 4000);
+      sock.onopen = () => {
+        opened = true;
+        clearTimeout(fallback);
+      };
+      sock.onmessage = (ev) => {
+        const d = decodeRoomMessage(String(ev.data), room, null, null);
+        if (d && alive) onWorld(d.world);
+      };
+      sock.onclose = () => {
+        clearTimeout(fallback);
+        if (alive) void poll();
+      };
+    } else void poll();
     return () => {
       alive = false;
+      sock?.close();
       if (timer) clearTimeout(timer);
     };
-  }, [gameId]);
+  }, [gameId, wsUrl]);
 
   useEffect(() => {
     if (!shout) return;
@@ -98,35 +140,37 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
   const alive = world?.alive ?? arena.alive;
 
   return (
-    <div className="flex h-full flex-col gap-3 py-1">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="quiz-pulse flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-rose-600 sm:h-14 sm:w-14">
-            <Swords className="h-7 w-7" />
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      {/* Ixcham sarlavha: xaritaga iloji boricha ko'p joy */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="quiz-pulse flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 to-rose-600">
+            <Swords className="h-5 w-5" />
           </span>
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Final · hamma hammaga qarshi</p>
-            <p className="text-3xl font-black sm:text-5xl">Kiber jang</p>
-          </div>
+          <p className="text-2xl font-black sm:text-3xl">Kiber jang</p>
+          <span className="rounded-full bg-fuchsia-500/20 px-3 py-1 text-xs font-black uppercase tracking-widest text-fuchsia-200">
+            {arena.final ? "Final" : "Raund"}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2 text-xl font-black sm:text-2xl">
-            <Users className="h-6 w-6 text-emerald-300" /> {alive}/{rows.length} tirik
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-lg font-black">
+            <Users className="h-5 w-5 text-emerald-300" /> {alive}/{rows.length}
           </span>
           {starts > 0 ? (
-            <span key={Math.ceil(starts / 1000)} className="quiz-count font-mono text-6xl font-black">
+            <span key={Math.ceil(starts / 1000)} className="quiz-count min-w-[3ch] text-center font-mono text-4xl font-black">
               {Math.ceil(starts / 1000)}
             </span>
           ) : arena.ended ? (
-            <span className="live-pop rounded-full bg-emerald-500 px-4 py-2 text-lg font-black">Tugadi!</span>
+            <span className="live-pop rounded-full bg-emerald-500 px-4 py-1.5 text-base font-black">Tugadi!</span>
           ) : (
-            <span className={cn("font-mono text-5xl font-black tabular-nums sm:text-7xl", left <= 10_000 && "text-rose-400 quiz-shake")}>{Math.ceil(left / 1000)}</span>
+            <span className={cn("min-w-[3ch] text-center font-mono text-4xl font-black tabular-nums", left <= 10_000 && "text-rose-400 quiz-shake")}>{Math.ceil(left / 1000)}</span>
           )}
+          {actions}
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-        <div className="relative min-h-[260px] flex-1 overflow-hidden rounded-2xl ring-1 ring-fuchsia-400/30">
-          <ArenaSpectator worldRef={worldRef} />
+      <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
+        <div className="relative min-h-[300px] flex-1 overflow-hidden rounded-2xl ring-1 ring-fuchsia-400/30">
+          <ArenaSpectator worldRef={worldRef} realtime={Boolean(wsUrl)} />
           {shout && (
             <div key={shout.key} className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
               <span className="live-banner rounded-2xl bg-amber-500 px-6 py-3 text-3xl font-black text-white shadow-2xl sm:text-4xl">
@@ -147,7 +191,7 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
             </div>
           )}
         </div>
-        <div className="flex min-h-0 flex-col gap-3 lg:w-[380px]">
+        <div className="flex min-h-0 flex-col gap-2 lg:w-[300px]">
           <ol className="live-noscroll grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto">
             {liveRows.map((r, i) => (
               <li
@@ -196,7 +240,7 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
 }
 
 /** Butun maydon: hamma o'yinchilar, o'qlar va sovg'alar (so'rovlar orasida silliq harakat) */
-function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | null> }) {
+function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpWorld | null>; realtime: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -204,6 +248,9 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const layers = makeMapLayers();
+    const cam = { s: 0, x: 0, y: 0 };
+    // Real vaqtda (tez kadrlar) kam kechikish, so'rovlarda — ko'proq bufer
+    const smooth = new Smoother(realtime ? 140 : 350);
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
     const shots: Shot[] = [];
     const seenShots = new Map<string, number>();
@@ -219,6 +266,8 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
       const world = worldRef.current;
       if (world && world !== lastWorld) {
         lastWorld = world;
+        for (const p of world.peers) smooth.push(p.id, now, p.x, p.y, p.a);
+        smooth.keep(new Set(world.peers.map((p) => p.id)));
         spawnForeignShots(shots, seenShots, world.peers, now, BULLET_SPEED, BULLET_RANGE);
         for (const p of world.peers) {
           if (p.out && !outSeen.has(p.id)) {
@@ -234,9 +283,39 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
         canvas.width = Math.round(r.width * dpr);
         canvas.height = Math.round(r.height * dpr);
       }
-      const scale = Math.min(r.width / MAP_W, r.height / MAP_H);
-      const ox = (r.width - MAP_W * scale) / 2;
-      const oy = (r.height - MAP_H * scale) / 2;
+      // Kamera: tiriklar to'plangan joyga yaqinlashadi (1,8× gacha), tarqalsa — butun xarita
+      const fit = Math.min(r.width / MAP_W, r.height / MAP_H);
+      const live = (world?.peers ?? []).filter((p) => !p.out).map((p) => shown.get(p.id) ?? p);
+      let tw = MAP_W;
+      let th = MAP_H;
+      let tcx = MAP_W / 2;
+      let tcy = MAP_H / 2;
+      if (live.length > 0) {
+        const xs = live.map((p) => p.x);
+        const ys = live.map((p) => p.y);
+        const pad = 260;
+        const x0 = Math.max(0, Math.min(...xs) - pad);
+        const x1 = Math.min(MAP_W, Math.max(...xs) + pad);
+        const y0 = Math.max(0, Math.min(...ys) - pad);
+        const y1 = Math.min(MAP_H, Math.max(...ys) + pad);
+        tw = x1 - x0;
+        th = y1 - y0;
+        tcx = (x0 + x1) / 2;
+        tcy = (y0 + y1) / 2;
+      }
+      const targetScale = Math.max(fit, Math.min(fit * 1.8, Math.min(r.width / tw, r.height / th)));
+      cam.s = cam.s === 0 ? targetScale : cam.s + (targetScale - cam.s) * Math.min(1, dt * 1.5);
+      const scale = cam.s;
+      const halfW = r.width / 2 / scale;
+      const halfH = r.height / 2 / scale;
+      // Markaz xarita chegarasidan chiqib ketmasin (xarita ekrandan kichik bo'lsa — o'rtada)
+      const clampC = (c: number, half: number, size: number) => (half * 2 >= size ? size / 2 : Math.max(half, Math.min(size - half, c)));
+      const ccx = clampC(tcx, halfW, MAP_W);
+      const ccy = clampC(tcy, halfH, MAP_H);
+      cam.x = cam.x === 0 ? ccx : cam.x + (ccx - cam.x) * Math.min(1, dt * 1.5);
+      cam.y = cam.y === 0 ? ccy : cam.y + (ccy - cam.y) * Math.min(1, dt * 1.5);
+      const ox = r.width / 2 - cam.x * scale;
+      const oy = r.height / 2 - cam.y * scale;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.fillStyle = "#070b18";
       ctx.fillRect(0, 0, r.width, r.height);
@@ -245,21 +324,11 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
       const big = Math.min(2.2, Math.max(1, 0.55 / scale));
       drawFloor(ctx, t, layers);
       for (const p of world?.pickups ?? []) drawPickup(ctx, p, t);
-      const k = Math.min(1, dt * 9);
       const peers = world?.peers ?? [];
       for (const p of peers) {
         const s = shown.get(p.id) ?? { x: p.x, y: p.y, a: p.a, moving: false };
-        const dx = p.x - s.x;
-        const dy = p.y - s.y;
-        s.moving = Math.hypot(dx, dy) > 4;
-        if (Math.hypot(dx, dy) > 400) {
-          s.x = p.x;
-          s.y = p.y;
-        } else {
-          s.x += dx * k;
-          s.y += dy * k;
-        }
-        s.a += Math.atan2(Math.sin(p.a - s.a), Math.cos(p.a - s.a)) * k;
+        const v = smooth.sample(p.id, now);
+        if (v) Object.assign(s, v);
         shown.set(p.id, s);
         drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y), size: big }, t);
       }
@@ -280,7 +349,7 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [worldRef]);
+  }, [worldRef, realtime]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />;
 }
@@ -294,7 +363,8 @@ export function ArenaPlayer({ gameId, arena, myName }: { gameId: string; arena: 
         <PvpGame
           gameId={gameId}
           myName={myName}
-          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon }}
+          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon, cooldown: arena.cooldown, playerId: arena.playerId }}
+          ws={arena.ws}
           startsInMs={arena.startsInMs}
           remainingMs={arena.remainingMs}
         />

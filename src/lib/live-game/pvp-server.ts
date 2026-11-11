@@ -5,6 +5,9 @@
 import mongoose from "mongoose";
 import { LiveGame, type ILiveArena, type ILiveArenaFeed, type ILiveArenaPickup } from "@/lib/db/models/live-game.model";
 import { LiveGamePlayer, type ILiveArenaPlayer } from "@/lib/db/models/live-game-player.model";
+import type { PvpFeedView, PvpMe, PvpPeer, PvpTickInput, PvpTickResult, PvpWorld } from "./pvp-types";
+import { hmacVerify, signTicket, type ArenaTicket } from "./arena-token";
+import type { RoomResults } from "./pvp-room";
 import {
   BULLET_RANGE,
   HIT_GRACE_MS,
@@ -29,89 +32,7 @@ import {
 
 type Id = mongoose.Types.ObjectId | string;
 
-export interface PvpShotView {
-  id: number;
-  x: number;
-  y: number;
-  a: number;
-  /** Necha ms oldin otilgan */
-  age: number;
-}
-
-export interface PvpPeer {
-  id: string;
-  name: string;
-  skin: string;
-  x: number;
-  y: number;
-  a: number;
-  lives: number;
-  maxLives: number;
-  out: boolean;
-  kills: number;
-  /** Qalqon (yoki boshlanishdagi himoya) bor — o'q tegmaydi */
-  shield: boolean;
-  powers: PowerKind[];
-  shots: PvpShotView[];
-  isMe: boolean;
-}
-
-export interface PvpFeedView {
-  key: string;
-  kind: "kill" | "pickup";
-  a: string;
-  b: string | null;
-  power: PowerKind | null;
-  ago: number;
-}
-
-export interface PvpWorld {
-  startsInMs: number;
-  remainingMs: number;
-  ended: boolean;
-  peers: PvpPeer[];
-  pickups: ILiveArenaPickup[];
-  feed: PvpFeedView[];
-  alive: number;
-  total: number;
-}
-
-export interface PvpMe {
-  id: string;
-  name: string;
-  skin: string;
-  weapon: string;
-  cooldown: number;
-  lives: number;
-  maxLives: number;
-  out: boolean;
-  killedBy: string | null;
-  kills: number;
-  hits: number;
-  x: number;
-  y: number;
-  /** Qolgan ms: qalqon, tezlik, tez otish, uchtalik */
-  powers: Record<Exclude<PowerKind, "heart">, number>;
-  points: number;
-  place: number;
-}
-
-export interface PvpTickInput {
-  x?: number;
-  y?: number;
-  a?: number;
-  shots?: { id: number; x: number; y: number; a: number }[];
-  hits?: { target: string; shot: number }[];
-  claim?: number | null;
-}
-
-export interface PvpTickResult {
-  world: PvpWorld;
-  me: PvpMe;
-  /** Shu so'rovda qabul qilingan tekkizishlar */
-  accepted: number;
-  claimed: PowerKind | null;
-}
+export type { PvpFeedView, PvpMe, PvpPeer, PvpShotView, PvpTickInput, PvpTickResult, PvpWorld } from "./pvp-types";
 
 // ---- Qisqa kesh (bir vaqtda o'nlab so'rov keladi) ----
 const TTL = process.env.VITEST ? 0 : 150;
@@ -443,4 +364,101 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
   const latestGame = accepted > 0 || claimed ? (await loadPvpGame(game._id)) ?? game : game;
   const players = (await loadPlayers(game._id)).map((p) => (String(p._id) === meId ? fresh : p));
   return { world: pvpWorld(latestGame, players, meId, now), me: pvpMeOf(fresh, now), accepted, claimed };
+}
+
+// ---- Real vaqt xonasi (Cloudflare) bilan bog'lanish ----
+
+/** Real vaqt xonasi sozlanganmi (Vercel muhit o'zgaruvchilari) */
+export function arenaRealtimeEnabled(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_ARENA_WS_URL && process.env.ARENA_SECRET);
+}
+
+/**
+ * Xonaga ulanish manzili (imzolangan bilet bilan). Sozlanmagan yoki jang tugagan bo'lsa — null (o'yin HTTP yo'lida ishlaydi).
+ * `player` berilmasa — proyektor uchun tomoshabin bileti.
+ */
+export async function arenaSocketUrl(
+  game: { _id: unknown; arena?: ILiveArena | null },
+  player: { _id: unknown; name: string; arena?: ILiveArenaPlayer | null } | null
+): Promise<string | null> {
+  const base = process.env.NEXT_PUBLIC_ARENA_WS_URL;
+  const secret = process.env.ARENA_SECRET;
+  const a = game.arena;
+  if (!base || !secret || !a || a.endedAt || typeof a.round !== "number" || a.round < 0) return null;
+  const st = new Date(a.startedAt).getTime();
+  const en = new Date(a.endsAt).getTime();
+  const pa = player?.arena;
+  if (player && !pa) return null;
+  const ticket: ArenaTicket = pa
+    ? {
+        g: String(game._id),
+        r: a.round,
+        role: "player",
+        p: String(player!._id),
+        n: player!.name,
+        skin: pa.skin,
+        lives: pa.lives,
+        maxLives: pa.maxLives,
+        weapon: pa.weapon,
+        cooldown: pa.cooldown,
+        x: pa.x,
+        y: pa.y,
+        shieldUntil: pa.shieldUntil,
+        st,
+        en,
+        exp: en + 60_000,
+      }
+    : { g: String(game._id), r: a.round, role: "watch", p: "watch", n: "", skin: "", lives: 0, maxLives: 0, weapon: "", cooldown: 0, x: 0, y: 0, shieldUntil: 0, st, en, exp: en + 60_000 };
+  return `${base.replace(/\/$/, "")}/room/${String(game._id)}/${a.round}?t=${encodeURIComponent(await signTicket(secret, ticket))}`;
+}
+
+/** Xonadan kelgan natija (imzo bilan): jonlar, yiqitishlar va lenta Mongo'ga yoziladi — bonusni `finishPvp` hisoblaydi */
+export async function applyRoomResults(raw: string, sig: string | null): Promise<{ status: number; error?: string }> {
+  const secret = process.env.ARENA_SECRET;
+  if (!secret || !sig || !(await hmacVerify(secret, raw, sig))) return { status: 401, error: "Imzo noto'g'ri" };
+  let body: RoomResults;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return { status: 400, error: "Noto'g'ri ma'lumot" };
+  }
+  if (!mongoose.isValidObjectId(body?.g) || !Number.isInteger(body?.r)) return { status: 400, error: "Noto'g'ri ma'lumot" };
+  const game = await LiveGame.findById(body.g).select("status arena").lean();
+  const a = game?.arena;
+  if (!game || game.status !== "arena" || !a || a.endedAt || a.round !== body.r) return { status: 409, error: "Jang tugagan" };
+  const n = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || 0)));
+  const players = (Array.isArray(body.players) ? body.players : []).filter((p) => mongoose.isValidObjectId(p?.id)).slice(0, 80);
+  if (players.length > 0) {
+    await LiveGamePlayer.bulkWrite(
+      players.map((p) => ({
+        updateOne: {
+          filter: { _id: new mongoose.Types.ObjectId(p.id), gameId: game._id, arena: { $ne: null } },
+          update: {
+            $set: {
+              "arena.lives": n(p.lives, 0, MAX_LIVES),
+              "arena.maxLives": n(p.maxLives, 0, MAX_LIVES),
+              "arena.kills": n(p.kills, 0, 200),
+              "arena.hits": n(p.hits, 0, 2000),
+              "arena.hitsTaken": n(p.hitsTaken, 0, 2000),
+              "arena.out": Boolean(p.out),
+              "arena.outAt": p.outAt ? n(p.outAt, 0, Number.MAX_SAFE_INTEGER) : null,
+              "arena.killedBy": typeof p.killedBy === "string" ? p.killedBy.slice(0, 80) : null,
+              "arena.x": n(p.x, 0, MAP_W),
+              "arena.y": n(p.y, 0, MAP_H),
+            },
+          },
+        },
+      }))
+    );
+  }
+  const feed = (Array.isArray(body.feed) ? body.feed : []).slice(-20).map((f) => ({
+    at: n(f.at, 0, Number.MAX_SAFE_INTEGER),
+    kind: f.kind === "kill" ? "kill" : "pickup",
+    a: String(f.a ?? "").slice(0, 80),
+    b: f.b ? String(f.b).slice(0, 80) : null,
+    power: f.power ? String(f.power).slice(0, 12) : null,
+  }));
+  await LiveGame.updateOne({ _id: game._id, "arena.endedAt": null }, { $set: { "arena.feed": feed } });
+  invalidatePvp(game._id);
+  return { status: 200 };
 }

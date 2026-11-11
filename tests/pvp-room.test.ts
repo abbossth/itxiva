@@ -1,0 +1,113 @@
+import { describe, expect, it } from "vitest";
+import { PvpRoom, decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
+import { signTicket, verifyTicket, hmacSign, hmacVerify, type ArenaTicket } from "@/lib/live-game/arena-token";
+import { HIT_GRACE_MS, PICKUP_EVERY_MS } from "@/lib/live-game/pvp";
+
+const START = 1_000_000;
+const join = (room: PvpRoom, p: string, x: number, y: number, lives = 3) =>
+  room.join({ p, n: p.toUpperCase(), skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives, maxLives: lives, x, y, shieldUntil: START + 3000 });
+
+describe("real vaqt xonasi", () => {
+  it("o'q tekkanini tekshiradi: himoya, takror o'q, daxlsizlik, masofa; 3 o'qda chiqadi", () => {
+    const room = new PvpRoom("g", 2, START, START + 45_000, () => 0.5);
+    join(room, "ali", 200, 150);
+    join(room, "vali", 600, 150);
+    const hit = (now: number, id: number, x = 230) => room.input("ali", { x: 200, y: 150, shots: [{ id, x, y: 150, a: 0 }], hits: [{ target: "vali", shot: id }] }, now);
+    // Boshlanishdagi himoya
+    hit(START + 1000, 1);
+    expect(room.players.get("vali")!.lives).toBe(3);
+    hit(START + 3500, 2);
+    expect(room.players.get("vali")!.lives).toBe(2);
+    // O'sha o'q qayta hisoblanmaydi, daxlsizlik ichida ham o'tmaydi
+    room.input("ali", { hits: [{ target: "vali", shot: 2 }] }, START + 4100);
+    hit(START + 3500 + HIT_GRACE_MS - 50, 3);
+    expect(room.players.get("vali")!.lives).toBe(2);
+    // Otilmagan o'q va juda uzoqdagi nishon
+    room.input("ali", { hits: [{ target: "vali", shot: 77 }] }, START + 5000);
+    room.input("ali", { x: 2300, y: 1300, shots: [{ id: 4, x: 2300, y: 1300, a: 0 }], hits: [{ target: "vali", shot: 4 }] }, START + 5000);
+    expect(room.players.get("vali")!.lives).toBe(2);
+    hit(START + 6000, 5);
+    expect(room.killsDirty).toBe(false);
+    hit(START + 7000, 6);
+    const v = room.players.get("vali")!;
+    expect(v).toMatchObject({ lives: 0, out: true, killedBy: "ALI" });
+    expect(room.players.get("ali")).toMatchObject({ kills: 1, hits: 3 });
+    expect(room.killsDirty).toBe(true);
+    expect(room.feed.at(-1)).toMatchObject({ kind: "kill", a: "ALI", b: "VALI" });
+    // Chiqqan o'yinchi harakatlanmaydi
+    room.input("vali", { x: 900, y: 900 }, START + 8000);
+    expect(v.x).toBe(600);
+    expect(room.alive()).toBe(1);
+    const res = room.results();
+    expect(res).toMatchObject({ g: "g", r: 2 });
+    expect(res.players.find((p) => p.id === "vali")).toMatchObject({ out: true, lives: 0, hitsTaken: 3 });
+  });
+
+  it("sovg'ani birinchi yetib kelgan oladi, vaqt o'tib yangisi chiqadi; qayta ulanganda holat saqlanadi", () => {
+    const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.1);
+    join(room, "ali", 1200, 700);
+    join(room, "vali", 1210, 700);
+    room.input("ali", { x: 1200, y: 700, claim: 1 }, START + 100);
+    room.input("vali", { x: 1210, y: 700, claim: 1 }, START + 110);
+    expect(room.players.get("ali")!.claimed).toBe("triple");
+    expect(room.players.get("vali")!.claimed).toBe(null);
+    expect(room.players.get("ali")!.until.triple).toBeGreaterThan(START + 100);
+    // Uzoqdan olib bo'lmaydi
+    room.input("vali", { x: 200, y: 150, claim: 2 }, START + 200);
+    expect(room.pickups.some((k) => k.id === 2)).toBe(true);
+    const n = room.pickups.length;
+    room.step(START + PICKUP_EVERY_MS);
+    expect(room.pickups.length).toBe(n + 1);
+    // Qayta ulanish
+    const again = join(room, "ali", 0, 0);
+    expect(again.x).toBe(1200);
+    expect(room.players.size).toBe(2);
+  });
+
+  it("ixcham kadr brauzerda to'liq dunyoga aylanadi; yangi o'qlar bir marta yuboriladi", () => {
+    const room = new PvpRoom("g", 4, START, START + 120_000);
+    join(room, "ali", 300, 300);
+    join(room, "vali", 900, 300);
+    const now = START + 4000;
+    room.input("vali", { x: 905, y: 301, a: 1.5, shots: [{ id: 9, x: 920, y: 301, a: 1.5 }] }, now);
+    const st = newClientState();
+    expect(decodeRoomMessage(room.rosterMessage(), st, "ali", null)).toBe(null);
+    const sent = { pickups: 0, feed: -1 };
+    const d = decodeRoomMessage(room.frame(now + 20, "ali", sent), st, "ali", { weapon: "Lazer-1", cooldown: 0.36, name: "ALI", skin: "bolt" })!;
+    expect(d.world.peers.map((p) => [p.name, p.isMe])).toEqual([
+      ["ALI", true],
+      ["VALI", false],
+    ]);
+    const vali = d.world.peers.find((p) => p.name === "VALI")!;
+    expect(vali).toMatchObject({ x: 905, y: 301, a: 1.5, lives: 3 });
+    expect(vali.shots).toEqual([{ id: 9, x: 920, y: 301, a: 1.5, age: 20 }]);
+    expect(d.world.pickups).toHaveLength(3);
+    expect(d.me).toMatchObject({ lives: 3, out: false, weapon: "Lazer-1" });
+    expect(d.world.remainingMs).toBe(120_000 - 4020);
+    room.flush();
+    const d2 = decodeRoomMessage(room.frame(now + 80, "ali", { pickups: room.pickupsVer, feed: room.feedVer }), st, "ali", null)!;
+    expect(d2.world.peers.find((p) => p.name === "VALI")!.shots).toEqual([]);
+    // Sovg'alar o'zgarmagan bo'lsa ham oxirgisi eslab qolinadi
+    expect(d2.world.pickups).toHaveLength(3);
+  });
+});
+
+describe("bilet va imzo", () => {
+  const t: ArenaTicket = { g: "g1", r: 2, role: "player", p: "p1", n: "Ali", skin: "bolt", lives: 3, maxLives: 3, weapon: "Lazer-1", cooldown: 0.36, x: 1, y: 2, shieldUntil: 0, st: 1, en: 2, exp: Date.now() + 60_000 };
+  it("to'g'ri bilet o'qiladi, buzilgan yoki muddati o'tgani rad etiladi", async () => {
+    const tok = await signTicket("s3cret", t);
+    expect(await verifyTicket("s3cret", tok)).toMatchObject({ g: "g1", p: "p1", role: "player" });
+    expect(await verifyTicket("boshqa", tok)).toBe(null);
+    const [body, sig] = tok.split(".");
+    const forged = Buffer.from(JSON.stringify({ ...t, role: "watch" })).toString("base64url");
+    expect(await verifyTicket("s3cret", `${forged}.${sig}`)).toBe(null);
+    expect(await verifyTicket("s3cret", `${body}.x${sig}`)).toBe(null);
+    expect(await verifyTicket("s3cret", await signTicket("s3cret", { ...t, exp: Date.now() - 1 }))).toBe(null);
+    expect(await verifyTicket("s3cret", "")).toBe(null);
+  });
+  it("natija imzosi", async () => {
+    const sig = await hmacSign("k", '{"a":1}');
+    expect(await hmacVerify("k", '{"a":1}', sig)).toBe(true);
+    expect(await hmacVerify("k", '{"a":2}', sig)).toBe(false);
+  });
+});

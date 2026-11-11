@@ -16,6 +16,8 @@ const { LiveGame } = await import("@/lib/db/models/live-game.model");
 const { LiveGamePlayer } = await import("@/lib/db/models/live-game-player.model");
 const live = await import("@/actions/live-game.actions");
 const route = await import("@/app/api/live/pvp/route");
+const resultRoute = await import("@/app/api/live/pvp/result/route");
+const { hmacSign, verifyTicket } = await import("@/lib/live-game/arena-token");
 const { NextRequest } = await import("next/server");
 const { PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom } = await import("@/lib/live-game/pvp");
 
@@ -236,6 +238,56 @@ describe("kiber jang (server)", () => {
     const w = await route.GET(new NextRequest(`http://t/api/live/pvp?gameId=${id}`));
     expect(w.status).toBe(200);
     expect((await w.json()).data.peers).toHaveLength(2);
+  });
+
+  it("real vaqt xonasi: bilet beriladi; xona natijasi imzo bilan Mongo'ga yoziladi, keyin bonus to'g'ri", async () => {
+    process.env.ARENA_SECRET = "test-secret";
+    process.env.NEXT_PUBLIC_ARENA_WS_URL = "wss://arena.example.dev";
+    try {
+      const { mentor, ali, vali, id } = await seed();
+      as(mentor);
+      await live.startLiveQuestionAction(id);
+      as(ali);
+      const st = await live.getLivePlayerStateAction(id);
+      const ws = st.success ? st.data.arena?.ws : null;
+      expect(ws).toMatch(/^wss:\/\/arena\.example\.dev\/room\/[a-f0-9]{24}\/2\?t=/);
+      const ticket = await verifyTicket("test-secret", decodeURIComponent(new URL(ws!).searchParams.get("t")!));
+      expect(ticket).toMatchObject({ g: id, r: 2, role: "player", n: "ALI", lives: 4 });
+      as(mentor);
+      const host = await live.getLiveHostStateAction(id);
+      const hostTicket = await verifyTicket("test-secret", decodeURIComponent(new URL((host.success && host.data.arena?.ws) || "x:/").searchParams.get("t") ?? ""));
+      expect(hostTicket?.role).toBe("watch");
+
+      const aliId = (await player(ali))._id.toString();
+      const valiId = (await player(vali))._id.toString();
+      const body = JSON.stringify({
+        g: id,
+        r: 2,
+        players: [
+          { id: aliId, lives: 4, maxLives: 4, kills: 1, hits: 3, hitsTaken: 0, out: false, outAt: null, killedBy: null, x: 300, y: 300 },
+          { id: valiId, lives: 0, maxLives: 3, kills: 0, hits: 0, hitsTaken: 3, out: true, outAt: Date.now(), killedBy: "ALI", x: 500, y: 300 },
+        ],
+        feed: [{ at: Date.now(), kind: "kill", a: "ALI", b: "VALI" }],
+      });
+      const post = (sig: string | null, b = body) =>
+        resultRoute.POST(new NextRequest("http://t/api/live/pvp/result", { method: "POST", body: b, headers: sig ? { "x-arena-sig": sig } : {} }));
+      expect((await post(null)).status).toBe(401);
+      expect((await post(await hmacSign("boshqa", body))).status).toBe(401);
+      const wrongRound = body.replace('"r":2', '"r":1');
+      expect((await post(await hmacSign("test-secret", wrongRound), wrongRound)).status).toBe(409);
+      expect((await post(await hmacSign("test-secret", body))).status).toBe(200);
+      expect((await player(vali)).arena).toMatchObject({ out: true, lives: 0, killedBy: "ALI" });
+      expect((await LiveGame.findById(id).lean())?.arena?.feed[0]).toMatchObject({ kind: "kill", a: "ALI" });
+
+      const score = (await player(ali)).score;
+      await live.endArenaAction(id);
+      expect((await player(ali)).score).toBe(score + pvpBonus(1, true, true));
+      // Jang tugagach kelgan natija qabul qilinmaydi
+      expect((await post(await hmacSign("test-secret", body))).status).toBe(409);
+    } finally {
+      delete process.env.ARENA_SECRET;
+      delete process.env.NEXT_PUBLIC_ARENA_WS_URL;
+    }
   });
 
   it("jang tugatilmasdan 'Keyingi' bosilsa — avval bonus hisoblanadi, keyin yakun", async () => {

@@ -64,7 +64,7 @@ function arenaRoundDue(mode: LiveGameMode, index: number, total: number, done: n
   if (mode !== "arena" || index < 0 || index >= total - 1 || done.includes(index)) return false;
   return (index + 1) % ARENA_EVERY === 0;
 }
-import { finishPvp, loadPvpGame, pvpTick, setupPvp, watchPvp, type PvpTickInput, type PvpTickResult, type PvpWorld } from "@/lib/live-game/pvp-server";
+import { arenaSocketUrl, finishPvp, loadPvpGame, pvpTick, setupPvp, watchPvp, type PvpTickInput, type PvpTickResult, type PvpWorld } from "@/lib/live-game/pvp-server";
 
 // Jonli o'yin: mentor proyektorda boshqaradi, o'quvchilar telefondan qo'shiladi. Holat qisqa so'rovlar bilan olinadi.
 
@@ -557,6 +557,8 @@ export interface LiveArenaRow {
 }
 
 export interface LiveArenaView {
+  /** Real vaqt xonasi manzili (tomoshabin bileti bilan); null — HTTP so'rovlar */
+  ws?: string | null;
   /** Qaysi savoldan keyingi jang; final — oxirgi savol */
   round: number;
   final: boolean;
@@ -709,7 +711,10 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
         events: [...game.events].reverse().slice(0, 8).map((e) => ({ text: e.text, kind: e.kind })),
         minigame: minigameView(game, players),
         bonus: game.bonusIndex === game.index && game.index >= 0,
-        arena: arenaView(game, players),
+        arena: await (async () => {
+          const v = arenaView(game, players);
+          return v ? { ...v, ws: v.ended ? null : await arenaSocketUrl(game, null) } : null;
+        })(),
         arenaNext: Boolean(game.options?.arena && !(game.arenaRounds ?? []).includes(game.questions.length - 1)),
         introMs: introLeft(game),
         arenaRoundNext: game.status === "reveal" && arenaRoundDue(game.mode, game.index, game.questions.length, game.arenaRounds ?? []),
@@ -981,6 +986,10 @@ export interface LivePlayerState {
   minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number }) | null;
   bonus: boolean;
   arena: {
+    /** Real vaqt xonasi manzili (o'yinchi bileti bilan); null — HTTP so'rovlar */
+    ws: string | null;
+    playerId: string;
+    cooldown: number;
     round: number;
     final: boolean;
     startsInMs: number;
@@ -1102,11 +1111,14 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
           };
         })(),
         bonus: game.bonusIndex === game.index && game.index >= 0,
-        arena: (() => {
+        arena: await (async () => {
           const v = arenaView(game, players);
           const a = mine?.arena;
           if (!v) return null;
           return {
+            ws: mine && !v.ended ? await arenaSocketUrl(game, mine) : null,
+            playerId: mine?._id.toString() ?? "",
+            cooldown: a?.cooldown ?? 0.36,
             round: v.round,
             final: v.final,
             startsInMs: v.startsInMs,

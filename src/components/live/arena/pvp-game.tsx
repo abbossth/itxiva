@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crosshair, Eye, Skull, Users } from "lucide-react";
-import type { PvpFeedView, PvpMe, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-server";
+import type { PvpFeedView, PvpMe, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-types";
+import { decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
+import { Smoother } from "./interp";
 import {
   BASE_SPEED,
   BULLET_RANGE,
@@ -46,6 +48,8 @@ import {
 // Telefon/planshet: chap tomonda joystik, o'ng tomonni bosib turing — eng yaqin raqibga avtomatik nishon bilan otadi.
 
 const TICK_MS = 200;
+/** Real vaqt xonasiga yuborish oralig'i */
+const WS_TICK_MS = 66;
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: string };
 
@@ -87,10 +91,13 @@ export function PvpGame({
   startsInMs,
   remainingMs,
   sound = true,
+  ws: wsUrl = null,
 }: {
   gameId: string;
   myName: string;
-  init: { lives: number; maxLives: number; skin: string; weapon: string };
+  init: { lives: number; maxLives: number; skin: string; weapon: string; cooldown: number; playerId: string };
+  /** Real vaqt xonasi manzili (bo'lmasa — HTTP so'rovlar) */
+  ws?: string | null;
   startsInMs: number;
   remainingMs: number;
   sound?: boolean;
@@ -270,78 +277,144 @@ export function PvpGame({
       });
 
     // ---- Server bilan almashish ----
+    // Raqiblar bir oz orqada, ikki ma'lum holat orasi to'ldirilib chiziladi (real vaqtda ~0,1 s, HTTP'da ~0,35 s)
+    const smooth = new Smoother(wsUrl ? 120 : 350);
+    let claimSentAt = 0;
+
+    /** Kelgan yangilanish (xonadan yoki HTTP'dan): o'z holati, dunyo, sovg'a natijasi */
+    const apply = (data: { world: PvpWorld; me: PvpMe | null; claimed: PowerKind | null }, sentClaim: number | null) => {
+      const prev = me;
+      if (data.me) me = data.me;
+      if (!me) return;
+      meId = me.id;
+      powersAt = performance.now();
+      world = data.world;
+      const at = performance.now();
+      for (const p of world.peers) if (!p.isMe) smooth.push(p.id, at, p.x, p.y, p.a);
+      smooth.keep(new Set(world.peers.map((p) => p.id)));
+      if (!pos.ready) {
+        const mine = world.peers.find((p) => p.isMe);
+        pos.x = mine?.x ?? me.x;
+        pos.y = mine?.y ?? me.y;
+        pos.ready = true;
+      }
+      if (data.claimed) {
+        const def = POWERS[data.claimed];
+        say(`${def.icon} ${def.label}!`, "power");
+        if (sound) playCorrectSound();
+        haptic([10, 30, 10]);
+        claim = null;
+      } else if (sentClaim !== null) {
+        // HTTP: javob keldi, olinmadi. Xonada: sovg'a yo'qoldi yoki 1,2 s o'tdi
+        const gone = !world.pickups.some((k) => k.id === sentClaim);
+        if (!wsReady || gone || performance.now() - claimSentAt > 1200) {
+          claim = null;
+          if (!gone) claimed.delete(sentClaim);
+        }
+      }
+      if (prev) {
+        if (me.lives < prev.lives) {
+          flashUntil = performance.now() + 300;
+          shake = 14;
+          burst(sparks, pos.x, pos.y, "#f87171", 12);
+          if (sound) playHurt();
+          haptic([70]);
+          if (!me.out) say(`-1 jon · ${me.lives} qoldi`, "hurt");
+        }
+        if (me.kills > prev.kills) {
+          if (sound) playBoom();
+          haptic([20, 40, 20]);
+        }
+        if (me.out && !prev.out) {
+          if (sound) playBoom();
+          burst(sparks, pos.x, pos.y, skinOf(me.skin).body, 40);
+        }
+      }
+      // Yangi "yiqitdi" xabarlari: portlash va banner
+      const fresh = new Set(world.feed.map((f) => f.key));
+      for (const f of world.feed) {
+        if (feedSeen.has(f.key) || f.ago > 4000) continue;
+        if (f.kind === "kill") {
+          const victim = world.peers.find((p) => p.name === f.b);
+          if (victim) burst(sparks, victim.x, victim.y, skinOf(victim.skin).body, 34);
+          if (f.a === me.name) say(`💥 ${f.b} yiqitildi!`, "kill");
+          else if (sound && f.b !== me.name) playBoom();
+        }
+      }
+      feedSeen = fresh;
+      // Boshqalarning o'qlari
+      spawnForeignShots(
+        foreign,
+        seenShots,
+        world.peers.filter((p) => !p.isMe),
+        performance.now(),
+        BULLET_SPEED,
+        BULLET_RANGE
+      );
+      for (const p of world.peers) if (!shown.has(p.id)) shown.set(p.id, { x: p.x, y: p.y, a: p.a, moving: false });
+      for (const id of [...shown.keys()]) if (!world.peers.some((p) => p.id === id)) shown.delete(id);
+    };
+
+    // Real vaqt xonasi (WebSocket). 4 s da ulanmasa yoki uzilib qayta ulanmasa — HTTP so'rovlarga o'tiladi
+    let socket: WebSocket | null = null;
+    let wsReady = false;
+    let useHttp = !wsUrl;
+    let retries = 0;
+    let closed = false;
+    const room = newClientState();
+    const meBase = { weapon: init.weapon, cooldown: init.cooldown, name: myName, skin: init.skin };
+    const connect = () => {
+      if (!wsUrl || closed) return;
+      let opened = false;
+      const sock = new WebSocket(wsUrl);
+      socket = sock;
+      const fail = setTimeout(() => {
+        if (!opened) sock.close();
+      }, 4000);
+      sock.onopen = () => {
+        opened = true;
+        wsReady = true;
+        retries = 0;
+        clearTimeout(fail);
+        smooth.setDelay(120);
+      };
+      sock.onmessage = (ev) => {
+        const d = decodeRoomMessage(String(ev.data), room, init.playerId, meBase);
+        if (d) apply(d, claim);
+      };
+      sock.onclose = () => {
+        clearTimeout(fail);
+        wsReady = false;
+        if (closed) return;
+        if (retries < 3) {
+          retries++;
+          setTimeout(connect, 800 * retries);
+        } else {
+          useHttp = true;
+          smooth.setDelay(350);
+        }
+      };
+    };
+    connect();
+
     const tick = () => {
-      if (inFlight) return;
+      if (wsReady && socket) {
+        const shots = pendingShots.splice(0, 10);
+        const hits = pendingHits.splice(0, 8);
+        const sendClaim = claim !== null && claimSentAt === 0 ? claim : null;
+        if (sendClaim !== null) claimSentAt = performance.now();
+        socket.send(JSON.stringify({ t: "in", x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sendClaim }));
+        if (claim === null) claimSentAt = 0;
+        return;
+      }
+      if (!useHttp || inFlight) return;
       inFlight = true;
       const shots = pendingShots.splice(0, 10);
       const hits = pendingHits.splice(0, 8);
       const sentClaim = claim;
       void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim })
         .then((r) => {
-          if (!r.success) return;
-          const prev = me;
-          me = r.data.me;
-          meId = me.id;
-          powersAt = performance.now();
-          world = r.data.world;
-          if (!pos.ready) {
-            pos.x = me.x;
-            pos.y = me.y;
-            pos.ready = true;
-          }
-          if (sentClaim !== null) {
-            claim = null;
-            if (r.data.claimed) {
-              const def = POWERS[r.data.claimed];
-              say(`${def.icon} ${def.label}!`, "power");
-              if (sound) playCorrectSound();
-              haptic([10, 30, 10]);
-            } else claimed.delete(sentClaim);
-          }
-          if (prev) {
-            if (me.lives < prev.lives) {
-              flashUntil = performance.now() + 300;
-              shake = 14;
-              burst(sparks, pos.x, pos.y, "#f87171", 12);
-              if (sound) playHurt();
-              haptic([70]);
-              if (!me.out) say(`-1 jon · ${me.lives} qoldi`, "hurt");
-            }
-            if (me.kills > prev.kills) {
-              if (sound) playBoom();
-              haptic([20, 40, 20]);
-            }
-            if (me.out && !prev.out) {
-              if (sound) playBoom();
-              burst(sparks, pos.x, pos.y, skinOf(me.skin).body, 40);
-            }
-          }
-          // Yangi "yiqitdi" xabarlari: portlash va banner
-          const fresh = new Set(world.feed.map((f) => f.key));
-          for (const f of world.feed) {
-            if (feedSeen.has(f.key) || f.ago > 4000) continue;
-            if (f.kind === "kill") {
-              const victim = world.peers.find((p) => p.name === f.b);
-              if (victim) burst(sparks, victim.x, victim.y, skinOf(victim.skin).body, 34);
-              if (f.a === me.name) say(`💥 ${f.b} yiqitildi!`, "kill");
-              else if (sound && f.b !== me.name) playBoom();
-            }
-          }
-          feedSeen = fresh;
-          // Boshqalarning o'qlari
-          spawnForeignShots(
-            foreign,
-            seenShots,
-            world.peers.filter((p) => !p.isMe),
-            performance.now(),
-            BULLET_SPEED,
-            BULLET_RANGE
-          );
-          for (const p of world.peers) {
-            const s = shown.get(p.id);
-            if (!s) shown.set(p.id, { x: p.x, y: p.y, a: p.a, moving: false });
-          }
-          for (const id of [...shown.keys()]) if (!world.peers.some((p) => p.id === id)) shown.delete(id);
+          if (r.success) apply(r.data, sentClaim);
         })
         .catch(() => {})
         .finally(() => {
@@ -483,7 +556,7 @@ export function PvpGame({
       last = now;
       const t = now / 1000;
       const tm = timing.current!;
-      if (now - lastTick > TICK_MS) {
+      if (now - lastTick > (wsReady ? WS_TICK_MS : TICK_MS)) {
         lastTick = now;
         tick();
       }
@@ -552,23 +625,12 @@ export function PvpGame({
           }
         }
       }
-      // Boshqalarning silliq harakati
-      const k = Math.min(1, dt * 10);
+      // Boshqalar: buferdan silliq (ikki ma'lum holat orasi to'ldiriladi)
       for (const p of world?.peers ?? []) {
+        if (p.isMe) continue;
+        const v = smooth.sample(p.id, now);
         const s = shown.get(p.id);
-        if (!s || p.isMe) continue;
-        const dx = p.x - s.x;
-        const dy = p.y - s.y;
-        s.moving = Math.hypot(dx, dy) > 4;
-        // Teleport yoki katta sakrash — darhol
-        if (Math.hypot(dx, dy) > 400) {
-          s.x = p.x;
-          s.y = p.y;
-        } else {
-          s.x += dx * k;
-          s.y += dy * k;
-        }
-        s.a += Math.atan2(Math.sin(p.a - s.a), Math.cos(p.a - s.a)) * k;
+        if (v && s) Object.assign(s, v);
       }
       // O'qlar
       const targets = (world?.peers ?? []).filter((p) => !p.isMe && !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
@@ -620,6 +682,8 @@ export function PvpGame({
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      closed = true;
+      socket?.close();
       if (bannerTimer) clearTimeout(bannerTimer);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);

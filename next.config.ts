@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// "Kiber jang" real vaqt xonasi (Cloudflare Worker) — sozlangan bo'lsa, uning manzili
+const arenaOrigin = (() => {
+  try {
+    const u = process.env.NEXT_PUBLIC_ARENA_WS_URL ? new URL(process.env.NEXT_PUBLIC_ARENA_WS_URL) : null;
+    return u && (u.protocol === "wss:" || u.protocol === "ws:") ? `${u.protocol}//${u.host}` : "";
+  } catch {
+    return "";
+  }
+})();
+
 // Skript va freymlar faqat o'zimizdan (va YouTube pleyeridan). Rasm, fayl yuklash va yuklab olish
 // Cloudflare R2'ning vaqtinchalik havolalari orqali ketadi, shuning uchun img/connect/media uchun https ruxsat etilgan.
 // Next.js o'zining inline skriptlarini nonce'siz chiqaradi — shu sabab 'unsafe-inline' qoldirilgan.
@@ -11,8 +21,8 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  // Brauzer faqat saytning o'ziga va fayl omboriga (R2 presigned havolalari) so'rov yubora oladi
-  "connect-src 'self' https://*.r2.cloudflarestorage.com",
+  // Brauzer faqat saytning o'ziga, fayl omboriga (R2 presigned havolalari) va "Kiber jang" real vaqt xonasiga ulana oladi
+  `connect-src 'self' https://*.r2.cloudflarestorage.com${arenaOrigin ? ` ${arenaOrigin}` : ""}`,
   "media-src 'self' blob: https:",
   "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
   "worker-src 'self' blob:",
