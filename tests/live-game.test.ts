@@ -95,6 +95,17 @@ describe("qoidalar", () => {
   });
 });
 
+describe("yaratish oynasi", () => {
+  it("hozir darsi bor guruh sukut bo'yicha tanlanadi", async () => {
+    const { group, other } = await seed();
+    // NOW — seshanba 16:40: 9-B ning darsi hozir, 9-A niki toq kunlarda
+    await Group.updateOne({ _id: group._id }, { schedule: { days: [1, 3, 5], startTime: "14:00", endTime: "15:30" } });
+    await Group.updateOne({ _id: other._id }, { schedule: { days: [2, 4, 6], startTime: "16:30", endTime: "18:00" } });
+    const res = await live.getLiveGameSetupAction();
+    expect(res.success && res.data.groups.filter((g) => g.suggested).map((g) => g.name)).toEqual(["9-B"]);
+  });
+});
+
 describe("o'yin jarayoni", () => {
   it("klassik: qo'shilish, savol, to'g'ri javob savol paytida yashirin, natija va yakunda coin", async () => {
     const { gid, mentor, ali, vali, guli } = await seed();
@@ -153,7 +164,7 @@ describe("o'yin jarayoni", () => {
 
     const coins = async (u: { _id: import("mongoose").Types.ObjectId }) => (await CoinLedger.find({ studentId: u._id, idempotencyKey: /^live:/ }).lean()).map((l) => l.amount);
     // Guli 2-savolda tez javob berib birinchi o'ringa chiqdi: 1–3 o'rinlar 30 / 20 / 10
-    expect([...(await coins(guli)), ...(await coins(ali)), ...(await coins(vali))]).toEqual([30, 20, 10]);
+    expect([...(await coins(guli)), ...(await coins(ali)), ...(await coins(vali))]).toEqual([10, 7, 5]);
     as(ali);
     expect(await live.getMyActiveLiveGameAction()).toBeNull();
   });
@@ -271,7 +282,7 @@ describe("o'yin jarayoni", () => {
     as(mentor);
     await live.revealLiveQuestionAction(id);
     await live.finishLiveGameAction(id);
-    expect((await CoinLedger.find({ idempotencyKey: /^live:/ }).lean()).map((l) => [String(l.studentId), l.amount])).toEqual([[String(vali._id), 30]]);
+    expect((await CoinLedger.find({ idempotencyKey: /^live:/ }).lean()).map((l) => [String(l.studentId), l.amount])).toEqual([[String(vali._id), 10]]);
   });
 
   it("yopilmay qolgan o'yin 3 soatdan keyin yakunlanadi", async () => {

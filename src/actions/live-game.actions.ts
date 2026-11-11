@@ -10,7 +10,9 @@ import { User } from "@/lib/db/models/user.model";
 import { getCurrentUser, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { autoGradeQuiz } from "@/lib/grading";
 import { countLiveQuestions, pickQuestions } from "@/lib/live-game/questions";
+import { isValidSchedule, pickNearestLessonGroup } from "@/lib/schedule";
 import {
+  DEFAULT_PRIZES,
   LIVE_GRACE_MS,
   SURVIVAL_LIVES,
   TEAM_NAMES,
@@ -67,6 +69,8 @@ export interface LiveGroupOption {
   today: number;
   all: number;
   activeGameId: string | null;
+  /** Hozir yoki eng yaqin darsi bor guruh — oynada sukut bo'yicha tanlanadi */
+  suggested: boolean;
 }
 
 /** Yaratish oynasi uchun: guruhlar va har birida nechta yaroqli savol bor */
@@ -74,7 +78,9 @@ export async function getLiveGameSetupAction(): Promise<Result<{ groups: LiveGro
   try {
     await requireMentor();
     await connectDB();
-    const groups = await Group.find({ isActive: { $ne: false } }).select("name").sort({ name: 1 }).lean();
+    const groups = await Group.find({ isActive: { $ne: false } }).select("name schedule").sort({ name: 1 }).lean();
+    const scheduled = groups.filter((g) => isValidSchedule(g.schedule));
+    const suggestedId = scheduled.length > 0 ? pickNearestLessonGroup(scheduled)?._id.toString() : undefined;
     const active = await LiveGame.find({ ...activeFilter(), groupId: { $in: groups.map((g) => g._id) } }).select("groupId").lean();
     const activeOf = new Map(active.map((g) => [g.groupId.toString(), g._id.toString()]));
     const data = await Promise.all(
@@ -84,6 +90,7 @@ export async function getLiveGameSetupAction(): Promise<Result<{ groups: LiveGro
         today: await countLiveQuestions(g._id, "today"),
         all: await countLiveQuestions(g._id, "all"),
         activeGameId: activeOf.get(g._id.toString()) ?? null,
+        suggested: g._id.toString() === suggestedId,
       }))
     );
     return { success: true, data: { groups: data } };
@@ -111,7 +118,7 @@ export async function createLiveGameAction(input: {
     }
     const count = COUNTS.includes(Number(input.count)) ? Number(input.count) : 10;
     const teams = Math.min(4, Math.max(2, Math.round(Number(input.teams) || 2)));
-    const prizes = (Array.isArray(input.prizes) ? input.prizes : [30, 20, 10])
+    const prizes = (Array.isArray(input.prizes) ? input.prizes : DEFAULT_PRIZES)
       .slice(0, 3)
       .map((n) => Math.min(500, Math.max(0, Math.round(Number(n) || 0))));
     await connectDB();

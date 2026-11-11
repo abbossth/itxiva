@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { createLiveGameAction, getLiveGameSetupAction, type LiveGameListItem, type LiveGroupOption } from "@/actions/live-game.actions";
-import { LIVE_MODES } from "@/lib/live-game/modes";
+import { DEFAULT_PRIZES, LIVE_MODES } from "@/lib/live-game/modes";
 import type { LiveGameMode, LiveGameSource } from "@/lib/db/models/live-game.model";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 
@@ -114,7 +114,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [source, setSource] = useState<LiveGameSource>("today");
   const [count, setCount] = useState(10);
   const [teams, setTeams] = useState(2);
-  const [prizes, setPrizes] = useState([30, 20, 10]);
+  const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
   const [minigames, setMinigames] = useState(true);
   const [arena, setArena] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -129,7 +129,8 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
         return;
       }
       setGroups(res.data.groups);
-      const first = res.data.groups.find((g) => g.today > 0) ?? res.data.groups.find((g) => g.all > 0) ?? res.data.groups[0];
+      const first =
+        res.data.groups.find((g) => g.suggested) ?? res.data.groups.find((g) => g.today > 0) ?? res.data.groups.find((g) => g.all > 0) ?? res.data.groups[0];
       if (first) {
         setGroupId(first.id);
         setSource(first.today > 0 ? "today" : "all");

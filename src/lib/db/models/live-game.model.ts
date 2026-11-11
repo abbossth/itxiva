@@ -100,7 +100,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     mode: { type: String, enum: ["classic", "survival", "chest", "team"], required: true },
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
-    prizes: { type: [Number], default: [30, 20, 10] },
+    prizes: { type: [Number], default: [10, 7, 5] },
     status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "finished"], default: "lobby" },
     index: { type: Number, default: -1 },
     questionStartedAt: { type: Date, default: null },

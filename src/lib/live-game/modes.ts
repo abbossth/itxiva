@@ -143,6 +143,9 @@ export function teamStandings(players: { team: number; score: number }[], teams:
 }
 
 /** Yakunda kimga qancha coin: 1–3 o'rin, jamoaviyda g'olib jamoaning har a'zosi 1-o'rin mukofotini oladi */
+/** Sukut bo'yicha coin: 1-o'rin 10, 2-o'rin 7, 3-o'rin 5. Jamoaviyda faqat g'olib jamoa a'zolariga — 1-qiymat (10) */
+export const DEFAULT_PRIZES = [10, 7, 5];
+
 export function computeAwards<T extends RankablePlayer>(
   mode: LiveGameMode,
   players: T[],
