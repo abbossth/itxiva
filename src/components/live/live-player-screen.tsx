@@ -17,6 +17,9 @@ import { requestRewardCheck } from "@/lib/rewards-client";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { MinigamePlayer } from "./live-minigame";
 import { ArenaPlayer } from "./arena/arena-screens";
+import { AdventureMine } from "./adventure-boards";
+import { ModeIntro } from "./live-intro";
+import { isAdventure } from "@/lib/live-game/adventures";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -28,6 +31,24 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
   const [error, setError] = useState<string | null>(null);
   const [chest, setChest] = useState<{ kind: string; text: string; key: number } | null>(null);
   const seenReveal = useRef(-1);
+  // Rejim introsi (mentor "Boshlash"ni bosganda telefonlarda ham chiqadi)
+  // Taymerlar alohida: har yangilanishda bekor bo'lib qolmasin; savol boshlansa intro baribir yopiladi
+  const [intro, setIntro] = useState<number | null>(null);
+  const introShown = useRef(false);
+  const introTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    const timers = introTimers.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  useEffect(() => {
+    if (state.status !== "lobby" || state.introMs <= 0 || introShown.current) return;
+    introShown.current = true;
+    const ms = state.introMs;
+    introTimers.current.push(
+      setTimeout(() => setIntro(ms), 0),
+      setTimeout(() => setIntro(null), ms)
+    );
+  }, [state.status, state.introMs]);
   const celebrated = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -95,7 +116,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
   const me = state.me;
 
   return (
-    <ImmersiveFrame>
+    <ImmersiveFrame mode={state.mode}>
+      {intro !== null && state.status === "lobby" && <ModeIntro mode={state.mode} ms={intro} sound={false} compact />}
       <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col [&>*]:flex-1", state.status === "arena" ? "max-w-none" : "max-w-xl md:max-w-3xl lg:max-w-5xl")}>
       <LiveShell className="min-h-[75vh]">
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -159,7 +181,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
         ) : state.status === "arena" && state.arena ? (
-          <ArenaPlayer gameId={state.id} arena={state.arena} myName={state.me?.name ?? "Siz"} />
+          <ArenaPlayer key={state.arena.round} gameId={state.id} arena={state.arena} myName={state.me?.name ?? "Siz"} />
         ) : state.status === "minigame" && state.minigame ? (
           <MinigamePlayer key={state.minigame.round} gameId={state.id} m={state.minigame} />
         ) : state.status === "reveal" ? (
@@ -362,6 +384,8 @@ function RevealView({
           <p className="rounded-xl bg-white/90 px-3 py-1.5 text-sm font-bold text-slate-900">To&apos;g&apos;ri javob: {state.correctAnswers.join(", ")}</p>
         )}
       </div>
+
+      {isAdventure(state.mode) && <AdventureMine mode={state.mode} me={me} goal={state.goal} />}
 
       {state.mode === "chest" && (me.chests > 0 || chest) && (
         <div className="flex flex-col items-center gap-3 rounded-3xl bg-amber-400/10 p-5 text-center ring-1 ring-amber-300/30">

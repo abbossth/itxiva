@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Heart, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { LiveGameMode } from "@/lib/db/models/live-game.model";
+import { MODE_THEMES, themeBackground } from "@/lib/live-game/themes";
 
 // Jonli o'yin ekranlari uchun umumiy ranglar va kichik bo'laklar (proyektor va o'quvchi telefoni).
 
@@ -40,6 +42,36 @@ export function LiveShell({ children, className }: { children: React.ReactNode; 
     </div>
   );
 }
+
+/** Rejim bezagi: ikki rangli nur va sekin suzib yuradigan belgilar */
+export function ThemeDecor({ mode }: { mode: LiveGameMode }) {
+  const t = MODE_THEMES[mode] ?? MODE_THEMES.classic;
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full blur-3xl" style={{ background: t.glow[0] }} />
+      <div className="absolute -bottom-28 -left-20 h-96 w-96 rounded-full blur-3xl" style={{ background: t.glow[1] }} />
+      {FLOAT_SPOTS.map((f, i) => (
+        <span
+          key={i}
+          className="live-drift absolute select-none opacity-[0.13]"
+          style={{ left: `${f.x}%`, top: `${f.y}%`, fontSize: f.size, animationDelay: `${f.delay}s`, animationDuration: `${f.dur}s` }}
+        >
+          {t.floaters[i % t.floaters.length]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const FLOAT_SPOTS = [
+  { x: 6, y: 18, size: 44, delay: 0, dur: 9 },
+  { x: 88, y: 12, size: 36, delay: 1.5, dur: 11 },
+  { x: 14, y: 78, size: 52, delay: 0.7, dur: 10 },
+  { x: 72, y: 84, size: 40, delay: 2.2, dur: 12 },
+  { x: 46, y: 6, size: 30, delay: 3, dur: 8 },
+  { x: 94, y: 58, size: 48, delay: 1, dur: 13 },
+  { x: 32, y: 46, size: 26, delay: 4, dur: 10 },
+];
 
 function ShellGlow() {
   return (
@@ -111,7 +143,18 @@ export function Lives({ lives, max = 3, className }: { lives: number; max?: numb
  * Brauzerning haqiqiy to'liq ekranini sahifa o'zi yoqa olmaydi — foydalanuvchi o'yin ichida birinchi marta bosganda yoqiladi.
  * Foydalanuvchi Esc bilan chiqsa, qayta majburlanmaydi (o'yin oynani egallab turaveradi).
  */
-export function ImmersiveFrame({ children, leading, toolbar }: { children: React.ReactNode; leading?: React.ReactNode; toolbar?: React.ReactNode }) {
+export function ImmersiveFrame({
+  children,
+  leading,
+  toolbar,
+  mode,
+}: {
+  children: React.ReactNode;
+  leading?: React.ReactNode;
+  toolbar?: React.ReactNode;
+  /** O'yin turi: fon ranglari va bezaklari shunga qarab */
+  mode?: LiveGameMode;
+}) {
   const [immersive, setImmersive] = useState(true);
   const entered = useRef(false);
   const declined = useRef(false);
@@ -191,9 +234,10 @@ export function ImmersiveFrame({ children, leading, toolbar }: { children: React
     <ImmersiveContext.Provider value>
       <div
         className="fixed inset-0 z-[60] flex h-dvh w-screen flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 pb-[env(safe-area-inset-bottom)] text-white"
+        style={mode ? themeBackground(mode) : undefined}
         onClickCapture={tryNative}
       >
-        <ShellGlow />
+        {mode ? <ThemeDecor mode={mode} /> : <ShellGlow />}
         {bar}
         <div className="live-noscroll relative flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
       </div>

@@ -217,14 +217,14 @@ export async function setupPvp(gameId: Id, startedAt: Date) {
 }
 
 /** Yakun: o'rinlar va bonus ochkolar (bir marta — chaqiruvchi shartli yangilash bilan kafolatlaydi) */
-export async function finishPvp(gameId: Id): Promise<void> {
+export async function finishPvp(gameId: Id, factor = 1): Promise<void> {
   const players = await LiveGamePlayer.find({ gameId, arena: { $ne: null } }).select("arena").lean();
   const rows = players.map((p) => ({ id: p._id, lives: p.arena!.lives, out: p.arena!.out, outAt: p.arena!.outAt ?? 0, kills: p.arena!.kills }));
   const alive = rows.filter((r) => !r.out).length;
   const ordered = pvpStandings(rows);
   await Promise.all(
     ordered.map((r, i) => {
-      const pts = pvpBonus(r.kills, !r.out, alive === 1 && !r.out && rows.length >= 2);
+      const pts = Math.round(pvpBonus(r.kills, !r.out, alive === 1 && !r.out && rows.length >= 2) * factor);
       return LiveGamePlayer.updateOne({ _id: r.id }, { $inc: { score: pts }, $set: { "arena.points": pts, "arena.place": i + 1 } });
     })
   );

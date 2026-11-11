@@ -38,7 +38,12 @@ export interface ILiveGamePlayerData {
   prevRank: number;
   /** Qisqa o'yinlar natijasi: round — savol raqami, value — bosish/nishon soni, points — olingan ochko */
   minigames: { round: number; value: number; points: number }[];
-  /** Arena: yuklama va natija (o'yin davomida yangilanadi, eng yaxshisi saqlanadi) */
+  /** Sarguzasht rejimlari: masofa (m), balandlik (km), qadam, olmos yoki katak soni */
+  progress: number;
+  /** Marraga / narigi qirg'oqqa yetgan (poyga, ko'prik) */
+  finished: boolean;
+  /** Oxirgi natija ta'siri (o'quvchi ekranida va proyektorda ko'rsatiladi) */
+  effect?: { index: number; kind: string; text: string; delta: number; items: string[] } | null;
   /** "Kiber jang" (hamma hammaga qarshi) holati */
   arena?: ILiveArenaPlayer | null;
   createdAt?: Date | string;
@@ -121,6 +126,12 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     coins: { type: Number, default: 0 },
     rank: { type: Number, default: 0 },
     prevRank: { type: Number, default: 0 },
+    progress: { type: Number, default: 0 },
+    finished: { type: Boolean, default: false },
+    effect: {
+      type: new Schema({ index: Number, kind: String, text: String, delta: Number, items: { type: [String], default: [] } }, { _id: false }),
+      default: null,
+    },
     minigames: {
       type: [new Schema({ round: Number, value: { type: Number, default: 0 }, points: { type: Number, default: 0 } }, { _id: false })],
       default: [],

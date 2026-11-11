@@ -3,7 +3,8 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 // Jonli o'yin: mentor proyektorda boshqaradi, guruh o'quvchilari telefondan bir vaqtda javob beradi.
 // Savollar o'yin yaratilganda nusxalanadi — keyin test tahrirlansa ham o'yin buzilmaydi.
 
-export type LiveGameMode = "classic" | "survival" | "chest" | "team";
+import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
+export { LIVE_GAME_MODES, type LiveGameMode };
 export type LiveGameSource = "today" | "all";
 export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "finished";
 export type LiveQuestionType = "single_choice" | "multiple_choice" | "short_answer";
@@ -57,6 +58,12 @@ export interface ILiveGameData {
   minigame?: ILiveMinigame | null;
   /** O'tkazilgan qisqa o'yinlar (savol raqamlari) */
   minigameRounds: number[];
+  /** Jang o'tkazilgan savollar (savol raqami; oxirgisi — final jang) */
+  arenaRounds: number[];
+  /** "Hudud bosib olish": har katakning egasi (o'yinchining qo'shilish tartibi), -1 — bo'sh */
+  cells: number[];
+  /** Rejim introsi boshlangan vaqt (kutish zalida) */
+  introAt?: Date | string | null;
   /** Bonus raund: shu savolda ochko ×2 */
   bonusIndex?: number | null;
   /** Oxirgi bosqich — otishmali arena */
@@ -83,6 +90,8 @@ export interface ILiveArenaFeed {
 }
 
 export interface ILiveArena {
+  /** Qaysi savoldan keyingi jang (oxirgi savol — final) */
+  round?: number;
   startedAt: Date | string;
   endsAt: Date | string;
   endedAt?: Date | string | null;
@@ -124,7 +133,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
   {
     mentorId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     groupId: { type: Schema.Types.ObjectId, ref: "Group", required: true },
-    mode: { type: String, enum: ["classic", "survival", "chest", "team"], required: true },
+    mode: { type: String, enum: LIVE_GAME_MODES, required: true },
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
     prizes: { type: [Number], default: [10, 7, 5] },
@@ -152,10 +161,14 @@ const LiveGameSchema = new Schema<ILiveGame>(
       default: null,
     },
     minigameRounds: { type: [Number], default: [] },
+    arenaRounds: { type: [Number], default: [] },
+    cells: { type: [Number], default: [] },
+    introAt: { type: Date, default: null },
     bonusIndex: { type: Number, default: null },
     arena: {
       type: new Schema(
         {
+          round: { type: Number, default: null },
           startedAt: Date,
           endsAt: Date,
           endedAt: { type: Date, default: null },

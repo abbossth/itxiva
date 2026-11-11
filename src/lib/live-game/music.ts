@@ -1,4 +1,5 @@
 import { getAudioContext } from "@/lib/sound";
+import type { ModeTheme } from "./themes";
 
 // Jonli o'yin fon musiqasi: Web Audio'da sintez qilinadigan original kuylar (fayl yo'q, mualliflik huquqi muammosi yo'q).
 // Kichik 16 qadamli sekvenser: baraban (shovqin va sinus), bas, arpedjio. Faqat proyektorda chalinadi.
@@ -107,6 +108,34 @@ class LiveMusic {
   private nextAt = 0;
   private boost = false;
   private enabled = true;
+  private theme: ModeTheme["music"] | null = null;
+  private def: TrackDef | null = null;
+
+  /** Rejim uslubi: tonallik, tezlik, tembr va arpedjio naqshi shunga qarab o'zgaradi (har rejimning o'z kuyi) */
+  setTheme(theme: ModeTheme["music"] | null) {
+    const same = JSON.stringify(theme) === JSON.stringify(this.theme);
+    this.theme = theme;
+    if (!same && this.track) {
+      const t = this.track;
+      this.track = null;
+      this.play(t);
+    }
+  }
+
+  private themed(def: TrackDef): TrackDef {
+    const th = this.theme;
+    if (!th) return def;
+    // Arpedjio naqshi rejimga qarab siljiydi — bir xil kuy takrorlanmasin
+    const shift = ((th.transpose % 4) + 4) % 4;
+    const arp = def.arp.map((_, i) => def.arp[(i + shift * 2) % def.arp.length]);
+    return {
+      ...def,
+      bpm: Math.round(def.bpm * th.tempo),
+      chords: def.chords.map((c, i) => ({ root: c.root + th.transpose, minor: i === 0 ? th.minor : c.minor })),
+      arp,
+      arpWave: def.arpWave === "square" || def.arpWave === "triangle" ? th.wave : def.arpWave,
+    };
+  }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -141,7 +170,8 @@ class LiveMusic {
     const ctx = this.ensure();
     if (!ctx || !this.master) return;
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    const def = TRACKS[track];
+    const def = this.themed(TRACKS[track]);
+    this.def = def;
     // Silliq o'tish: ovoz pasayib, yangi kuy bilan qayta ko'tariladi
     const now = ctx.currentTime;
     this.master.gain.cancelScheduledValues(now);
@@ -167,7 +197,7 @@ class LiveMusic {
   private schedule() {
     const ctx = this.ctx;
     if (!ctx || !this.track) return;
-    const def = TRACKS[this.track];
+    const def = this.def ?? TRACKS[this.track];
     const bpm = def.bpm * (this.boost ? 1.25 : 1);
     const stepDur = 60 / bpm / 4;
     while (this.nextAt < ctx.currentTime + 0.12) {

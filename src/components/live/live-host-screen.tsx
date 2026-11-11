@@ -12,9 +12,14 @@ import {
   finishLiveGameAction,
   getLiveHostStateAction,
   revealLiveQuestionAction,
+  startLiveIntroAction,
   startLiveQuestionAction,
   type LiveHostState,
 } from "@/actions/live-game.actions";
+import { isAdventure } from "@/lib/live-game/adventures";
+import { MODE_THEMES } from "@/lib/live-game/themes";
+import { AdventureBoard } from "./adventure-boards";
+import { ModeIntro } from "./live-intro";
 import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
 import { playCheckInSound, playTickSound, unlockSound } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
@@ -125,21 +130,22 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   }, [remaining, state, refresh]);
 
   // Jang vaqti tugasa (yoki bitta o'yinchi qolsa) — bonus hisoblanadi
-  const arenaEnding = useRef(false);
-  const arenaEndsAt = useRef<number | null>(null);
-  const arenaDecidedAt = useRef<number | null>(null);
+  // Har jang (raund) uchun alohida: muddatlar bir marta eslab qolinadi
+  const arenaEnding = useRef<number | null>(null);
+  const arenaEndsAt = useRef<{ round: number; at: number } | null>(null);
+  const arenaDecidedAt = useRef<{ round: number; at: number } | null>(null);
   useEffect(() => {
     const a = state.arena;
-    if (state.status !== "arena" || !a || a.ended || arenaEnding.current) return;
-    if (arenaEndsAt.current === null) arenaEndsAt.current = Date.now() + a.startsInMs + a.remainingMs;
+    if (state.status !== "arena" || !a || a.ended || arenaEnding.current === a.round) return;
+    if (arenaEndsAt.current?.round !== a.round) arenaEndsAt.current = { round: a.round, at: Date.now() + a.startsInMs + a.remainingMs };
     // Bittadan boshqa hamma chiqib ketsa — g'olib aniq, jang tugaydi
     const decided = a.rows.length >= 2 && a.startsInMs === 0 && a.alive <= 1;
     // Mutlaq muddat: har soniyalik so'rov taymerni qaytadan boshlamasin
-    if (decided && arenaDecidedAt.current === null) arenaDecidedAt.current = Date.now() + 3000;
-    const deadline = decided ? arenaDecidedAt.current! : arenaEndsAt.current + 2000;
+    if (decided && arenaDecidedAt.current?.round !== a.round) arenaDecidedAt.current = { round: a.round, at: Date.now() + 3000 };
+    const deadline = decided ? arenaDecidedAt.current!.at : arenaEndsAt.current.at + 2000;
     const wait = Math.max(0, deadline - Date.now());
     const t = setTimeout(() => {
-      arenaEnding.current = true;
+      arenaEnding.current = a.round;
       void endArenaAction(state.id).then(() => refresh());
     }, wait);
     return () => clearTimeout(t);
@@ -153,6 +159,11 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     return () => clearTimeout(t);
   }, [state.status, state.index]);
   const revealStep: "answer" | "board" = boardFor === state.index ? "board" : "answer";
+
+  // Har rejimning o'z kuyi (tonallik, tezlik, tembr)
+  useEffect(() => {
+    liveMusic.setTheme(MODE_THEMES[state.mode]?.music ?? null);
+  }, [state.mode]);
 
   // Fon musiqasi: holatga qarab kuy (g'oliblar musiqasini shohsupa o'zi boshqaradi)
   useEffect(() => {
@@ -188,6 +199,29 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   useEffect(() => {
     actRef.current = act;
   });
+  // Rejim introsi: proyektor va telefonlarda bir vaqtda; tugagach birinchi savol o'zi boshlanadi.
+  // Taymerlar alohida saqlanadi: har soniyalik yangilanish ularni bekor qilmasin
+  const introUntil = useRef<number | null>(null);
+  const introTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [intro, setIntro] = useState<number | null>(null);
+  const introOn = intro !== null;
+  useEffect(() => {
+    const timers = introTimers.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  useEffect(() => {
+    if (state.status !== "lobby" || state.introMs <= 0 || introUntil.current !== null) return;
+    introUntil.current = Date.now() + state.introMs;
+    const ms = state.introMs;
+    introTimers.current.push(
+      setTimeout(() => setIntro(ms), 0),
+      setTimeout(() => {
+        setIntro(null);
+        void actRef.current(() => startLiveQuestionAction(state.id));
+      }, ms)
+    );
+  }, [state.status, state.introMs, state.id]);
+
   // Avto rejim kaliti: natija ("r3") yoki tugagan qisqa o'yin ("m3")
   const autoKey =
     state.status === "reveal"
@@ -195,7 +229,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       : state.status === "minigame" && state.minigame?.ended
       ? `m${state.index}`
       : state.status === "arena" && state.arena?.ended
-      ? "a"
+      ? `a${state.arena.round}`
       : null;
   useEffect(() => {
     if (!autoplay || !autoKey || autoFired.current === autoKey) return;
@@ -234,6 +268,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
 
   return (
     <ImmersiveFrame
+      mode={state.mode}
       leading={
         <Link href="/mentor/live" className="inline-flex min-h-[40px] items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white">
           <ArrowLeft className="h-4 w-4" /> Jonli o&apos;yinlar
@@ -313,7 +348,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         </div>
 
         {state.status === "lobby" && (
-          <Lobby state={state} busy={busy} onStart={() => act(() => startLiveQuestionAction(state.id))} onCancel={() => act(() => cancelLiveGameAction(state.id))} />
+          <Lobby state={state} busy={busy || introOn} onStart={() => act(() => startLiveIntroAction(state.id))} onCancel={() => act(() => cancelLiveGameAction(state.id))} />
         )}
         {state.status === "question" && state.question && (
           <QuestionView state={state} remaining={remaining} busy={busy} onReveal={() => act(() => revealLiveQuestionAction(state.id))} />
@@ -358,7 +393,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         {state.status === "arena" && state.arena && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1">
-              <ArenaHost gameId={state.id} arena={state.arena} sound={sound} />
+              <ArenaHost key={state.arena.round} gameId={state.id} arena={state.arena} sound={sound} />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 pt-3">
               {autoLeft !== null && (
@@ -372,11 +407,21 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
                 disabled={busy}
                 className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-amber-400 px-8 text-lg font-black text-slate-900 disabled:opacity-60"
               >
-                <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish{autoLeft !== null ? ` (${autoLeft})` : ""}
+                {state.arena.final ? (
+                  <>
+                    <Crown className="h-5 w-5" /> G&apos;oliblarni ko&apos;rsatish
+                  </>
+                ) : (
+                  <>
+                    Keyingi savol <SkipForward className="h-5 w-5" />
+                  </>
+                )}
+                {autoLeft !== null ? ` (${autoLeft})` : ""}
               </button>
             </div>
           </div>
         )}
+        {intro !== null && <ModeIntro mode={state.mode} ms={intro} sound={sound} />}
         {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
       </LiveShell>
       {track && <BackgroundTrack src={track.src} playing={music} volume={state.status === "finished" ? 0.35 : 0.55} />}
@@ -512,7 +557,13 @@ function RevealView({
           <p className="text-center text-sm font-black uppercase tracking-[0.35em] text-fuchsia-300">
             {state.mode === "team" ? "Jamoalar poygasi" : `${state.index + 1}-savoldan keyin reyting`}
           </p>
-          {state.mode === "team" ? <ModePanel state={state} /> : <LiveLeaderboard key={state.index} players={state.players} mode={state.mode} sound={sound} index={state.index} />}
+          {state.mode === "team" ? (
+            <ModePanel state={state} />
+          ) : isAdventure(state.mode) ? (
+            <AdventureBoard key={state.index} state={state} />
+          ) : (
+            <LiveLeaderboard key={state.index} players={state.players} mode={state.mode} sound={sound} index={state.index} />
+          )}
           {state.mode === "chest" && state.events.length > 0 && <ChestFeed events={state.events} />}
         </>
       ) : (
@@ -552,7 +603,7 @@ function RevealView({
       <div className="flex flex-wrap items-center justify-end gap-2">
         {step === "answer" && (
           <Button variant="ghost" onClick={onShowBoard} className="gap-1.5 text-slate-300 hover:text-white">
-            Reytingni ko&apos;rsatish
+            {isAdventure(state.mode) ? "Maydonni ko'rsatish" : "Reytingni ko'rsatish"}
           </Button>
         )}
         {autoLeft !== null && (
@@ -560,7 +611,11 @@ function RevealView({
             <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
           </Button>
         )}
-        {isLast && state.arenaNext ? (
+        {state.arenaRoundNext ? (
+          <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 px-8 text-lg font-black text-white disabled:opacity-60">
+            <Swords className="h-5 w-5" /> Jangga!{autoLeft !== null ? ` (${autoLeft})` : ""}
+          </button>
+        ) : isLast && state.arenaNext ? (
           <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 px-8 text-lg font-black text-white disabled:opacity-60">
             <Swords className="h-5 w-5" /> Arenaga o&apos;tish{autoLeft !== null ? ` (${autoLeft})` : ""}
           </button>

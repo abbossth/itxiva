@@ -1,5 +1,6 @@
 import { answerPoints } from "@/lib/quiz-game";
 import type { LiveGameMode } from "@/lib/db/models/live-game.model";
+import { isAdventure } from "./adventures";
 
 // Jonli o'yin turlarining qoidalari — sof funksiyalar (server ham, test ham shu yerdan foydalanadi).
 // Bu fayl brauzerda ham ishlatiladi (qoida matnlari), shuning uchun serverga bog'liq emas.
@@ -24,6 +25,36 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
     title: "Jamoaviy jang",
     tagline: "Jamoa bo'lib yutamiz",
     rules: ["O'quvchilar jamoalarga bo'linadi", "Har to'g'ri javob jamoaga ochko qo'shadi", "Jamoa ochkosi — a'zolar o'rtachasi"],
+  },
+  arena: {
+    title: "Kiber arena",
+    tagline: "Savol — jang — savol: hamma hammaga qarshi",
+    rules: ["Har 3 savoldan keyin 45 soniyalik otishma", "To'g'ri javoblar — ko'proq jon va kuchliroq qurol", "Oxirida 2 daqiqalik katta final jang"],
+  },
+  race: {
+    title: "Robot poyga",
+    tagline: "To'g'ri javob — robot oldinga!",
+    rules: ["To'g'ri javob robotni oldinga yuradi", "Tez javob — uzoqroq, 3 ketma-ket — turbo", "Marraga birinchi yetganlarga katta bonus"],
+  },
+  territory: {
+    title: "Hudud bosib olish",
+    tagline: "Xaritani o'z rangingizga bo'yang",
+    rules: ["To'g'ri javob — 1–3 ta yangi katak", "Bo'sh joy qolmasa — qo'shnidan tortib olasiz", "Eng katta hudud egasi yutadi"],
+  },
+  rocket: {
+    title: "Raketa parvozi",
+    tagline: "Yoqilg'i — to'g'ri javoblar",
+    rules: ["To'g'ri javob raketani yuqoriga ko'taradi", "Xato javob — yoqilg'i tugab pastga tushadi", "Eng baland uchgan yutadi: bulutlar, koinot, Oy!"],
+  },
+  bridge: {
+    title: "Ko'prikdan o'tish",
+    tagline: "Bir qadam xato — suvga!",
+    rules: ["To'g'ri javob — ko'prikda bir qadam oldinga", "Xato javob — suvga tushib, bir qadam orqaga", "Narigi qirg'oqqa birinchi yetganlar yutadi"],
+  },
+  gold: {
+    title: "Oltin kon",
+    tagline: "Kovla, top, boyi!",
+    rules: ["To'g'ri javob — kovlash imkoni (tez javob — 2 marta)", "Oltin, olmos chiqadi… ehtiyot bo'ling, bomba ham!", "Eng boy konchi yutadi"],
   },
 };
 
@@ -60,6 +91,8 @@ export function scoreAnswer(
   const base = { points: 0, streak, lives: player.lives, eliminated: player.eliminated, chests: 0, double: player.double };
   // ×2 (sandiq yoki omad g'ildiragidan) keyingi to'g'ri javobda ishlatiladi; bonus raund bilan qo'shiladi
   const mult = (a.isCorrect && player.double ? 2 : 1) * (a.bonus ? 2 : 1);
+  // Sarguzasht rejimlarida ochko natija ochilganda (hammaga birdan) hisoblanadi
+  if (isAdventure(mode)) return base;
   if (mode === "chest") {
     if (!a.isCorrect) return base;
     return { ...base, points: CHEST_CORRECT_POINTS * mult, chests: 1, double: false };

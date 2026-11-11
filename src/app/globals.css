@@ -516,8 +516,36 @@ h1,
   100% { opacity: 1; transform: none; }
 }
 .live-drop { animation: live-drop 0.75s cubic-bezier(0.22, 1, 0.36, 1); }
+/* Rejim bezagi: fondagi belgilar sekin suzadi */
+@keyframes live-drift {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-22px) rotate(6deg); }
+}
+.live-drift { animation: live-drift 10s ease-in-out infinite; }
+/* Rejim introsi */
+@keyframes live-intro-in {
+  0% { opacity: 0; transform: scale(0.3) rotate(-20deg); }
+  55% { opacity: 1; transform: scale(1.2) rotate(6deg); }
+  75% { transform: scale(0.95) rotate(-2deg); }
+  100% { opacity: 1; transform: none; }
+}
+.live-intro-in { animation: live-intro-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes live-intro-up {
+  0% { opacity: 0; transform: translateY(26px); }
+  100% { opacity: 1; transform: none; }
+}
+.live-intro-up { animation: live-intro-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes live-intro-ring {
+  0% { opacity: 0.7; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+.live-intro-ring { animation: live-intro-ring 1.6s ease-out infinite; }
+@keyframes live-intro-out {
+  0%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .live-banner, .live-pop, .live-float, .live-drop { animation: none; }
+  .live-banner, .live-pop, .live-float, .live-drop, .live-drift, .live-intro-in, .live-intro-up, .live-intro-ring { animation: none; }
 }
 
 /* Jonli o'yin to'liq ekranda: juda kichik ekranda mazmun sig'masa ham aylantirish chizig'i ko'rinmaydi */

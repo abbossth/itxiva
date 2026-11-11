@@ -332,3 +332,25 @@ export function playHurt(): void {
   tone(audio, "sawtooth", 180, t, 0.18, 0.12);
   tone(audio, "sawtooth", 120, t + 0.05, 0.2, 0.1);
 }
+
+/** Rejim introsi: har rejimga o'z tonalligi va tembridagi qisqa jingl (ko'tariluvchi arpedjio + akkord) */
+export function playModeJingle(transpose = 0, wave: OscillatorType = "square", minor = false): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime + 0.05;
+  const root = 261.63 * Math.pow(2, transpose / 12);
+  const third = minor ? 3 : 4;
+  const steps = [0, third, 7, 12, third + 12];
+  steps.forEach((st, i) => tone(audio, wave, root * Math.pow(2, st / 12), t + i * 0.11, 0.16, 0.06));
+  for (const st of [0, third, 7, 12]) tone(audio, "triangle", root * Math.pow(2, st / 12), t + 0.62, 0.9, 0.05);
+  // Baraban zarbasi
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.frequency.setValueAtTime(140, t + 0.62);
+  osc.frequency.exponentialRampToValueAtTime(45, t + 0.8);
+  g.gain.setValueAtTime(0.6, t + 0.62);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t + 0.62);
+  osc.stop(t + 0.95);
+}

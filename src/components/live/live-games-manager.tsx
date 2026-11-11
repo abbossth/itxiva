@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Crown, Flame, Gamepad2, Gem, Heart, Plus, Swords, Users } from "lucide-react";
+import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Pickaxe, Plus, Rocket, Swords, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,33 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { createLiveGameAction, getLiveGameSetupAction, type LiveGameListItem, type LiveGroupOption } from "@/actions/live-game.actions";
 import { DEFAULT_PRIZES, LIVE_MODES } from "@/lib/live-game/modes";
-import type { LiveGameMode, LiveGameSource } from "@/lib/db/models/live-game.model";
+import type { LiveGameSource } from "@/lib/db/models/live-game.model";
+import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 
-export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = { classic: Flame, survival: Heart, chest: Gem, team: Swords };
+export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = {
+  classic: Flame,
+  survival: Heart,
+  chest: Gem,
+  team: Swords,
+  arena: Crosshair,
+  race: Bot,
+  territory: Flag,
+  rocket: Rocket,
+  bridge: Footprints,
+  gold: Pickaxe,
+};
 export const MODE_COLORS: Record<LiveGameMode, string> = {
   classic: "from-orange-500 to-rose-600",
   survival: "from-rose-500 to-red-700",
   chest: "from-amber-400 to-yellow-600",
   team: "from-sky-500 to-indigo-600",
+  arena: "from-fuchsia-500 to-purple-700",
+  race: "from-cyan-400 to-sky-700",
+  territory: "from-green-500 to-emerald-800",
+  rocket: "from-indigo-400 to-violet-700",
+  bridge: "from-sky-400 to-cyan-700",
+  gold: "from-yellow-400 to-amber-700",
 };
 
 const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", finished: "Yakunlangan" } as const;
@@ -182,7 +200,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
 
           <Field label="O'yin turi">
             <div className="grid gap-2 sm:grid-cols-2">
-              {(Object.keys(LIVE_MODES) as LiveGameMode[]).map((m) => {
+              {LIVE_GAME_MODES.map((m) => {
                 const Icon = MODE_ICONS[m];
                 const on = mode === m;
                 return (
@@ -255,6 +273,8 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             )}
           </Field>
 
+          {mode !== "arena" && (
+          <>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={minigames} onChange={(e) => setMinigames(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
             <span>
@@ -274,6 +294,8 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+          </>
+          )}
 
           <Field label={mode === "team" ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
             <div className="flex gap-2">
