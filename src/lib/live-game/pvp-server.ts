@@ -326,7 +326,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       { gameId: game._id, studentId, arena: { $ne: null }, "arena.out": false },
       {
         $set: { "arena.x": Math.round(x), "arena.y": Math.round(y), "arena.a": Number(ang.toFixed(2)) },
-        ...(incoming.length > 0 ? { $push: { "arena.shots": { $each: incoming, $slice: -24 } } } : {}),
+        ...(incoming.length > 0 ? { $push: { "arena.shots": { $each: incoming, $slice: -40 } } } : {}),
       },
       { returnDocument: "before", projection: { name: 1, studentId: 1, arena: 1 } }
     ).lean()) as CachedPlayer | null;
@@ -348,7 +348,8 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
     const hits = (Array.isArray(input?.hits) ? input.hits : []).slice(0, 8);
     if (hits.length > 0) {
       const recent = new Map<number, { x: number; y: number }>();
-      for (const s of before.arena!.shots ?? []) if (now - s.at < 1500) recent.set(s.id, s);
+      // Sekin internetda tekkani kechroq keladi — shuning uchun 3 soniyalik oyna
+      for (const s of before.arena!.shots ?? []) if (now - s.at < 3000) recent.set(s.id, s);
       for (const s of incoming) recent.set(s.id, s);
       const used = new Set(before.arena!.used ?? []);
       const spent: number[] = [];

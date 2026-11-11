@@ -12,13 +12,10 @@ const BASES = [
   { x: 2160, y: 1160, c: "245,158,11" },
 ];
 
-export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
-  ctx.fillStyle = "#070b18";
-  ctx.fillRect(-600, -600, MAP_W + 1200, MAP_H + 1200);
-  // Maydon
+/** Qo'zg'almas pol: fon, bazalar, plitkalar, yo'laklar, chegara (bir marta chiziladi) */
+function drawFloorStatic(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#0b1226";
   ctx.fillRect(0, 0, MAP_W, MAP_H);
-  // Burchak bazalari — rangli nur
   for (const b of BASES) {
     const g = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, 420);
     g.addColorStop(0, `rgba(${b.c},0.20)`);
@@ -26,14 +23,6 @@ export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
     ctx.fillStyle = g;
     ctx.fillRect(b.x - 420, b.y - 420, 840, 840);
   }
-  // Markaz yadrosi — puls
-  const pulse = 0.16 + Math.sin(t * 2) * 0.05;
-  const core = ctx.createRadialGradient(MAP_W / 2, MAP_H / 2, 20, MAP_W / 2, MAP_H / 2, 360);
-  core.addColorStop(0, `rgba(168,85,247,${pulse + 0.1})`);
-  core.addColorStop(1, "rgba(168,85,247,0)");
-  ctx.fillStyle = core;
-  ctx.fillRect(MAP_W / 2 - 360, MAP_H / 2 - 360, 720, 720);
-  // Plitkalar
   ctx.strokeStyle = "rgba(99,102,241,0.10)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -46,7 +35,6 @@ export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
     ctx.lineTo(MAP_W, y);
   }
   ctx.stroke();
-  // Yo'laklar: markazdan chiqadigan nurli chiziqlar
   ctx.strokeStyle = "rgba(56,189,248,0.10)";
   ctx.lineWidth = 26;
   ctx.beginPath();
@@ -55,7 +43,6 @@ export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
   ctx.moveTo(1200, 160);
   ctx.lineTo(1200, MAP_H - 160);
   ctx.stroke();
-  // Chegara
   ctx.save();
   ctx.shadowColor = "#a855f7";
   ctx.shadowBlur = 24;
@@ -63,13 +50,19 @@ export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
   ctx.lineWidth = 8;
   ctx.strokeRect(4, 4, MAP_W - 8, MAP_H - 8);
   ctx.restore();
-  // Teleportlar
+}
+
+/** Harakatlanuvchi qism: markaz pulsi va teleportlar */
+function drawFloorLive(ctx: CanvasRenderingContext2D, t: number) {
+  const pulse = 0.16 + Math.sin(t * 2) * 0.05;
+  ctx.fillStyle = `rgba(168,85,247,${pulse})`;
+  ctx.beginPath();
+  ctx.arc(MAP_W / 2, MAP_H / 2, 150 + Math.sin(t * 2) * 10, 0, Math.PI * 2);
+  ctx.fill();
   for (const tp of TELEPORTS) {
     for (const p of [tp.a, tp.b]) {
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.shadowColor = tp.color;
-      ctx.shadowBlur = 22;
       ctx.strokeStyle = tp.color;
       ctx.lineWidth = 5;
       for (let i = 0; i < 3; i++) {
@@ -85,6 +78,45 @@ export function drawFloor(ctx: CanvasRenderingContext2D, t: number) {
       ctx.restore();
     }
   }
+}
+
+/** Xaritaning qo'zg'almas qatlamlari oldindan chiziladi: har kadrda faqat tayyor rasm qo'yiladi (telefonda tez) */
+export interface MapLayers {
+  base: HTMLCanvasElement;
+  top: HTMLCanvasElement;
+}
+const LAYER_Q = 0.7;
+export function makeMapLayers(): MapLayers {
+  const mk = () => {
+    const c = document.createElement("canvas");
+    c.width = Math.round(MAP_W * LAYER_Q);
+    c.height = Math.round(MAP_H * LAYER_Q);
+    const x = c.getContext("2d")!;
+    x.scale(LAYER_Q, LAYER_Q);
+    return { c, x };
+  };
+  const base = mk();
+  drawFloorStatic(base.x);
+  drawWalls(base.x);
+  const top = mk();
+  drawBushes(top.x, 0);
+  return { base: base.c, top: top.c };
+}
+
+export function drawFloor(ctx: CanvasRenderingContext2D, t: number, layers?: MapLayers) {
+  ctx.fillStyle = "#070b18";
+  ctx.fillRect(-600, -600, MAP_W + 1200, MAP_H + 1200);
+  if (layers) ctx.drawImage(layers.base, 0, 0, MAP_W, MAP_H);
+  else {
+    drawFloorStatic(ctx);
+    drawWalls(ctx);
+  }
+  drawFloorLive(ctx, t);
+}
+
+export function drawTop(ctx: CanvasRenderingContext2D, t: number, layers?: MapLayers) {
+  if (layers) ctx.drawImage(layers.top, 0, 0, MAP_W, MAP_H);
+  else drawBushes(ctx, t);
 }
 
 export function drawWalls(ctx: CanvasRenderingContext2D) {
@@ -138,8 +170,12 @@ export function drawPickup(ctx: CanvasRenderingContext2D, p: { x: number; y: num
   const bob = Math.sin(t * 4 + p.x) * 4;
   ctx.save();
   ctx.translate(p.x, p.y + bob);
-  ctx.shadowColor = def.color;
-  ctx.shadowBlur = 26;
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = def.color;
+  ctx.beginPath();
+  ctx.arc(0, 0, 36, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
   ctx.fillStyle = "rgba(2,6,23,0.85)";
   ctx.beginPath();
   ctx.arc(0, 0, 25, 0, Math.PI * 2);
@@ -149,7 +185,6 @@ export function drawPickup(ctx: CanvasRenderingContext2D, p: { x: number; y: num
   ctx.beginPath();
   ctx.arc(0, 0, 25, t * 3, t * 3 + Math.PI * 1.6);
   ctx.stroke();
-  ctx.shadowBlur = 0;
   ctx.font = "26px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -159,17 +194,17 @@ export function drawPickup(ctx: CanvasRenderingContext2D, p: { x: number; y: num
 }
 
 export function drawShot(ctx: CanvasRenderingContext2D, s: Shot, color: string) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 14;
-  ctx.lineWidth = 6;
   ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 12;
   ctx.beginPath();
   ctx.moveTo(s.x, s.y);
   ctx.lineTo(s.x - s.vx * 0.03, s.y - s.vy * 0.03);
   ctx.stroke();
-  ctx.restore();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 5;
+  ctx.stroke();
 }
 
 export interface RobotLook {
@@ -231,8 +266,6 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
     ctx.restore();
   } else ctx.fillRect(R - 6, -5, 22, 10);
   // Tana
-  ctx.shadowColor = skin.body;
-  ctx.shadowBlur = 16;
   ctx.fillStyle = r.flash ? "#ffffff" : r.out ? "#475569" : skin.body;
   ctx.beginPath();
   if (skin.shape === "square") ctx.roundRect(-R, -R, R * 2, R * 2, 8);
@@ -244,7 +277,6 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
     ctx.closePath();
   } else ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
   ctx.strokeStyle = skin.accent;
   ctx.lineWidth = 3;
   ctx.stroke();

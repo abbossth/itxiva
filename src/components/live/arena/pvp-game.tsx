@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crosshair, Eye, Skull, Users } from "lucide-react";
-import { pvpTickAction } from "@/actions/live-game.actions";
-import type { PvpFeedView, PvpMe, PvpWorld } from "@/lib/live-game/pvp-server";
+import type { PvpFeedView, PvpMe, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-server";
 import {
   BASE_SPEED,
   BULLET_RANGE,
@@ -30,13 +29,13 @@ import { cn } from "@/lib/utils";
 import {
   burst,
   colorFor,
-  drawBushes,
   drawFloor,
   drawPickup,
   drawRobot,
   drawShot,
+  drawTop,
+  makeMapLayers,
   drawSparks,
-  drawWalls,
   nameTag,
   spawnForeignShots,
   stepSparks,
@@ -47,6 +46,23 @@ import {
 // Telefon/planshet: chap tomonda joystik, o'ng tomonni bosib turing — eng yaqin raqibga avtomatik nishon bilan otadi.
 
 const TICK_MS = 200;
+
+type ApiResult<T> = { success: true; data: T } | { success: false; error: string };
+
+/** Tezkor API (server action emas: navbatda kutmaydi, deploydan keyin ham ishlaydi). Osilib qolgan so'rov 2,5 s da bekor qilinadi */
+export async function pvpFetch<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 2500);
+  try {
+    const r = await fetch(url, { ...init, cache: "no-store", signal: ctrl.signal });
+    return (await r.json()) as ApiResult<T>;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+const sendTick = (gameId: string, input: PvpTickInput) =>
+  pvpFetch<PvpTickResult>("/api/live/pvp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ gameId, input }) });
 /** Butadagi raqib shu masofadan yaqin bo'lsagina ko'rinadi */
 const BUSH_SEE = 170;
 
@@ -114,6 +130,7 @@ export function PvpGame({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const layers = makeMapLayers();
     // ---- Holat ----
     let meId = "";
     let me: PvpMe | null = null;
@@ -129,7 +146,8 @@ export function PvpGame({
     const pendingHits: { target: string; shot: number }[] = [];
     let claim: number | null = null;
     const claimed = new Set<number>();
-    let shotSeq = 1;
+    // Sahifa yangilansa ham o'q raqamlari takrorlanmasin (server ishlatilganlarini eslab qoladi)
+    let shotSeq = Math.floor(Date.now() / 10) % 1_000_000_000;
     let lastFire = 0;
     let lastTeleport = 0;
     let flashUntil = 0;
@@ -258,7 +276,7 @@ export function PvpGame({
       const shots = pendingShots.splice(0, 10);
       const hits = pendingHits.splice(0, 8);
       const sentClaim = claim;
-      void pvpTickAction(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim })
+      void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim })
         .then((r) => {
           if (!r.success) return;
           const prev = me;
@@ -363,9 +381,8 @@ export function PvpGame({
       ctx.fillStyle = "#070b18";
       ctx.fillRect(0, 0, w, h);
       ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (w / 2 - view.cx * scale + sx), dpr * (h / 2 - view.cy * scale + sy));
-      drawFloor(ctx, t);
+      drawFloor(ctx, t, layers);
       for (const p of world?.pickups ?? []) if (!claimed.has(p.id)) drawPickup(ctx, p, t);
-      drawWalls(ctx);
 
       // Boshqalar
       const vis = new Set(visiblePeers().map((p) => p.id));
@@ -385,7 +402,7 @@ export function PvpGame({
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
       for (const s of myShots) drawShot(ctx, s, "#fde047");
       drawSparks(ctx, sparks);
-      drawBushes(ctx, t);
+      drawTop(ctx, t, layers);
       // Ismlar — butalar ustida
       for (const p of world?.peers ?? []) {
         if (p.isMe || (!p.out && !vis.has(p.id))) continue;

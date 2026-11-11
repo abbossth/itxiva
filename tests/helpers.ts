@@ -28,6 +28,9 @@ export function sessionFor(user: {
 }
 
 /** Haqiqiy himoya funksiyalari bilan bir xil qoidalar, faqat sessiya manbai boshqa */
+/** Route handler'lar uchun: sessiya cookie'si o'rniga joriy sinov sessiyasi */
+export const sessionMock = { getSession: async () => currentSession };
+
 export const guardsMock = {
   getCurrentUser: async () => currentSession,
   requireAuth: async () => {

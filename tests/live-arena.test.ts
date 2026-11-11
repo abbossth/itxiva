@@ -1,9 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { actAs, clearDb, guardsMock, sessionFor, startDb, stopDb } from "./helpers";
+import { actAs, clearDb, guardsMock, sessionFor, sessionMock, startDb, stopDb } from "./helpers";
 
 vi.mock("@/lib/auth/guards", () => guardsMock);
+vi.mock("@/lib/auth/session", () => sessionMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/server", () => ({ after: vi.fn() }));
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: vi.fn() }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: vi.fn() }));
 vi.mock("@/lib/notifications/notify", () => ({ sendNotifications: vi.fn(), notify: vi.fn(), notifyMany: vi.fn(), notifyMentors: vi.fn(), notifyGroup: vi.fn() }));
 
@@ -14,6 +15,8 @@ const { Quiz } = await import("@/lib/db/models/quiz.model");
 const { LiveGame } = await import("@/lib/db/models/live-game.model");
 const { LiveGamePlayer } = await import("@/lib/db/models/live-game-player.model");
 const live = await import("@/actions/live-game.actions");
+const route = await import("@/app/api/live/pvp/route");
+const { NextRequest } = await import("next/server");
 const { PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom } = await import("@/lib/live-game/pvp");
 
 const NOW = new Date("2026-11-10T16:40:00+05:00");
@@ -207,6 +210,32 @@ describe("kiber jang (server)", () => {
     const fin = await live.startLiveQuestionAction(id);
     expect(fin.success && fin.data.finished).toBe(true);
     expect((await LiveGame.findById(id).lean())?.status).toBe("finished");
+  });
+
+  it("tezkor API: o'quvchi qadami va proyektor ko'rinishi; begona va mentor bo'lmaganlarga yopiq", async () => {
+    const { mentor, ali, begona, id } = await seed();
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    tick(PVP_INTRO_S * 1000 + 500);
+    await User.updateMany({}, { mustChangePassword: false });
+    const post = (input: object, gameId = id) =>
+      route.POST(new NextRequest("http://t/api/live/pvp", { method: "POST", body: JSON.stringify({ gameId, input }) }));
+    as(ali);
+    const r = await post({ x: 300, y: 300, a: 0 });
+    expect(r.status).toBe(200);
+    const body = await r.json();
+    expect(body.data.me.name).toBe("ALI");
+    expect(body.data.world.peers).toHaveLength(2);
+    expect((await player(ali)).arena?.x).toBe(300);
+    // Proyektor (GET) — faqat mentor
+    expect((await route.GET(new NextRequest(`http://t/api/live/pvp?gameId=${id}`))).status).toBe(401);
+    as(begona);
+    expect((await post({ x: 1, y: 1 })).status).toBe(404);
+    as(mentor);
+    expect((await post({ x: 1, y: 1 })).status).toBe(401);
+    const w = await route.GET(new NextRequest(`http://t/api/live/pvp?gameId=${id}`));
+    expect(w.status).toBe(200);
+    expect((await w.json()).data.peers).toHaveLength(2);
   });
 
   it("jang tugatilmasdan 'Keyingi' bosilsa — avval bonus hisoblanadi, keyin yakun", async () => {

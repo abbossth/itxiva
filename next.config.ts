@@ -34,7 +34,11 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
+// Qaysi versiya ishlayotgani: brauzerdagi eski sahifa yangi deploydan keyin o'zini yangilashi uchun
+const buildId = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.VERCEL_DEPLOYMENT_ID ?? "dev";
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

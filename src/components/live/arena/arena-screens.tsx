@@ -2,22 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Crown, Skull, Swords, Trophy, Users } from "lucide-react";
-import { watchArenaAction, type LiveArenaView, type LivePlayerState } from "@/actions/live-game.actions";
+import type { LiveArenaView, LivePlayerState } from "@/actions/live-game.actions";
 import type { PvpFeedView, PvpWorld } from "@/lib/live-game/pvp-server";
 import { BULLET_RANGE, BULLET_SPEED, MAP_H, MAP_W, PLAYER_R, POWERS, inBush, skinOf, stepShots, type Shot } from "@/lib/live-game/pvp";
 import { playBoom } from "@/lib/sound";
 import { useCountdown } from "../live-ui";
-import { PvpGame } from "./pvp-game";
+import { PvpGame, pvpFetch } from "./pvp-game";
 import {
   burst,
   colorFor,
-  drawBushes,
   drawFloor,
   drawPickup,
   drawRobot,
   drawShot,
+  drawTop,
+  makeMapLayers,
   drawSparks,
-  drawWalls,
   nameTag,
   spawnForeignShots,
   stepSparks,
@@ -52,7 +52,7 @@ export function ArenaHost({ gameId, arena, sound = true }: { gameId: string; are
       if (!busy) {
         busy = true;
         try {
-          const r = await watchArenaAction(gameId);
+          const r = await pvpFetch<PvpWorld | null>(`/api/live/pvp?gameId=${gameId}`);
           if (alive && r.success && r.data) {
             worldRef.current = r.data;
             setWorld(r.data);
@@ -203,6 +203,7 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
+    const layers = makeMapLayers();
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
     const shots: Shot[] = [];
     const seenShots = new Map<string, number>();
@@ -242,9 +243,8 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
       ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
       // Kichik ekranda ham ismlar va qahramonlar o'qiladigan bo'lsin
       const big = Math.min(2.2, Math.max(1, 0.55 / scale));
-      drawFloor(ctx, t);
+      drawFloor(ctx, t, layers);
       for (const p of world?.pickups ?? []) drawPickup(ctx, p, t);
-      drawWalls(ctx);
       const k = Math.min(1, dt * 9);
       const peers = world?.peers ?? [];
       for (const p of peers) {
@@ -271,7 +271,7 @@ function ArenaSpectator({ worldRef }: { worldRef: React.RefObject<PvpWorld | nul
       for (const s of shots) drawShot(ctx, s, colorFor(s.owner));
       stepSparks(sparks, dt);
       drawSparks(ctx, sparks);
-      drawBushes(ctx, t);
+      drawTop(ctx, t, layers);
       for (const p of peers) {
         const s = shown.get(p.id) ?? p;
         nameTag(ctx, `${p.out ? "💀 " : ""}${p.name} · ${p.kills}`, s.x, s.y - PLAYER_R * big - 14, colorFor(p.id), p.lives, p.maxLives, big);
