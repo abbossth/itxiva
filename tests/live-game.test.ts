@@ -158,6 +158,39 @@ describe("o'yin jarayoni", () => {
     expect(await live.getMyActiveLiveGameAction()).toBeNull();
   });
 
+  it("savol davomida javob natijasi yashirin: ochko, o'rin va seriya natija ochilgach ko'rinadi", async () => {
+    const { gid, mentor, ali, vali } = await seed();
+    const id = await create(gid, mentor, "survival");
+    for (const s of [ali, vali]) {
+      as(s);
+      await live.joinLiveGameAction(id);
+    }
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    as(ali);
+    tick(1000);
+    await live.answerLiveQuestionAction(id, 0, await correctOf(id));
+    as(vali);
+    await live.answerLiveQuestionAction(id, 0, "xato");
+
+    as(ali);
+    const during = await live.getLivePlayerStateAction(id);
+    expect(during.success && during.data.me).toMatchObject({ score: 0, streak: 0, answered: true, lastCorrect: null, lastPoints: 0 });
+    as(vali);
+    const valiDuring = await live.getLivePlayerStateAction(id);
+    expect(valiDuring.success && valiDuring.data.me).toMatchObject({ score: 0, lives: 3 }); // jon hali ketmagan ko'rinadi
+
+    as(mentor);
+    await live.revealLiveQuestionAction(id);
+    as(ali);
+    const after = await live.getLivePlayerStateAction(id);
+    expect(after.success && after.data.me?.score).toBeGreaterThan(0);
+    expect(after.success && after.data.me).toMatchObject({ streak: 1, lastCorrect: true, rank: 1 });
+    as(vali);
+    const valiAfter = await live.getLivePlayerStateAction(id);
+    expect(valiAfter.success && valiAfter.data.me?.lives).toBe(2);
+  });
+
   it("vaqt tugagach javob qabul qilinmaydi; boshqa guruh qo'shila olmaydi", async () => {
     const { gid, mentor, ali, begona } = await seed();
     const id = await create(gid, mentor, "classic");

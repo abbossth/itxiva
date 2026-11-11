@@ -21,7 +21,7 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
   team: "from-sky-500 to-indigo-600",
 };
 
-const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", finished: "Yakunlangan" } as const;
+const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", finished: "Yakunlangan" } as const;
 
 export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
   const [open, setOpen] = useState(false);

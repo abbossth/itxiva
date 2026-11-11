@@ -5,7 +5,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type LiveGameMode = "classic" | "survival" | "chest" | "team";
 export type LiveGameSource = "today" | "all";
-export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "finished";
+export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "finished";
 export type LiveQuestionType = "single_choice" | "multiple_choice" | "short_answer";
 
 export interface ILiveQuestion {
@@ -59,6 +59,8 @@ export interface ILiveGameData {
   minigameRounds: number[];
   /** Bonus raund: shu savolda ochko ×2 */
   bonusIndex?: number | null;
+  /** Oxirgi bosqich — otishmali arena */
+  arena?: { startedAt: Date | string; endsAt: Date | string; endedAt?: Date | string | null } | null;
   finishedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
@@ -99,7 +101,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
     prizes: { type: [Number], default: [30, 20, 10] },
-    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "finished"], default: "lobby" },
+    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "finished"], default: "lobby" },
     index: { type: Number, default: -1 },
     questionStartedAt: { type: Date, default: null },
     questions: { type: [LiveQuestionSchema], default: [] },
@@ -124,6 +126,10 @@ const LiveGameSchema = new Schema<ILiveGame>(
     },
     minigameRounds: { type: [Number], default: [] },
     bonusIndex: { type: Number, default: null },
+    arena: {
+      type: new Schema({ startedAt: Date, endsAt: Date, endedAt: { type: Date, default: null } }, { _id: false }),
+      default: null,
+    },
     finishedAt: { type: Date, default: null },
     rewardedAt: { type: Date, default: null },
   },

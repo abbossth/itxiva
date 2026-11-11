@@ -287,3 +287,48 @@ export function playFanfare(grand = false): void {
     tone(audio, "triangle", f * 2, t + at, dur, 0.05);
   }
 }
+
+/** Arena: lazer otishi (qisqa, baland) */
+export function playShot(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(1400, t);
+  osc.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+  g.gain.setValueAtTime(0.05, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.1);
+}
+
+/** Arena: dron portlashi */
+export function playBoom(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const src = audio.createBufferSource();
+  src.buffer = getNoise(audio);
+  const f = audio.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(1800, t);
+  f.frequency.exponentialRampToValueAtTime(120, t + 0.4);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.35, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  src.connect(f).connect(g).connect(audio.destination);
+  src.start(t);
+  src.stop(t + 0.5);
+}
+
+/** Arena: urildi */
+export function playHurt(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "sawtooth", 180, t, 0.18, 0.12);
+  tone(audio, "sawtooth", 120, t + 0.05, 0.2, 0.1);
+}

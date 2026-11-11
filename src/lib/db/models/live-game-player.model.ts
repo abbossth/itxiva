@@ -38,6 +38,8 @@ export interface ILiveGamePlayerData {
   prevRank: number;
   /** Qisqa o'yinlar natijasi: round — savol raqami, value — bosish/nishon soni, points — olingan ochko */
   minigames: { round: number; value: number; points: number }[];
+  /** Arena: yuklama va natija (o'yin davomida yangilanadi, eng yaxshisi saqlanadi) */
+  arena?: { ammo: number; armor: number; kills: number; waves: number; finished: boolean; dead: boolean; final: boolean; points: number } | null;
   createdAt?: Date | string;
 }
 
@@ -81,6 +83,22 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     minigames: {
       type: [new Schema({ round: Number, value: { type: Number, default: 0 }, points: { type: Number, default: 0 } }, { _id: false })],
       default: [],
+    },
+    arena: {
+      type: new Schema(
+        {
+          ammo: { type: Number, default: 0 },
+          armor: { type: Number, default: 0 },
+          kills: { type: Number, default: 0 },
+          waves: { type: Number, default: 0 },
+          finished: { type: Boolean, default: false },
+          dead: { type: Boolean, default: false },
+          final: { type: Boolean, default: false },
+          points: { type: Number, default: 0 },
+        },
+        { _id: false }
+      ),
+      default: null,
     },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
