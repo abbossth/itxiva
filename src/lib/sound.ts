@@ -354,3 +354,41 @@ export function playModeJingle(transpose = 0, wave: OscillatorType = "square", m
   osc.start(t + 0.62);
   osc.stop(t + 0.95);
 }
+
+/** "Boshlash" bosilganda: ko'tariluvchi shovqin (riser) va kuchli zarba */
+export function playGameStart(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  // Riser: shovqin filtri yuqoriga ko'tariladi
+  const len = Math.floor(audio.sampleRate * 0.9);
+  const buf = audio.createBuffer(1, len, audio.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = audio.createBufferSource();
+  src.buffer = buf;
+  const f = audio.createBiquadFilter();
+  f.type = "bandpass";
+  f.Q.value = 3;
+  f.frequency.setValueAtTime(300, t);
+  f.frequency.exponentialRampToValueAtTime(6000, t + 0.8);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.35, t + 0.75);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  src.connect(f).connect(g).connect(audio.destination);
+  src.start(t);
+  src.stop(t + 0.92);
+  // Zarba: past baraban + akkord
+  const hit = t + 0.82;
+  const osc = audio.createOscillator();
+  const og = audio.createGain();
+  osc.frequency.setValueAtTime(160, hit);
+  osc.frequency.exponentialRampToValueAtTime(40, hit + 0.35);
+  og.gain.setValueAtTime(0.9, hit);
+  og.gain.exponentialRampToValueAtTime(0.0001, hit + 0.5);
+  osc.connect(og).connect(audio.destination);
+  osc.start(hit);
+  osc.stop(hit + 0.55);
+  for (const fr of [261.63, 329.63, 392, 523.25]) tone(audio, "sawtooth", fr, hit, 0.6, 0.05);
+}

@@ -21,7 +21,7 @@ import { MODE_THEMES } from "@/lib/live-game/themes";
 import { AdventureBoard } from "./adventure-boards";
 import { ModeIntro } from "./live-intro";
 import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
-import { playCheckInSound, playTickSound, unlockSound } from "@/lib/sound";
+import { playCheckInSound, playGameStart, playTickSound, unlockSound } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
@@ -33,6 +33,8 @@ import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, Ti
 import { cn, formatNumberUz } from "@/lib/utils";
 
 const POLL_MS = 1000;
+/** Kutish zali kuyi (o'quvchilar qo'shilayotganda) */
+const LOBBY_TRACK = "/audio/lobby.mp3";
 
 /** Avto rejimda natija shuncha soniya ko'rsatiladi (xazinada — sandiq ochishga ulgurish uchun ko'proq) */
 /** Avto rejimda natijadan keyingi kutish: to'g'ri javob (~3,5 s) + reyting sahnasi; xazinada sandiq ochishga ko'proq */
@@ -169,10 +171,13 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   useEffect(() => {
     liveMusic.setEnabled(synthOn);
     if (!synthOn || state.status === "finished") return;
+    // Kutish zalida — umumiy kutish kuyi (MP3), o'yin boshlangach — rejimning o'z kuyi
+    if (state.status === "lobby") {
+      liveMusic.play(null);
+      return;
+    }
     liveMusic.play(
-      state.status === "lobby"
-        ? "lobby"
-        : state.status === "question" || state.status === "arena" || (state.status === "minigame" && !state.minigame?.ended)
+      state.status === "question" || state.status === "arena" || (state.status === "minigame" && !state.minigame?.ended)
         ? "question"
         : "board"
     );
@@ -348,7 +353,10 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         </div>
 
         {state.status === "lobby" && (
-          <Lobby state={state} busy={busy || introOn} onStart={() => act(() => startLiveIntroAction(state.id))} onCancel={() => act(() => cancelLiveGameAction(state.id))} />
+          <Lobby state={state} busy={busy || introOn} onStart={() => {
+              if (sound) playGameStart();
+              void act(() => startLiveIntroAction(state.id));
+            }} onCancel={() => act(() => cancelLiveGameAction(state.id))} />
         )}
         {state.status === "question" && state.question && (
           <QuestionView state={state} remaining={remaining} busy={busy} onReveal={() => act(() => revealLiveQuestionAction(state.id))} />
@@ -424,7 +432,9 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         {intro !== null && <ModeIntro mode={state.mode} ms={intro} sound={sound} />}
         {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
       </LiveShell>
-      {track && <BackgroundTrack src={track.src} playing={music} volume={state.status === "finished" ? 0.35 : 0.55} />}
+      {/* Kutish zali kuyi: o'quvchilar qo'shilayotganda; "Boshlash" bosilganda to'xtaydi */}
+      <BackgroundTrack src={LOBBY_TRACK} playing={music && state.status === "lobby" && !introOn} volume={0.5} />
+      {track && <BackgroundTrack src={track.src} playing={music && state.status !== "lobby"} volume={state.status === "finished" ? 0.35 : 0.55} />}
     </ImmersiveFrame>
   );
 }
