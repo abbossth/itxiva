@@ -122,7 +122,7 @@ export function LessonsManager({
 
       {/* Tekshirish kerak: barcha guruhlar bo'yicha */}
       {toCheck.length > 0 && (
-        <section aria-labelledby="to-check-heading" className="rounded-2xl border border-amber-500/40 bg-amber-50/70 dark:bg-amber-500/10 p-3">
+        <section aria-labelledby="to-check-heading" className="min-w-0 max-w-full rounded-2xl border border-amber-500/40 bg-amber-50/70 dark:bg-amber-500/10 p-3">
           <h2 id="to-check-heading" className="flex items-center gap-2 px-1 pb-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
             <ClipboardCheck className="w-4 h-4 shrink-0" />
             <span className="whitespace-nowrap">Tekshirish kerak</span>
@@ -134,12 +134,12 @@ export function LessonsManager({
               Barcha javoblar
             </Link>
           </h2>
-          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          <ul className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2">
             {toCheck.map((item) => (
-              <li key={item.lessonId}>
+              <li key={item.lessonId} className="min-w-0">
                 <Link
                   href={`/mentor/homework/${item.lessonId}`}
-                  className="flex items-center gap-2 rounded-xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 px-3 min-h-[44px] hover:border-teal-500/50 transition-colors"
+                  className="flex w-full max-w-full items-center gap-2 overflow-hidden rounded-xl bg-white dark:bg-surface border border-slate-200/80 dark:border-slate-800 px-3 min-h-[44px] hover:border-teal-500/50 transition-colors"
                 >
                   <Badge variant="teal" className="shrink-0" title={item.groupName}>{item.groupShortName}</Badge>
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
