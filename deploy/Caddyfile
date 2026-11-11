@@ -14,11 +14,16 @@ itxiva.uz {
 
 www.itxiva.uz {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:3000 {
+	# Ikki nusxa (deploy paytida biri yangilanayotganda ikkinchisi javob beradi)
+	reverse_proxy 127.0.0.1:3000 127.0.0.1:3001 {
+		lb_policy least_conn
+		health_uri /api/version
+		health_interval 5s
+		health_timeout 3s
 		# Ilova login cheklovi x-forwarded-for'ning birinchi qiymatini o'qiydi — u doim haqiqiy mijoz IP'si bo'lsin
 		header_up X-Forwarded-For {client_ip}
 		header_up X-Real-IP {client_ip}
-		# Yangi versiya ishga tushayotgan bir necha soniyada so'rovlar xato bermay kutadi
+		# Nusxa qayta ishga tushayotganda so'rov ikkinchisiga yoki biroz kutib qayta yuboriladi
 		lb_try_duration 20s
 		lb_try_interval 250ms
 	}

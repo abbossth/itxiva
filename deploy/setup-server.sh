@@ -54,6 +54,8 @@ touch /home/deploy/.ssh/authorized_keys && chown deploy:deploy /home/deploy/.ssh
 install -d -m 0755 -o deploy -g deploy /opt/itxiva
 install -m 0644 -o deploy -g deploy "$HERE/docker-compose.yml" /opt/itxiva/docker-compose.yml
 install -m 0755 -o deploy -g deploy "$HERE/deploy.sh" "$HERE/rollback.sh" /opt/itxiva/
+# GitHub Actions kaliti faqat shu skript orqali ishlaydi (root egasi — deploy o'zgartira olmaydi)
+install -m 0755 -o root -g root "$HERE/ssh-gate.sh" /usr/local/bin/itxiva-ssh-gate
 install -m 0755 "$HERE/cron.sh" /opt/itxiva/cron.sh
 install -d -m 0750 -o root -g deploy /etc/itxiva
 [ -f /etc/itxiva/app.env ] || install -m 0640 -o root -g deploy /dev/null /etc/itxiva/app.env

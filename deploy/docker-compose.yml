@@ -1,19 +1,30 @@
-# VPS'da: /opt/itxiva/docker-compose.yml. Image tegi deploy.sh orqali beriladi (IMAGE_TAG).
+# VPS'da: /opt/itxiva/docker-compose.yml. Ilova 2 nusxada (VPS'ning 2 yadrosi uchun): Caddy ikkalasiga
+# navbat bilan yuboradi, deploy.sh ularni birin-ketin yangilaydi — yangilanish paytida sayt to'xtamaydi.
+# Image tegi har nusxa uchun alohida beriladi (TAG_A / TAG_B, deploy.sh shuni boshqaradi).
+x-app: &app
+  restart: unless-stopped
+  env_file: /etc/itxiva/app.env
+  environment:
+    NODE_OPTIONS: --max-old-space-size=1024
+  mem_limit: 1400m
+  stop_grace_period: 10s
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
 services:
-  app:
-    image: itxiva:${IMAGE_TAG:-latest}
-    container_name: itxiva-app
-    restart: unless-stopped
-    env_file: /etc/itxiva/app.env
-    environment:
-      NODE_OPTIONS: --max-old-space-size=1536
+  app_a:
+    <<: *app
+    image: itxiva:${TAG_A:-latest}
+    container_name: itxiva-a
     # Faqat serverning o'zidan (Caddy) ochiq — internetdan to'g'ridan-to'g'ri emas
     ports:
       - "127.0.0.1:3000:3000"
-    mem_limit: 2g
-    stop_grace_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
+  app_b:
+    <<: *app
+    image: itxiva:${TAG_B:-latest}
+    container_name: itxiva-b
+    ports:
+      - "127.0.0.1:3001:3000"
