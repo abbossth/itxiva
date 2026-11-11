@@ -19,7 +19,7 @@ import { playCheckInSound, playTickSound, unlockSound } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
-import { YoutubeMusic, setYoutubeLink, useYoutubeLink, youtubeId } from "./live-youtube";
+import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, useMusicChoice, type MusicChoice } from "./live-track";
 import { MinigameHost } from "./live-minigame";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
@@ -67,10 +67,10 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const [sound, setSound] = useState(true);
   const [music, setMusic] = useState(true);
   const [musicMenu, setMusicMenu] = useState(false);
-  // YouTube havolasi tanlangan bo'lsa — o'sha chalinadi (original kuy o'chadi)
-  const ytLink = useYoutubeLink(initial.mode);
-  const ytId = youtubeId(ytLink);
-  const synthOn = music && !ytId;
+  // Tayyor kuy tanlangan bo'lsa — o'sha chalinadi (original sintez kuylari o'chadi)
+  const choice = useMusicChoice(initial.mode);
+  const track = choice === "synth" ? null : MUSIC_TRACKS[choice];
+  const synthOn = music && !track;
   // Natijaning ikkinchi qadami (reyting) qaysi savol uchun ochilgan
   const [boardFor, setBoardFor] = useState<number | null>(null);
   const autoplay = useSyncExternalStore(subscribeAuto, readAuto, () => false);
@@ -237,13 +237,13 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
           <button
             type="button"
             onClick={() => setMusicMenu((v) => !v)}
-            title="Musiqani tanlash (YouTube havola yoki original kuy)"
+            title="Musiqani tanlash"
             aria-expanded={musicMenu}
             className="inline-flex min-h-[40px] cursor-pointer items-center rounded-xl bg-white/10 px-2.5 text-slate-200 hover:bg-white/20"
           >
             <Settings2 className="h-4 w-4" />
           </button>
-          {musicMenu && <MusicMenu mode={state.mode} link={ytLink} onClose={() => setMusicMenu(false)} />}
+          {musicMenu && <MusicMenu mode={state.mode} choice={choice} onClose={() => setMusicMenu(false)} />}
           <button
             type="button"
             onClick={() => setSound((v) => !v)}
@@ -323,7 +323,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         )}
         {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
       </LiveShell>
-      {music && ytId && <YoutubeMusic videoId={ytId} playing={music} />}
+      {track && <BackgroundTrack src={track.src} playing={music} volume={state.status === "finished" ? 0.35 : 0.55} />}
     </ImmersiveFrame>
   );
 }
@@ -590,46 +590,36 @@ function ChestFeed({ events }: { events: LiveHostState["events"] }) {
   );
 }
 
-/** Musiqa tanlash: shu o'yin turi uchun YouTube havola yoki original (sintez) kuy */
-function MusicMenu({ mode, link, onClose }: { mode: LiveHostState["mode"]; link: string; onClose: () => void }) {
-  const [value, setValue] = useState(link);
-  const valid = value.trim() === "" || Boolean(youtubeId(value));
+/** Musiqa tanlash: shu o'yin turi uchun tayyor kuy yoki o'yinning original kuylari */
+function MusicMenu({ mode, choice, onClose }: { mode: LiveHostState["mode"]; choice: MusicChoice; onClose: () => void }) {
+  const options: { id: MusicChoice; title: string; hint: string }[] = [
+    ...(Object.entries(MUSIC_TRACKS) as [MusicChoice, { title: string }][]).map(([id, t]) => ({ id, title: t.title, hint: "Tayyor fon kuyi, takrorlanib chalinadi" })),
+    { id: "synth", title: "Original kuylar", hint: "Holatga qarab o'zgaradi: kutish, savol, reyting, g'alaba" },
+  ];
   return (
-    <div className="absolute right-3 top-14 z-20 w-[min(92vw,380px)] space-y-3 rounded-2xl bg-slate-900 p-4 text-left shadow-2xl ring-1 ring-white/15 sm:right-6">
-      <p className="text-sm font-black">{LIVE_MODES[mode].title} uchun musiqa</p>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="https://www.youtube.com/watch?v=…"
-        className="w-full min-h-[44px] rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white placeholder:text-slate-500 focus:border-fuchsia-400 focus:outline-hidden"
-      />
-      {!valid && <p className="text-xs font-semibold text-rose-300">YouTube havolasi noto&apos;g&apos;ri</p>}
-      <p className="text-[11px] leading-relaxed text-slate-400">
-        YouTube pleeri burchakda ko&apos;rinib turadi va qo&apos;shiq takrorlanadi. Bo&apos;sh qoldirsangiz — o&apos;yinning original kuylari chalinadi.
-      </p>
-      <div className="flex justify-end gap-2">
+    <div className="absolute right-3 top-14 z-20 w-[min(92vw,340px)] space-y-2 rounded-2xl bg-slate-900 p-3 text-left shadow-2xl ring-1 ring-white/15 sm:right-6">
+      <p className="px-1 text-sm font-black">{LIVE_MODES[mode].title} uchun musiqa</p>
+      {options.map((o) => (
         <button
+          key={o.id}
           type="button"
           onClick={() => {
-            setYoutubeLink(mode, "");
+            setMusicChoice(mode, o.id);
             onClose();
           }}
-          className="min-h-[40px] cursor-pointer rounded-xl px-3 text-sm font-semibold text-slate-300 hover:bg-white/10"
+          aria-pressed={choice === o.id}
+          className={cn(
+            "flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+            choice === o.id ? "bg-fuchsia-500/25 ring-1 ring-fuchsia-400" : "hover:bg-white/10"
+          )}
         >
-          Original kuy
+          <Music className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <span className="block text-sm font-bold">{o.title}</span>
+            <span className="block text-[11px] text-slate-400">{o.hint}</span>
+          </span>
         </button>
-        <button
-          type="button"
-          disabled={!valid}
-          onClick={() => {
-            setYoutubeLink(mode, value);
-            onClose();
-          }}
-          className="min-h-[40px] cursor-pointer rounded-xl bg-fuchsia-500 px-4 text-sm font-bold text-white hover:bg-fuchsia-400 disabled:opacity-50"
-        >
-          Saqlash
-        </button>
-      </div>
+      ))}
     </div>
   );
 }
