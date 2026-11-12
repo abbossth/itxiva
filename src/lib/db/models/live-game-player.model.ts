@@ -8,6 +8,9 @@ export interface ILiveAnswer {
   isCorrect: boolean;
   ms: number;
   points: number;
+  /** Sarguzasht rejimlari: javobdan keyin tanlangan taktika va nishon */
+  tactic?: string | null;
+  target?: string | null;
 }
 
 export interface ILiveGamePlayerData {
@@ -100,6 +103,8 @@ const LiveAnswerSchema = new Schema<ILiveAnswer>(
     isCorrect: { type: Boolean, default: false },
     ms: { type: Number, default: 0 },
     points: { type: Number, default: 0 },
+    tactic: { type: String, default: null },
+    target: { type: String, default: null },
   },
   { _id: false }
 );

@@ -34,27 +34,27 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
   race: {
     title: "Robot poyga",
     tagline: "To'g'ri javob — robot oldinga!",
-    rules: ["To'g'ri javob robotni oldinga yuradi", "Tez javob — uzoqroq, 3 ketma-ket — turbo", "Marraga birinchi yetganlarga katta bonus"],
+    rules: ["To'g'ri javob robotni oldinga yuradi, tez javob — uzoqroq", "Javobdan keyin taktika: 🔥 turbo, ⚡ raqibga to'r yoki 🛡️ qalqon", "Marraga birinchi yetganlarga katta bonus"],
   },
   territory: {
     title: "Hudud bosib olish",
     tagline: "Xaritani o'z rangingizga bo'yang",
-    rules: ["To'g'ri javob — 1–3 ta yangi katak", "Bo'sh joy qolmasa — qo'shnidan tortib olasiz", "Eng katta hudud egasi yutadi"],
+    rules: ["To'g'ri javob — 1–3 ta yangi katak", "Taktika: 🚩 kengayish, ⚔️ qo'shniga hujum yoki 🏰 mudofaa", "Mudofaa hujumni qaytaradi · eng katta hudud yutadi"],
   },
   rocket: {
     title: "Raketa parvozi",
     tagline: "Yoqilg'i — to'g'ri javoblar",
-    rules: ["To'g'ri javob raketani yuqoriga ko'taradi", "Xato javob — yoqilg'i tugab pastga tushadi", "Eng baland uchgan yutadi: bulutlar, koinot, Oy!"],
+    rules: ["To'g'ri javob raketani yuqoriga ko'taradi, xato — pastga", "Taktika: 🪂 ehtiyotkor, 🛰️ barqaror yoki ☄️ xavfli forsaj", "Eng baland uchgan yutadi: bulutlar, koinot, Oy!"],
   },
   bridge: {
     title: "Ko'prikdan o'tish",
-    tagline: "Bir qadam xato — suvga!",
-    rules: ["To'g'ri javob — ko'prikda bir qadam oldinga", "Xato javob — suvga tushib, bir qadam orqaga", "Narigi qirg'oqqa birinchi yetganlar yutadi"],
+    tagline: "Qaysi taxta mustahkam?",
+    rules: ["To'g'ri javob — taxta tanlab bir qadam oldinga", "Har qadamda 3 taxta, bittasi yoriq — singanini hamma ko'radi", "Xato javob — suvga, bir qadam orqaga · qirg'oqqa birinchi yetgan yutadi"],
   },
   gold: {
     title: "Oltin kon",
     tagline: "Kovla, top, boyi!",
-    rules: ["To'g'ri javob — kovlash imkoni (tez javob — 2 marta)", "Oltin, olmos chiqadi… ehtiyot bo'ling, bomba ham!", "Eng boy konchi yutadi"],
+    rules: ["To'g'ri javob — kovlash imkoni (tez javob — 2 marta)", "Qatlamni tanlang: yuza — xavfsiz, chuqur — olmos va bomba!", "Eng boy konchi yutadi"],
   },
 };
 

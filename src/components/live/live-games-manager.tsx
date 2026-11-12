@@ -280,7 +280,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             <span>
               <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Savollar orasida qisqa o&apos;yinlar</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
-                Har 3 savoldan keyin tasodifiy: tezkor bosish, mo&apos;ljalga otish, omad g&apos;ildiragi yoki bonus raund (×2)
+                Har 3 savoldan keyin tasodifiy: mo&apos;ljalga otish, omad g&apos;ildiragi yoki bonus raund (×2)
               </span>
             </span>
           </label>

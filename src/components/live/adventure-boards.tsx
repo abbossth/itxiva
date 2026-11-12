@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { LiveHostState, LivePlayerRow } from "@/actions/live-game.actions";
-import { GRID_H, GRID_W, ROCKET_MILESTONES } from "@/lib/live-game/adventures";
+import { GRID_H, GRID_W, PLANKS, ROCKET_MILESTONES } from "@/lib/live-game/adventures";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 // Sarguzasht rejimlarining proyektordagi maydonlari: poyga yo'li, osmon, ko'prik, kon va hudud xaritasi.
@@ -38,7 +38,7 @@ export function AdventureBoard({ state }: { state: LiveHostState }) {
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {state.mode === "race" && <RaceBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} />}
       {state.mode === "rocket" && <RocketBoard players={state.players} slotOf={slotOf} index={state.index} />}
-      {state.mode === "bridge" && <BridgeBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} />}
+      {state.mode === "bridge" && <BridgeBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} planks={state.planks ?? []} />}
       {state.mode === "gold" && <GoldBoard players={state.players} slotOf={slotOf} />}
       {state.mode === "territory" && <TerritoryBoard players={state.players} cells={state.cells} slots={state.slots} />}
       {state.events.length > 0 && (
@@ -97,6 +97,8 @@ function RaceBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[];
                 <span className="relative text-3xl drop-shadow-[0_0_8px_rgba(0,0,0,0.6)] sm:text-4xl" style={{ filter: `drop-shadow(0 0 10px ${color})` }}>
                   🤖
                   {p.effect?.items.includes("🔥") && <span className="absolute -left-5 top-1 text-xl">🔥</span>}
+                  {p.effect?.items.includes("🛡️") && <span className="live-pop absolute -right-2 -top-2 text-lg">🛡️</span>}
+                  {p.effect?.text.includes("⚡") && (p.effect?.delta ?? 0) <= 0 && <span className="live-pop absolute -top-3 left-1 text-xl">⚡</span>}
                 </span>
                 <DeltaBadge p={p} />
               </div>
@@ -151,7 +153,19 @@ function RocketBoard({ players, slotOf, index }: { players: LivePlayerRow[]; slo
 }
 
 // ---- Ko'prikdan o'tish ----
-function BridgeBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[]; goal: number; slotOf: (id: string) => number; index: number }) {
+function BridgeBoard({
+  players,
+  goal,
+  slotOf,
+  index,
+  planks,
+}: {
+  players: LivePlayerRow[];
+  goal: number;
+  slotOf: (id: string) => number;
+  index: number;
+  planks: { known: number; broken: number }[];
+}) {
   const arrived = useArrived(index);
   const L = Math.max(1, goal);
   const shown = players.slice(0, 24);
@@ -169,10 +183,27 @@ function BridgeBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[
       <div className="absolute bottom-0 right-0 top-[42%] w-[8%] rounded-tl-3xl bg-gradient-to-b from-lime-500 to-amber-900">
         <span className="absolute -top-10 left-1/2 -translate-x-1/2 text-4xl">🏝️</span>
       </div>
-      {/* Ko'prik taxtalari */}
-      <div className="absolute left-[8%] right-[8%] top-[42%] flex h-5 gap-1">
+      {/* Ko'prik: har qadamda 3 ta taxta — bosilgan mustahkamlari yashil, singanlari yo'q bo'lib qoladi */}
+      <div className="absolute left-[8%] right-[8%] top-[38%] flex h-[13%] gap-1">
         {Array.from({ length: L }, (_, i) => (
-          <div key={i} className="h-full flex-1 rounded-sm bg-gradient-to-b from-amber-600 to-amber-800 shadow-md" />
+          <div key={i} className="flex h-full flex-1 flex-col gap-[3px]">
+            {Array.from({ length: PLANKS }, (_, j) => {
+              const pl = planks[i];
+              const broken = pl ? pl.broken & (1 << j) : 0;
+              const safe = pl && !broken ? pl.known & (1 << j) : 0;
+              return (
+                <div
+                  key={j}
+                  className={cn(
+                    "relative flex-1 rounded-sm shadow-md transition-colors duration-700",
+                    broken ? "border border-dashed border-rose-300/60 bg-transparent" : safe ? "bg-gradient-to-b from-emerald-400 to-emerald-700" : "bg-gradient-to-b from-amber-600 to-amber-800"
+                  )}
+                >
+                  {broken ? <span className="live-pop absolute inset-0 flex items-center justify-center text-xs">💥</span> : null}
+                </div>
+              );
+            })}
+          </div>
         ))}
       </div>
       {/* To'lqinlar */}
@@ -187,7 +218,7 @@ function BridgeBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[
             <div
               key={p.id}
               className="absolute flex -translate-x-1/2 flex-col items-center transition-[left] duration-[1200ms] ease-out"
-              style={{ left: `calc(${left}% + ${((j % 4) - 1.5) * 26}px)`, bottom: `${58 + Math.floor(j / 4) * 7}%` }}
+              style={{ left: `calc(${left}% + ${((j % 4) - 1.5) * 26}px)`, bottom: `${63 + Math.floor(j / 4) * 7}%` }}
             >
               <span
                 className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-black text-white shadow-lg ring-2 ring-white/70"

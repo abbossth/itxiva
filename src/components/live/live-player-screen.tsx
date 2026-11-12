@@ -6,6 +6,7 @@ import Link from "@/components/ui/link";
 import { useLivePoll, withRetry } from "./use-live-poll";
 import {
   answerLiveQuestionAction,
+  chooseLiveTacticAction,
   joinLiveGameAction,
   openLiveChestAction,
   type LivePlayerState,
@@ -19,6 +20,7 @@ import { MinigamePlayer } from "./live-minigame";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
 import { ModeIntro } from "./live-intro";
+import { TacticView } from "./live-tactics";
 import { isAdventure } from "@/lib/live-game/adventures";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -53,13 +55,20 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
 
   // Shu savolga yuborilgan javob: server javobi kelguncha ham "qabul qilindi" holati saqlanadi
   const myAnswer = useRef<{ index: number; value: string | string[] } | null>(null);
+  // Tanlangan taktika ham: server keshi (≤0,4 s) yangilanguncha eski tanlov qaytib chiqmasin
+  const myTactic = useRef<{ index: number; tactic: string; target: string | null } | null>(null);
   const apply = useCallback((next: LivePlayerState) => {
     const a = myAnswer.current;
     if (a && next.me && next.index === a.index && next.status === "question" && !next.me.answered) {
       next = { ...next, me: { ...next.me, answered: true, value: a.value } };
     }
+    const t = myTactic.current;
+    if (t && next.tactics && next.index === t.index && next.status === "question") {
+      next = { ...next, tactics: { ...next.tactics, picked: t.tactic, target: t.target } };
+    }
     setState(next);
   }, []);
+  const [tacticSaving, setTacticSaving] = useState(false);
   const { refresh, discardPending, weak } = useLivePoll<LivePlayerState>(
     `/api/live/state?gameId=${encodeURIComponent(initial.id)}`,
     POLL_MS,
@@ -131,6 +140,26 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
     } finally {
       await refresh();
       setBusy(false);
+    }
+  };
+
+  const pickTactic = async (tactic: string, target: string | null) => {
+    const index = state.index;
+    myTactic.current = { index, tactic, target };
+    haptic([20]);
+    setState((s) => (s.tactics && s.index === index ? { ...s, tactics: { ...s.tactics, picked: tactic, target } } : s));
+    setTacticSaving(true);
+    try {
+      // Takrorlansa zarari yo'q: oxirgi tanlov saqlanadi
+      const res = await withRetry(() => chooseLiveTacticAction(state.id, index, tactic, target));
+      if (!res.success && myTactic.current?.index === index) {
+        // Savol yopilgan bo'lsa — xabar ko'rsatilmaydi (natija o'zi chiqadi)
+        if (res.error !== "Savol yopildi" && res.error !== "Vaqt tugadi") setError(res.error);
+      }
+    } catch {
+      setError(NET_ERROR);
+    } finally {
+      setTacticSaving(false);
     }
   };
 
@@ -220,6 +249,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         ) : state.status === "question" ? (
           me?.eliminated ? (
             <Waiting title="Siz o'yindan chiqdingiz" text="Jonlar tugadi — oxirigacha tomosha qiling." tone="out" />
+          ) : me?.answered && isAdventure(state.mode) && state.tactics ? (
+            <TacticView state={state} onPick={pickTactic} saving={tacticSaving} />
           ) : me?.answered ? (
             <Waiting title="Javob qabul qilindi" text="Boshqalar javob berishini kuting…" tone="ok" />
           ) : (

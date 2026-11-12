@@ -98,7 +98,82 @@ describe("sarguzasht qoidalari", () => {
   });
 });
 
-async function seed(mode: "race" | "territory" | "arena" | "rocket", count = 5) {
+
+describe("taktikalar", () => {
+  it("poyga: turbo uzoqroq (xatoda orqaga), to'r oldingi robotni suradi, qalqon qaytaradi", () => {
+    const r = adv.revealAdventure(
+      "race",
+      [
+        P({ id: "a", ms: 0, tactic: "turbo" }),
+        P({ id: "b", ms: 0, progress: 100, score: 100 }),
+        P({ id: "c", ms: 0, tactic: "zap", target: "b" }),
+        P({ id: "d", correct: false, tactic: "turbo", progress: 50, score: 50 }),
+      ],
+      ctx()
+    );
+    const by = (id: string) => r.out.find((o) => o.id === id)!;
+    expect(by("a").progress).toBe(168);
+    expect(by("c").progress).toBe(96);
+    expect(by("b").progress).toBe(220 - 50);
+    expect(by("b").score).toBe(220 - 50);
+    expect(by("b").effect.items).toContain("⚡");
+    expect(by("d")).toMatchObject({ progress: 20, score: 20 });
+    expect(r.events.some((e) => e.includes("orqaga surdi"))).toBe(true);
+    // Qalqon to'rni qaytaradi
+    const sh = adv.revealAdventure("race", [P({ id: "b", ms: 0, progress: 100, tactic: "shield" }), P({ id: "c", ms: 0, tactic: "zap", target: "b" })], ctx());
+    expect(sh.out.find((o) => o.id === "b")!.progress).toBe(100 + 102);
+    expect(sh.events[0]).toContain("qalqoni");
+    // Xato javob bilan to'r ishlamaydi
+    const miss = adv.revealAdventure("race", [P({ id: "b", ms: 0, progress: 100 }), P({ id: "c", correct: false, tactic: "zap", target: "b" })], ctx());
+    expect(miss.out.find((o) => o.id === "b")!.progress).toBe(220);
+  });
+
+  it("raketa: forsaj baland, xatoda qattiq qulaydi; ehtiyotkor sekin, kam yo'qotadi", () => {
+    const r = adv.revealAdventure(
+      "rocket",
+      [P({ id: "a", ms: 0, tactic: "boost" }), P({ id: "b", ms: 0, tactic: "careful" }), P({ id: "c", correct: false, tactic: "boost", progress: 500, score: 500 }), P({ id: "d", correct: false, tactic: "careful", progress: 500, score: 500 })],
+      ctx()
+    );
+    const by = (id: string) => r.out.find((o) => o.id === id)!;
+    expect(by("a").progress).toBe(340);
+    expect(by("b").progress).toBe(140);
+    expect(by("c").progress).toBe(300);
+    expect(by("d").progress).toBe(480);
+  });
+
+  it("ko'prik: yoriq taxta — joyida qoladi va hammaga ochiladi; mustahkam taxta ham belgilanadi", () => {
+    const cracks = [1, 0, 2, 0, 0, 0];
+    const r = adv.revealAdventure("bridge", [P({ id: "a", tactic: "1" }), P({ id: "b", tactic: "2" }), P({ id: "c", correct: false, tactic: "1", progress: 1, score: 100 })], { ...ctx(), cracks, known: [] });
+    const by = (id: string) => r.out.find((o) => o.id === id)!;
+    expect(by("a")).toMatchObject({ progress: 0, score: 50, effect: { kind: "crack" } });
+    expect(by("b").progress).toBe(1);
+    expect(by("c")).toMatchObject({ progress: 0, effect: { kind: "splash" } });
+    expect(r.known?.[0]).toBe(0b110);
+  });
+
+  it("oltin kon: yuza qatlamda bomba yo'q, chuqurda olmos ko'p", () => {
+    for (let i = 0; i < 50; i++) expect(adv.rollDig(() => i / 50, "shallow")).not.toBe("bomb");
+    const deep = Array.from({ length: 100 }, (_, i) => adv.rollDig(() => i / 100, "deep"));
+    expect(deep.filter((k) => k === "diamond").length).toBe(30);
+    const r = adv.revealAdventure("gold", [P({ id: "a", ms: 9000, tactic: "deep", score: 500 })], { ...ctx(), rng: () => 0.6 });
+    expect(r.out[0]).toMatchObject({ score: 250, effect: { items: ["💣"] } });
+  });
+
+  it("hudud: hujum tanlangan qo'shnidan oladi, mudofaa hujumni qaytaradi", () => {
+    const cells = adv.emptyCells().map(() => 1);
+    cells[0] = 0;
+    const atk = adv.revealAdventure("territory", [P({ id: "a", slot: 0, ms: 9000, tactic: "attack", target: "1" }), P({ id: "b", slot: 1, correct: false, score: 14300 })], ctx(10, cells));
+    expect(atk.out.find((o) => o.id === "a")!.progress).toBe(3);
+    const def = adv.revealAdventure("territory", [P({ id: "a", slot: 0, ms: 9000, tactic: "attack", target: "1" }), P({ id: "b", slot: 1, ms: 9000, tactic: "defend", score: 14300 })], ctx(10, cells));
+    // Hujum qaytarildi: b birorta katak yo'qotmadi (o'zi esa +1 katak oldi)
+    expect(def.out.find((o) => o.id === "a")!.effect.text).toContain("qal'asiga");
+    expect(def.out.find((o) => o.id === "b")!).toMatchObject({ progress: adv.GRID_W * adv.GRID_H, effect: { kind: "defend" } });
+    expect(def.events.some((e) => e.includes("qaytardi"))).toBe(true);
+    expect(adv.borderRivals(cells, 0)).toEqual([1]);
+  });
+});
+
+async function seed(mode: "race" | "territory" | "arena" | "rocket" | "bridge", count = 5) {
   const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
   const group = await Group.create({ name: "9-A", grade: 9 });
   const mk = (login: string) => User.create({ login, fullName: login.toUpperCase(), role: "student", passwordHash: "x", groupId: group._id });
@@ -173,6 +248,57 @@ describe("sarguzasht rejimlari (server)", () => {
     const host = await live.getLiveHostStateAction(id);
     expect(host.success && host.data.players[0].effect?.kind).toBe("move");
     expect(host.success && host.data.slots).toHaveLength(2);
+  });
+
+  it("taktika: faqat javobdan keyin, natija ochilguncha; natijada qo'llanadi", async () => {
+    const { mentor, ali, vali, id } = await seed("rocket");
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    const g = (await LiveGame.findById(id).lean())!;
+    as(ali);
+    expect((await live.chooseLiveTacticAction(id, 0, "boost")).success).toBe(false);
+    await live.answerLiveQuestionAction(id, 0, g.questions[0].correctAnswers[0]);
+    expect((await live.chooseLiveTacticAction(id, 0, "hack")).success).toBe(false);
+    expect((await live.chooseLiveTacticAction(id, 0, "careful")).success).toBe(true);
+    expect((await live.chooseLiveTacticAction(id, 0, "boost")).success).toBe(true);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.tactics?.picked).toBe("boost");
+    as(vali);
+    await live.answerLiveQuestionAction(id, 0, "x");
+    await live.chooseLiveTacticAction(id, 0, "boost");
+    as(mentor);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.players.filter((p) => p.tactic === "boost")).toHaveLength(2);
+    await live.revealLiveQuestionAction(id);
+    expect((await player(ali)).progress).toBeGreaterThanOrEqual(300);
+    expect((await player(vali)).effect).toMatchObject({ kind: "fall" });
+    as(ali);
+    expect((await live.chooseLiveTacticAction(id, 0, "steady")).success).toBe(false);
+  });
+
+  it("ko'prik: yoriqlar yashirin, bosilgani ochiladi", async () => {
+    const { mentor, ali, vali, id } = await seed("bridge");
+    const g0 = (await LiveGame.findById(id).lean())!;
+    expect(g0.cracks).toHaveLength(adv.bridgeLength(5));
+    const crack = g0.cracks![0];
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    as(ali);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.tactics?.plank).toEqual({ known: 0, broken: 0 });
+    await live.answerLiveQuestionAction(id, 0, g0.questions[0].correctAnswers[0]);
+    await live.chooseLiveTacticAction(id, 0, String(crack));
+    as(vali);
+    await live.answerLiveQuestionAction(id, 0, g0.questions[0].correctAnswers[0]);
+    await live.chooseLiveTacticAction(id, 0, String((crack + 1) % 3));
+    as(mentor);
+    await live.revealLiveQuestionAction(id);
+    expect((await player(ali)).progress).toBe(0);
+    expect((await player(vali)).progress).toBe(1);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.planks[0]).toEqual({ known: (1 << crack) | (1 << ((crack + 1) % 3)), broken: 1 << crack });
+    // Keyingi qadamning yoriqlari ochilmagan
+    expect(host.success && host.data.planks[1]).toEqual({ known: 0, broken: 0 });
   });
 
   it("hudud: xarita o'yinda saqlanadi, ochko — katak × 100", async () => {

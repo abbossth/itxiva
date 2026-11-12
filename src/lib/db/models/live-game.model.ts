@@ -62,6 +62,9 @@ export interface ILiveGameData {
   arenaRounds: number[];
   /** "Hudud bosib olish": har katakning egasi (o'yinchining qo'shilish tartibi), -1 — bo'sh */
   cells: number[];
+  /** "Ko'prikdan o'tish": har qadamdagi yoriq taxta (yashirin) va ochilgan taxtalar (bit maskasi) */
+  cracks?: number[];
+  known?: number[];
   /** Rejim introsi boshlangan vaqt (kutish zalida) */
   introAt?: Date | string | null;
   /** Bonus raund: shu savolda ochko ×2 */
@@ -163,6 +166,8 @@ const LiveGameSchema = new Schema<ILiveGame>(
     minigameRounds: { type: [Number], default: [] },
     arenaRounds: { type: [Number], default: [] },
     cells: { type: [Number], default: [] },
+    cracks: { type: [Number], default: [] },
+    known: { type: [Number], default: [] },
     introAt: { type: Date, default: null },
     bonusIndex: { type: Number, default: null },
     arena: {

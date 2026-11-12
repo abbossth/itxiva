@@ -2,7 +2,8 @@
 // Bu fayl brauzerda ham ishlatiladi (ekranlar), shuning uchun serverga bog'liq emas.
 
 export type MinigameKind = "tap" | "target" | "wheel" | "bonus";
-export const MINIGAME_KINDS: MinigameKind[] = ["tap", "target", "wheel", "bonus"];
+// "Tezkor bosish" endi tanlanmaydi (o'quvchilar sichqonchani qiynab bosardi); tur faqat eski o'yinlar uchun qoldi
+export const MINIGAME_KINDS: MinigameKind[] = ["target", "wheel", "bonus"];
 
 export const MINIGAMES: Record<MinigameKind, { title: string; rule: string; seconds: number }> = {
   tap: { title: "Tezkor bosish", rule: "10 soniyada tugmani iloji boricha ko'p bosing!", seconds: 10 },

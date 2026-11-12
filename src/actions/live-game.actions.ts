@@ -40,7 +40,7 @@ import {
 } from "@/lib/live-game/minigames";
 import { PVP_INTRO_S, PVP_SECONDS, pvpStandings } from "@/lib/live-game/pvp";
 import { liveSnapshot } from "@/lib/live-game/live-cache";
-import { INTRO_MS, bridgeLength, emptyCells, isAdventure, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
+import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic, makeCracks, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
 
 /** "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang, oxirida final */
 const ARENA_EVERY = 3;
@@ -170,6 +170,7 @@ export async function createLiveGameAction(input: {
       // "Kiber arena" rejimida qisqa o'yinlar o'rnini janglar egallaydi, final jang doim bor
       options: input.mode === "arena" ? { minigames: false, arena: true } : { minigames: input.minigames !== false, arena: input.arena === true },
       cells: input.mode === "territory" ? emptyCells() : [],
+      cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
     });
     return { success: true, data: { gameId: game._id.toString(), existing: false } };
   } catch (err) {
@@ -291,9 +292,18 @@ async function applyAdventure(game: ILiveGame) {
       streak: p.streak,
       correct: Boolean(a?.isCorrect),
       ms: a?.ms ?? limitMs,
+      tactic: a?.tactic ?? null,
+      target: a?.target ?? null,
     };
   });
-  const { out, cells, events } = revealAdventure(game.mode, input, { total: game.questions.length, limitMs, cells: game.cells ?? [], rng: Math.random });
+  const { out, cells, events, known } = revealAdventure(game.mode, input, {
+    total: game.questions.length,
+    limitMs,
+    cells: game.cells ?? [],
+    rng: Math.random,
+    cracks: game.cracks ?? [],
+    known: game.known ?? [],
+  });
   await LiveGamePlayer.bulkWrite(
     out.map((o) => ({
       updateOne: {
@@ -312,6 +322,7 @@ async function applyAdventure(game: ILiveGame) {
     }))
   );
   if (game.mode === "territory") await LiveGame.updateOne({ _id: game._id }, { $set: { cells } });
+  if (game.mode === "bridge" && known) await LiveGame.updateOne({ _id: game._id }, { $set: { known } });
   if (events.length > 0) await pushEvents(game._id, events.slice(0, 6).map((text) => ({ text, kind: "info" as const })));
 }
 
@@ -504,6 +515,8 @@ export interface LivePlayerRow {
   finished: boolean;
   /** Oxirgi natija ta'siri (faqat shu savolniki) */
   effect: { kind: string; text: string; delta: number; items: string[] } | null;
+  /** Sarguzasht rejimlari: shu savolda tanlangan taktika */
+  tactic: string | null;
 }
 
 export interface LiveQuestionView {
@@ -639,6 +652,8 @@ export interface LiveHostState {
   cells: number[];
   /** Qo'shilish tartibi bo'yicha o'yinchi id'lari (hudud ranglari uchun) */
   slots: string[];
+  /** "Ko'prikdan o'tish": har qadamda ochilgan taxtalar — singanmi */
+  planks: { known: number; broken: number }[];
 }
 
 const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): LivePlayerRow[] =>
@@ -664,6 +679,7 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): 
       progress: p.progress ?? 0,
       finished: Boolean(p.finished),
       effect: p.effect && p.effect.index === index ? { kind: p.effect.kind, text: p.effect.text, delta: p.effect.delta, items: p.effect.items ?? [] } : null,
+      tactic: ans?.tactic ?? null,
     };
   });
 
@@ -722,11 +738,22 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
         goal: goalOf(game.mode, game.questions.length),
         cells: game.mode === "territory" ? game.cells ?? [] : [],
         slots: slotsOf(players),
+        planks: bridgePlanks(game),
       },
     };
   } catch (err) {
     return errorOf(err, "Holatni olib bo'lmadi");
   }
+}
+
+/** Ko'prik: faqat bosilgan (ochilgan) taxtalar va ulardan qaysi biri singan — yashirin yoriqlar ko'rsatilmaydi */
+function bridgePlanks(game: Pick<ILiveGame, "mode" | "questions" | "cracks" | "known">): { known: number; broken: number }[] {
+  if (game.mode !== "bridge") return [];
+  return Array.from({ length: bridgeLength(game.questions.length) }, (_, i) => {
+    const known = game.known?.[i] ?? 0;
+    const crack = game.cracks?.[i] ?? -1;
+    return { known, broken: crack >= 0 && known & (1 << crack) ? 1 << crack : 0 };
+  });
 }
 
 export interface LiveGameListItem {
@@ -885,6 +912,34 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
   }
 }
 
+/** Sarguzasht rejimlari: javobdan keyin taktika tanlash (natija ochilguncha o'zgartirish mumkin) */
+export async function chooseLiveTacticAction(gameId: string, index: number, tactic: string, target?: string | null): Promise<Result<{ tactic: string }>> {
+  try {
+    const user = await requireStudent();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId) || !Number.isInteger(index) || index < 0 || typeof tactic !== "string") {
+      return fail("Taktikani tanlab bo'lmaydi");
+    }
+    await connectDB();
+    const game = await LiveGame.findById(gameId)
+      .select({ groupId: 1, status: 1, index: 1, mode: 1, questionStartedAt: 1, questions: { $slice: [index, 1] } })
+      .lean<Pick<ILiveGame, "groupId" | "status" | "index" | "mode" | "questionStartedAt" | "questions"> & { _id: mongoose.Types.ObjectId }>();
+    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (!isAdventure(game.mode) || !isTactic(game.mode, tactic)) return fail("Bu taktika yo'q");
+    if (game.status !== "question" || game.index !== index || !game.questionStartedAt) return fail("Savol yopildi");
+    const limit = (game.questions[0]?.timeLimit ?? 20) * 1000;
+    if (Date.now() - new Date(game.questionStartedAt).getTime() > limit + LIVE_GRACE_MS) return fail("Vaqt tugadi");
+    const clean = typeof target === "string" ? target.slice(0, 40) : null;
+    const res = await LiveGamePlayer.updateOne(
+      { gameId: game._id, studentId: user.userId, answers: { $elemMatch: { index } } },
+      { $set: { "answers.$.tactic": tactic, "answers.$.target": clean } }
+    );
+    if (res.matchedCount === 0) return fail("Avval savolga javob bering");
+    return { success: true, data: { tactic } };
+  } catch (err) {
+    return errorOf(err, "Taktikani saqlab bo'lmadi");
+  }
+}
+
 /** Xazina sandig'ini ochish: natija serverda tasodifiy tanlanadi */
 export async function openLiveChestAction(gameId: string): Promise<Result<{ kind: string; amount: number; text: string }>> {
   try {
@@ -984,6 +1039,18 @@ export interface LivePlayerState {
     effect: { kind: string; text: string; delta: number; items: string[] } | null;
     /** Qo'shilish tartibi (hudud rangi) */
     slot: number;
+  } | null;
+  /** Sarguzasht rejimlari: javobdan keyingi taktika tanlovi uchun */
+  tactics: {
+    /** Tanlangan taktika (shu savolda) */
+    picked: string | null;
+    target: string | null;
+    /** Poyga: oldingi robotlar (yaqinlari) */
+    ahead: { id: string; name: string; progress: number }[];
+    /** Hudud: chegaradosh raqiblar */
+    rivals: { slot: number; name: string; cells: number }[];
+    /** Ko'prik: keyingi qadamdagi taxtalar (ochilgan / singan bit maskasi) */
+    plank: { known: number; broken: number } | null;
   } | null;
   /** Marra yoki ko'prik uzunligi */
   goal: number;
@@ -1111,6 +1178,33 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               slot: slotsOf(players).indexOf(mine._id.toString()),
             }
           : null,
+        tactics: (() => {
+          if (!isAdventure(game.mode) || game.status !== "question" || !mine) return null;
+          const slots = slotsOf(players);
+          const mySlot = slots.indexOf(mine._id.toString());
+          const nameOf = (slot: number) => players.find((p) => p._id.toString() === slots[slot])?.name ?? "?";
+          const cells = game.cells ?? [];
+          return {
+            picked: ans?.tactic ?? null,
+            target: ans?.target ?? null,
+            ahead:
+              game.mode === "race"
+                ? players
+                    .filter((p) => !p.finished && (p.progress ?? 0) > (mine.progress ?? 0))
+                    .sort((a, b) => (a.progress ?? 0) - (b.progress ?? 0))
+                    .slice(0, 4)
+                    .map((p) => ({ id: p._id.toString(), name: p.name, progress: p.progress ?? 0 }))
+                : [],
+            rivals:
+              game.mode === "territory"
+                ? borderRivals(cells, mySlot)
+                    .map((slot) => ({ slot, name: nameOf(slot), cells: cells.filter((c) => c === slot).length }))
+                    .sort((a, b) => b.cells - a.cells)
+                    .slice(0, 6)
+                : [],
+            plank: game.mode === "bridge" && !mine.finished ? bridgePlanks(game)[mine.progress ?? 0] ?? null : null,
+          };
+        })(),
         goal: goalOf(game.mode, game.questions.length),
         cells: game.mode === "territory" && game.status !== "question" ? game.cells ?? [] : [],
         introMs: introLeft(game),

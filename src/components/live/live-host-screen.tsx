@@ -15,7 +15,7 @@ import {
   startLiveQuestionAction,
   type LiveHostState,
 } from "@/actions/live-game.actions";
-import { isAdventure } from "@/lib/live-game/adventures";
+import { TACTICS, isAdventure } from "@/lib/live-game/adventures";
 import { MODE_THEMES } from "@/lib/live-game/themes";
 import { AdventureBoard } from "./adventure-boards";
 import { useLivePoll } from "./use-live-poll";
@@ -41,6 +41,8 @@ const LOBBY_TRACK = "/audio/lobby.mp3";
 const autoDelayFor = (mode: LiveHostState["mode"]) => (mode === "chest" ? 14 : 10);
 /** Natijada to'g'ri javob shuncha ko'rsatilgach reyting sahnasiga o'tiladi */
 const ANSWER_STEP_MS = 3500;
+/** Sarguzasht rejimlari: hamma javob bergach taktika tanlashga ko'pi bilan shuncha vaqt */
+const TACTIC_WAIT_MS = 6000;
 
 // "Avto" tanlovi brauzerda eslab qolinadi (keyingi o'yinda ham yoqilgan bo'ladi)
 const AUTO_KEY = "itxiva:live-autoplay";
@@ -89,6 +91,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const minigameEnding = useRef<number | null>(null);
   const minigameEndsAt = useRef<{ round: number; at: number } | null>(null);
   const revealing = useRef<number | null>(null);
+  const allDoneAt = useRef<{ index: number; at: number } | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
 
   // Holat har soniyada yangilanadi (tab yashirin bo'lsa — to'xtaydi). Oddiy GET: ustoz tugmalari
@@ -131,6 +134,11 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     // Vaqt — server qiymati bo'yicha (mahalliy taymer faqat ko'rsatish uchun)
     const timeUp = state.remainingMs <= 0 || (remaining <= 0 && state.remainingMs < 1500);
     if (!timeUp && !allDone) return;
+    // Sarguzasht rejimlarida hamma javob bergan bo'lsa ham — taktika tanlashga bir necha soniya
+    if (!timeUp && isAdventure(state.mode) && !state.players.filter((p) => p.answered).every((p) => p.tactic)) {
+      if (allDoneAt.current?.index !== state.index) allDoneAt.current = { index: state.index, at: Date.now() };
+      if (Date.now() - allDoneAt.current.at < TACTIC_WAIT_MS) return;
+    }
     const index = state.index;
     revealing.current = index;
     // Tarmoq xatosida belgi qaytariladi — keyingi yangilanishda yana urinadi (aks holda savol ochilmay qolardi)
@@ -558,10 +566,31 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
           Javob berdi: <span className="font-mono text-emerald-300">{state.players.filter((p) => p.answered).length}</span>
           <span className="text-slate-400"> / {state.activeCount}</span>
         </p>
+        {isAdventure(state.mode) && <TacticTally state={state} />}
         <Button variant="secondary" onClick={onReveal} disabled={busy} className="gap-2">
           <SkipForward className="h-4 w-4" /> Natijani ko&apos;rsatish
         </Button>
       </div>
+    </div>
+  );
+}
+
+/** Proyektorda: qaysi taktikani nechta o'quvchi tanladi (sirli emas — natijada baribir ko'rinadi) */
+function TacticTally({ state }: { state: LiveHostState }) {
+  if (!isAdventure(state.mode)) return null;
+  const list = TACTICS[state.mode];
+  const count = (id: string) => state.players.filter((p) => p.tactic === id).length;
+  const picked = state.players.filter((p) => p.tactic).length;
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-label="Taktikalar">
+      <span className="text-sm font-bold text-slate-300">Taktika:</span>
+      {list.map((t) => (
+        <span key={t.id} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-base font-black transition-colors", count(t.id) > 0 ? "bg-white/15" : "bg-white/5 text-white/40")}>
+          <span>{t.icon}</span>
+          <span className="font-mono">{count(t.id)}</span>
+        </span>
+      ))}
+      {picked === 0 && <span className="text-xs text-slate-400">javob berganlar telefonda tanlaydi</span>}
     </div>
   );
 }

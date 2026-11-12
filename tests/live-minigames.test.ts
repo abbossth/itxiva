@@ -80,7 +80,9 @@ describe("qoidalar", () => {
     expect(mg.minigameDue(1, 10, [])).toBe(false);
     expect(mg.minigameDue(2, 3, [])).toBe(false);
     expect(mg.minigameDue(2, 10, [2])).toBe(false);
-    for (let r = 0; r < 1; r += 0.1) expect(mg.pickMinigame("tap", r)).not.toBe("tap");
+    for (let r = 0; r < 1; r += 0.1) expect(mg.pickMinigame("target", r)).not.toBe("target");
+    // Tezkor bosish olib tashlangan — hech qachon tanlanmaydi
+    for (let r = 0; r < 1; r += 0.05) expect(mg.pickMinigame(null, r)).not.toBe("tap");
   });
 
   it("ochko: bosish ×5 (120 gacha) va eng tezga +200, nishon ×40; katta son chegaralanadi", () => {
@@ -101,13 +103,13 @@ describe("qoidalar", () => {
 });
 
 describe("o'yin ichida", () => {
-  it("tezkor bosish: 3-savoldan keyin boshlanadi, natija vaqt oynasida qabul qilinadi, ochko qo'shiladi, keyin 4-savol", async () => {
+  it("mo'ljalga otish: 3-savoldan keyin boshlanadi, natija vaqt oynasida qabul qilinadi, ochko qo'shiladi, keyin 4-savol", async () => {
     const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
-    vi.spyOn(Math, "random").mockReturnValue(0); // tur: tap
+    vi.spyOn(Math, "random").mockReturnValue(0); // tur: mo'ljal
     await live.startLiveQuestionAction(id);
     let g = await LiveGame.findById(id).lean();
-    expect(g).toMatchObject({ status: "minigame", minigame: { kind: "tap", round: 2 } });
+    expect(g).toMatchObject({ status: "minigame", minigame: { kind: "target", round: 2 } });
 
     as(ali);
     expect((await live.submitMinigameAction(id, 2, 10)).success).toBe(false); // sanoq paytida hali qabul qilinmaydi
@@ -124,13 +126,14 @@ describe("o'yin ichida", () => {
     await live.endMinigameAction(id);
     await live.endMinigameAction(id); // ikkinchi marta hech narsa qo'shmaydi
     const score = async (u: { _id: import("mongoose").Types.ObjectId }) => (await LiveGamePlayer.findOne({ studentId: u._id }).lean())?.score;
-    expect(await score(ali)).toBe(250 + 200);
-    expect(await score(vali)).toBe(100);
+    // 50 → 40 gacha cheklanadi, ochko — 30 nishongacha ×40
+    expect(await score(ali)).toBe(30 * 40);
+    expect(await score(vali)).toBe(20 * 40);
 
     const host = await live.getLiveHostStateAction(id);
     expect(host.success && host.data.minigame?.progress.map((p) => [p.name, p.value, p.points])).toEqual([
-      ["ALI", 50, 450],
-      ["VALI", 20, 100],
+      ["ALI", 40, 1200],
+      ["VALI", 20, 800],
     ]);
 
     await live.startLiveQuestionAction(id);
