@@ -51,7 +51,21 @@ export interface ICoinLedgerData {
   referenceId?: string | mongoose.Types.ObjectId | null;
   description: string;
   balanceAfter?: number;
+  /** Mentor tuzatishlari: summa o'zgartirilgan yoki bekor qilingan (yozuv o'chirilmaydi — mukofot qayta berilmasin) */
+  edits?: ICoinLedgerEdit[];
+  /** Mentor bekor qilgan (coin va XP 0 ga tushirilgan) */
+  voidedAt?: Date | string | null;
   createdAt?: Date | string;
+}
+
+export interface ICoinLedgerEdit {
+  at: Date | string;
+  by: string | mongoose.Types.ObjectId;
+  fromCoin: number;
+  fromXp: number;
+  toCoin: number;
+  toXp: number;
+  reason: string;
 }
 
 export interface ICoinLedger extends Document, Omit<ICoinLedgerData, "_id"> {
@@ -91,6 +105,24 @@ const CoinLedgerSchema = new Schema<ICoinLedger>(
     balanceAfter: {
       type: Number,
     },
+    edits: {
+      type: [
+        new Schema(
+          {
+            at: { type: Date, default: Date.now },
+            by: { type: Schema.Types.ObjectId, ref: "User" },
+            fromCoin: Number,
+            fromXp: Number,
+            toCoin: Number,
+            toXp: Number,
+            reason: { type: String, default: "" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: undefined,
+    },
+    voidedAt: { type: Date, default: undefined },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

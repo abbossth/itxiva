@@ -12,6 +12,7 @@ import {
   Clock,
   ChevronRight,
   UserRound,
+  Coins,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { IUserData } from "@/lib/db/models/user.model";
@@ -26,6 +27,7 @@ import { useToast } from "@/components/ui/toast";
 import { StudentImportModal } from "@/components/mentor/student-import-modal";
 import { ResetPasswordModal } from "@/components/mentor/reset-password-modal";
 import { CredentialsExport } from "@/components/mentor/credentials-export";
+import { GrantCoinsDialog } from "@/components/mentor/coin-admin-dialogs";
 import { moveStudentAction, deleteStudentAction } from "@/actions/student.actions";
 import { formatDateUz } from "@/lib/utils";
 import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
@@ -66,6 +68,22 @@ export function GroupStudentsView({
   // Delete modal state
   const [studentToDelete, setStudentToDelete] = useState<IUserData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Coin berish: bitta o'quvchi yoki belgilanganlar
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [grantFor, setGrantFor] = useState<{ id: string; name: string }[] | null>(null);
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const onGranted = ({ coin, ids }: { coin: number; ids: string[] }) => {
+    // Ro'yxatdagi coinlar darhol yangilanadi (faqat haqiqatda yozilganlar)
+    setStudents((list) => list.map((s) => (ids.includes(s._id.toString()) ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + coin) } : s)));
+    setSelected(new Set());
+  };
 
   const { toast } = useToast();
 
@@ -145,6 +163,34 @@ export function GroupStudentsView({
 
       <TableFilterBar table={table} />
 
+      {/* Belgilanganlarga coin */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 rounded-xl px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-teal-600"
+            checked={filtered.length > 0 && filtered.every((s) => selected.has(s._id.toString()))}
+            onChange={(e) => setSelected(e.target.checked ? new Set(filtered.map((s) => s._id.toString())) : new Set())}
+          />
+          Hammasini belgilash
+        </label>
+        {selected.size > 0 && (
+          <>
+            <Button
+              variant="gold"
+              size="sm"
+              className="gap-1.5 min-h-[40px]"
+              onClick={() => setGrantFor(students.filter((s) => selected.has(s._id.toString())).map((s) => ({ id: s._id.toString(), name: s.fullName })))}
+            >
+              <Coins className="w-4 h-4" /> Belgilanganlarga coin ({selected.size})
+            </Button>
+            <Button variant="ghost" size="sm" className="min-h-[40px]" onClick={() => setSelected(new Set())}>
+              Tozalash
+            </Button>
+          </>
+        )}
+      </div>
+
       {/* === DESKTOP TABLE VIEW (md and up) === */}
       <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-surface">
         <table className="w-full text-left text-xs sm:text-sm">
@@ -171,7 +217,18 @@ export function GroupStudentsView({
                   key={s._id.toString()}
                   className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400 font-mono text-xs">{idx + 1}</td>
+                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400 font-mono text-xs">
+                    <label className="inline-flex min-h-[36px] cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-teal-600"
+                        checked={selected.has(s._id.toString())}
+                        onChange={() => toggle(s._id.toString())}
+                        aria-label={`${s.fullName} ni belgilash`}
+                      />
+                      {idx + 1}
+                    </label>
+                  </td>
                   <td className="px-4 py-2">
                     <Link
                       href={`/mentor/students/${s._id}`}
@@ -195,6 +252,15 @@ export function GroupStudentsView({
                   </td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setGrantFor([{ id: s._id.toString(), name: s.fullName }])}
+                        className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer flex items-center justify-center"
+                        aria-label={`${s.fullName} ga coin berish`}
+                        title="Coin berish"
+                      >
+                        <Coins className="w-4 h-4" />
+                      </button>
                       <Link
                         href={`/mentor/students/${s._id}`}
                         className="p-2 min-h-[36px] min-w-[36px] rounded-xl text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors flex items-center justify-center"
@@ -265,9 +331,16 @@ export function GroupStudentsView({
                     </div>
                   </div>
                 </Link>
-                <span className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 accent-teal-600"
+                    checked={selected.has(s._id.toString())}
+                    onChange={() => toggle(s._id.toString())}
+                    aria-label={`${s.fullName} ni belgilash`}
+                  />
                   #{idx + 1}
-                </span>
+                </label>
               </div>
 
               {/* Card middle: Coins & Last Login */}
@@ -282,7 +355,15 @@ export function GroupStudentsView({
               </div>
 
               {/* Card bottom: 3 clear action buttons (44px min touch target) */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+              <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                <button
+                  type="button"
+                  onClick={() => setGrantFor([{ id: s._id.toString(), name: s.fullName }])}
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-200 bg-amber-100/70 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-800/60 min-h-[44px] cursor-pointer active:scale-95 transition-transform"
+                >
+                  <Coins className="w-3.5 h-3.5 shrink-0" />
+                  <span>Coin</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setSelectedStudentForReset(s)}
@@ -314,6 +395,8 @@ export function GroupStudentsView({
           ))
         )}
       </div>
+
+      <GrantCoinsDialog students={grantFor ?? []} open={Boolean(grantFor)} onOpenChange={(o) => !o && setGrantFor(null)} onDone={onGranted} />
 
       {/* Move Student Modal */}
       <Dialog open={Boolean(studentToMove)} onOpenChange={(open) => !open && setStudentToMove(null)}>

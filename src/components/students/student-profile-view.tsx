@@ -32,6 +32,7 @@ import {
   reportAverages,
 } from "@/components/students/report-blocks";
 import { ResetPasswordModal } from "@/components/mentor/reset-password-modal";
+import { EditCoinEntryDialog, GrantCoinsDialog, type EditableEntry } from "@/components/mentor/coin-admin-dialogs";
 import { StudentPersonalForm } from "@/components/students/student-personal-form";
 import { setStudentPhotoAction, type StudentProfileData } from "@/actions/student-profile.actions";
 import { uploadFileToStorage } from "@/lib/upload-client";
@@ -49,6 +50,8 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
   const [photoUrl, setPhotoUrl] = useState(profile.photoUrl);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [grantOpen, setGrantOpen] = useState(false);
+  const [editing, setEditing] = useState<EditableEntry | null>(null);
 
   const { homeworkAvg, quizAvg, examAvg } = reportAverages(report);
   // Faoliyat tasmasi: o'quvchining o'z harakatlari va mentor amallari bitta ro'yxatda
@@ -150,7 +153,11 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
           </div>
         </div>
 
-        <div className="flex sm:flex-col gap-2 shrink-0">
+        <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
+          <Button variant="gold" size="sm" className="gap-1.5 min-h-[40px]" onClick={() => setGrantOpen(true)}>
+            <Coins className="w-4 h-4" />
+            Coin berish
+          </Button>
           <Button variant="secondary" size="sm" className="gap-1.5 min-h-[40px]" onClick={() => setResetOpen(true)}>
             <KeyRound className="w-4 h-4" />
             Parolni tiklash
@@ -186,7 +193,7 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
           tone={scoreTone(quizAvg)}
           hint={`${report.quizzes.length} ta test${examAvg === null ? "" : ` · imtihon ${examAvg}%`}`}
         />
-        <StatTile icon={Coins} label="Jami coin" value={student.totalCoins} hint="Reyting uchun" />
+        <StatTile icon={Coins} label="Jami coin" value={student.totalCoins} hint={`Reyting uchun · ${student.xp} XP`} />
         <div className="col-span-2 lg:col-span-1">
           <StatTile icon={Wallet} label="Balans" value={student.spendableBalance} hint="Sarflash mumkin" />
         </div>
@@ -206,7 +213,17 @@ export function StudentProfileView({ profile }: { profile: StudentProfileData })
         </TabsContent>
 
         <TabsContent value="coins" className="space-y-4">
-          <CoinHistory ledger={report.ledger} balance={student.spendableBalance} csvName={student.login} />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Xato yozilgan coin yoki XP ni ✏️ tugmasi bilan o&apos;zgartiring yoki bekor qiling. Qo&apos;lda berish — yuqoridagi &quot;Coin berish&quot; tugmasi.
+          </p>
+          <CoinHistory
+            ledger={report.ledger}
+            balance={student.spendableBalance}
+            csvName={student.login}
+            onEdit={(l) => setEditing({ id: l.id, amount: l.amount, xp: l.xp, description: l.description })}
+          />
+          <GrantCoinsDialog students={[{ id: student._id, name: student.fullName }]} open={grantOpen} onOpenChange={setGrantOpen} />
+          <EditCoinEntryDialog entry={editing} onOpenChange={(o) => !o && setEditing(null)} />
           <OrdersList orders={report.orders} />
         </TabsContent>
 

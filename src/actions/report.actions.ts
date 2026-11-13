@@ -417,6 +417,7 @@ export interface StudentReport {
     groupName: string | null;
     totalCoins: number;
     spendableBalance: number;
+    xp: number;
     lastLoginAt: string | null;
   };
   attendance: {
@@ -427,7 +428,18 @@ export interface StudentReport {
   quizzes: { title: string; totalScore: number; maxScore: number; status: string; submittedAt: string | null }[];
   homework: { lessonId: string; title: string; status: HomeworkStatus; score: number | null; isLate: boolean; submittedAt: string | null }[];
   exams: { title: string; attemptNumber: number; isMain: boolean; totalScore: number; maxScore: number; status: string; isPassed: boolean; submittedAt: string | null }[];
-  ledger: { amount: number; type: CoinTransactionType; description: string; balanceAfter: number | null; createdAt: string | null }[];
+  ledger: {
+    id: string;
+    amount: number;
+    xp: number;
+    type: CoinTransactionType;
+    description: string;
+    balanceAfter: number | null;
+    createdAt: string | null;
+    /** Mentor bekor qilgan / summasini o'zgartirgan (oxirgi tuzatish) */
+    voided: boolean;
+    edit: { fromCoin: number; fromXp: number; reason: string; at: string | null } | null;
+  }[];
   /** XP harakati (gamifikatsiyadan keyingi yozuvlar; "xp_align" — oldingi coinlardan boshlang'ich XP) */
   xpHistory: { xp: number; type: CoinTransactionType; description: string; createdAt: string | null }[];
   orders: { productTitle: string; price: number; status: OrderStatus; createdAt: string | null }[];
@@ -505,6 +517,7 @@ async function loadStudentReport(studentId: string): Promise<StudentReport | nul
       groupName: group?.name ?? null,
       totalCoins: student.totalCoins ?? 0,
       spendableBalance: student.spendableBalance ?? 0,
+      xp: student.xp ?? 0,
       lastLoginAt: iso(student.lastLoginAt),
     },
     attendance: {
@@ -544,13 +557,22 @@ async function loadStudentReport(studentId: string): Promise<StudentReport | nul
       isPassed: e.isPassed,
       submittedAt: iso(e.submittedAt),
     })),
-    ledger: ledger.map((l) => ({
-      amount: l.amount,
-      type: l.type,
-      description: l.description,
-      balanceAfter: typeof l.balanceAfter === "number" ? l.balanceAfter : null,
-      createdAt: iso(l.createdAt),
-    })),
+    ledger: ledger.map((l) => {
+      const last = l.edits?.at(-1);
+      // Birinchi tuzatishdan oldingi asl qiymat
+      const first = l.edits?.[0];
+      return {
+        id: l._id.toString(),
+        amount: l.amount,
+        xp: l.xp ?? 0,
+        type: l.type,
+        description: l.description,
+        balanceAfter: typeof l.balanceAfter === "number" ? l.balanceAfter : null,
+        createdAt: iso(l.createdAt),
+        voided: Boolean(l.voidedAt),
+        edit: last && first ? { fromCoin: first.fromCoin, fromXp: first.fromXp, reason: last.reason, at: iso(last.at) } : null,
+      };
+    }),
     xpHistory: xpRows.map((l) => ({
       xp: l.xp ?? 0,
       type: l.type,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "@/components/ui/link";
-import { Coins, Wallet, Zap } from "lucide-react";
+import { Coins, Pencil, Wallet, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReportSection, ScoreBar, StatTile } from "@/components/reports/report-parts";
 import type { StudentReport } from "@/actions/report.actions";
@@ -134,11 +134,14 @@ export function CoinHistory({
   balance,
   csvName,
   title = "Coinlar tarixi",
+  onEdit,
 }: {
   ledger: StudentReport["ledger"];
   balance: number;
   csvName: string;
   title?: string;
+  /** Mentor: yozuvni tuzatish (berilmasa — faqat ko'rish) */
+  onEdit?: (entry: StudentReport["ledger"][number]) => void;
 }) {
   const [filter, setFilter] = useState<LedgerFilter>("all");
   const [type, setType] = useState<CoinTransactionType | "">("");
@@ -277,10 +280,16 @@ export function CoinHistory({
                     {formatCoinDelta(l.amount)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-slate-800 dark:text-slate-200 break-words">{l.description}</span>
+                    <span className={cn("block text-sm break-words", l.voided ? "text-slate-500 line-through dark:text-slate-500" : "text-slate-800 dark:text-slate-200")}>{l.description}</span>
                     <span className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500 dark:text-slate-400">
                       <span className={cn("px-1.5 py-0.5 rounded-md font-semibold", COIN_TYPE_COLORS[l.type].soft)}>{COIN_TYPE_LABELS[l.type]}</span>
                       {l.createdAt && <span>{formatDateTimeUz(l.createdAt)}</span>}
+                      {l.edit && (
+                        <span className={cn("px-1.5 py-0.5 rounded-md font-semibold", l.voided ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300" : "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300")}>
+                          {l.voided ? "Ustoz bekor qildi" : `Ustoz tuzatdi (avval ${formatCoinDelta(l.edit.fromCoin)})`}
+                          {l.edit.reason ? `: ${l.edit.reason}` : ""}
+                        </span>
+                      )}
                     </span>
                   </span>
                   {l.balanceAfter !== null && (
@@ -288,6 +297,17 @@ export function CoinHistory({
                       balans
                       <span className="block text-sm font-bold tabular-nums text-slate-800 dark:text-slate-200">{l.balanceAfter}</span>
                     </span>
+                  )}
+                  {onEdit && l.type !== "purchase" && l.type !== "xp_align" && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(l)}
+                      aria-label={`Tuzatish: ${l.description}`}
+                      title="O'zgartirish yoki bekor qilish"
+                      className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/30 cursor-pointer transition-colors"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
                   )}
                 </li>
               ))}
