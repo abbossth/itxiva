@@ -1,65 +1,99 @@
 // "Kiber jang" chizmalari (canvas): xarita, qahramonlar, o'qlar, sovg'alar. O'quvchi va proyektor bir xil ko'radi.
 
-import { BUSHES, MAP_H, MAP_W, PLAYER_R, POWERS, PVP_WALLS, TELEPORTS, TELEPORT_R, skinOf, type PowerKind, type Shot } from "@/lib/live-game/pvp";
+import { DEFAULT_MAP, EMOTES, PLAYER_R, POWERS, TELEPORT_R, skinOf, type ArenaMap, type PowerKind, type Shot } from "@/lib/live-game/pvp";
 
 export const PEER_COLORS = ["#f472b6", "#a78bfa", "#fb923c", "#4ade80", "#facc15", "#60a5fa", "#f87171", "#2dd4bf", "#e879f9", "#a3e635"];
 
-/** Bazalar (burchaklar) rangi */
-const BASES = [
-  { x: 240, y: 240, c: "34,211,238" },
-  { x: 2160, y: 240, c: "244,114,182" },
-  { x: 240, y: 1160, c: "163,230,53" },
-  { x: 2160, y: 1160, c: "245,158,11" },
-];
-
 /** Qo'zg'almas pol: fon, bazalar, plitkalar, yo'laklar, chegara (bir marta chiziladi) */
-function drawFloorStatic(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = "#0b1226";
-  ctx.fillRect(0, 0, MAP_W, MAP_H);
-  for (const b of BASES) {
-    const g = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, 420);
-    g.addColorStop(0, `rgba(${b.c},0.20)`);
-    g.addColorStop(1, `rgba(${b.c},0)`);
-    ctx.fillStyle = g;
-    ctx.fillRect(b.x - 420, b.y - 420, 840, 840);
+function drawFloorStatic(ctx: CanvasRenderingContext2D, map: ArenaMap) {
+  const { w: W, h: H, theme } = map;
+  ctx.fillStyle = theme.floor;
+  ctx.fillRect(0, 0, W, H);
+  // Yulduzlar (kosmik xarita)
+  if (theme.stars) {
+    for (let i = 0; i < 260; i++) {
+      const x = (i * 7919) % W;
+      const y = (i * 104729) % H;
+      ctx.fillStyle = `rgba(255,255,255,${0.15 + ((i * 37) % 60) / 100})`;
+      ctx.fillRect(x, y, i % 9 === 0 ? 3 : 2, i % 9 === 0 ? 3 : 2);
+    }
   }
-  ctx.strokeStyle = "rgba(99,102,241,0.10)";
+  map.bases.forEach((b, i) => {
+    const c = theme.bases[i % theme.bases.length];
+    const g = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, 460);
+    g.addColorStop(0, `rgba(${c},0.22)`);
+    g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(b.x - 460, b.y - 460, 920, 920);
+  });
+  ctx.strokeStyle = theme.grid;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  for (let x = 0; x <= MAP_W; x += 80) {
+  for (let x = 0; x <= W; x += 80) {
     ctx.moveTo(x, 0);
-    ctx.lineTo(x, MAP_H);
+    ctx.lineTo(x, H);
   }
-  for (let y = 0; y <= MAP_H; y += 80) {
+  for (let y = 0; y <= H; y += 80) {
     ctx.moveTo(0, y);
-    ctx.lineTo(MAP_W, y);
+    ctx.lineTo(W, y);
   }
   ctx.stroke();
-  ctx.strokeStyle = "rgba(56,189,248,0.10)";
-  ctx.lineWidth = 26;
+  // Asosiy yo'laklar (markazdan o'tuvchi xoch)
+  ctx.strokeStyle = `rgba(${theme.wallEdge},0.08)`;
+  ctx.lineWidth = 30;
   ctx.beginPath();
-  ctx.moveTo(240, 700);
-  ctx.lineTo(MAP_W - 240, 700);
-  ctx.moveTo(1200, 160);
-  ctx.lineTo(1200, MAP_H - 160);
+  ctx.moveTo(240, H / 2);
+  ctx.lineTo(W - 240, H / 2);
+  ctx.moveTo(W / 2, 160);
+  ctx.lineTo(W / 2, H - 160);
   ctx.stroke();
+  // Tezlik yo'laklari: o'qchali chiziqlar
+  for (const p of map.pads) {
+    ctx.fillStyle = `rgba(${theme.pad},0.14)`;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.strokeStyle = `rgba(${theme.pad},0.55)`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p.x + 1.5, p.y + 1.5, p.w - 3, p.h - 3);
+    ctx.fillStyle = `rgba(${theme.pad},0.45)`;
+    const horiz = p.w >= p.h;
+    const n = Math.floor((horiz ? p.w : p.h) / 60);
+    for (let i = 0; i < n; i++) {
+      ctx.save();
+      ctx.translate(horiz ? p.x + 30 + i * 60 : p.x + p.w / 2, horiz ? p.y + p.h / 2 : p.y + 30 + i * 60);
+      if (!horiz) ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-10, -12);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(-10, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
   ctx.save();
-  ctx.shadowColor = "#a855f7";
+  ctx.shadowColor = `rgb(${theme.edge})`;
   ctx.shadowBlur = 24;
-  ctx.strokeStyle = "rgba(192,132,252,0.95)";
+  ctx.strokeStyle = `rgba(${theme.edge},0.95)`;
   ctx.lineWidth = 8;
-  ctx.strokeRect(4, 4, MAP_W - 8, MAP_H - 8);
+  ctx.strokeRect(4, 4, W - 8, H - 8);
   ctx.restore();
 }
 
-/** Harakatlanuvchi qism: markaz pulsi va teleportlar */
-function drawFloorLive(ctx: CanvasRenderingContext2D, t: number) {
-  const pulse = 0.16 + Math.sin(t * 2) * 0.05;
-  ctx.fillStyle = `rgba(168,85,247,${pulse})`;
+/** Harakatlanuvchi qism: markaz pulsi, teleportlar va tezlik yo'laklari yaltirashi */
+function drawFloorLive(ctx: CanvasRenderingContext2D, t: number, map: ArenaMap) {
+  const pulse = 0.14 + Math.sin(t * 2) * 0.05;
+  ctx.fillStyle = `rgba(${map.theme.edge},${pulse})`;
   ctx.beginPath();
-  ctx.arc(MAP_W / 2, MAP_H / 2, 150 + Math.sin(t * 2) * 10, 0, Math.PI * 2);
+  ctx.arc(map.w / 2, map.h / 2, 160 + Math.sin(t * 2) * 10, 0, Math.PI * 2);
   ctx.fill();
-  for (const tp of TELEPORTS) {
+  for (const p of map.pads) {
+    const horiz = p.w >= p.h;
+    const k = (t * 0.9) % 1;
+    ctx.fillStyle = `rgba(${map.theme.pad},0.35)`;
+    if (horiz) ctx.fillRect(p.x + k * (p.w - 40), p.y, 40, p.h);
+    else ctx.fillRect(p.x, p.y + k * (p.h - 40), p.w, 40);
+  }
+  for (const tp of map.teleports) {
     for (const p of [tp.a, tp.b]) {
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -84,56 +118,70 @@ function drawFloorLive(ctx: CanvasRenderingContext2D, t: number) {
 export interface MapLayers {
   base: HTMLCanvasElement;
   top: HTMLCanvasElement;
+  map: ArenaMap;
 }
-const LAYER_Q = 0.7;
-export function makeMapLayers(): MapLayers {
+const LAYER_Q = 0.6;
+export function makeMapLayers(map: ArenaMap = DEFAULT_MAP, q = LAYER_Q): MapLayers {
   const mk = () => {
     const c = document.createElement("canvas");
-    c.width = Math.round(MAP_W * LAYER_Q);
-    c.height = Math.round(MAP_H * LAYER_Q);
+    c.width = Math.round(map.w * q);
+    c.height = Math.round(map.h * q);
     const x = c.getContext("2d")!;
-    x.scale(LAYER_Q, LAYER_Q);
+    x.scale(q, q);
     return { c, x };
   };
   const base = mk();
-  drawFloorStatic(base.x);
-  drawWalls(base.x);
+  drawFloorStatic(base.x, map);
+  drawWalls(base.x, map);
   const top = mk();
-  drawBushes(top.x, 0);
-  return { base: base.c, top: top.c };
+  drawBushes(top.x, 0, map);
+  return { base: base.c, top: top.c, map };
 }
 
-export function drawFloor(ctx: CanvasRenderingContext2D, t: number, layers?: MapLayers) {
-  ctx.fillStyle = "#070b18";
-  ctx.fillRect(-600, -600, MAP_W + 1200, MAP_H + 1200);
-  if (layers) ctx.drawImage(layers.base, 0, 0, MAP_W, MAP_H);
-  else {
-    drawFloorStatic(ctx);
-    drawWalls(ctx);
-  }
-  drawFloorLive(ctx, t);
+export function drawFloor(ctx: CanvasRenderingContext2D, t: number, layers: MapLayers) {
+  const map = layers.map;
+  ctx.fillStyle = "#05070f";
+  ctx.fillRect(-800, -800, map.w + 1600, map.h + 1600);
+  ctx.drawImage(layers.base, 0, 0, map.w, map.h);
+  drawFloorLive(ctx, t, map);
 }
 
-export function drawTop(ctx: CanvasRenderingContext2D, t: number, layers?: MapLayers) {
-  if (layers) ctx.drawImage(layers.top, 0, 0, MAP_W, MAP_H);
-  else drawBushes(ctx, t);
+export function drawTop(ctx: CanvasRenderingContext2D, _t: number, layers: MapLayers) {
+  ctx.drawImage(layers.top, 0, 0, layers.map.w, layers.map.h);
 }
 
-export function drawWalls(ctx: CanvasRenderingContext2D) {
+/** Ovoz berish kartasi uchun: butun xarita kichik rasmda */
+export function drawMapPreview(canvas: HTMLCanvasElement, map: ArenaMap) {
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.round(r.width * dpr));
+  canvas.height = Math.max(1, Math.round(r.height * dpr));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const k = Math.min(canvas.width / map.w, canvas.height / map.h);
+  ctx.setTransform(k, 0, 0, k, (canvas.width - map.w * k) / 2, (canvas.height - map.h * k) / 2);
+  drawFloorStatic(ctx, map);
+  drawWalls(ctx, map);
+  drawFloorLive(ctx, 0.6, map);
+  drawBushes(ctx, 0, map);
+}
+
+export function drawWalls(ctx: CanvasRenderingContext2D, map: ArenaMap = DEFAULT_MAP) {
+  const th = map.theme;
   ctx.save();
-  for (const w of PVP_WALLS) {
+  for (const w of map.walls) {
     const box = w.w === w.h;
-    ctx.fillStyle = box ? "#1b2440" : "#121a33";
-    ctx.shadowColor = box ? "#f59e0b" : "#38bdf8";
+    ctx.fillStyle = box ? th.box : th.wall;
+    ctx.shadowColor = `rgb(${box ? th.boxEdge : th.wallEdge})`;
     ctx.shadowBlur = 16;
     ctx.fillRect(w.x, w.y, w.w, w.h);
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = box ? "rgba(251,191,36,0.9)" : "rgba(56,189,248,0.9)";
+    ctx.strokeStyle = `rgba(${box ? th.boxEdge : th.wallEdge},0.9)`;
     ctx.lineWidth = 4;
     ctx.strokeRect(w.x + 2, w.y + 2, w.w - 4, w.h - 4);
     if (box) {
       // Quti: diagonal chiziqlar
-      ctx.strokeStyle = "rgba(251,191,36,0.35)";
+      ctx.strokeStyle = `rgba(${th.boxEdge},0.35)`;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(w.x + 8, w.y + 8);
@@ -146,9 +194,10 @@ export function drawWalls(ctx: CanvasRenderingContext2D) {
   ctx.restore();
 }
 
-export function drawBushes(ctx: CanvasRenderingContext2D, t: number) {
+export function drawBushes(ctx: CanvasRenderingContext2D, t: number, map: ArenaMap = DEFAULT_MAP) {
+  const colors = map.theme.bush;
   ctx.save();
-  for (const b of BUSHES) {
+  for (const b of map.bushes) {
     const n = Math.round((b.w * b.h) / 2600);
     for (let i = 0; i < n; i++) {
       const fx = ((i * 73) % 97) / 97;
@@ -156,7 +205,7 @@ export function drawBushes(ctx: CanvasRenderingContext2D, t: number) {
       const x = b.x + 18 + fx * (b.w - 36);
       const y = b.y + 18 + fy * (b.h - 36);
       const r = 26 + ((i * 13) % 14) + Math.sin(t * 2 + i) * 1.5;
-      ctx.fillStyle = i % 3 === 0 ? "rgba(34,197,94,0.92)" : i % 3 === 1 ? "rgba(22,163,74,0.92)" : "rgba(21,128,61,0.94)";
+      ctx.fillStyle = colors[i % 3];
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -224,6 +273,10 @@ export interface RobotLook {
   size?: number;
   /** Jamoaviy arenada jamoa rangidagi halqa */
   ring?: string | null;
+  /** Hozirgina o'q uzdi (stvol uchida olov) */
+  fired?: boolean;
+  /** Sakrash (dash) davomida — orqasida iz */
+  dash?: boolean;
 }
 
 export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number) {
@@ -233,6 +286,21 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
   ctx.translate(r.x, r.y);
   if (r.size && r.size !== 1) ctx.scale(r.size, r.size);
   ctx.globalAlpha = r.out ? 0.3 : r.ghost ? 0.45 : 1;
+  // Sakrash izi
+  if (r.dash && !r.out) {
+    ctx.fillStyle = skin.body;
+    for (let i = 1; i <= 4; i++) {
+      ctx.globalAlpha = 0.28 - i * 0.05;
+      ctx.beginPath();
+      ctx.arc(-Math.cos(r.a) * i * 16, -Math.sin(r.a) * i * 16, R - i * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = r.ghost ? 0.45 : 1;
+  }
+  // Jonli harakat: turganda "nafas oladi", yurganda qadamga qarab silkinadi
+  const seed = (r.x * 0.013 + r.y * 0.007) % 6.28;
+  const bob = r.out ? 0 : r.moving ? -Math.abs(Math.sin(t * 16)) * 3 : Math.sin(t * 2.6 + seed) * 1.4;
+  const breathe = r.out ? 1 : 1 + Math.sin(t * 2.6 + seed) * 0.03;
   // Tezlik izi
   if (r.powers?.includes("speed") && !r.out) {
     ctx.fillStyle = "rgba(250,204,21,0.35)";
@@ -257,7 +325,11 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
   ctx.beginPath();
   ctx.ellipse(4, R * 0.9, R * 0.9, R * 0.35, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.translate(0, bob);
+  ctx.scale(breathe, breathe);
   ctx.rotate(r.a);
+  // Yurganda tana biroz egiladi
+  if (r.moving && !r.out) ctx.rotate(Math.sin(t * 16) * 0.06);
   // Oyoqlar (yurganda qadam tashlaydi)
   const step = r.moving ? Math.sin(t * 18) * 5 : 0;
   ctx.fillStyle = skin.accent;
@@ -277,6 +349,25 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
     }
     ctx.restore();
   } else ctx.fillRect(R - 6, -5, 22, 10);
+  // Otganda stvol uchida olov
+  if (r.fired && !r.out) {
+    ctx.save();
+    ctx.translate(R + 20, 0);
+    ctx.fillStyle = "rgba(253,224,71,0.95)";
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      const rr = i % 2 === 0 ? 14 : 6;
+      ctx.lineTo(Math.cos(ang) * rr, Math.sin(ang) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // Tana
   ctx.fillStyle = r.flash ? "#ffffff" : r.out ? "#475569" : skin.body;
   ctx.beginPath();
@@ -297,12 +388,34 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
   ctx.beginPath();
   ctx.roundRect(R * 0.05, -R * 0.55, R * 0.75, R * 1.1, 6);
   ctx.fill();
-  const blink = Math.sin(t * 3 + r.x) > 0.97 ? 0.2 : 1;
-  ctx.fillStyle = r.out ? "#64748b" : "#e0f2fe";
-  ctx.beginPath();
-  ctx.ellipse(R * 0.5, -R * 0.25, 3.5, 4.5 * blink, 0, 0, Math.PI * 2);
-  ctx.ellipse(R * 0.5, R * 0.25, 3.5, 4.5 * blink, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (r.out) {
+    // Yiqilgan: ✕ ko'zlar
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (const ey of [-R * 0.25, R * 0.25]) {
+      ctx.moveTo(R * 0.5 - 4, ey - 4);
+      ctx.lineTo(R * 0.5 + 4, ey + 4);
+      ctx.moveTo(R * 0.5 + 4, ey - 4);
+      ctx.lineTo(R * 0.5 - 4, ey + 4);
+    }
+    ctx.stroke();
+  } else {
+    // Ko'z qisish (har qahramon o'z vaqtida) va oldinga qaragan qorachiq
+    const blink = Math.sin(t * 1.7 + seed * 3) > 0.985 ? 0.15 : 1;
+    ctx.fillStyle = r.flash ? "#fecaca" : "#e0f2fe";
+    ctx.beginPath();
+    ctx.ellipse(R * 0.5, -R * 0.25, 4, 5 * blink, 0, 0, Math.PI * 2);
+    ctx.ellipse(R * 0.5, R * 0.25, 4, 5 * blink, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (blink > 0.5) {
+      ctx.fillStyle = "#0b1020";
+      ctx.beginPath();
+      ctx.arc(R * 0.5 + 1.8, -R * 0.25, 1.8, 0, Math.PI * 2);
+      ctx.arc(R * 0.5 + 1.8, R * 0.25, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   // Antenna
   ctx.strokeStyle = skin.accent;
   ctx.lineWidth = 3;
@@ -325,6 +438,30 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
     ctx.fill();
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/** Emoji-reaksiya pufakchasi (ism ustida) */
+export function drawEmote(ctx: CanvasRenderingContext2D, emote: number, x: number, y: number, t: number, size = 1) {
+  const e = EMOTES[emote];
+  if (!e) return;
+  ctx.save();
+  ctx.translate(x, y + Math.sin(t * 6) * 3);
+  ctx.scale(size, size);
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.beginPath();
+  ctx.roundRect(-26, -26, 52, 46, 16);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-7, 19);
+  ctx.lineTo(0, 30);
+  ctx.lineTo(7, 19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.font = "30px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(e, 0, -2);
   ctx.restore();
 }
 

@@ -45,10 +45,11 @@ describe("real vaqt xonasi", () => {
 
   it("sovg'ani birinchi yetib kelgan oladi, vaqt o'tib yangisi chiqadi; qayta ulanganda holat saqlanadi", () => {
     const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.1);
-    join(room, "ali", 1200, 700);
-    join(room, "vali", 1210, 700);
-    room.input("ali", { x: 1200, y: 700, claim: 1 }, START + 100);
-    room.input("vali", { x: 1210, y: 700, claim: 1 }, START + 110);
+    // Klassik xaritaning markaziy sovg'asi (1500, 875)
+    join(room, "ali", 1500, 875);
+    join(room, "vali", 1510, 875);
+    room.input("ali", { x: 1500, y: 875, claim: 1 }, START + 100);
+    room.input("vali", { x: 1510, y: 875, claim: 1 }, START + 110);
     expect(room.players.get("ali")!.claimed).toBe("triple");
     expect(room.players.get("vali")!.claimed).toBe(null);
     expect(room.players.get("ali")!.until.triple).toBeGreaterThan(START + 100);
@@ -60,7 +61,7 @@ describe("real vaqt xonasi", () => {
     expect(room.pickups.length).toBe(n + 1);
     // Qayta ulanish
     const again = join(room, "ali", 0, 0);
-    expect(again.x).toBe(1200);
+    expect(again.x).toBe(1500);
     expect(room.players.size).toBe(2);
   });
 
@@ -130,5 +131,53 @@ describe("bilet va imzo", () => {
     const sig = await hmacSign("k", '{"a":1}');
     expect(await hmacVerify("k", '{"a":1}', sig)).toBe(true);
     expect(await hmacVerify("k", '{"a":2}', sig)).toBe(false);
+  });
+});
+
+describe("xaritalar va reaksiyalar", () => {
+  it("har xaritada paydo bo'lish, sovg'a, teleport va baza joylari devor ichida emas va xarita ichida", async () => {
+    const { ARENA_MAPS, MAP_IDS, inWall } = await import("@/lib/live-game/pvp");
+    expect(MAP_IDS).toHaveLength(4);
+    for (const id of MAP_IDS) {
+      const m = ARENA_MAPS[id];
+      expect(m.w).toBeGreaterThanOrEqual(3000);
+      const pts = [...m.spawns, ...m.pickups, ...m.bases, ...m.teleports.flatMap((t) => [t.a, t.b])];
+      for (const p of pts) {
+        expect(inWall(p.x, p.y, m), `${id}: ${p.x},${p.y}`).toBe(false);
+        expect(p.x > 0 && p.x < m.w && p.y > 0 && p.y < m.h).toBe(true);
+      }
+      expect(m.pickups.length).toBeGreaterThanOrEqual(3);
+      expect(m.spawns.length).toBe(16);
+    }
+  });
+
+  it("ovoz natijasi: eng ko'p ovoz; teng yoki ovoz yo'q — ular orasidan", async () => {
+    const { pickMap } = await import("@/lib/live-game/pvp");
+    expect(pickMap(["ice", "ice", "forest", "hack"])).toBe("ice");
+    expect(pickMap(["ice", "forest"], () => 0)).toBe("ice");
+    expect(pickMap(["ice", "forest"], () => 0.99)).toBe("forest");
+    expect(pickMap([], () => 0)).toBe("neon");
+  });
+
+  it("xona tanlangan xaritada: sovg'alar va chegaralar shu xaritaniki; reaksiya boshqalarga yetadi", async () => {
+    const { ARENA_MAPS } = await import("@/lib/live-game/pvp");
+    const room = new PvpRoom("g", 1, START, START + 120_000, () => 0.5, "space");
+    expect(room.map.id).toBe("space");
+    expect(room.pickups[0]).toMatchObject({ x: ARENA_MAPS.space.pickups[0].x, y: ARENA_MAPS.space.pickups[0].y });
+    join(room, "ali", 300, 300);
+    join(room, "vali", 3100, 1700);
+    // Katta xaritaning chetiga yurish mumkin (klassik xaritadan tashqarida)
+    room.input("vali", { x: 3150, y: 1750 }, START + 100);
+    expect(room.players.get("vali")!.x).toBe(3150);
+    room.input("ali", { x: 300, y: 300, em: 2 }, START + 200);
+    room.input("ali", { x: 300, y: 300, em: 9 }, START + 1200);
+    const st = newClientState();
+    decodeRoomMessage(room.rosterMessage(), st, "vali", null);
+    const d = decodeRoomMessage(room.frame(START + 300, "vali", { pickups: 0, feed: 0 }), st, "vali", { weapon: "Lazer-1", cooldown: 0.36, name: "VALI", skin: "bolt" })!;
+    expect(d.world.map).toBe("space");
+    expect(d.world.peers.find((p) => p.id === "ali")?.emote).toBe(2);
+    // 2,5 s dan keyin reaksiya yo'qoladi
+    const later = decodeRoomMessage(room.frame(START + 3000, "vali", { pickups: 0, feed: 0 }), st, "vali", { weapon: "Lazer-1", cooldown: 0.36, name: "VALI", skin: "bolt" })!;
+    expect(later.world.peers.find((p) => p.id === "ali")?.emote).toBe(-1);
   });
 });

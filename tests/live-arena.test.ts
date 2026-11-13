@@ -64,6 +64,17 @@ async function seed(arena = true) {
 
 const player = async (u: { _id: import("mongoose").Types.ObjectId }) => (await LiveGamePlayer.findOne({ studentId: u._id }).lean())!;
 
+/** Jang oldidan: o'quvchilar xaritaga ovoz beradi, ustoz ovozni yakunlaydi — jang shu xaritada boshlanadi */
+async function voteAndGo(id: string, mentor: U, voters: U[], map = "neon") {
+  const g = (await LiveGame.findById(id).lean())!;
+  for (const v of voters) {
+    as(v);
+    expect((await live.voteArenaMapAction(id, g.arena!.round!, map)).success).toBe(true);
+  }
+  as(mentor);
+  expect((await live.resolveArenaVoteAction(id)).success).toBe(true);
+}
+
 beforeAll(startDb);
 afterAll(stopDb);
 beforeEach(async () => {
@@ -94,8 +105,9 @@ describe("kiber jang qoidalari", () => {
 
   it("devorlar, o'q tegishi va teleport", () => {
     // Devor ichiga kirib bo'lmaydi
-    const p = resolve(1100, 580);
-    expect(p.y < 560 || p.y > 600 || p.x < 1080 || p.x > 1160).toBe(true);
+    // Klassik xarita 1,25 marta kattalashgan: markaziy devor (1350,700)–(1450,750)
+    const p = resolve(1375, 725);
+    expect(p.y < 700 || p.y > 750 || p.x < 1350 || p.x > 1450).toBe(true);
     // O'q egasiga tegmaydi, boshqaga tegadi
     let id = 1;
     const shots = fireShots("me", 300, 100, 0, false, () => id++);
@@ -104,7 +116,7 @@ describe("kiber jang qoidalari", () => {
     // Uchtalik — uchta o'q
     expect(fireShots("me", 300, 100, 0, true, () => id++)).toHaveLength(3);
     // Teleport
-    expect(teleportFrom(420, 700, 1, 0)?.x).toBeGreaterThan(1900);
+    expect(teleportFrom(525, 875, 1, 0)?.x).toBeGreaterThan(2400);
   });
 });
 
@@ -146,6 +158,7 @@ describe("jamoaviy arena", () => {
     await live.startLiveQuestionAction(id);
     await live.revealLiveQuestionAction(id);
     await live.startLiveQuestionAction(id);
+    await voteAndGo(id, mentor, studs);
     const g = (await LiveGame.findById(id).lean())!;
     expect(g.status).toBe("arena");
     const ps = await LiveGamePlayer.find({ gameId: id }).lean();
@@ -199,6 +212,53 @@ describe("jamoaviy arena", () => {
   });
 });
 
+describe("xarita uchun ovoz berish", () => {
+  it("o'quvchilar ovoz beradi (o'zgartirish mumkin), proyektor hisobni ko'radi; ovozdan keyin jang shu xaritada", async () => {
+    const { mentor, ali, vali, begona, id } = await seed();
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    const round = (await LiveGame.findById(id).lean())!.arena!.round!;
+    as(ali);
+    await live.voteArenaMapAction(id, round, "forest");
+    await live.voteArenaMapAction(id, round, "ice");
+    as(vali);
+    await live.voteArenaMapAction(id, round, "ice");
+    expect((await live.voteArenaMapAction(id, round, "hack")).success).toBe(false);
+    as(begona);
+    expect((await live.voteArenaMapAction(id, round, "ice")).success).toBe(false);
+    as(mentor);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.arena?.vote).toMatchObject({ voted: 2, total: 2, counts: { ice: 2, forest: 0 } });
+    as(ali);
+    const me = await live.getLivePlayerStateAction(id);
+    expect(me.success && me.data.arena).toMatchObject({ ready: false, vote: { myVote: "ice" } });
+
+    as(mentor);
+    await live.resolveArenaVoteAction(id);
+    // Ikkinchi marta — hech narsa
+    expect((await live.resolveArenaVoteAction(id)).success && true).toBe(true);
+    const g = (await LiveGame.findById(id).lean())!;
+    expect(g.arena).toMatchObject({ map: "ice", voteEndsAt: null });
+    expect(g.events.some((e) => e.text.includes("Muz labirint"))).toBe(true);
+    // Qahramonlar muz labirintda joylashtirildi; sovg'alar ham shu xaritada
+    const { ARENA_MAPS } = await import("@/lib/live-game/pvp");
+    expect(g.arena!.pickups[0]).toMatchObject({ x: ARENA_MAPS.ice.pickups[0].x, y: ARENA_MAPS.ice.pickups[0].y });
+    as(ali);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.arena).toMatchObject({ ready: true, vote: null, map: "ice", lives: 4 });
+    // Ovoz yopildi
+    expect((await live.voteArenaMapAction(id, round, "space")).success).toBe(false);
+    // HTTP qadami: xarita chegarasi kattaroq, reaksiya boshqalarga ko'rinadi
+    tick(PVP_INTRO_S * 1000 + 500);
+    const t = await live.pvpTickAction(id, { x: 3150, y: 1750, em: 1 });
+    expect(t.success && t.data.world.map).toBe("ice");
+    expect((await player(ali)).arena).toMatchObject({ x: 3150, y: 1750, emote: 1 });
+    as(vali);
+    const v = await live.pvpTickAction(id, { x: 500, y: 500 });
+    expect(v.success && v.data.world.peers.find((p) => p.name === "ALI")?.emote).toBe(1);
+  });
+});
+
 describe("kiber jang (server)", () => {
   it("jon faqat haqiqiy o'qdan ayiriladi, 3 (yoki 4) o'qda chiqadi; sovg'ani birinchi olgan oladi; yakunda bonus bir marta", async () => {
     const { mentor, ali, vali, begona, id } = await seed();
@@ -206,6 +266,7 @@ describe("kiber jang (server)", () => {
     const r = await live.startLiveQuestionAction(id);
     expect(r.success && r.data.finished).toBe(false);
     expect((await LiveGame.findById(id).lean())?.status).toBe("arena");
+    await voteAndGo(id, mentor, [ali, vali]);
     expect((await player(ali)).arena).toMatchObject({ lives: 4, weapon: "Lazer-2", out: false });
     expect((await player(vali)).arena).toMatchObject({ lives: 3, weapon: "Lazer-1" });
     const valiId = (await player(vali))._id.toString();
@@ -265,10 +326,10 @@ describe("kiber jang (server)", () => {
 
     // Sovg'a: birinchi yetib kelgan oladi
     as(ali);
-    const got = await live.pvpTickAction(id, { x: 1200, y: 700, claim: 1 });
+    const got = await live.pvpTickAction(id, { x: 1500, y: 875, claim: 1 });
     expect(got.success && got.data.claimed).toBe("triple");
     expect(got.success && got.data.me.powers.triple).toBeGreaterThan(0);
-    const again = await live.pvpTickAction(id, { x: 1200, y: 700, claim: 1 });
+    const again = await live.pvpTickAction(id, { x: 1500, y: 875, claim: 1 });
     expect(again.success && again.data.claimed).toBe(null);
     // Uzoqdan olib bo'lmaydi
     const far = await live.pvpTickAction(id, { x: 200, y: 150, claim: 2 });
@@ -306,9 +367,10 @@ describe("kiber jang (server)", () => {
   });
 
   it("tezkor API: o'quvchi qadami va proyektor ko'rinishi; begona va mentor bo'lmaganlarga yopiq", async () => {
-    const { mentor, ali, begona, id } = await seed();
+    const { mentor, ali, vali, begona, id } = await seed();
     as(mentor);
     await live.startLiveQuestionAction(id);
+    await voteAndGo(id, mentor, [ali, vali]);
     tick(PVP_INTRO_S * 1000 + 500);
     await User.updateMany({}, { mustChangePassword: false });
     const post = (input: object, gameId = id) =>
@@ -338,8 +400,15 @@ describe("kiber jang (server)", () => {
       const { mentor, ali, vali, id } = await seed();
       as(mentor);
       await live.startLiveQuestionAction(id);
+      // Ovoz paytida bilet yo'q (jang hali boshlanmagan)
+      as(ali);
+      const during = await live.getLivePlayerStateAction(id);
+      expect(during.success && during.data.arena?.ws).toBe(null);
+      expect(during.success && during.data.arena?.vote?.total).toBe(2);
+      await voteAndGo(id, mentor, [ali, vali], "ice");
       as(ali);
       const st = await live.getLivePlayerStateAction(id);
+      expect(st.success && st.data.arena?.map).toBe("ice");
       const ws = st.success ? st.data.arena?.ws : null;
       expect(ws).toMatch(/^wss:\/\/arena\.example\.dev\/room\/[a-f0-9]{24}\/2\?t=/);
       const ticket = await verifyTicket("test-secret", decodeURIComponent(new URL(ws!).searchParams.get("t")!));
@@ -382,9 +451,10 @@ describe("kiber jang (server)", () => {
   });
 
   it("jang tugatilmasdan 'Keyingi' bosilsa — avval bonus hisoblanadi, keyin yakun", async () => {
-    const { mentor, ali, id } = await seed();
+    const { mentor, ali, vali, id } = await seed();
     as(mentor);
     await live.startLiveQuestionAction(id);
+    await voteAndGo(id, mentor, [ali, vali]);
     const before = (await player(ali)).score;
     await live.startLiveQuestionAction(id);
     // Ikkalasi ham tirik: har biri 300 (tirik qolgani uchun)

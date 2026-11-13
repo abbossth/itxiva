@@ -10,6 +10,7 @@ import {
   endMinigameAction,
   endArenaAction,
   finishLiveGameAction,
+  resolveArenaVoteAction,
   revealLiveQuestionAction,
   startLiveIntroAction,
   startLiveQuestionAction,
@@ -155,9 +156,31 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const arenaEnding = useRef<number | null>(null);
   const arenaEndsAt = useRef<{ round: number; at: number } | null>(null);
   const arenaDecidedAt = useRef<{ round: number; at: number } | null>(null);
+  // Xarita uchun ovoz: vaqt tugaganda yoki hamma ovoz berganda (1,5 s dan keyin) — xarita tanlanadi, jang boshlanadi
+  const voteResolving = useRef<number | null>(null);
+  useEffect(() => {
+    const v = state.arena?.vote;
+    const round = state.arena?.round;
+    if (state.status !== "arena" || !v || typeof round !== "number" || voteResolving.current === round) return;
+    const everyone = v.total > 0 && v.voted >= v.total;
+    const wait = everyone ? 1500 : v.endsInMs + 300;
+    const t = setTimeout(() => {
+      voteResolving.current = round;
+      void resolveArenaVoteAction(state.id).then(
+        () => refresh(),
+        () => {
+          // Tarmoq xatosi: keyingi yangilanishda qayta urinadi
+          if (voteResolving.current === round) voteResolving.current = null;
+        }
+      );
+    }, wait);
+    return () => clearTimeout(t);
+  }, [state.status, state.arena, state.id, refresh]);
+
   useEffect(() => {
     const a = state.arena;
-    if (state.status !== "arena" || !a || a.ended || arenaEnding.current === a.round) return;
+    // Ovoz davomida jang hali boshlanmagan — tugash vaqti hisoblanmaydi
+    if (state.status !== "arena" || !a || a.vote || a.ended || arenaEnding.current === a.round) return;
     if (arenaEndsAt.current?.round !== a.round) arenaEndsAt.current = { round: a.round, at: Date.now() + a.startsInMs + a.remainingMs };
     // Bittadan boshqa hamma chiqib ketsa — g'olib aniq, jang tugaydi
     // Jamoaviy arenada — bitta jamoa qolganda

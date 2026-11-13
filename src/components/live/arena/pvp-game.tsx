@@ -9,14 +9,19 @@ import {
   BASE_SPEED,
   BULLET_RANGE,
   BULLET_SPEED,
-  MAP_H,
-  MAP_W,
+  DASH_COOLDOWN_MS,
+  DASH_MS,
+  DASH_SPEED,
+  EMOTES,
+  EMOTE_MS,
+  PAD_BOOST,
   PICKUP_R,
   PLAYER_R,
   POWERS,
-  PVP_WALLS,
   fireShots,
   inBush,
+  mapOf,
+  onPad,
   nearestTarget,
   resolve,
   sameTeam,
@@ -41,6 +46,7 @@ import {
   drawTop,
   makeMapLayers,
   drawSparks,
+  drawEmote,
   nameTag,
   spawnForeignShots,
   stepSparks,
@@ -100,7 +106,7 @@ export function PvpGame({
 }: {
   gameId: string;
   myName: string;
-  init: { lives: number; maxLives: number; skin: string; weapon: string; cooldown: number; playerId: string; /** Jamoaviy arenada o'z jamoasi; -1 — individual */ team?: number };
+  init: { lives: number; maxLives: number; skin: string; weapon: string; cooldown: number; playerId: string; /** Jamoaviy arenada o'z jamoasi; -1 — individual */ team?: number; /** Jang xaritasi */ map?: string };
   /** Real vaqt xonasi manzili (bo'lmasa — HTTP so'rovlar) */
   ws?: string | null;
   startsInMs: number;
@@ -130,6 +136,8 @@ export function PvpGame({
   const [touch, setTouch] = useState(false);
 
   const timing = useRef<{ start: number; end: number } | null>(null);
+  // Ekrandagi tugmalar (sakrash, emoji) o'yin siklidagi funksiyalarni chaqiradi
+  const controls = useRef<{ dash: () => void; emote: (i: number) => void } | null>(null);
   useEffect(() => {
     const now = performance.now();
     timing.current = { start: now + startsInMs, end: now + startsInMs + remainingMs };
@@ -144,7 +152,8 @@ export function PvpGame({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const layers = makeMapLayers();
+    const map = mapOf(init.map);
+    const layers = makeMapLayers(map);
     // ---- Holat ----
     let meId = "";
     let me: PvpMe | null = null;
@@ -164,6 +173,14 @@ export function PvpGame({
     let shotSeq = Math.floor(Date.now() / 10) % 1_000_000_000;
     let lastFire = 0;
     let lastTeleport = 0;
+    // Sakrash (dash), emoji-reaksiya, oyoq ostidagi chang, boshqalar o'q uzgan vaqt
+    let dashUntil = 0;
+    let lastDash = -1e9;
+    let dashDir = { x: 1, y: 0 };
+    let pendingEmote: number | null = null;
+    let myEmote: { e: number; at: number } | null = null;
+    let lastDust = 0;
+    const peerFired = new Map<string, number>();
     let flashUntil = 0;
     let shake = 0;
     let inFlight = false;
@@ -213,11 +230,34 @@ export function PvpGame({
 
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
+      if (down && (k === "shift" || k === "e")) {
+        e.preventDefault();
+        dashReq = true;
+        return;
+      }
+      if (down && /^[1-4]$/.test(k)) {
+        emote(Number(k) - 1);
+        return;
+      }
       if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) {
         e.preventDefault();
         if (down) keys.add(k);
         else keys.delete(k);
       }
+    };
+    // Tugmalar (telefon) va klavish bir xil yo'l bilan: sakrash so'rovi va emoji
+    let dashReq = false;
+    function emote(i: number) {
+      if (i < 0 || i >= EMOTES.length || (myEmote && performance.now() - myEmote.at < 800)) return;
+      pendingEmote = i;
+      myEmote = { e: i, at: performance.now() };
+      haptic([10]);
+    }
+    controls.current = {
+      dash: () => {
+        dashReq = true;
+      },
+      emote,
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
     const ku = (e: KeyboardEvent) => onKey(e, false);
@@ -285,7 +325,7 @@ export function PvpGame({
       (world?.peers ?? []).filter((p) => {
         if (p.isMe || p.out) return false;
         const s = shown.get(p.id) ?? p;
-        return sameTeam(myTeam, p.team) || !inBush(s.x, s.y) || Math.hypot(s.x - pos.x, s.y - pos.y) < BUSH_SEE || Boolean(me?.out);
+        return sameTeam(myTeam, p.team) || !inBush(s.x, s.y, map) || Math.hypot(s.x - pos.x, s.y - pos.y) < BUSH_SEE || Boolean(me?.out);
       });
 
     // ---- Server bilan almashish ----
@@ -302,6 +342,7 @@ export function PvpGame({
       powersAt = performance.now();
       world = data.world;
       const at = performance.now();
+      for (const p of world.peers) if (!p.isMe && p.shots.some((sh) => sh.age < 160)) peerFired.set(p.id, at);
       for (const p of world.peers) if (!p.isMe) smooth.push(p.id, at, p.x, p.y, p.a);
       smooth.keep(new Set(world.peers.map((p) => p.id)));
       if (!pos.ready) {
@@ -415,7 +456,9 @@ export function PvpGame({
         const hits = pendingHits.splice(0, 8);
         const sendClaim = claim !== null && claimSentAt === 0 ? claim : null;
         if (sendClaim !== null) claimSentAt = performance.now();
-        socket.send(JSON.stringify({ t: "in", x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sendClaim }));
+        const em = pendingEmote;
+        pendingEmote = null;
+        socket.send(JSON.stringify({ t: "in", x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sendClaim, ...(em !== null ? { em } : {}) }));
         if (claim === null) claimSentAt = 0;
         return;
       }
@@ -424,7 +467,9 @@ export function PvpGame({
       const shots = pendingShots.splice(0, 10);
       const hits = pendingHits.splice(0, 8);
       const sentClaim = claim;
-      void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim })
+      const em = pendingEmote;
+      pendingEmote = null;
+      void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim, ...(em !== null ? { em } : {}) })
         .then((r) => {
           if (r.success) apply(r.data, sentClaim);
         })
@@ -452,13 +497,13 @@ export function PvpGame({
         }
       }
       if (!pos.ready && !me) {
-        fx = MAP_W / 2;
-        fy = MAP_H / 2;
+        fx = map.w / 2;
+        fy = map.h / 2;
       }
       const halfW = w / 2 / scale;
       const halfH = h / 2 / scale;
-      view.cx += ((halfW * 2 >= MAP_W ? MAP_W / 2 : Math.max(halfW, Math.min(MAP_W - halfW, fx))) - view.cx) * (view.cx === 0 ? 1 : 0.2);
-      view.cy += ((halfH * 2 >= MAP_H ? MAP_H / 2 : Math.max(halfH, Math.min(MAP_H - halfH, fy))) - view.cy) * (view.cy === 0 ? 1 : 0.2);
+      view.cx += ((halfW * 2 >= map.w ? map.w / 2 : Math.max(halfW, Math.min(map.w - halfW, fx))) - view.cx) * (view.cx === 0 ? 1 : 0.2);
+      view.cy += ((halfH * 2 >= map.h ? map.h / 2 : Math.max(halfH, Math.min(map.h - halfH, fy))) - view.cy) * (view.cy === 0 ? 1 : 0.2);
       const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0;
       const sy = shake > 0 ? (Math.random() - 0.5) * shake : 0;
 
@@ -475,13 +520,21 @@ export function PvpGame({
         if (p.isMe) continue;
         const s = shown.get(p.id) ?? p;
         if (!p.out && !vis.has(p.id)) continue;
-        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y), ring: teamColor(p.team) }, t);
+        drawRobot(
+          ctx,
+          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y, map), ring: teamColor(p.team), fired: now - (peerFired.get(p.id) ?? -1e9) < 110 },
+          t
+        );
       }
       // O'zi
       if (me && pos.ready) {
         const powers = (["shield", "speed", "rapid", "triple"] as const).filter((k) => powerLeft(k, now) > 0);
         const moving = keys.size > 0 || Boolean(stick);
-        drawRobot(ctx, { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y), ring: teamColor(myTeam) }, t);
+        drawRobot(
+          ctx,
+          { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y, map), ring: teamColor(myTeam), fired: now - lastFire < 90, dash: now < dashUntil },
+          t
+        );
       }
       // O'qlar
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
@@ -495,22 +548,29 @@ export function PvpGame({
         nameTag(ctx, `${p.out ? "💀 " : ""}${sameTeam(myTeam, p.team) ? "🤝 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives);
       }
       if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", me.lives, me.maxLives);
+      // Emoji-reaksiyalar
+      for (const p of world?.peers ?? []) {
+        if (p.isMe || p.out || p.emote < 0 || !vis.has(p.id)) continue;
+        const s = shown.get(p.id) ?? p;
+        drawEmote(ctx, p.emote, s.x, s.y - PLAYER_R - 78, t);
+      }
+      if (myEmote && now - myEmote.at < EMOTE_MS && pos.ready && me && !me.out) drawEmote(ctx, myEmote.e, pos.x, pos.y - PLAYER_R - 78, t);
 
       // ---- Ekran qatlami ----
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Kichik xarita
       const mmW = Math.min(190, w * 0.3);
-      const mmH = (mmW * MAP_H) / MAP_W;
+      const mmH = (mmW * map.h) / map.w;
       const mx0 = w - mmW - 10;
       const my0 = h - mmH - 10;
-      const k = mmW / MAP_W;
+      const k = mmW / map.w;
       ctx.fillStyle = "rgba(2,6,23,0.72)";
       ctx.fillRect(mx0, my0, mmW, mmH);
       ctx.strokeStyle = "rgba(192,132,252,0.7)";
       ctx.lineWidth = 1.5;
       ctx.strokeRect(mx0, my0, mmW, mmH);
       ctx.fillStyle = "rgba(56,189,248,0.6)";
-      for (const wl of PVP_WALLS) ctx.fillRect(mx0 + wl.x * k, my0 + wl.y * k, Math.max(1, wl.w * k), Math.max(1, wl.h * k));
+      for (const wl of map.walls) ctx.fillRect(mx0 + wl.x * k, my0 + wl.y * k, Math.max(1, wl.w * k), Math.max(1, wl.h * k));
       for (const p of world?.pickups ?? []) {
         if (claimed.has(p.id)) continue;
         ctx.fillStyle = POWERS[p.kind].color;
@@ -589,12 +649,32 @@ export function PvpGame({
           mx /= len;
           my /= len;
         }
-        const speed = BASE_SPEED * (powerLeft("speed", now) > 0 ? 1.45 : 1);
-        const np = resolve(pos.x + mx * speed * dt, pos.y + my * speed * dt);
+        // Sakrash: harakat yo'nalishida (turgan bo'lsa — nishon tomonga) qisqa tez siljish
+        if (dashReq) {
+          dashReq = false;
+          if (now - lastDash >= DASH_COOLDOWN_MS) {
+            lastDash = now;
+            dashUntil = now + DASH_MS;
+            dashDir = len > 0.1 ? { x: mx / Math.max(len, 1e-6), y: my / Math.max(len, 1e-6) } : { x: Math.cos(pos.a), y: Math.sin(pos.a) };
+            burst(sparks, pos.x, pos.y, "#e0f2fe", 10);
+            haptic([15]);
+          }
+        }
+        const boost = (powerLeft("speed", now) > 0 ? 1.45 : 1) * (onPad(pos.x, pos.y, map) ? PAD_BOOST : 1);
+        const speed = BASE_SPEED * boost;
+        const dashing = now < dashUntil;
+        const vx = dashing ? dashDir.x * BASE_SPEED * DASH_SPEED : mx * speed;
+        const vy = dashing ? dashDir.y * BASE_SPEED * DASH_SPEED : my * speed;
+        const np = resolve(pos.x + vx * dt, pos.y + vy * dt, PLAYER_R, map);
         pos.x = np.x;
         pos.y = np.y;
-        if (len > 0.1 && now - lastTeleport > 900) {
-          const tp = teleportFrom(pos.x, pos.y, mx, my);
+        // Oyoq ostidan chang (tezlik yo'lagida — rangli)
+        if ((len > 0.1 || dashing) && now - lastDust > (dashing ? 25 : 90)) {
+          lastDust = now;
+          sparks.push({ x: pos.x - Math.cos(pos.a) * 14 + (Math.random() - 0.5) * 10, y: pos.y + 16, vx: (Math.random() - 0.5) * 40, vy: -20, life: 0.35, color: onPad(pos.x, pos.y, map) ? `rgb(${map.theme.pad})` : "rgba(148,163,184,0.7)" });
+        }
+        if ((len > 0.1 || dashing) && now - lastTeleport > 900) {
+          const tp = teleportFrom(pos.x, pos.y, dashing ? dashDir.x : mx, dashing ? dashDir.y : my, map);
           if (tp) {
             lastTeleport = now;
             burst(sparks, pos.x, pos.y, "#e879f9", 16);
@@ -647,7 +727,7 @@ export function PvpGame({
       // O'qlar
       const targets = (world?.peers ?? []).filter((p) => !p.isMe && !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
       // O'z o'qlari jamoadoshlar ustidan o'tib ketadi
-      const mine = stepShots(myShots, dt, targets.filter((p) => !isAlly(p.id)));
+      const mine = stepShots(myShots, dt, targets.filter((p) => !isAlly(p.id)), undefined, map);
       myShots.length = 0;
       myShots.push(...mine.shots);
       for (const hit of mine.hits) {
@@ -657,7 +737,7 @@ export function PvpGame({
       }
       for (const wpt of mine.walls) burst(sparks, wpt.x, wpt.y, "#94a3b8", 4);
       const everyone = [...targets, ...(me && !me.out && pos.ready ? [{ id: meId, x: pos.x, y: pos.y }] : [])];
-      const theirs = stepShots(foreign, dt, everyone, allyShot);
+      const theirs = stepShots(foreign, dt, everyone, allyShot, map);
       foreign.length = 0;
       foreign.push(...theirs.shots);
       for (const hit of theirs.hits) burst(sparks, hit.x, hit.y, colorFor(hit.owner), 6);
@@ -763,6 +843,40 @@ export function PvpGame({
           </div>
         )}
       </div>
+      {/* Emoji-reaksiyalar va sakrash */}
+      {phase === "play" && !hud.out && (
+        <>
+          <div className="absolute left-1/2 top-14 flex -translate-x-1/2 gap-1.5 sm:top-3">
+            {EMOTES.map((e, i) => (
+              <button
+                key={e}
+                type="button"
+                onPointerDown={(ev) => {
+                  ev.stopPropagation();
+                  controls.current?.emote(i);
+                }}
+                aria-label={`Reaksiya ${e}`}
+                title={touch ? undefined : `${i + 1} tugmasi`}
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-black/45 text-xl backdrop-blur transition-transform active:scale-90"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onPointerDown={(ev) => {
+              ev.stopPropagation();
+              controls.current?.dash();
+            }}
+            aria-label="Sakrash"
+            title={touch ? undefined : "Shift"}
+            className="absolute bottom-[150px] right-4 flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-full bg-sky-500/40 text-2xl font-black text-white ring-2 ring-sky-300/60 backdrop-blur transition-transform active:scale-90"
+          >
+            💨<span className="text-[9px] font-black uppercase tracking-wider">sakrash</span>
+          </button>
+        </>
+      )}
       {/* Kim kimni yiqitdi */}
       <div className="pointer-events-none absolute left-2 top-24 flex max-w-[60%] flex-col gap-1 sm:left-3">
         {hud.feed.map((f) => (
@@ -782,6 +896,9 @@ export function PvpGame({
       {phase === "intro" && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center text-white backdrop-blur-sm">
           <p className="text-xs font-black uppercase tracking-[0.4em] text-fuchsia-300">{myTeam >= 0 ? "Kiber jang · jamoaviy" : "Kiber jang · hamma hammaga qarshi"}</p>
+          <p className="rounded-full bg-white/10 px-4 py-1 text-sm font-black">
+            Xarita: {mapOf(init.map).emoji} {mapOf(init.map).name}
+          </p>
           {myTeam >= 0 && (
             <p className="rounded-2xl px-4 py-1.5 text-xl font-black text-slate-950" style={{ background: teamColor(myTeam) ?? undefined }}>
               Jamoangiz: {TEAM_NAMES[myTeam] ?? `${myTeam + 1}-jamoa`} — jamoadoshlarga o&apos;q tegmaydi
@@ -794,7 +911,9 @@ export function PvpGame({
             Qahramoningiz: <span style={{ color: skin.body }}>{skin.name}</span> · {init.lives} ❤ · {init.weapon}
           </p>
           <p className="max-w-md text-sm text-slate-200">
-            {touch ? "Chap tomon — yurish, o'ng tomonni bosib turing — otish (o'zi nishonga oladi)" : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham)"}
+            {touch
+              ? "Chap tomon — yurish, o'ng tomonni bosib turing — otish (o'zi nishonga oladi), 💨 — sakrash"
+              : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya"}
           </p>
           <p className="max-w-md text-xs text-slate-300">
             3 marta o&apos;q yegan o&apos;yindan chiqadi. Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!

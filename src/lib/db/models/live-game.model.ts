@@ -95,6 +95,13 @@ export interface ILiveArenaFeed {
 export interface ILiveArena {
   /** Qaysi savoldan keyingi jang (oxirgi savol — final) */
   round?: number;
+  /** Jang xaritasi; ovoz berish davomida null (eski janglarda yo'q — klassik) */
+  map?: string | null;
+  /** Xarita uchun ovoz berish tugash vaqti; ovoz hal bo'lgach null */
+  voteEndsAt?: Date | string | null;
+  /** Jang davomiyligi (s) va jamoaviymi — ovozdan keyin jang shu bilan boshlanadi */
+  seconds?: number;
+  teams?: boolean;
   startedAt: Date | string;
   endsAt: Date | string;
   endedAt?: Date | string | null;
@@ -174,6 +181,10 @@ const LiveGameSchema = new Schema<ILiveGame>(
       type: new Schema(
         {
           round: { type: Number, default: null },
+          map: { type: String, default: undefined },
+          voteEndsAt: { type: Date, default: null },
+          seconds: { type: Number, default: 0 },
+          teams: { type: Boolean, default: false },
           startedAt: Date,
           endsAt: Date,
           endedAt: { type: Date, default: null },

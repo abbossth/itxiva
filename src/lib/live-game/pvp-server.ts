@@ -10,9 +10,10 @@ import { hmacVerify, signTicket, type ArenaTicket } from "./arena-token";
 import type { RoomResults } from "./pvp-room";
 import {
   BULLET_RANGE,
+  EMOTES,
+  EMOTE_MS,
   HIT_GRACE_MS,
-  MAP_H,
-  MAP_W,
+  mapOf,
   MAX_LIVES,
   MAX_PICKUPS,
   PICKUP_EVERY_MS,
@@ -94,7 +95,8 @@ function activePowers(a: ILiveArenaPlayer, now: number): PowerKind[] {
 // ---- Boshlash va yakunlash ----
 
 /** Arena boshlanadi: har o'yinchiga jon (to'g'ri javoblarga qarab), qurol, qahramon va joy beriladi */
-export async function setupPvp(gameId: Id, startedAt: Date, teams = false) {
+export async function setupPvp(gameId: Id, startedAt: Date, teams = false, mapId: string | null = null) {
+  const map = mapOf(mapId);
   const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt team").sort({ createdAt: 1 }).lean();
   const start = startedAt.getTime();
   // Jamoaviy arenada: har jamoa o'z burchagidan, a'zolar yonma-yon
@@ -106,7 +108,7 @@ export async function setupPvp(gameId: Id, startedAt: Date, teams = false) {
         const team = teams ? Math.max(0, p.team ?? 0) : -1;
         const k = teamIndex.get(team) ?? 0;
         teamIndex.set(team, k + 1);
-        const pos = teams ? teamSpawn(team, k) : spawnPoint(i);
+        const pos = teams ? teamSpawn(team, k, map) : spawnPoint(i, map);
         const arena: ILiveArenaPlayer = {
           lives: load.lives,
           maxLives: load.lives,
@@ -121,7 +123,7 @@ export async function setupPvp(gameId: Id, startedAt: Date, teams = false) {
           cooldown: load.cooldown,
           x: pos.x,
           y: pos.y,
-          a: Math.atan2(MAP_H / 2 - pos.y, MAP_W / 2 - pos.x),
+          a: Math.atan2(map.h / 2 - pos.y, map.w / 2 - pos.x),
           shieldUntil: start + SPAWN_SHIELD_MS,
           speedUntil: 0,
           rapidUntil: 0,
@@ -132,16 +134,19 @@ export async function setupPvp(gameId: Id, startedAt: Date, teams = false) {
           points: 0,
           place: 0,
           team,
+          emote: -1,
+          emoteAt: 0,
         };
         return { updateOne: { filter: { _id: p._id }, update: { $set: { arena } } } };
       })
     );
   }
   // Boshida uchta sovg'a: markazda va yon tomonlarda
+  const [c, l, r] = map.pickups;
   const pickups: ILiveArenaPickup[] = [
-    { id: 1, kind: "triple", x: 1200, y: 700 },
-    { id: 2, kind: "shield", x: 600, y: 700 },
-    { id: 3, kind: "speed", x: 1800, y: 700 },
+    { id: 1, kind: "triple", x: c.x, y: c.y },
+    { id: 2, kind: "shield", x: l.x, y: l.y },
+    { id: 3, kind: "speed", x: r.x, y: r.y },
   ];
   await LiveGame.updateOne({ _id: gameId }, { $set: { "arena.pickups": pickups, "arena.seq": pickups.length, "arena.nextPickupAt": start + PICKUP_EVERY_MS, "arena.feed": [] } });
   invalidatePvp(gameId);
@@ -204,6 +209,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
         shots: isMe ? [] : (s.shots ?? []).filter((x) => now - x.at < 900).map((x) => ({ id: x.id, x: x.x, y: x.y, a: x.a, age: Math.max(0, now - x.at) })),
         isMe,
         team: s.team ?? -1,
+        emote: (s.emote ?? -1) >= 0 && now - (s.emoteAt ?? 0) < EMOTE_MS ? s.emote ?? -1 : -1,
       };
     });
   return {
@@ -218,6 +224,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
       .map((f: ILiveArenaFeed) => ({ key: `${f.at}:${f.kind}:${f.a}:${f.b ?? f.power}`, kind: f.kind, a: f.a, b: f.b ?? null, power: (f.power as PowerKind) ?? null, ago: now - f.at })),
     alive: peers.filter((p) => !p.out).length,
     total: peers.length,
+    map: mapOf(a.map).id,
   };
 }
 
@@ -260,20 +267,23 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
   const end = new Date(a.endsAt).getTime();
   const playing = !a.endedAt && now >= start - 300 && now <= end + 2000;
 
-  const x = num(input?.x, PLAYER_R, MAP_W - PLAYER_R, MAP_W / 2);
-  const y = num(input?.y, PLAYER_R, MAP_H - PLAYER_R, MAP_H / 2);
+  const map = mapOf(a.map);
+  const x = num(input?.x, PLAYER_R, map.w - PLAYER_R, map.w / 2);
+  const y = num(input?.y, PLAYER_R, map.h - PLAYER_R, map.h / 2);
+  const em = Number(input?.em);
+  const emote = Number.isInteger(em) && em >= 0 && em < EMOTES.length ? em : null;
   const ang = num(input?.a, -7, 7, 0);
   const incoming = (Array.isArray(input?.shots) ? input.shots : [])
     .slice(0, 10)
     .filter((s) => Number.isInteger(s?.id))
-    .map((s) => ({ id: s.id, x: num(s.x, 0, MAP_W, x), y: num(s.y, 0, MAP_H, y), a: num(s.a, -7, 7, 0), at: now }));
+    .map((s) => ({ id: s.id, x: num(s.x, 0, map.w, x), y: num(s.y, 0, map.h, y), a: num(s.a, -7, 7, 0), at: now }));
 
   let before: CachedPlayer | null = null;
   if (playing && now >= start) {
     before = (await LiveGamePlayer.findOneAndUpdate(
       { gameId: game._id, studentId, arena: { $ne: null }, "arena.out": false },
       {
-        $set: { "arena.x": Math.round(x), "arena.y": Math.round(y), "arena.a": Number(ang.toFixed(2)) },
+        $set: { "arena.x": Math.round(x), "arena.y": Math.round(y), "arena.a": Number(ang.toFixed(2)), ...(emote !== null ? { "arena.emote": emote, "arena.emoteAt": now } : {}) },
         ...(incoming.length > 0 ? { $push: { "arena.shots": { $each: incoming, $slice: -40 } } } : {}),
       },
       { returnDocument: "before", projection: { name: 1, studentId: 1, arena: 1 } }
@@ -367,7 +377,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
     // ---- Yangi sovg'a ----
     const pickups = a.pickups ?? [];
     if (now >= (a.nextPickupAt ?? 0) && pickups.length < MAX_PICKUPS) {
-      const spot = freeSpot(pickups);
+      const spot = freeSpot(pickups, Math.random, map);
       if (spot) {
         await LiveGame.updateOne(
           { _id: game._id, "arena.nextPickupAt": a.nextPickupAt ?? 0, "arena.endedAt": null },
@@ -386,7 +396,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
   const fresh = changed && (accepted > 0 || claimed)
     ? ((await LiveGamePlayer.findById(meDoc._id).select("name studentId arena").lean()) as CachedPlayer | null) ?? meDoc
     : before
-    ? { ...meDoc, arena: { ...meDoc.arena!, x: Math.round(x), y: Math.round(y), a: ang } }
+    ? { ...meDoc, arena: { ...meDoc.arena!, x: Math.round(x), y: Math.round(y), a: ang, ...(emote !== null ? { emote, emoteAt: now } : {}) } }
     : meDoc;
   const latestGame = accepted > 0 || claimed ? (await loadPvpGame(game._id)) ?? game : game;
   const players = (await loadPlayers(game._id)).map((p) => (String(p._id) === meId ? fresh : p));
@@ -412,6 +422,8 @@ export async function arenaSocketUrl(
   const secret = process.env.ARENA_SECRET;
   const a = game.arena;
   if (!base || !secret || !a || a.endedAt || typeof a.round !== "number" || a.round < 0) return null;
+  // Xarita uchun ovoz berish davomida jang hali yo'q
+  if (a.voteEndsAt && !a.map) return null;
   const st = new Date(a.startedAt).getTime();
   const en = new Date(a.endsAt).getTime();
   const pa = player?.arena;
@@ -432,11 +444,12 @@ export async function arenaSocketUrl(
         y: pa.y,
         shieldUntil: pa.shieldUntil,
         team: pa.team ?? -1,
+        m: mapOf(a.map).id,
         st,
         en,
         exp: en + 60_000,
       }
-    : { g: String(game._id), r: a.round, role: "watch", p: "watch", n: "", skin: "", lives: 0, maxLives: 0, weapon: "", cooldown: 0, x: 0, y: 0, shieldUntil: 0, st, en, exp: en + 60_000 };
+    : { g: String(game._id), r: a.round, role: "watch", p: "watch", n: "", skin: "", lives: 0, maxLives: 0, weapon: "", cooldown: 0, x: 0, y: 0, shieldUntil: 0, m: mapOf(a.map).id, st, en, exp: en + 60_000 };
   return `${base.replace(/\/$/, "")}/room/${String(game._id)}/${a.round}?t=${encodeURIComponent(await signTicket(secret, ticket))}`;
 }
 
@@ -471,8 +484,8 @@ export async function applyRoomResults(raw: string, sig: string | null): Promise
               "arena.out": Boolean(p.out),
               "arena.outAt": p.outAt ? n(p.outAt, 0, Number.MAX_SAFE_INTEGER) : null,
               "arena.killedBy": typeof p.killedBy === "string" ? p.killedBy.slice(0, 80) : null,
-              "arena.x": n(p.x, 0, MAP_W),
-              "arena.y": n(p.y, 0, MAP_H),
+              "arena.x": n(p.x, 0, mapOf(a.map).w),
+              "arena.y": n(p.y, 0, mapOf(a.map).h),
             },
           },
         },

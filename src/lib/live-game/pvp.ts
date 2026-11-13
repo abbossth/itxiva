@@ -2,8 +2,12 @@
 // Har kim o'z qurilmasida harakatlanadi va otadi; o'q tekkanini otgan o'yinchi aniqlaydi, jonni server ayiradi.
 // Bu fayl sof: server va brauzer, testlar shu yerdan foydalanadi.
 
-export const MAP_W = 2400;
-export const MAP_H = 1400;
+import { DEFAULT_MAP, type ArenaMap } from "./pvp-maps";
+export { ARENA_MAPS, DEFAULT_MAP, MAP_IDS, PAD_BOOST, isMapId, mapOf, pickMap, type ArenaMap, type MapId } from "./pvp-maps";
+
+/** Klassik xarita o'lchami (eski chaqiruvlar uchun). Har jang o'z xaritasidan foydalanadi: `map.w`, `map.h` */
+export const MAP_W = DEFAULT_MAP.w;
+export const MAP_H = DEFAULT_MAP.h;
 export const PVP_SECONDS = 120;
 export const PVP_INTRO_S = 6;
 /** Boshlanishda o'q tegmaydigan vaqt */
@@ -20,71 +24,13 @@ export interface Rect {
   h: number;
 }
 
-/** Devorlar va qutilar (o'q o'tmaydi) */
-export const PVP_WALLS: Rect[] = [
-  // Markaziy "yadro": to'rt tomonida kirish joyi bor
-  { x: 1080, y: 560, w: 80, h: 40 },
-  { x: 1240, y: 560, w: 80, h: 40 },
-  { x: 1080, y: 800, w: 80, h: 40 },
-  { x: 1240, y: 800, w: 80, h: 40 },
-  { x: 1000, y: 600, w: 40, h: 60 },
-  { x: 1000, y: 740, w: 40, h: 60 },
-  { x: 1360, y: 600, w: 40, h: 60 },
-  { x: 1360, y: 740, w: 40, h: 60 },
-  // Burchaklardagi "bazalar"
-  { x: 240, y: 240, w: 260, h: 36 },
-  { x: 240, y: 276, w: 36, h: 180 },
-  { x: 1900, y: 240, w: 260, h: 36 },
-  { x: 2124, y: 276, w: 36, h: 180 },
-  { x: 240, y: 1124, w: 260, h: 36 },
-  { x: 240, y: 944, w: 36, h: 180 },
-  { x: 1900, y: 1124, w: 260, h: 36 },
-  { x: 2124, y: 944, w: 36, h: 180 },
-  // Qutilar
-  { x: 700, y: 640, w: 80, h: 80 },
-  { x: 1620, y: 640, w: 80, h: 80 },
-  { x: 1160, y: 300, w: 80, h: 80 },
-  { x: 1160, y: 1020, w: 80, h: 80 },
-  { x: 560, y: 420, w: 70, h: 70 },
-  { x: 1770, y: 910, w: 70, h: 70 },
-  { x: 560, y: 910, w: 70, h: 70 },
-  { x: 1770, y: 420, w: 70, h: 70 },
-];
-
-/** Butalar: ichidagi o'yinchi boshqalarga deyarli ko'rinmaydi (o'q o'tadi) */
-export const BUSHES: Rect[] = [
-  { x: 820, y: 220, w: 200, h: 120 },
-  { x: 1380, y: 1060, w: 200, h: 120 },
-  { x: 120, y: 620, w: 140, h: 160 },
-  { x: 2140, y: 620, w: 140, h: 160 },
-];
-
-/** Teleport juftliklari: biriga kirsang — ikkinchisidan chiqasan */
-export const TELEPORTS: { a: { x: number; y: number }; b: { x: number; y: number }; color: string }[] = [
-  { a: { x: 420, y: 700 }, b: { x: 1980, y: 700 }, color: "#22d3ee" },
-  { a: { x: 1200, y: 160 }, b: { x: 1200, y: 1240 }, color: "#e879f9" },
-];
+/** Klassik xarita qismlari (eski chaqiruvlar uchun) */
+export const PVP_WALLS: Rect[] = DEFAULT_MAP.walls;
+export const BUSHES: Rect[] = DEFAULT_MAP.bushes;
+export const TELEPORTS = DEFAULT_MAP.teleports;
 export const TELEPORT_R = 34;
+export const SPAWNS = DEFAULT_MAP.spawns;
 
-/** O'yinchilar paydo bo'ladigan joylar: avval burchaklar, keyin chetlar — bir-biridan uzoqroq */
-export const SPAWNS = [
-  { x: 150, y: 150 },
-  { x: 2250, y: 1250 },
-  { x: 2250, y: 150 },
-  { x: 150, y: 1250 },
-  { x: 1200, y: 420 },
-  { x: 1200, y: 980 },
-  { x: 700, y: 150 },
-  { x: 1700, y: 1250 },
-  { x: 1700, y: 150 },
-  { x: 700, y: 1250 },
-  { x: 150, y: 450 },
-  { x: 2250, y: 950 },
-  { x: 2250, y: 450 },
-  { x: 150, y: 950 },
-  { x: 860, y: 700 },
-  { x: 1540, y: 700 },
-];
 // ---- Jamoaviy arena: jamoadoshlar bir-biriga o'q tekkiza olmaydi, har jamoa o'z burchagidan chiqadi ----
 
 /** Jamoa ranglari (TEAM_NAMES tartibida: Qizillar, Ko'klar, Sariqlar, Yashillar) */
@@ -93,21 +39,14 @@ export const teamColor = (team: number | null | undefined) => (typeof team === "
 /** Ikkalasi bitta jamoada (individual jangda — hech qachon) */
 export const sameTeam = (a: number | null | undefined, b: number | null | undefined) => typeof a === "number" && a >= 0 && a === b;
 
-/** Jamoa bazalari: to'rt burchak */
-const TEAM_BASES = [
-  { x: 170, y: 170 },
-  { x: 2230, y: 1230 },
-  { x: 2230, y: 170 },
-  { x: 170, y: 1230 },
-];
-/** Jamoa a'zosining paydo bo'lish joyi: o'z burchagida, bir-biriga yopishmasdan */
-export function teamSpawn(team: number, i: number): { x: number; y: number } {
-  const b = TEAM_BASES[team % TEAM_BASES.length];
-  const dx = b.x < MAP_W / 2 ? 1 : -1;
-  const dy = b.y < MAP_H / 2 ? 1 : -1;
+/** Jamoa a'zosining paydo bo'lish joyi: o'z burchagida (xarita bazasi), bir-biriga yopishmasdan */
+export function teamSpawn(team: number, i: number, map: ArenaMap = DEFAULT_MAP): { x: number; y: number } {
+  const b = map.bases[team % map.bases.length];
+  const dx = b.x < map.w / 2 ? 1 : -1;
+  const dy = b.y < map.h / 2 ? 1 : -1;
   const col = i % 4;
   const row = Math.floor(i / 4);
-  return resolve(b.x + dx * col * 58, b.y + dy * row * 58);
+  return resolve(b.x + dx * col * 58, b.y + dy * row * 58, PLAYER_R, map);
 }
 
 /** Jamoalar tartibi: ko'proq tirik a'zo, keyin jami jon, keyin yiqitishlar */
@@ -126,13 +65,23 @@ export function teamArenaStandings(rows: { team: number; lives: number; out: boo
   }
   return [...by.values()].sort((a, b) => b.alive - a.alive || b.lives - a.lives || b.kills - a.kills);
 }
+/** Emoji-reaksiyalar (o'yinchi bosganda boshqalarga ham ko'rinadi) */
+export const EMOTES = ["😂", "👍", "😡", "🔥"];
+export const EMOTE_MS = 2500;
+/** Sakrash (dash): qisqa tez siljish, qayta tiklanish vaqti */
+export const DASH_MS = 170;
+export const DASH_SPEED = 3.2;
+export const DASH_COOLDOWN_MS = 2500;
+/** Jang oldidan xarita uchun ovoz berish (soniya) */
+export const MAP_VOTE_S = 12;
+
 /** G'olib jamoaning har a'zosiga */
 export const TEAM_WIN_BONUS = 400;
 
-export function spawnPoint(i: number): { x: number; y: number } {
-  const s = SPAWNS[i % SPAWNS.length];
-  const ring = Math.floor(i / SPAWNS.length);
-  return resolve(s.x + ring * 46, s.y + ring * 30);
+export function spawnPoint(i: number, map: ArenaMap = DEFAULT_MAP): { x: number; y: number } {
+  const s = map.spawns[i % map.spawns.length];
+  const ring = Math.floor(i / map.spawns.length);
+  return resolve(s.x + ring * 46, s.y + ring * 30, PLAYER_R, map);
 }
 
 export const SKINS = [
@@ -164,20 +113,8 @@ export const HIT_GRACE_MS = 450;
 export const PICKUP_EVERY_MS = 4000;
 export const PICKUP_R = 22;
 
-/** Sovg'a paydo bo'ladigan joylar */
-export const PICKUP_SPOTS = [
-  { x: 1200, y: 700 },
-  { x: 600, y: 700 },
-  { x: 1800, y: 700 },
-  { x: 1200, y: 460 },
-  { x: 1200, y: 940 },
-  { x: 380, y: 360 },
-  { x: 2020, y: 360 },
-  { x: 380, y: 1040 },
-  { x: 2020, y: 1040 },
-  { x: 900, y: 1000 },
-  { x: 1500, y: 400 },
-];
+/** Sovg'a paydo bo'ladigan joylar (klassik xarita) */
+export const PICKUP_SPOTS = DEFAULT_MAP.pickups;
 
 /** To'g'ri javoblar — ustunlik: 3+ to'g'ri → +1 jon; ko'p to'g'ri → tezroq otadigan qurol */
 export function pvpLoadout(correct: number): { lives: number; cooldown: number; weapon: string } {
@@ -214,9 +151,9 @@ function collideRect(x: number, y: number, r: number, rect: Rect): { x: number; 
 }
 
 /** Doira devor va chegaralardan tashqariga chiqariladi */
-export function resolve(x: number, y: number, r = PLAYER_R): { x: number; y: number } {
-  let p = { x: Math.max(r, Math.min(MAP_W - r, x)), y: Math.max(r, Math.min(MAP_H - r, y)) };
-  for (const w of PVP_WALLS) {
+export function resolve(x: number, y: number, r = PLAYER_R, map: ArenaMap = DEFAULT_MAP): { x: number; y: number } {
+  let p = { x: Math.max(r, Math.min(map.w - r, x)), y: Math.max(r, Math.min(map.h - r, y)) };
+  for (const w of map.walls) {
     const c = collideRect(p.x, p.y, r, w);
     if (c) p = c;
   }
@@ -224,19 +161,20 @@ export function resolve(x: number, y: number, r = PLAYER_R): { x: number; y: num
 }
 
 export const inRect = (x: number, y: number, r: Rect) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
-export const inWall = (x: number, y: number) => PVP_WALLS.some((w) => inRect(x, y, w));
-export const inBush = (x: number, y: number) => BUSHES.some((b) => inRect(x, y, b));
+export const inWall = (x: number, y: number, map: ArenaMap = DEFAULT_MAP) => map.walls.some((w) => inRect(x, y, w));
+export const inBush = (x: number, y: number, map: ArenaMap = DEFAULT_MAP) => map.bushes.some((b) => inRect(x, y, b));
+export const onPad = (x: number, y: number, map: ArenaMap = DEFAULT_MAP) => map.pads.some((b) => inRect(x, y, b));
 
 /** Teleportga kirdimi: chiqish nuqtasi (bir oz yonida, qayta kirib qolmaslik uchun) */
-export function teleportFrom(x: number, y: number, dirX: number, dirY: number): { x: number; y: number } | null {
-  for (const t of TELEPORTS) {
+export function teleportFrom(x: number, y: number, dirX: number, dirY: number, map: ArenaMap = DEFAULT_MAP): { x: number; y: number } | null {
+  for (const t of map.teleports) {
     for (const [from, to] of [
       [t.a, t.b],
       [t.b, t.a],
     ] as const) {
       if ((x - from.x) ** 2 + (y - from.y) ** 2 < TELEPORT_R ** 2) {
         const len = Math.hypot(dirX, dirY) || 1;
-        return resolve(to.x + (dirX / len) * (TELEPORT_R + PLAYER_R + 8), to.y + (dirY / len) * (TELEPORT_R + PLAYER_R + 8));
+        return resolve(to.x + (dirX / len) * (TELEPORT_R + PLAYER_R + 8), to.y + (dirY / len) * (TELEPORT_R + PLAYER_R + 8), PLAYER_R, map);
       }
     }
   }
@@ -285,7 +223,8 @@ export function stepShots(
   dt: number,
   targets: { id: string; x: number; y: number }[],
   /** Jamoadosh: o'q uning ustidan o'tib ketadi */
-  ally?: (owner: string, target: string) => boolean
+  ally?: (owner: string, target: string) => boolean,
+  map: ArenaMap = DEFAULT_MAP
 ): { shots: Shot[]; hits: ShotHit[]; walls: { x: number; y: number }[] } {
   const hits: ShotHit[] = [];
   const walls: { x: number; y: number }[] = [];
@@ -299,7 +238,7 @@ export function stepShots(
       s.x += (s.vx * dt) / steps;
       s.y += (s.vy * dt) / steps;
       s.dist += (speed * dt) / steps;
-      if (s.x < 0 || s.y < 0 || s.x > MAP_W || s.y > MAP_H || inWall(s.x, s.y)) {
+      if (s.x < 0 || s.y < 0 || s.x > map.w || s.y > map.h || inWall(s.x, s.y, map)) {
         alive = false;
         walls.push({ x: s.x, y: s.y });
       } else if (s.dist > BULLET_RANGE) alive = false;
@@ -352,8 +291,8 @@ export function rollPower(rng: () => number = Math.random): PowerKind {
 }
 
 /** Bo'sh joy: mavjud sovg'alar turmagan nuqta */
-export function freeSpot(taken: { x: number; y: number }[], rng: () => number = Math.random): { x: number; y: number } | null {
-  const free = PICKUP_SPOTS.filter((s) => !taken.some((t) => Math.abs(t.x - s.x) < 5 && Math.abs(t.y - s.y) < 5));
+export function freeSpot(taken: { x: number; y: number }[], rng: () => number = Math.random, map: ArenaMap = DEFAULT_MAP): { x: number; y: number } | null {
+  const free = map.pickups.filter((s) => !taken.some((t) => Math.abs(t.x - s.x) < 5 && Math.abs(t.y - s.y) < 5));
   if (free.length === 0) return null;
   return free[Math.floor(rng() * free.length)];
 }

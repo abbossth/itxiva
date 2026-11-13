@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, HIT_GRACE_MS, MAP_H, MAP_W, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, freeSpot, rollPower, sameTeam, type PowerKind } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, HIT_GRACE_MS, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, freeSpot, mapOf, rollPower, sameTeam, type ArenaMap, type MapId, type PowerKind } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -32,6 +32,8 @@ export interface RoomPlayer {
   name: string;
   skin: string;
   team: number;
+  emote: number;
+  emoteAt: number;
   weapon: string;
   cooldown: number;
   lives: number;
@@ -100,18 +102,22 @@ export class PvpRoom {
   rosterVer = 0;
   /** Yiqitish bo'ldi — natijani darhol saqlash kerak */
   killsDirty = false;
+  readonly map: ArenaMap;
 
   constructor(
     readonly gameId: string,
     readonly round: number,
     readonly startedAt: number,
     readonly endsAt: number,
-    private rng: () => number = Math.random
+    private rng: () => number = Math.random,
+    mapId?: string | null
   ) {
+    this.map = mapOf(mapId);
+    const [c, l, r] = this.map.pickups;
     this.pickups = [
-      { id: 1, kind: "triple", x: 1200, y: 700 },
-      { id: 2, kind: "shield", x: 600, y: 700 },
-      { id: 3, kind: "speed", x: 1800, y: 700 },
+      { id: 1, kind: "triple", x: c.x, y: c.y },
+      { id: 2, kind: "shield", x: l.x, y: l.y },
+      { id: 3, kind: "speed", x: r.x, y: r.y },
     ];
     this.seq = this.pickups.length;
     this.nextPickupAt = startedAt + PICKUP_EVERY_MS;
@@ -127,6 +133,8 @@ export class PvpRoom {
       name: t.n,
       skin: t.skin,
       team: typeof t.team === "number" ? t.team : -1,
+      emote: -1,
+      emoteAt: 0,
       weapon: t.weapon,
       cooldown: t.cooldown,
       lives: t.lives,
@@ -139,7 +147,7 @@ export class PvpRoom {
       killedBy: null,
       x: t.x,
       y: t.y,
-      a: Math.atan2(MAP_H / 2 - t.y, MAP_W / 2 - t.x),
+      a: Math.atan2(this.map.h / 2 - t.y, this.map.w / 2 - t.x),
       until: { shield: t.shieldUntil, speed: 0, rapid: 0, triple: 0 },
       hitUntil: 0,
       shots: new Map(),
@@ -163,13 +171,19 @@ export class PvpRoom {
   input(id: string, inp: PvpTickInput, now: number): void {
     const p = this.players.get(id);
     if (!p || p.out || now < this.startedAt || now > this.endsAt + 2000) return;
-    p.x = Math.round(num(inp?.x, PLAYER_R, MAP_W - PLAYER_R, p.x));
-    p.y = Math.round(num(inp?.y, PLAYER_R, MAP_H - PLAYER_R, p.y));
+    p.x = Math.round(num(inp?.x, PLAYER_R, this.map.w - PLAYER_R, p.x));
+    p.y = Math.round(num(inp?.y, PLAYER_R, this.map.h - PLAYER_R, p.y));
     p.a = num(inp?.a, -7, 7, p.a);
+    // Emoji-reaksiya: tez-tez bosib "spam" qilinmasin (0,8 s da bir)
+    const em = Number(inp?.em);
+    if (Number.isInteger(em) && em >= 0 && em < EMOTES.length && now - p.emoteAt > 800) {
+      p.emote = em;
+      p.emoteAt = now;
+    }
 
     for (const s of (Array.isArray(inp?.shots) ? inp.shots : []).slice(0, 10)) {
       if (!Number.isInteger(s?.id) || p.shots.has(s.id)) continue;
-      const shot = { id: s.id, x: num(s.x, 0, MAP_W, p.x), y: num(s.y, 0, MAP_H, p.y), a: num(s.a, -7, 7, 0), at: now };
+      const shot = { id: s.id, x: num(s.x, 0, this.map.w, p.x), y: num(s.y, 0, this.map.h, p.y), a: num(s.a, -7, 7, 0), at: now };
       p.shots.set(s.id, shot);
       p.fresh.push(shot);
     }
@@ -221,7 +235,7 @@ export class PvpRoom {
   step(now: number): void {
     if (now < this.startedAt || now > this.endsAt) return;
     if (now >= this.nextPickupAt && this.pickups.length < MAX_PICKUPS) {
-      const spot = freeSpot(this.pickups, this.rng);
+      const spot = freeSpot(this.pickups, this.rng, this.map);
       if (spot) {
         this.seq += 1;
         this.pickups.push({ id: this.seq, kind: rollPower(this.rng), x: spot.x, y: spot.y });
@@ -273,13 +287,15 @@ export class PvpRoom {
       TIMED.forEach((k, j) => {
         if (k !== "shield" && p.until[k] > now) flags |= 4 << j;
       });
-      return [p.i, p.x, p.y, Math.round(p.a * 100), p.lives, p.maxLives, flags, p.kills];
+      const emote = p.emote >= 0 && now - p.emoteAt < EMOTE_MS ? p.emote : -1;
+      return [p.i, p.x, p.y, Math.round(p.a * 100), p.lives, p.maxLives, flags, p.kills, emote];
     });
     const shots: number[][] = [];
     for (const p of this.players.values()) if (p.id !== forId) for (const s of p.fresh) shots.push([p.i, s.id, Math.round(s.x), Math.round(s.y), Math.round(s.a * 1000), now - s.at]);
     const msg: Record<string, unknown> = {
       t: "f",
       n: now,
+      mp: this.map.id,
       s: Math.max(0, this.startedAt - now),
       e: Math.max(0, this.endsAt - now),
       p: peers,
@@ -355,7 +371,7 @@ export function decodeRoomMessage(
     shotsBy.set(i, list);
   }
   const peers: PvpPeer[] = [];
-  for (const [i, x, y, a, lives, maxLives, flags, kills] of m.p as number[][]) {
+  for (const [i, x, y, a, lives, maxLives, flags, kills, emote] of m.p as number[][]) {
     const r = st.roster.get(i);
     if (!r) continue;
     const powers: PowerKind[] = [];
@@ -378,6 +394,7 @@ export function decodeRoomMessage(
       shots: shotsBy.get(i) ?? [],
       isMe: r.id === meId,
       team: r.team,
+      emote: typeof emote === "number" ? emote : -1,
     });
   }
   const world: PvpWorld = {
@@ -389,6 +406,7 @@ export function decodeRoomMessage(
     feed: st.feed,
     alive: peers.filter((p) => !p.out).length,
     total: peers.length,
+    map: (typeof m.mp === "string" ? m.mp : "neon") as MapId,
   };
   let me: PvpMe | null = null;
   const mm = m.m as (number | string | null)[] | undefined;

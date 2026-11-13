@@ -323,6 +323,12 @@ describe("sarguzasht rejimlari (server)", () => {
     let g = (await LiveGame.findById(id).lean())!;
     expect(g.status).toBe("arena");
     expect(g.arena?.round).toBe(2);
+    // Avval xarita uchun ovoz: hali qahramonlar yo'q
+    expect(g.arena?.voteEndsAt).toBeTruthy();
+    expect((await player(ali)).arena ?? null).toBe(null);
+    await live.resolveArenaVoteAction(id);
+    g = (await LiveGame.findById(id).lean())!;
+    expect(g.arena?.map).toBeTruthy();
     expect(new Date(g.arena!.endsAt).getTime() - new Date(g.arena!.startedAt).getTime()).toBe(45_000);
     expect((await player(ali)).arena?.lives).toBe(4);
     // Jangdan keyin "Keyingi" — 4-savol (oraliq jang bonusi yarim)

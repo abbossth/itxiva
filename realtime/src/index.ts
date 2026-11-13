@@ -50,7 +50,7 @@ export class ArenaRoom implements DurableObject {
     const m = url.pathname.match(ROOM_PATH);
     const t: ArenaTicket | null = await verifyTicket(this.env.ARENA_SECRET, url.searchParams.get("t") ?? "");
     if (!m || !t || t.g !== m[1] || t.r !== Number(m[2])) return new Response("Bilet yaroqsiz", { status: 403 });
-    if (!this.room || this.room.startedAt !== t.st) this.room = new PvpRoom(t.g, t.r, t.st, t.en);
+    if (!this.room || this.room.startedAt !== t.st) this.room = new PvpRoom(t.g, t.r, t.st, t.en, Math.random, t.m ?? null);
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);

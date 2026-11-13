@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Crown, Skull, Swords, Trophy, Users } from "lucide-react";
 import type { LiveArenaView, LivePlayerState } from "@/actions/live-game.actions";
 import type { PvpFeedView, PvpWorld } from "@/lib/live-game/pvp-server";
-import { BULLET_RANGE, BULLET_SPEED, MAP_H, MAP_W, PLAYER_R, POWERS, inBush, sameTeam, skinOf, stepShots, teamColor, type Shot } from "@/lib/live-game/pvp";
+import { BULLET_RANGE, BULLET_SPEED, PLAYER_R, POWERS, inBush, mapOf, sameTeam, skinOf, stepShots, teamColor, type MapId, type Shot } from "@/lib/live-game/pvp";
+import { resolveArenaVoteAction, voteArenaMapAction } from "@/actions/live-game.actions";
+import { MapVote } from "./map-vote";
 import { playBoom } from "@/lib/sound";
 import { useCountdown } from "../live-ui";
 import { PvpGame, pvpFetch } from "./pvp-game";
@@ -20,6 +22,7 @@ import {
   drawTop,
   makeMapLayers,
   drawSparks,
+  drawEmote,
   nameTag,
   spawnForeignShots,
   stepSparks,
@@ -32,7 +35,48 @@ import { cn, formatNumberUz } from "@/lib/utils";
 
 const WATCH_MS = 250;
 
-export function ArenaHost({
+export function ArenaHost(props: { gameId: string; arena: LiveArenaView; sound?: boolean; actions?: React.ReactNode }) {
+  if (props.arena.vote) return <ArenaVoteHost gameId={props.gameId} vote={props.arena.vote} final={props.arena.final} actions={props.actions} />;
+  return <ArenaFight key={`${props.arena.round}:${props.arena.map}`} {...props} />;
+}
+
+/** Proyektor: xarita uchun ovoz berish (jonli hisob) */
+function ArenaVoteHost({ gameId, vote, final, actions }: { gameId: string; vote: NonNullable<LiveArenaView["vote"]>; final: boolean; actions?: React.ReactNode }) {
+  const [busy, setBusy] = useState(false);
+  const startNow = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await resolveArenaVoteAction(gameId);
+    } catch {
+      // Keyingi yangilanishda proyektor o'zi qayta urinadi
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="rounded-full bg-fuchsia-500/20 px-3 py-1 text-xs font-black uppercase tracking-widest text-fuchsia-200">{final ? "Final jang" : "Raund jangi"}</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={startNow}
+            disabled={busy}
+            className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl bg-white px-4 text-sm font-black text-slate-900 disabled:opacity-60"
+          >
+            Hozir boshlash
+          </button>
+          {actions}
+        </div>
+      </div>
+      <MapVote vote={vote} big />
+      <p className="text-center text-sm text-slate-300">Telefonlarda xaritani tanlang — eng ko&apos;p ovoz olgan xaritada jang boshlanadi</p>
+    </div>
+  );
+}
+
+function ArenaFight({
   gameId,
   arena,
   sound = true,
@@ -161,6 +205,9 @@ export function ArenaHost({
             {arena.final ? "Final" : "Raund"}
             {teams ? " · jamoaviy" : ""}
           </span>
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black">
+            {mapOf(arena.map).emoji} {mapOf(arena.map).name}
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-1.5 text-lg font-black">
@@ -180,7 +227,7 @@ export function ArenaHost({
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
         <div className="relative min-h-[300px] flex-1 overflow-hidden rounded-2xl ring-1 ring-fuchsia-400/30">
-          <ArenaSpectator worldRef={worldRef} realtime={Boolean(wsUrl)} />
+          <ArenaSpectator worldRef={worldRef} realtime={Boolean(wsUrl)} mapId={arena.map} />
           {shout && (
             <div key={shout.key} className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
               <span className="live-banner rounded-2xl bg-amber-500 px-6 py-3 text-3xl font-black text-white shadow-2xl sm:text-4xl">
@@ -280,15 +327,17 @@ export function ArenaHost({
 }
 
 /** Butun maydon: hamma o'yinchilar, o'qlar va sovg'alar (so'rovlar orasida silliq harakat) */
-function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpWorld | null>; realtime: boolean }) {
+function ArenaSpectator({ worldRef, realtime, mapId }: { worldRef: React.RefObject<PvpWorld | null>; realtime: boolean; mapId: MapId }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const layers = makeMapLayers();
+    const map = mapOf(mapId);
+    const layers = makeMapLayers(map);
     const cam = { s: 0, x: 0, y: 0 };
+    const fired = new Map<string, number>();
     // Real vaqtda (tez kadrlar) kam kechikish, so'rovlarda — ko'proq bufer
     const smooth = new Smoother(realtime ? 140 : 350);
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
@@ -307,6 +356,7 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
       if (world && world !== lastWorld) {
         lastWorld = world;
         for (const p of world.peers) smooth.push(p.id, now, p.x, p.y, p.a);
+        for (const p of world.peers) if (p.shots.some((sh) => sh.age < 160)) fired.set(p.id, now);
         smooth.keep(new Set(world.peers.map((p) => p.id)));
         spawnForeignShots(shots, seenShots, world.peers, now, BULLET_SPEED, BULLET_RANGE);
         for (const p of world.peers) {
@@ -324,20 +374,20 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
         canvas.height = Math.round(r.height * dpr);
       }
       // Kamera: tiriklar to'plangan joyga yaqinlashadi (1,8× gacha), tarqalsa — butun xarita
-      const fit = Math.min(r.width / MAP_W, r.height / MAP_H);
+      const fit = Math.min(r.width / map.w, r.height / map.h);
       const live = (world?.peers ?? []).filter((p) => !p.out).map((p) => shown.get(p.id) ?? p);
-      let tw = MAP_W;
-      let th = MAP_H;
-      let tcx = MAP_W / 2;
-      let tcy = MAP_H / 2;
+      let tw = map.w;
+      let th = map.h;
+      let tcx = map.w / 2;
+      let tcy = map.h / 2;
       if (live.length > 0) {
         const xs = live.map((p) => p.x);
         const ys = live.map((p) => p.y);
         const pad = 260;
         const x0 = Math.max(0, Math.min(...xs) - pad);
-        const x1 = Math.min(MAP_W, Math.max(...xs) + pad);
+        const x1 = Math.min(map.w, Math.max(...xs) + pad);
         const y0 = Math.max(0, Math.min(...ys) - pad);
-        const y1 = Math.min(MAP_H, Math.max(...ys) + pad);
+        const y1 = Math.min(map.h, Math.max(...ys) + pad);
         tw = x1 - x0;
         th = y1 - y0;
         tcx = (x0 + x1) / 2;
@@ -350,8 +400,8 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
       const halfH = r.height / 2 / scale;
       // Markaz xarita chegarasidan chiqib ketmasin (xarita ekrandan kichik bo'lsa — o'rtada)
       const clampC = (c: number, half: number, size: number) => (half * 2 >= size ? size / 2 : Math.max(half, Math.min(size - half, c)));
-      const ccx = clampC(tcx, halfW, MAP_W);
-      const ccy = clampC(tcy, halfH, MAP_H);
+      const ccx = clampC(tcx, halfW, map.w);
+      const ccy = clampC(tcy, halfH, map.h);
       cam.x = cam.x === 0 ? ccx : cam.x + (ccx - cam.x) * Math.min(1, dt * 1.5);
       cam.y = cam.y === 0 ? ccy : cam.y + (ccy - cam.y) * Math.min(1, dt * 1.5);
       const ox = r.width / 2 - cam.x * scale;
@@ -370,11 +420,15 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
         const v = smooth.sample(p.id, now);
         if (v) Object.assign(s, v);
         shown.set(p.id, s);
-        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y), size: big, ring: teamColor(p.team) }, t);
+        drawRobot(
+          ctx,
+          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y, map), size: big, ring: teamColor(p.team), fired: now - (fired.get(p.id) ?? -1e9) < 110 },
+          t
+        );
       }
       const targets = peers.filter((p) => !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
       const teamOf = new Map(peers.map((p) => [p.id, p.team]));
-      const step = stepShots(shots, dt, targets, (o, tg) => sameTeam(teamOf.get(o), teamOf.get(tg)));
+      const step = stepShots(shots, dt, targets, (o, tg) => sameTeam(teamOf.get(o), teamOf.get(tg)), map);
       shots.length = 0;
       shots.push(...step.shots);
       for (const h of step.hits) burst(sparks, h.x, h.y, colorFor(h.owner), 8);
@@ -385,12 +439,13 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
       for (const p of peers) {
         const s = shown.get(p.id) ?? p;
         nameTag(ctx, `${p.out ? "💀 " : ""}${p.name} · ${p.kills}`, s.x, s.y - PLAYER_R * big - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives, big);
+        if (!p.out && p.emote >= 0) drawEmote(ctx, p.emote, s.x, s.y - PLAYER_R * big - 64 * big, t, big);
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [worldRef, realtime]);
+  }, [worldRef, realtime, mapId]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />;
 }
@@ -398,13 +453,26 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
 type PlayerArena = NonNullable<LivePlayerState["arena"]>;
 
 export function ArenaPlayer({ gameId, arena, myName }: { gameId: string; arena: PlayerArena; myName: string }) {
+  if (arena.vote) return <ArenaVotePlayer gameId={gameId} round={arena.round} vote={arena.vote} />;
+  // Xarita tanlandi, qahramon joylashtirilmoqda (bir lahza)
+  if (!arena.ready && !arena.ended && arena.remainingMs > 0) {
+    const m = mapOf(arena.map);
+    return (
+      <div className="flex flex-col items-center gap-3 py-14 text-center">
+        <span className="quiz-pulse text-7xl">{m.emoji}</span>
+        <p className="text-xs font-black uppercase tracking-[0.3em] text-fuchsia-300">Xarita tanlandi</p>
+        <p className="text-3xl font-black">{m.name}</p>
+        <p className="text-sm text-slate-300">Jang boshlanmoqda…</p>
+      </div>
+    );
+  }
   if (!arena.ended && arena.remainingMs > 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <PvpGame
           gameId={gameId}
           myName={myName}
-          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon, cooldown: arena.cooldown, playerId: arena.playerId, team: arena.team }}
+          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon, cooldown: arena.cooldown, playerId: arena.playerId, team: arena.team, map: arena.map }}
           ws={arena.ws}
           startsInMs={arena.startsInMs}
           remainingMs={arena.remainingMs}
@@ -434,4 +502,22 @@ export function ArenaPlayer({ gameId, arena, myName }: { gameId: string; arena: 
       )}
     </div>
   );
+}
+
+/** Telefon: xarita uchun ovoz (bosilgani darhol belgilanadi, server keyin tasdiqlaydi) */
+function ArenaVotePlayer({ gameId, round, vote }: { gameId: string; round: number; vote: NonNullable<PlayerArena["vote"]> }) {
+  const [mine, setMine] = useState<{ round: number; map: MapId } | null>(null);
+  const myVote = mine?.round === round ? mine.map : vote.myVote;
+  const counts = { ...vote.counts };
+  // Server hisobi hali yangilanmagan bo'lsa ham o'z ovozi ko'rinsin
+  if (mine?.round === round && vote.myVote !== mine.map) {
+    counts[mine.map] = (counts[mine.map] ?? 0) + 1;
+    if (vote.myVote) counts[vote.myVote] = Math.max(0, (counts[vote.myVote] ?? 0) - 1);
+  }
+  const voted = vote.voted + (mine?.round === round && !vote.myVote ? 1 : 0);
+  const onVote = (id: MapId) => {
+    setMine({ round, map: id });
+    void voteArenaMapAction(gameId, round, id).catch(() => {});
+  };
+  return <MapVote vote={{ ...vote, counts, voted }} myVote={myVote} onVote={onVote} />;
 }

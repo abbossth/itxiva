@@ -1,7 +1,7 @@
 // "Kiber jang" ko'rinish turlari: server (Vercel), real vaqt xonasi (Cloudflare) va brauzer uchun umumiy.
 // Mongoose'ga bog'liq emas.
 
-import type { PowerKind } from "./pvp";
+import type { MapId, PowerKind } from "./pvp";
 
 export interface PvpPickup {
   id: number;
@@ -37,6 +37,8 @@ export interface PvpPeer {
   isMe: boolean;
   /** Jamoaviy arenada jamoa raqami; individualda -1 */
   team: number;
+  /** Ko'rsatilayotgan emoji-reaksiya (EMOTES indeksi); -1 — yo'q */
+  emote: number;
 }
 
 export interface PvpFeedView {
@@ -57,6 +59,8 @@ export interface PvpWorld {
   feed: PvpFeedView[];
   alive: number;
   total: number;
+  /** Jang xaritasi */
+  map: MapId;
 }
 
 export interface PvpMe {
@@ -86,6 +90,8 @@ export interface PvpTickInput {
   shots?: { id: number; x: number; y: number; a: number }[];
   hits?: { target: string; shot: number }[];
   claim?: number | null;
+  /** Emoji-reaksiya (EMOTES indeksi) */
+  em?: number | null;
 }
 
 export interface PvpTickResult {

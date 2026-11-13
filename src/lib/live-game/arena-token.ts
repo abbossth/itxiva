@@ -19,6 +19,8 @@ export interface ArenaTicket {
   shieldUntil: number;
   /** Jamoaviy arenada jamoa (yo'q yoki -1 — individual) */
   team?: number;
+  /** Jang xaritasi (yo'q — klassik) */
+  m?: string;
   /** Jang boshlanishi va tugashi (ms) */
   st: number;
   en: number;

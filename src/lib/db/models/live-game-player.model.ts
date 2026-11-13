@@ -49,6 +49,8 @@ export interface ILiveGamePlayerData {
   effect?: { index: number; kind: string; text: string; delta: number; items: string[] } | null;
   /** "Kiber jang" (hamma hammaga qarshi) holati */
   arena?: ILiveArenaPlayer | null;
+  /** Jang oldidan xarita uchun ovozi (qaysi jang uchun) */
+  arenaVote?: { round: number; map: string } | null;
   createdAt?: Date | string;
 }
 
@@ -92,6 +94,9 @@ export interface ILiveArenaPlayer {
   place: number;
   /** Jamoaviy arenada jamoa raqami; -1 — individual jang */
   team?: number;
+  /** Emoji-reaksiya (EMOTES indeksi) va vaqti (ms) */
+  emote?: number;
+  emoteAt?: number;
 }
 
 export interface ILiveGamePlayer extends Document, Omit<ILiveGamePlayerData, "_id"> {
@@ -143,6 +148,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
       type: [new Schema({ round: Number, value: { type: Number, default: 0 }, points: { type: Number, default: 0 } }, { _id: false })],
       default: [],
     },
+    arenaVote: { type: new Schema({ round: Number, map: String }, { _id: false }), default: null },
     arena: {
       type: new Schema(
         {
@@ -173,6 +179,8 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           points: { type: Number, default: 0 },
           place: { type: Number, default: 0 },
           team: { type: Number, default: -1 },
+          emote: { type: Number, default: -1 },
+          emoteAt: { type: Number, default: 0 },
         },
         { _id: false }
       ),

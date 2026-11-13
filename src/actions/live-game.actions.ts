@@ -40,7 +40,7 @@ import {
   wheelPoints,
   type MinigameKind,
 } from "@/lib/live-game/minigames";
-import { PVP_INTRO_S, PVP_SECONDS, pvpStandings, teamArenaStandings } from "@/lib/live-game/pvp";
+import { MAP_IDS, MAP_VOTE_S, PVP_INTRO_S, PVP_SECONDS, isMapId, mapOf, pickMap, pvpStandings, teamArenaStandings, type MapId } from "@/lib/live-game/pvp";
 import { liveSnapshot } from "@/lib/live-game/live-cache";
 import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic, makeCracks, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
 
@@ -407,19 +407,80 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
   return true;
 }
 
+/**
+ * Jang bosqichi boshlanadi: avval xarita uchun ovoz berish (MAP_VOTE_S), keyin `resolveArenaVote` g'olib xaritada
+ * o'yinchilarni joylashtiradi va jang boshlanadi. Ovoz paytidagi startedAt/endsAt — taxminiy, ovozdan keyin qayta yoziladi.
+ */
 async function startArena(gameId: mongoose.Types.ObjectId, round: number, seconds: number, teams = false) {
-  const startedAt = new Date(Date.now() + PVP_INTRO_S * 1000);
+  const voteEndsAt = new Date(Date.now() + MAP_VOTE_S * 1000);
+  const startedAt = new Date(voteEndsAt.getTime() + PVP_INTRO_S * 1000);
   const endsAt = new Date(startedAt.getTime() + seconds * 1000);
   const res = await LiveGame.updateOne(
     { _id: gameId, arenaRounds: { $ne: round }, status: { $in: ["reveal", "minigame"] } },
     {
-      $set: { status: "arena", arena: { round, startedAt, endsAt, endedAt: null, pickups: [], nextPickupAt: 0, seq: 0, feed: [] }, questionStartedAt: null },
+      $set: {
+        status: "arena",
+        arena: { round, map: null, voteEndsAt, seconds, teams, startedAt, endsAt, endedAt: null, pickups: [], nextPickupAt: 0, seq: 0, feed: [] },
+        questionStartedAt: null,
+      },
       $push: { arenaRounds: round },
     }
   );
   if (res.modifiedCount === 0) return;
-  // Jon, qurol, qahramon va joy — to'g'ri javoblarga qarab
-  await setupPvp(gameId, startedAt, teams);
+  // Oldingi jangdagi holat ko'rinmasin (bonuslari allaqachon ochkoga qo'shilgan)
+  await LiveGamePlayer.updateMany({ gameId }, { $set: { arena: null } });
+}
+
+/** Ovoz berish tugadi (yoki hamma ovoz berdi): xarita tanlanadi, o'yinchilar joylashtiriladi, jang boshlanadi */
+async function resolveArenaVote(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
+  const game = await LiveGame.findById(gameId).select("status arena").lean();
+  const a = game?.arena;
+  if (!game || game.status !== "arena" || !a || !a.voteEndsAt || a.map || typeof a.round !== "number") return false;
+  const votes = await LiveGamePlayer.find({ gameId: game._id, "arenaVote.round": a.round }).select("arenaVote").lean();
+  const map = pickMap(votes.map((v) => v.arenaVote?.map));
+  const startedAt = new Date(Date.now() + PVP_INTRO_S * 1000);
+  const endsAt = new Date(startedAt.getTime() + (a.seconds || PVP_SECONDS) * 1000);
+  // Bir marta: parallel chaqiruvlardan faqat bittasi
+  const res = await LiveGame.updateOne(
+    { _id: game._id, status: "arena", "arena.round": a.round, "arena.voteEndsAt": { $ne: null } },
+    { $set: { "arena.map": map, "arena.voteEndsAt": null, "arena.startedAt": startedAt, "arena.endsAt": endsAt } }
+  );
+  if (res.modifiedCount === 0) return false;
+  // Jon, qurol, qahramon va joy — to'g'ri javoblarga qarab, tanlangan xaritada
+  await setupPvp(game._id, startedAt, Boolean(a.teams), map);
+  await pushEvents(game._id, [{ text: `🗺️ Jang xaritasi: ${mapOf(map).emoji} ${mapOf(map).name}`, kind: "info" }]);
+  return true;
+}
+
+/** Proyektor: ovoz vaqti tugaganda yoki hamma ovoz berganda (yoki ustoz "Hozir boshlash" bosganda) */
+export async function resolveArenaVoteAction(gameId: string): Promise<Result<{ resolved: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: { resolved: await resolveArenaVote(gameId) } };
+  } catch (err) {
+    return errorOf(err, "Xaritani tanlab bo'lmadi");
+  }
+}
+
+/** O'quvchi: jang xaritasi uchun ovoz (ovoz tugaguncha o'zgartirish mumkin) */
+export async function voteArenaMapAction(gameId: string, round: number, map: string): Promise<Result<{ map: MapId }>> {
+  try {
+    const user = await requireStudent();
+    if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId) || !Number.isInteger(round) || !isMapId(map)) return fail("Ovoz berib bo'lmaydi");
+    await connectDB();
+    const game = await LiveGame.findById(gameId).select("groupId status arena.round arena.voteEndsAt arena.map").lean();
+    const a = game?.arena;
+    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (game.status !== "arena" || !a?.voteEndsAt || a.map || a.round !== round) return fail("Ovoz berish tugadi");
+    if (Date.now() > new Date(a.voteEndsAt).getTime() + 1500) return fail("Ovoz berish tugadi");
+    const res = await LiveGamePlayer.updateOne({ gameId: game._id, studentId: user.userId }, { $set: { arenaVote: { round, map } } });
+    if (res.matchedCount === 0) return fail("Avval o'yinga qo'shiling");
+    return { success: true, data: { map } };
+  } catch (err) {
+    return errorOf(err, "Ovozni saqlab bo'lmadi");
+  }
 }
 
 /** Arena tugadi: bonus ochkolar qo'shiladi (bir marta) */
@@ -598,6 +659,10 @@ export interface LiveArenaView {
   ended: boolean;
   rows: LiveArenaRow[];
   alive: number;
+  /** Jang xaritasi (ovoz paytida — hali tanlanmagan, klassik ko'rsatiladi) */
+  map: MapId;
+  /** Xarita uchun ovoz berish (davom etayotgan bo'lsa) */
+  vote: { endsInMs: number; counts: Record<MapId, number>; voted: number; total: number } | null;
   /** Jamoaviy arena: jamoalar holati (tirik a'zolar bo'yicha tartiblangan); individualda — null */
   teams: { team: number; name: string; alive: number; members: number; kills: number }[] | null;
 }
@@ -634,6 +699,22 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, play
     ended: Boolean(a.endedAt),
     rows,
     alive: rows.filter((r) => !r.out).length,
+    map: mapOf(a.map).id,
+    vote:
+      a.voteEndsAt && !a.map
+        ? (() => {
+            const counts = Object.fromEntries(MAP_IDS.map((id) => [id, 0])) as Record<MapId, number>;
+            let voted = 0;
+            for (const p of players) {
+              const v = p.arenaVote;
+              if (v && v.round === (a.round ?? -1) && isMapId(v.map)) {
+                counts[v.map]++;
+                voted++;
+              }
+            }
+            return { endsInMs: Math.max(0, new Date(a.voteEndsAt).getTime() - now), counts, voted, total: players.length };
+          })()
+        : null,
     teams: teamed ? teamArenaStandings(rows).map((t) => ({ team: t.team, name: TEAM_NAMES[t.team] ?? `${t.team + 1}-jamoa`, alive: t.alive, members: t.members, kills: t.kills })) : null,
   };
 }
@@ -1125,6 +1206,10 @@ export interface LivePlayerState {
     /** Jamoaviy arenada o'z jamoasi (-1 — individual) va jamoalar holati */
     team: number;
     teams: LiveArenaView["teams"];
+    map: MapId;
+    vote: (NonNullable<LiveArenaView["vote"]> & { myVote: MapId | null }) | null;
+    /** O'z qahramoni tayyor (xarita tanlangach joylashtirilgan) */
+    ready: boolean;
   } | null;
 }
 
@@ -1292,6 +1377,11 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             place: a?.place ?? 0,
             team: a?.team ?? -1,
             teams: v.teams,
+            map: v.map,
+            vote: v.vote
+              ? { ...v.vote, myVote: mine?.arenaVote?.round === v.round && isMapId(mine.arenaVote.map) ? mine.arenaVote.map : null }
+              : null,
+            ready: Boolean(a) && !v.vote,
           };
         })(),
       },
