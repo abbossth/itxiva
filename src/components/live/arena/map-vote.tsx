@@ -48,7 +48,7 @@ export function MapVote({
   const max = Math.max(1, ...MAP_IDS.map((id) => vote.counts[id] ?? 0));
   const leader = MAP_IDS.reduce((a, b) => ((vote.counts[b] ?? 0) > (vote.counts[a] ?? 0) ? b : a), MAP_IDS[0]);
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col gap-3", big && "gap-5")}>
+    <div className={cn("flex min-h-0 flex-col gap-3", big ? "flex-1 gap-5" : "mx-auto w-full max-w-4xl")}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Kiber jang</p>
@@ -61,7 +61,8 @@ export function MapVote({
           {Math.ceil(left / 1000)}
         </span>
       </div>
-      <div className={cn("grid gap-3", big ? "grid-cols-2 xl:grid-cols-4" : "grid-cols-2")}>
+      {/* Telefonda 2 tadan, kompyuterda 4 ta bitta qatorda (kartalar ixcham) */}
+      <div className={cn("grid", big ? "grid-cols-2 gap-3 xl:grid-cols-4" : "grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3")}>
         {MAP_IDS.map((id) => {
           const m = ARENA_MAPS[id];
           const n = vote.counts[id] ?? 0;

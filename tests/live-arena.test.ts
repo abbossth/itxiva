@@ -222,16 +222,17 @@ describe("xarita uchun ovoz berish", () => {
     await live.voteArenaMapAction(id, round, "forest");
     await live.voteArenaMapAction(id, round, "ice");
     as(vali);
-    await live.voteArenaMapAction(id, round, "ice");
     expect((await live.voteArenaMapAction(id, round, "hack")).success).toBe(false);
     as(begona);
     expect((await live.voteArenaMapAction(id, round, "ice")).success).toBe(false);
     as(mentor);
     const host = await live.getLiveHostStateAction(id);
-    expect(host.success && host.data.arena?.vote).toMatchObject({ voted: 2, total: 2, counts: { ice: 2, forest: 0 } });
+    expect(host.success && host.data.arena?.vote).toMatchObject({ voted: 1, total: 2, counts: { ice: 1, forest: 0 } });
     as(ali);
     const me = await live.getLivePlayerStateAction(id);
     expect(me.success && me.data.arena).toMatchObject({ ready: false, vote: { myVote: "ice" } });
+    as(vali);
+    await live.voteArenaMapAction(id, round, "ice");
 
     as(mentor);
     await live.resolveArenaVoteAction(id);
@@ -256,6 +257,37 @@ describe("xarita uchun ovoz berish", () => {
     as(vali);
     const v = await live.pvpTickAction(id, { x: 500, y: 500 });
     expect(v.success && v.data.world.peers.find((p) => p.name === "ALI")?.emote).toBe(1);
+  });
+});
+
+describe("ovoz proyektorsiz ham hal bo'ladi (qotib qolmaydi)", () => {
+  it("vaqt tugagach o'quvchining navbatdagi so'rovi jangni boshlaydi", async () => {
+    const { mentor, ali, id } = await seed();
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    as(ali);
+    expect((await live.getLivePlayerStateAction(id)).success && true).toBe(true);
+    expect((await LiveGame.findById(id).lean())!.arena?.map ?? null).toBe(null);
+    tick(13_000);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.arena).toMatchObject({ vote: null, ready: true });
+    expect((await LiveGame.findById(id).lean())!.arena?.map).toBeTruthy();
+  });
+
+  it("hamma ovoz bergach — vaqt tugashini kutmasdan", async () => {
+    const { mentor, ali, vali, id } = await seed();
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    const round = (await LiveGame.findById(id).lean())!.arena!.round!;
+    as(ali);
+    await live.voteArenaMapAction(id, round, "space");
+    expect((await live.getLivePlayerStateAction(id)).success && true).toBe(true);
+    expect((await LiveGame.findById(id).lean())!.arena?.map ?? null).toBe(null);
+    as(vali);
+    await live.voteArenaMapAction(id, round, "space");
+    as(mentor);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.arena).toMatchObject({ vote: null, map: "space" });
   });
 });
 

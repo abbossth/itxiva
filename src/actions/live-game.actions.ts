@@ -41,7 +41,7 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { MAP_IDS, MAP_VOTE_S, PVP_INTRO_S, PVP_SECONDS, isMapId, mapOf, pickMap, pvpStandings, teamArenaStandings, type MapId } from "@/lib/live-game/pvp";
-import { liveSnapshot } from "@/lib/live-game/live-cache";
+import { invalidateLiveSnapshot, liveSnapshot } from "@/lib/live-game/live-cache";
 import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic, makeCracks, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
 
 /** "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang, oxirida final */
@@ -452,6 +452,17 @@ async function resolveArenaVote(gameId: mongoose.Types.ObjectId | string): Promi
   return true;
 }
 
+/**
+ * Ovoz hal qilinadigan paytmi: vaqt tugadi yoki hamma ovoz berdi. Bu tekshiruv har holat so'rovida (o'quvchi va
+ * proyektor) bajariladi — proyektor tabi yashirin yoki internet uzilgan bo'lsa ham o'yin qotib qolmaydi.
+ */
+function voteDue(game: Pick<ILiveGame, "status" | "arena">, players: { arenaVote?: { round: number } | null }[]): boolean {
+  const a = game.arena;
+  if (game.status !== "arena" || !a?.voteEndsAt || a.map) return false;
+  if (Date.now() >= new Date(a.voteEndsAt).getTime()) return true;
+  return players.length > 0 && players.every((p) => p.arenaVote?.round === a.round);
+}
+
 /** Proyektor: ovoz vaqti tugaganda yoki hamma ovoz berganda (yoki ustoz "Hozir boshlash" bosganda) */
 export async function resolveArenaVoteAction(gameId: string): Promise<Result<{ resolved: boolean }>> {
   try {
@@ -793,12 +804,18 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).lean();
+    let game = await LiveGame.findById(gameId).lean();
     if (!game) return fail("O'yin topilmadi");
-    const [players, group] = await Promise.all([
+    const [firstPlayers, group] = await Promise.all([
       LiveGamePlayer.find({ gameId: game._id }).lean<(ILiveGamePlayer & { _id: mongoose.Types.ObjectId })[]>(),
       Group.findById(game.groupId).select("name").lean(),
     ]);
+    let players = firstPlayers;
+    if (voteDue(game, players) && (await resolveArenaVote(game._id))) {
+      invalidateLiveSnapshot(gameId);
+      game = (await LiveGame.findById(gameId).lean()) ?? game;
+      players = await LiveGamePlayer.find({ gameId: game._id }).lean<(ILiveGamePlayer & { _id: mongoose.Types.ObjectId })[]>();
+    }
     const q = game.index >= 0 ? game.questions[game.index] : null;
     const revealed = game.status === "reveal" || game.status === "finished";
     const answersNow = players.map((p) => p.answers.find((a) => a.index === game.index)).filter(Boolean);
@@ -1220,8 +1237,14 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
     await connectDB();
     // Umumiy holat — qisqa keshdan (hamma o'quvchi uchun bitta yuklash, ≤400 ms eski). Yuborilgan javobni
     // ekran o'zi eslab qoladi; o'z yozuvi faqat keshda hali bo'lmasa (hozirgina qo'shilgan) alohida o'qiladi
-    const snap = await liveSnapshot(gameId);
+    let snap = await liveSnapshot(gameId);
     if (!snap || snap.game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    // Xarita uchun ovoz vaqti tugagan (yoki hamma ovoz bergan) — jang shu so'rovda boshlanadi
+    if (voteDue(snap.game, snap.players)) {
+      await resolveArenaVote(gameId);
+      invalidateLiveSnapshot(gameId);
+      snap = (await liveSnapshot(gameId)) ?? snap;
+    }
     const game = snap.game;
     const group = { name: snap.groupName };
     const players: ILiveGamePlayer[] = [...snap.players];
