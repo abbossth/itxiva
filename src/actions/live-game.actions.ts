@@ -11,7 +11,9 @@ import { getCurrentUser, requireMentor, requireStudent } from "@/lib/auth/guards
 import { autoGradeQuiz } from "@/lib/grading";
 import { countLiveQuestions, pickQuestions } from "@/lib/live-game/questions";
 import { isValidSchedule, pickNearestLessonGroup } from "@/lib/schedule";
+import { notifyGroup } from "@/lib/notifications/notify";
 import {
+  LIVE_MODES,
   DEFAULT_PRIZES,
   LIVE_GRACE_MS,
   SURVIVAL_LIVES,
@@ -176,6 +178,13 @@ export async function createLiveGameAction(input: {
           : { minigames: input.minigames !== false, arena: input.arena === true, teamArena: input.mode === "team" && input.arena === true && input.teamArena === true },
       cells: input.mode === "territory" ? emptyCells() : [],
       cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
+    });
+    // Guruh o'quvchilariga Telegram: "Qatnashish" tugmasi bilan (faqat yangi o'yinda — mavjudi qaytarilganda emas)
+    notifyGroup(group._id, "live_game", {
+      gameId: game._id.toString(),
+      modeTitle: LIVE_MODES[input.mode].title,
+      tagline: LIVE_MODES[input.mode].tagline,
+      topPrize: prizes[0] || undefined,
     });
     return { success: true, data: { gameId: game._id.toString(), existing: false } };
   } catch (err) {

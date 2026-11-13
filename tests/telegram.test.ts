@@ -233,6 +233,15 @@ describe("telegram: bildirishnoma yuborish", () => {
     expect((await User.findById(user._id).lean())?.telegram?.chatId).toBe("777");
   });
 
+  it("jonli o'yin: \"Qatnashish\" tugmasi o'yin sahifasiga olib boradi", async () => {
+    const user = await linked("ali", 777);
+    await sendNotifications({ ids: [user._id] }, "live_game", { gameId: "6ac000000000000000000009", modeTitle: "Robot poyga", tagline: "To'g'ri javob — robot oldinga!", topPrize: 10 });
+    expect(sent[0].text).toContain("<b>Jonli o'yin boshlanmoqda!</b>");
+    expect(sent[0].text).toContain("<b>Robot poyga</b>");
+    expect(sent[0].text).toContain("+10");
+    expect(sent[0].reply_markup?.inline_keyboard[0][0]).toEqual({ text: "🎮 Qatnashish", url: "https://itxiva.uz/live/6ac000000000000000000009" });
+  });
+
   it("mentorlarga yuborish faqat mentorlarga boradi", async () => {
     await linked("oquvchi", 111);
     await linked("ustoz", 222, "mentor");

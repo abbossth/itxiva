@@ -6,7 +6,8 @@ vi.mock("@/lib/auth/session", () => sessionMock);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: vi.fn() }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: vi.fn() }));
-vi.mock("@/lib/notifications/notify", () => ({ sendNotifications: vi.fn(), notify: vi.fn(), notifyMany: vi.fn(), notifyMentors: vi.fn(), notifyGroup: vi.fn() }));
+const notifyGroup = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/notifications/notify", () => ({ sendNotifications: vi.fn(), notify: vi.fn(), notifyMany: vi.fn(), notifyMentors: vi.fn(), notifyGroup }));
 
 const { User } = await import("@/lib/db/models/user.model");
 const { Group } = await import("@/lib/db/models/group.model");
@@ -114,5 +115,22 @@ describe("/api/live/active (header tugmasi va o'yin oynasi)", () => {
     host = await live.getLiveHostStateAction(res.data.gameId);
     // "Begona" — boshqa guruhda: ro'yxatda yo'q
     expect(host.success && host.data.waiting).toEqual(["Vali"]);
+  });
+
+  it("yangi o'yin ochilganda guruhga Telegram xabari bir marta ketadi", async () => {
+    const { mentor, group } = await seed();
+    notifyGroup.mockClear();
+    as(mentor);
+    const input = { groupId: group._id.toString(), mode: "race" as const, source: "all" as const, count: 3, minigames: false, arena: false };
+    const res = await live.createLiveGameAction(input);
+    if (!res.success) throw new Error(res.error);
+    expect(notifyGroup).toHaveBeenCalledTimes(1);
+    expect(notifyGroup.mock.calls[0][0].toString()).toBe(group._id.toString());
+    expect(notifyGroup.mock.calls[0][1]).toBe("live_game");
+    expect(notifyGroup.mock.calls[0][2]).toMatchObject({ gameId: res.data.gameId, modeTitle: "Robot poyga", topPrize: 10 });
+    // Ochiq o'yin qaytarilsa — qayta yuborilmaydi
+    const again = await live.createLiveGameAction(input);
+    expect(again.success && again.data.existing).toBe(true);
+    expect(notifyGroup).toHaveBeenCalledTimes(1);
   });
 });

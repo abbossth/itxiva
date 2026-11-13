@@ -14,6 +14,7 @@ export type NotificationType =
   | "quest_new"
   | "quest_result"
   | "weekly_result"
+  | "live_game"
   // Mentor
   | "quest_submitted"
   | "homework_submitted"
@@ -30,6 +31,7 @@ export interface NotificationOption {
 
 export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
   { type: "lesson_reminder", label: "Dars eslatmasi", description: "Dars boshlanishiga bir soat qolganda" },
+  { type: "live_game", label: "Jonli o'yin", description: "Ustoz guruhingizda jonli o'yin ochganda — \"Qatnashish\" tugmasi bilan" },
   { type: "homework_graded", label: "Vazifa tekshirildi", description: "Baho, izoh yoki qayta ishlashga qaytarilgani" },
   { type: "lesson_new", label: "Yangi dars", description: "Guruhingizga yangi dars nashr etilganda" },
   { type: "material_new", label: "Yangi material", description: "Darsga video, fayl yoki havola qo'shilganda" },

@@ -30,6 +30,7 @@ export interface NotificationPayloads {
   quest_new: { questId: string; title: string; coinsLabel: string };
   quest_result: { questId: string; title: string; approved: boolean; coins?: number; xp?: number; reason?: string };
   weekly_result: { questId: string; title: string; place: number | null; coins?: number };
+  live_game: { gameId: string; modeTitle: string; tagline: string; /** 1-o'rin mukofoti (coin) */ topPrize?: number };
   quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
@@ -62,6 +63,17 @@ const b = (v: unknown) => `<b>${escapeHtml(v)}</b>`;
 const clip = (v: string, max = 300) => (v.length > max ? `${v.slice(0, max - 1)}…` : v);
 
 const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Message } = {
+  live_game: (p) => ({
+    text: [
+      `🎮 ${b("Jonli o'yin boshlanmoqda!")}`,
+      `${b(escapeHtml(p.modeTitle))} — ${escapeHtml(p.tagline)}`,
+      p.topPrize ? `\n🏆 G'oliblarga coin: 1-o'rin ${b(`+${p.topPrize}`)}` : "",
+      "\nTugmani bosing va o'yinga qo'shiling 👇",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    button: link("🎮 Qatnashish", `/live/${p.gameId}`),
+  }),
   level_up: (p) => ({
     text: [`🎉 ${b("Yangi daraja!")}`, `${LEVEL_EMOJI[p.level - 1] ?? "⭐"} ${p.level}-daraja · ${b(escapeHtml(p.name))}`, p.bonus > 0 ? `\n🪙 Bonus: ${b(`+${p.bonus}`)} coin` : ""]
       .filter(Boolean)
