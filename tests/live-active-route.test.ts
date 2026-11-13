@@ -99,4 +99,20 @@ describe("/api/live/active (header tugmasi va o'yin oynasi)", () => {
     expect((await get(stateRoute, "/api/live/state")).status).toBe(401);
     expect((await get(hostRoute, "/api/live/host")).status).toBe(401);
   });
+
+  it("kutish zali: guruhdagi qo'shilmaganlar ko'rinadi, boshqa guruh o'quvchisi — yo'q", async () => {
+    const { mentor, group, ali } = await seed();
+    await User.create({ login: "vali", fullName: "Vali", role: "student", passwordHash: "x", groupId: group._id });
+    as(mentor);
+    const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "classic", source: "all", count: 3, minigames: false, arena: false });
+    if (!res.success) throw new Error(res.error);
+    let host = await live.getLiveHostStateAction(res.data.gameId);
+    expect(host.success && host.data.waiting).toEqual(["Ali", "Vali"]);
+    as(ali);
+    await live.joinLiveGameAction(res.data.gameId);
+    as(mentor);
+    host = await live.getLiveHostStateAction(res.data.gameId);
+    // "Begona" — boshqa guruhda: ro'yxatda yo'q
+    expect(host.success && host.data.waiting).toEqual(["Vali"]);
+  });
 });

@@ -667,6 +667,8 @@ export interface LiveHostState {
   slots: string[];
   /** "Ko'prikdan o'tish": har qadamda ochilgan taxtalar — singanmi */
   planks: { known: number; broken: number }[];
+  /** Kutish zalida: guruhdagi hali qo'shilmagan o'quvchilar (ismlari) */
+  waiting: string[];
 }
 
 const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): LivePlayerRow[] =>
@@ -752,11 +754,26 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
         cells: game.mode === "territory" ? game.cells ?? [] : [],
         slots: slotsOf(players),
         planks: bridgePlanks(game),
+        waiting:
+          game.status === "lobby"
+            ? (await groupRoster(game.groupId.toString())).filter((s) => !players.some((p) => p.studentId.toString() === s.id)).map((s) => s.name)
+            : [],
       },
     };
   } catch (err) {
     return errorOf(err, "Holatni olib bo'lmadi");
   }
+}
+
+// Guruh ro'yxati (kutish zali uchun): proyektor har soniyada so'raydi — qisqa muddat saqlanadi
+const rosterCache = new Map<string, { at: number; list: { id: string; name: string }[] }>();
+async function groupRoster(groupId: string): Promise<{ id: string; name: string }[]> {
+  const c = rosterCache.get(groupId);
+  if (c && Date.now() - c.at < 15_000) return c.list;
+  const list = (await User.find({ groupId, role: "student" }).select("fullName").sort({ fullName: 1 }).lean()).map((u) => ({ id: u._id.toString(), name: u.fullName }));
+  if (rosterCache.size > 100) rosterCache.clear();
+  rosterCache.set(groupId, { at: Date.now(), list });
+  return list;
 }
 
 /** Ko'prik: faqat bosilgan (ochilgan) taxtalar va ulardan qaysi biri singan — yashirin yoriqlar ko'rsatilmaydi */

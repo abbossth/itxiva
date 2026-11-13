@@ -517,6 +517,23 @@ function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy:
           ))
         )}
       </div>
+      {state.waiting.length > 0 && (
+        <div className="w-full max-w-3xl rounded-2xl bg-black/25 px-4 py-3 text-left">
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+            Hali qo&apos;shilmagan ({state.waiting.length}) · {state.groupName}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {state.waiting.map((n) => (
+              <span key={n} className="rounded-xl bg-white/5 px-2.5 py-1 text-sm font-semibold text-slate-300 ring-1 ring-white/10">
+                {n}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Bu ro&apos;yxatda yo&apos;q o&apos;quvchi boshqa guruhda turibdi — unga o&apos;yin ko&apos;rinmaydi. Guruh sahifasidan bu guruhga ko&apos;chiring.
+          </p>
+        </div>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
