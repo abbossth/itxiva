@@ -135,6 +135,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
   const [minigames, setMinigames] = useState(true);
   const [arena, setArena] = useState(true);
+  const [teamArena, setTeamArena] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Guruhlar va ulardagi savollar soni oyna ochilganda bir marta olinadi
@@ -166,7 +167,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, arena });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, arena, teamArena: mode === "team" && teamArena });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -288,12 +289,39 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={arena} onChange={(e) => setArena(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
             <span>
-              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Oxirida &quot;Kiber jang&quot; (hamma hammaga qarshi otishma)</span>
+              <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">
+                Oxirida &quot;Kiber jang&quot; ({mode === "team" && teamArena ? "jamoa jamoaga qarshi" : "hamma hammaga qarshi"} otishma)
+              </span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 2 daqiqalik jang: har kimda 3 jon, 3 o&apos;q yegan chiqadi. 3+ to&apos;g&apos;ri javob — qo&apos;shimcha jon va tezroq qurol. Yiqitganlar va oxirgi qolganga bonus ochko
               </span>
             </span>
           </label>
+
+          {mode === "team" && arena && (
+            <Field label="Kiber jang qanday o'tadi">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { v: true, title: "Jamoaviy", text: "Jamoadoshlar birga jang qiladi, bir-biriga o'q tegmaydi. Oxirgi qolgan jamoa yutadi (+400 har a'zoga)" },
+                  { v: false, title: "Individual", text: "Hamma hammaga qarshi — jamoadoshni ham yiqitish mumkin" },
+                ].map((o) => (
+                  <button
+                    key={o.title}
+                    type="button"
+                    onClick={() => setTeamArena(o.v)}
+                    aria-pressed={teamArena === o.v}
+                    className={cn(
+                      "cursor-pointer rounded-2xl border-2 p-3 text-left transition-colors",
+                      teamArena === o.v ? "border-teal-500 bg-teal-500/10" : "border-slate-200 dark:border-slate-700"
+                    )}
+                  >
+                    <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">{o.v ? "🤝 " : "⚔️ "}{o.title}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">{o.text}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
           </>
           )}
 

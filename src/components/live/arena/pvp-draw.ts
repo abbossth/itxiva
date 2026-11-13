@@ -222,6 +222,8 @@ export interface RobotLook {
   moving?: boolean;
   /** Kattalashtirish (proyektorda butun xarita kichik ko'rinadi) */
   size?: number;
+  /** Jamoaviy arenada jamoa rangidagi halqa */
+  ring?: string | null;
 }
 
 export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number) {
@@ -239,6 +241,16 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
       ctx.arc(-Math.cos(r.a) * i * 12, -Math.sin(r.a) * i * 12, R - i * 4, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+  // Jamoa halqasi (yerda)
+  if (r.ring && !r.out) {
+    ctx.strokeStyle = r.ring;
+    ctx.lineWidth = 5;
+    ctx.globalAlpha *= 0.9;
+    ctx.beginPath();
+    ctx.arc(0, 0, R + 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = r.ghost ? 0.45 : 1;
   }
   // Soya
   ctx.fillStyle = "rgba(0,0,0,0.35)";

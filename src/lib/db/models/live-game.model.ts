@@ -53,7 +53,7 @@ export interface ILiveGameData {
   questions: ILiveQuestion[];
   events: ILiveEvent[];
   /** Yaratishda tanlangan qo'shimchalar */
-  options: { minigames: boolean; arena: boolean };
+  options: { minigames: boolean; arena: boolean; /** Jamoaviy jangda arena jamoa bo'lib o'tadi */ teamArena?: boolean };
   /** Joriy yoki oxirgi qisqa o'yin */
   minigame?: ILiveMinigame | null;
   /** O'tkazilgan qisqa o'yinlar (savol raqamlari) */
@@ -146,8 +146,8 @@ const LiveGameSchema = new Schema<ILiveGame>(
     questions: { type: [LiveQuestionSchema], default: [] },
     events: { type: [LiveEventSchema], default: [] },
     options: {
-      type: new Schema({ minigames: { type: Boolean, default: true }, arena: { type: Boolean, default: false } }, { _id: false }),
-      default: () => ({ minigames: true, arena: false }),
+      type: new Schema({ minigames: { type: Boolean, default: true }, arena: { type: Boolean, default: false }, teamArena: { type: Boolean, default: false } }, { _id: false }),
+      default: () => ({ minigames: true, arena: false, teamArena: false }),
     },
     minigame: {
       type: new Schema(

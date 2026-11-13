@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crown, Skull, Swords, Trophy, Users } from "lucide-react";
 import type { LiveArenaView, LivePlayerState } from "@/actions/live-game.actions";
 import type { PvpFeedView, PvpWorld } from "@/lib/live-game/pvp-server";
-import { BULLET_RANGE, BULLET_SPEED, MAP_H, MAP_W, PLAYER_R, POWERS, inBush, skinOf, stepShots, type Shot } from "@/lib/live-game/pvp";
+import { BULLET_RANGE, BULLET_SPEED, MAP_H, MAP_W, PLAYER_R, POWERS, inBush, sameTeam, skinOf, stepShots, teamColor, type Shot } from "@/lib/live-game/pvp";
 import { playBoom } from "@/lib/sound";
 import { useCountdown } from "../live-ui";
 import { PvpGame, pvpFetch } from "./pvp-game";
@@ -138,6 +138,15 @@ export function ArenaHost({
     : rows;
   const winner = arena.ended ? rows.find((r) => r.place === 1) : null;
   const alive = world?.alive ?? arena.alive;
+  // Jamoaviy arena: jamoalar holati jonli (kadrlardan), tugaganda — serverdagi yakuniy tartib
+  const teams = arena.teams
+    ? arena.ended
+      ? arena.teams
+      : arena.teams
+          .map((t) => ({ ...t, alive: liveRows.filter((r) => r.team === t.team && !r.out).length }))
+          .sort((a, b) => b.alive - a.alive)
+    : null;
+  const winnerTeam = arena.ended && teams && teams.length >= 2 ? teams[0] : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -150,6 +159,7 @@ export function ArenaHost({
           <p className="text-2xl font-black sm:text-3xl">Kiber jang</p>
           <span className="rounded-full bg-fuchsia-500/20 px-3 py-1 text-xs font-black uppercase tracking-widest text-fuchsia-200">
             {arena.final ? "Final" : "Raund"}
+            {teams ? " · jamoaviy" : ""}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -178,7 +188,15 @@ export function ArenaHost({
               </span>
             </div>
           )}
-          {winner && (
+          {winnerTeam ? (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 text-center">
+              <Crown className="h-16 w-16 text-amber-300" />
+              <p className="text-xl font-black uppercase tracking-[0.3em] text-amber-200">G&apos;olib jamoa</p>
+              <p className="live-pop text-5xl font-black sm:text-7xl" style={{ color: teamColor(winnerTeam.team) ?? undefined }}>
+                {winnerTeam.name}
+              </p>
+            </div>
+          ) : winner && !teams && (
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 text-center">
               <Crown className="h-16 w-16 text-amber-300" />
               <p className="text-xl font-black uppercase tracking-[0.3em] text-amber-200">Jang g&apos;olibi</p>
@@ -192,6 +210,25 @@ export function ArenaHost({
           )}
         </div>
         <div className="flex min-h-0 flex-col gap-2 lg:w-[300px]">
+          {teams && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {teams.map((t, i) => (
+                <div
+                  key={t.team}
+                  className={cn("rounded-2xl px-3 py-2 ring-2 transition-all", i === 0 && t.alive > 0 ? "bg-white/15" : "bg-white/5")}
+                  style={{ boxShadow: `inset 0 0 0 2px ${teamColor(t.team)}` }}
+                >
+                  <p className="truncate text-sm font-black" style={{ color: teamColor(t.team) ?? undefined }}>
+                    {i === 0 && arena.ended && teams.length >= 2 ? "👑 " : ""}
+                    {t.name}
+                  </p>
+                  <p className="font-mono text-lg font-black">
+                    {t.alive}/{t.members} <span className="text-xs text-slate-400">tirik</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
           <ol className="live-noscroll grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto">
             {liveRows.map((r, i) => (
               <li
@@ -202,7 +239,10 @@ export function ArenaHost({
                 )}
               >
                 <span className="w-6 font-mono font-black text-slate-400">{arena.ended ? r.place : i + 1}</span>
-                <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: skinOf(r.skin).body }} />
+                <span
+                  className="h-4 w-4 shrink-0 rounded-full"
+                  style={{ background: skinOf(r.skin).body, boxShadow: teamColor(r.team) ? `0 0 0 3px ${teamColor(r.team)}` : undefined }}
+                />
                 <span className="min-w-0 flex-1 truncate text-lg font-black">{r.name}</span>
                 {r.out ? (
                   <span className="truncate text-xs font-bold text-rose-300/80">
@@ -330,10 +370,11 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
         const v = smooth.sample(p.id, now);
         if (v) Object.assign(s, v);
         shown.set(p.id, s);
-        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y), size: big }, t);
+        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y), size: big, ring: teamColor(p.team) }, t);
       }
       const targets = peers.filter((p) => !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
-      const step = stepShots(shots, dt, targets);
+      const teamOf = new Map(peers.map((p) => [p.id, p.team]));
+      const step = stepShots(shots, dt, targets, (o, tg) => sameTeam(teamOf.get(o), teamOf.get(tg)));
       shots.length = 0;
       shots.push(...step.shots);
       for (const h of step.hits) burst(sparks, h.x, h.y, colorFor(h.owner), 8);
@@ -343,7 +384,7 @@ function ArenaSpectator({ worldRef, realtime }: { worldRef: React.RefObject<PvpW
       drawTop(ctx, t, layers);
       for (const p of peers) {
         const s = shown.get(p.id) ?? p;
-        nameTag(ctx, `${p.out ? "💀 " : ""}${p.name} · ${p.kills}`, s.x, s.y - PLAYER_R * big - 14, colorFor(p.id), p.lives, p.maxLives, big);
+        nameTag(ctx, `${p.out ? "💀 " : ""}${p.name} · ${p.kills}`, s.x, s.y - PLAYER_R * big - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives, big);
       }
       raf = requestAnimationFrame(loop);
     };
@@ -363,7 +404,7 @@ export function ArenaPlayer({ gameId, arena, myName }: { gameId: string; arena: 
         <PvpGame
           gameId={gameId}
           myName={myName}
-          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon, cooldown: arena.cooldown, playerId: arena.playerId }}
+          init={{ lives: arena.lives, maxLives: arena.maxLives, skin: arena.skin, weapon: arena.weapon, cooldown: arena.cooldown, playerId: arena.playerId, team: arena.team }}
           ws={arena.ws}
           startsInMs={arena.startsInMs}
           remainingMs={arena.remainingMs}
@@ -371,11 +412,15 @@ export function ArenaPlayer({ gameId, arena, myName }: { gameId: string; arena: 
       </div>
     );
   }
+  const teamed = arena.team >= 0 && Boolean(arena.teams && arena.teams.length >= 2);
   const won = arena.ended && arena.place === 1;
+  const myTeamName = arena.teams?.find((t) => t.team === arena.team)?.name ?? "";
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">
       {won ? <Trophy className="h-16 w-16 text-amber-300" /> : arena.out ? <Skull className="h-16 w-16 text-rose-300" /> : <Swords className="h-16 w-16 text-fuchsia-300" />}
-      <p className="text-3xl font-black lg:text-5xl">{!arena.ended ? "Jang tugadi" : won ? "Siz jang g'olibisiz!" : `${arena.place}-o'rin`}</p>
+      <p className="text-3xl font-black lg:text-5xl">
+        {!arena.ended ? "Jang tugadi" : teamed ? (won ? `${myTeamName} g'olib! 🤝` : `${myTeamName}: ${arena.place}-o'rin`) : won ? "Siz jang g'olibisiz!" : `${arena.place}-o'rin`}
+      </p>
       <p className="font-mono text-lg text-slate-300 lg:text-2xl">
         💥 {arena.kills} yiqitdi{arena.out && arena.killedBy ? ` · ${arena.killedBy} yiqitdi` : !arena.out ? " · tirik qoldi" : ""}
       </p>

@@ -57,7 +57,7 @@ export class ArenaRoom implements DurableObject {
     server.accept();
     let id: string | null = null;
     if (t.role === "player") {
-      this.room.join({ p: t.p, n: t.n, skin: t.skin, weapon: t.weapon, cooldown: t.cooldown, lives: t.lives, maxLives: t.maxLives, x: t.x, y: t.y, shieldUntil: t.shieldUntil });
+      this.room.join({ p: t.p, n: t.n, skin: t.skin, weapon: t.weapon, cooldown: t.cooldown, lives: t.lives, maxLives: t.maxLives, x: t.x, y: t.y, shieldUntil: t.shieldUntil, team: t.team ?? -1 });
       id = t.p;
     }
     this.clients.set(server, {

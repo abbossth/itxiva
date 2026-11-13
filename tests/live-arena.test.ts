@@ -19,7 +19,7 @@ const route = await import("@/app/api/live/pvp/route");
 const resultRoute = await import("@/app/api/live/pvp/result/route");
 const { hmacSign, verifyTicket } = await import("@/lib/live-game/arena-token");
 const { NextRequest } = await import("next/server");
-const { PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom } = await import("@/lib/live-game/pvp");
+const { PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
 
 const NOW = new Date("2026-11-10T16:40:00+05:00");
 const tick = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
@@ -105,6 +105,97 @@ describe("kiber jang qoidalari", () => {
     expect(fireShots("me", 300, 100, 0, true, () => id++)).toHaveLength(3);
     // Teleport
     expect(teleportFrom(420, 700, 1, 0)?.x).toBeGreaterThan(1900);
+  });
+});
+
+describe("jamoaviy arena", () => {
+  it("qoidalar: o'q jamoadosh ustidan o'tadi, jamoalar tirik a'zolar bo'yicha", () => {
+    const shot = { id: 1, owner: "a", x: 100, y: 100, vx: 1100, vy: 0, dist: 0 };
+    const r = stepShots([{ ...shot }], 0.1, [{ id: "b", x: 160, y: 100 }], (o, t) => o === "a" && t === "b");
+    expect(r.hits).toHaveLength(0);
+    expect(stepShots([{ ...shot }], 0.1, [{ id: "b", x: 160, y: 100 }]).hits).toHaveLength(1);
+    const t = teamArenaStandings([
+      { team: 0, lives: 1, out: false, kills: 0 },
+      { team: 1, lives: 3, out: false, kills: 2 },
+      { team: 1, lives: 0, out: true, kills: 0 },
+      { team: 0, lives: 2, out: false, kills: 1 },
+    ]);
+    expect(t.map((x) => [x.team, x.alive, x.members])).toEqual([
+      [0, 2, 2],
+      [1, 1, 2],
+    ]);
+  });
+
+  it("jamoaviy jang: jamoadoshni urib bo'lmaydi, g'olib jamoaning har a'zosi bonus oladi", async () => {
+    const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
+    const group = await Group.create({ name: "9-A", grade: 9 });
+    const mk = (login: string) => User.create({ login, fullName: login.toUpperCase(), role: "student", passwordHash: "x", groupId: group._id });
+    const studs = [await mk("ali"), await mk("vali"), await mk("olim"), await mk("soli")];
+    const lesson = await Lesson.create({ groupId: group._id, quarter: 2, order: 1, title: "Dars", isPublished: true, date: NOW });
+    await Quiz.create({ lessonId: lesson._id, title: "T", isPublished: true, questions: [{ type: "single_choice" as const, prompt: "?", options: ["ok", "x"], correctAnswers: ["ok"], points: 1, timeLimit: 10 }] });
+    as(mentor);
+    const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "team", source: "all", count: 5, teams: 2, minigames: false, arena: true, teamArena: true });
+    if (!res.success) throw new Error(res.error);
+    const id = res.data.gameId;
+    expect((await LiveGame.findById(id).lean())?.options).toMatchObject({ arena: true, teamArena: true });
+    for (const s of studs) {
+      as(s);
+      await live.joinLiveGameAction(id);
+    }
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    await live.revealLiveQuestionAction(id);
+    await live.startLiveQuestionAction(id);
+    const g = (await LiveGame.findById(id).lean())!;
+    expect(g.status).toBe("arena");
+    const ps = await LiveGamePlayer.find({ gameId: id }).lean();
+    for (const p of ps) expect(p.arena?.team).toBe(p.team);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.arena?.teams?.map((t) => t.members)).toEqual([2, 2]);
+
+    // Jamoadosh va raqib: 0-jamoadagi birinchi o'yinchi otadi
+    const by = (team: number) => ps.filter((p) => p.team === team);
+    const shooter = by(0)[0];
+    const mate = by(0)[1];
+    const foe = by(1)[0];
+    const shooterUser = studs.find((s) => s._id.equals(shooter.studentId))!;
+    tick(PVP_INTRO_S * 1000 + SPAWN_SHIELD_MS + 100);
+    await LiveGamePlayer.updateMany({ gameId: id }, { $set: { "arena.x": 400, "arena.y": 400 } });
+    as(shooterUser);
+    const shoot = (target: string, sid: number) => live.pvpTickAction(id, { x: 400, y: 400, a: 0, shots: [{ id: sid, x: 420, y: 400, a: 0 }], hits: [{ target, shot: sid }] });
+    await shoot(String(mate._id), 1);
+    expect((await LiveGamePlayer.findById(mate._id).lean())?.arena?.lives).toBe(mate.arena!.lives);
+    await shoot(String(foe._id), 2);
+    expect((await LiveGamePlayer.findById(foe._id).lean())?.arena?.lives).toBe(foe.arena!.lives - 1);
+
+    // 1-jamoa butunlay yiqildi — 0-jamoa g'olib
+    await LiveGamePlayer.updateMany({ gameId: id, team: 1 }, { $set: { "arena.out": true, "arena.lives": 0 } });
+    as(mentor);
+    await live.endArenaAction(id);
+    const after = await LiveGamePlayer.find({ gameId: id }).lean();
+    for (const p of after) {
+      if (p.team === 0) expect(p.arena?.points).toBeGreaterThanOrEqual(TEAM_WIN_BONUS + 300);
+      else expect(p.arena?.points).toBeLessThan(TEAM_WIN_BONUS);
+      expect(p.arena?.place).toBe(p.team === 0 ? 1 : 2);
+    }
+    const ev = (await LiveGame.findById(id).lean())!.events.map((e) => e.text);
+    expect(ev.some((t) => t.includes("g'alaba"))).toBe(true);
+  });
+
+  it("individual tanlansa — jamoadoshni ham urish mumkin", async () => {
+    const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
+    const group = await Group.create({ name: "9-A", grade: 9 });
+    as(mentor);
+    const lesson = await Lesson.create({ groupId: group._id, quarter: 2, order: 1, title: "Dars", isPublished: true, date: NOW });
+    await Quiz.create({ lessonId: lesson._id, title: "T", isPublished: true, questions: [{ type: "single_choice" as const, prompt: "?", options: ["ok", "x"], correctAnswers: ["ok"], points: 1, timeLimit: 10 }] });
+    const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "team", source: "all", count: 5, minigames: false, arena: true, teamArena: false });
+    if (!res.success) throw new Error(res.error);
+    expect((await LiveGame.findById(res.data.gameId).lean())?.options.teamArena).toBe(false);
+    // Boshqa rejimda jamoaviy arena yoqilmaydi
+    await live.cancelLiveGameAction(res.data.gameId);
+    const other = await live.createLiveGameAction({ groupId: group._id.toString(), mode: "classic", source: "all", count: 5, arena: true, teamArena: true });
+    if (!other.success) throw new Error(other.error);
+    expect((await LiveGame.findById(other.data.gameId).lean())?.options).toMatchObject({ arena: true, teamArena: false });
   });
 });
 

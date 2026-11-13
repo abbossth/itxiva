@@ -38,7 +38,7 @@ import {
   wheelPoints,
   type MinigameKind,
 } from "@/lib/live-game/minigames";
-import { PVP_INTRO_S, PVP_SECONDS, pvpStandings } from "@/lib/live-game/pvp";
+import { PVP_INTRO_S, PVP_SECONDS, pvpStandings, teamArenaStandings } from "@/lib/live-game/pvp";
 import { liveSnapshot } from "@/lib/live-game/live-cache";
 import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic, makeCracks, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
 
@@ -137,6 +137,8 @@ export async function createLiveGameAction(input: {
   minigames?: boolean;
   /** Oxirida otishmali arena bosqichi */
   arena?: boolean;
+  /** Jamoaviy jangda: arena jamoa bo'lib (jamoadoshlar bir-birini urmaydi) */
+  teamArena?: boolean;
 }): Promise<Result<{ gameId: string; existing: boolean }>> {
   try {
     const mentor = await requireMentor();
@@ -168,7 +170,10 @@ export async function createLiveGameAction(input: {
       prizes,
       questions,
       // "Kiber arena" rejimida qisqa o'yinlar o'rnini janglar egallaydi, final jang doim bor
-      options: input.mode === "arena" ? { minigames: false, arena: true } : { minigames: input.minigames !== false, arena: input.arena === true },
+      options:
+        input.mode === "arena"
+          ? { minigames: false, arena: true, teamArena: false }
+          : { minigames: input.minigames !== false, arena: input.arena === true, teamArena: input.mode === "team" && input.arena === true && input.teamArena === true },
       cells: input.mode === "territory" ? emptyCells() : [],
       cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
     });
@@ -221,7 +226,7 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
       // Oxirgi savoldan keyin — final jang (yoqilgan bo'lsa, bir marta), keyin g'oliblar
       const finalKey = game.questions.length - 1;
       if (game.options?.arena && !rounds.includes(finalKey) && game.status !== "arena") {
-        await startArena(game._id, finalKey, PVP_SECONDS);
+        await startArena(game._id, finalKey, PVP_SECONDS, game.mode === "team" && Boolean(game.options?.teamArena));
         return { success: true, data: { finished: false } };
       }
       await finishLiveGame(game._id);
@@ -393,7 +398,7 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
   return true;
 }
 
-async function startArena(gameId: mongoose.Types.ObjectId, round: number, seconds: number) {
+async function startArena(gameId: mongoose.Types.ObjectId, round: number, seconds: number, teams = false) {
   const startedAt = new Date(Date.now() + PVP_INTRO_S * 1000);
   const endsAt = new Date(startedAt.getTime() + seconds * 1000);
   const res = await LiveGame.updateOne(
@@ -405,7 +410,7 @@ async function startArena(gameId: mongoose.Types.ObjectId, round: number, second
   );
   if (res.modifiedCount === 0) return;
   // Jon, qurol, qahramon va joy — to'g'ri javoblarga qarab
-  await setupPvp(gameId, startedAt);
+  await setupPvp(gameId, startedAt, teams);
 }
 
 /** Arena tugadi: bonus ochkolar qo'shiladi (bir marta) */
@@ -418,7 +423,8 @@ async function endArena(gameId: mongoose.Types.ObjectId | string): Promise<boole
   if (!game) return false;
   // Oraliq janglarda bonus yarim (final — to'liq)
   const final = (game.arena?.round ?? game.questions.length - 1) >= game.questions.length - 1;
-  await finishPvp(game._id, final ? 1 : 0.5);
+  const { winnerTeam } = await finishPvp(game._id, final ? 1 : 0.5);
+  if (winnerTeam !== null) await pushEvents(game._id, [{ text: `⚔️ ${TEAM_NAMES[winnerTeam] ?? "Jamoa"} arenada g'alaba qozondi!`, kind: "info" }]);
   await saveRanks(game._id, game.mode);
   return true;
 }
@@ -568,6 +574,8 @@ export interface LiveArenaRow {
   killedBy: string | null;
   points: number;
   place: number;
+  /** Jamoaviy arenada jamoa; -1 — individual */
+  team: number;
 }
 
 export interface LiveArenaView {
@@ -581,6 +589,8 @@ export interface LiveArenaView {
   ended: boolean;
   rows: LiveArenaRow[];
   alive: number;
+  /** Jamoaviy arena: jamoalar holati (tirik a'zolar bo'yicha tartiblangan); individualda — null */
+  teams: { team: number; name: string; alive: number; members: number; kills: number }[] | null;
 }
 
 function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, players: ILiveGamePlayer[]): LiveArenaView | null {
@@ -602,8 +612,10 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, play
         killedBy: p.arena!.killedBy ?? null,
         points: p.arena!.points,
         place: p.arena!.place,
+        team: p.arena!.team ?? -1,
       }))
   ).map(({ outAt: _o, ...r }) => r);
+  const teamed = rows.some((r) => r.team >= 0);
   const round = a.round ?? game.questions.length - 1;
   return {
     round,
@@ -613,6 +625,7 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, play
     ended: Boolean(a.endedAt),
     rows,
     alive: rows.filter((r) => !r.out).length,
+    teams: teamed ? teamArenaStandings(rows).map((t) => ({ team: t.team, name: TEAM_NAMES[t.team] ?? `${t.team + 1}-jamoa`, alive: t.alive, members: t.members, kills: t.kills })) : null,
   };
 }
 
@@ -1083,6 +1096,9 @@ export interface LivePlayerState {
     killedBy: string | null;
     points: number;
     place: number;
+    /** Jamoaviy arenada o'z jamoasi (-1 — individual) va jamoalar holati */
+    team: number;
+    teams: LiveArenaView["teams"];
   } | null;
 }
 
@@ -1248,6 +1264,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             killedBy: a?.killedBy ?? null,
             points: a?.points ?? 0,
             place: a?.place ?? 0,
+            team: a?.team ?? -1,
+            teams: v.teams,
           };
         })(),
       },

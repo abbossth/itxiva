@@ -19,8 +19,10 @@ import {
   inBush,
   nearestTarget,
   resolve,
+  sameTeam,
   skinOf,
   stepShots,
+  teamColor,
   teleportFrom,
   type PowerKind,
   type Shot,
@@ -28,6 +30,7 @@ import {
 import { playBoom, playCorrectSound, playHurt, playShot, unlockSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { TEAM_NAMES } from "@/lib/live-game/modes";
 import {
   burst,
   colorFor,
@@ -82,6 +85,8 @@ interface Hud {
   out: boolean;
   killedBy: string | null;
   spectating: string | null;
+  /** Jamoaviy arena: har jamoaning tirik a'zolari */
+  teams: { team: number; alive: number }[];
 }
 
 export function PvpGame({
@@ -95,7 +100,7 @@ export function PvpGame({
 }: {
   gameId: string;
   myName: string;
-  init: { lives: number; maxLives: number; skin: string; weapon: string; cooldown: number; playerId: string };
+  init: { lives: number; maxLives: number; skin: string; weapon: string; cooldown: number; playerId: string; /** Jamoaviy arenada o'z jamoasi; -1 — individual */ team?: number };
   /** Real vaqt xonasi manzili (bo'lmasa — HTTP so'rovlar) */
   ws?: string | null;
   startsInMs: number;
@@ -116,7 +121,9 @@ export function PvpGame({
     out: false,
     killedBy: null,
     spectating: null,
+    teams: [],
   });
+  const myTeam = typeof init.team === "number" ? init.team : -1;
   const [phase, setPhase] = useState<"intro" | "play" | "done">(startsInMs > 0 ? "intro" : "play");
   const [intro, setIntro] = useState(Math.ceil(startsInMs / 1000));
   const [banner, setBanner] = useState<{ text: string; tone: "kill" | "power" | "hurt" } | null>(null);
@@ -268,12 +275,17 @@ export function PvpGame({
 
     const powerLeft = (k: Exclude<PowerKind, "heart">, now: number) => Math.max(0, (me?.powers[k] ?? 0) - (now - powersAt));
 
-    /** Boshqalar: ko'rinib turganlari (butadagilar faqat yaqindan) */
+    // Jamoaviy arena: jamoadoshga o'q tegmaydi, avtomatik nishon faqat raqibni oladi
+    const teamOf = (id: string) => (id === meId ? myTeam : world?.peers.find((p) => p.id === id)?.team ?? -1);
+    const isAlly = (id: string) => sameTeam(myTeam, teamOf(id));
+    const allyShot = (owner: string, target: string) => sameTeam(teamOf(owner), teamOf(target));
+
+    /** Boshqalar: ko'rinib turganlari (butadagilar faqat yaqindan; jamoadoshlar — doim) */
     const visiblePeers = () =>
       (world?.peers ?? []).filter((p) => {
         if (p.isMe || p.out) return false;
         const s = shown.get(p.id) ?? p;
-        return !inBush(s.x, s.y) || Math.hypot(s.x - pos.x, s.y - pos.y) < BUSH_SEE || Boolean(me?.out);
+        return sameTeam(myTeam, p.team) || !inBush(s.x, s.y) || Math.hypot(s.x - pos.x, s.y - pos.y) < BUSH_SEE || Boolean(me?.out);
       });
 
     // ---- Server bilan almashish ----
@@ -463,13 +475,13 @@ export function PvpGame({
         if (p.isMe) continue;
         const s = shown.get(p.id) ?? p;
         if (!p.out && !vis.has(p.id)) continue;
-        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y) }, t);
+        drawRobot(ctx, { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y), ring: teamColor(p.team) }, t);
       }
       // O'zi
       if (me && pos.ready) {
         const powers = (["shield", "speed", "rapid", "triple"] as const).filter((k) => powerLeft(k, now) > 0);
         const moving = keys.size > 0 || Boolean(stick);
-        drawRobot(ctx, { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y) }, t);
+        drawRobot(ctx, { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y), ring: teamColor(myTeam) }, t);
       }
       // O'qlar
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
@@ -480,7 +492,7 @@ export function PvpGame({
       for (const p of world?.peers ?? []) {
         if (p.isMe || (!p.out && !vis.has(p.id))) continue;
         const s = shown.get(p.id) ?? p;
-        nameTag(ctx, `${p.out ? "💀 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, colorFor(p.id), p.lives, p.maxLives);
+        nameTag(ctx, `${p.out ? "💀 " : ""}${sameTeam(myTeam, p.team) ? "🤝 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives);
       }
       if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", me.lives, me.maxLives);
 
@@ -507,7 +519,7 @@ export function PvpGame({
       for (const p of world?.peers ?? []) {
         if (p.isMe || p.out || !vis.has(p.id)) continue;
         const s = shown.get(p.id) ?? p;
-        ctx.fillStyle = colorFor(p.id);
+        ctx.fillStyle = teamColor(p.team) ?? colorFor(p.id);
         ctx.beginPath();
         ctx.arc(mx0 + s.x * k, my0 + s.y * k, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -597,7 +609,7 @@ export function PvpGame({
           const wpt = toWorld(mouse.x, mouse.y);
           pos.a = Math.atan2(wpt.y - pos.y, wpt.x - pos.x);
         } else {
-          const target = nearestTarget(pos.x, pos.y, visiblePeers().map((p) => shown.get(p.id) ?? p));
+          const target = nearestTarget(pos.x, pos.y, visiblePeers().filter((p) => !isAlly(p.id)).map((p) => shown.get(p.id) ?? p));
           if (target && (firing || len < 0.1)) pos.a = Math.atan2(target.y - pos.y, target.x - pos.x);
           else if (len > 0.1) pos.a = Math.atan2(my, mx);
         }
@@ -634,7 +646,8 @@ export function PvpGame({
       }
       // O'qlar
       const targets = (world?.peers ?? []).filter((p) => !p.isMe && !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
-      const mine = stepShots(myShots, dt, targets);
+      // O'z o'qlari jamoadoshlar ustidan o'tib ketadi
+      const mine = stepShots(myShots, dt, targets.filter((p) => !isAlly(p.id)));
       myShots.length = 0;
       myShots.push(...mine.shots);
       for (const hit of mine.hits) {
@@ -644,7 +657,7 @@ export function PvpGame({
       }
       for (const wpt of mine.walls) burst(sparks, wpt.x, wpt.y, "#94a3b8", 4);
       const everyone = [...targets, ...(me && !me.out && pos.ready ? [{ id: meId, x: pos.x, y: pos.y }] : [])];
-      const theirs = stepShots(foreign, dt, everyone);
+      const theirs = stepShots(foreign, dt, everyone, allyShot);
       foreign.length = 0;
       foreign.push(...theirs.shots);
       for (const hit of theirs.hits) burst(sparks, hit.x, hit.y, colorFor(hit.owner), 6);
@@ -669,6 +682,12 @@ export function PvpGame({
           out: Boolean(me?.out),
           killedBy: me?.killedBy ?? null,
           spectating: specName,
+          teams:
+            myTeam >= 0
+              ? [...new Set((world?.peers ?? []).map((p) => p.team).filter((x) => x >= 0))]
+                  .sort((a, b) => a - b)
+                  .map((team) => ({ team, alive: (world?.peers ?? []).filter((p) => p.team === team && !p.out).length }))
+              : [],
         });
       }
       if (!ended && (world?.ended || now >= tm.end + 1500)) {
@@ -729,6 +748,20 @@ export function PvpGame({
           </span>
           <span className={cn("rounded-xl bg-black/55 px-3 py-1.5 font-mono backdrop-blur", hud.left <= 10 && "text-rose-300 quiz-shake")}>{hud.left}s</span>
         </div>
+        {hud.teams.length > 0 && (
+          <div className="flex w-full flex-wrap justify-center gap-1.5 text-xs font-black sm:w-auto">
+            {hud.teams.map((t) => (
+              <span
+                key={t.team}
+                className={cn("inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 backdrop-blur", t.team === myTeam && "ring-2 ring-white/70")}
+                style={{ color: teamColor(t.team) ?? undefined }}
+              >
+                {t.team === myTeam ? "🤝 " : ""}
+                {TEAM_NAMES[t.team] ?? `${t.team + 1}-jamoa`}: {t.alive}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       {/* Kim kimni yiqitdi */}
       <div className="pointer-events-none absolute left-2 top-24 flex max-w-[60%] flex-col gap-1 sm:left-3">
@@ -748,7 +781,12 @@ export function PvpGame({
       </div>
       {phase === "intro" && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center text-white backdrop-blur-sm">
-          <p className="text-xs font-black uppercase tracking-[0.4em] text-fuchsia-300">Kiber jang · hamma hammaga qarshi</p>
+          <p className="text-xs font-black uppercase tracking-[0.4em] text-fuchsia-300">{myTeam >= 0 ? "Kiber jang · jamoaviy" : "Kiber jang · hamma hammaga qarshi"}</p>
+          {myTeam >= 0 && (
+            <p className="rounded-2xl px-4 py-1.5 text-xl font-black text-slate-950" style={{ background: teamColor(myTeam) ?? undefined }}>
+              Jamoangiz: {TEAM_NAMES[myTeam] ?? `${myTeam + 1}-jamoa`} — jamoadoshlarga o&apos;q tegmaydi
+            </p>
+          )}
           <span key={intro} className="quiz-count font-mono text-8xl font-black">
             {Math.max(1, intro)}
           </span>

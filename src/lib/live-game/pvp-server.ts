@@ -21,12 +21,16 @@ import {
   POWERS,
   SKINS,
   SPAWN_SHIELD_MS,
+  TEAM_WIN_BONUS,
   freeSpot,
   pvpBonus,
   pvpLoadout,
   pvpStandings,
   rollPower,
+  sameTeam,
   spawnPoint,
+  teamArenaStandings,
+  teamSpawn,
   type PowerKind,
 } from "./pvp";
 
@@ -90,14 +94,19 @@ function activePowers(a: ILiveArenaPlayer, now: number): PowerKind[] {
 // ---- Boshlash va yakunlash ----
 
 /** Arena boshlanadi: har o'yinchiga jon (to'g'ri javoblarga qarab), qurol, qahramon va joy beriladi */
-export async function setupPvp(gameId: Id, startedAt: Date) {
-  const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt").sort({ createdAt: 1 }).lean();
+export async function setupPvp(gameId: Id, startedAt: Date, teams = false) {
+  const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt team").sort({ createdAt: 1 }).lean();
   const start = startedAt.getTime();
+  // Jamoaviy arenada: har jamoa o'z burchagidan, a'zolar yonma-yon
+  const teamIndex = new Map<number, number>();
   if (players.length > 0) {
     await LiveGamePlayer.bulkWrite(
       players.map((p, i) => {
         const load = pvpLoadout(p.answers.filter((a) => a.isCorrect).length);
-        const pos = spawnPoint(i);
+        const team = teams ? Math.max(0, p.team ?? 0) : -1;
+        const k = teamIndex.get(team) ?? 0;
+        teamIndex.set(team, k + 1);
+        const pos = teams ? teamSpawn(team, k) : spawnPoint(i);
         const arena: ILiveArenaPlayer = {
           lives: load.lives,
           maxLives: load.lives,
@@ -122,6 +131,7 @@ export async function setupPvp(gameId: Id, startedAt: Date) {
           used: [],
           points: 0,
           place: 0,
+          team,
         };
         return { updateOne: { filter: { _id: p._id }, update: { $set: { arena } } } };
       })
@@ -138,9 +148,24 @@ export async function setupPvp(gameId: Id, startedAt: Date) {
 }
 
 /** Yakun: o'rinlar va bonus ochkolar (bir marta — chaqiruvchi shartli yangilash bilan kafolatlaydi) */
-export async function finishPvp(gameId: Id, factor = 1): Promise<void> {
+export async function finishPvp(gameId: Id, factor = 1): Promise<{ winnerTeam: number | null }> {
   const players = await LiveGamePlayer.find({ gameId, arena: { $ne: null } }).select("arena").lean();
-  const rows = players.map((p) => ({ id: p._id, lives: p.arena!.lives, out: p.arena!.out, outAt: p.arena!.outAt ?? 0, kills: p.arena!.kills }));
+  const rows = players.map((p) => ({ id: p._id, lives: p.arena!.lives, out: p.arena!.out, outAt: p.arena!.outAt ?? 0, kills: p.arena!.kills, team: p.arena!.team ?? -1 }));
+  // Jamoaviy arena: o'rin — jamoa o'rni; g'olib jamoaning har a'zosi (yiqilganlar ham) bonus oladi
+  if (rows.some((r) => r.team >= 0)) {
+    const teams = teamArenaStandings(rows);
+    // Raqib jamoa bo'lmasa — g'olib ham yo'q
+    const winner = teams.length >= 2 ? teams[0].team : null;
+    const placeOf = new Map(teams.map((t, i) => [t.team, i + 1]));
+    await Promise.all(
+      rows.map((r) => {
+        const pts = Math.round((pvpBonus(r.kills, !r.out, false) + (r.team === winner ? TEAM_WIN_BONUS : 0)) * factor);
+        return LiveGamePlayer.updateOne({ _id: r.id }, { $inc: { score: pts }, $set: { "arena.points": pts, "arena.place": placeOf.get(r.team) ?? teams.length + 1 } });
+      })
+    );
+    invalidatePvp(gameId);
+    return { winnerTeam: winner };
+  }
   const alive = rows.filter((r) => !r.out).length;
   const ordered = pvpStandings(rows);
   await Promise.all(
@@ -150,6 +175,7 @@ export async function finishPvp(gameId: Id, factor = 1): Promise<void> {
     })
   );
   invalidatePvp(gameId);
+  return { winnerTeam: null };
 }
 
 // ---- Ko'rinish ----
@@ -177,6 +203,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
         powers: activePowers(s, now),
         shots: isMe ? [] : (s.shots ?? []).filter((x) => now - x.at < 900).map((x) => ({ id: x.id, x: x.x, y: x.y, a: x.a, age: Math.max(0, now - x.at) })),
         isMe,
+        team: s.team ?? -1,
       };
     });
   return {
@@ -278,7 +305,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
         const shot = recent.get(Number(h?.shot));
         if (!shot || used.has(Number(h.shot)) || typeof h.target !== "string" || h.target === meId) continue;
         const target = players.find((p) => String(p._id) === h.target);
-        if (!target?.arena || target.arena.out) continue;
+        if (!target?.arena || target.arena.out || sameTeam(before.arena!.team, target.arena.team)) continue;
         // Kechikish hisobga olingan holda: o'q chiqqan joydan nishongacha masofa o'q uchadigan masofadan oshmasin
         if (Math.hypot(target.arena.x - shot.x, target.arena.y - shot.y) > BULLET_RANGE + 260) continue;
         used.add(Number(h.shot));
@@ -404,6 +431,7 @@ export async function arenaSocketUrl(
         x: pa.x,
         y: pa.y,
         shieldUntil: pa.shieldUntil,
+        team: pa.team ?? -1,
         st,
         en,
         exp: en + 60_000,

@@ -35,6 +35,8 @@ export interface PvpPeer {
   powers: PowerKind[];
   shots: PvpShotView[];
   isMe: boolean;
+  /** Jamoaviy arenada jamoa raqami; individualda -1 */
+  team: number;
 }
 
 export interface PvpFeedView {

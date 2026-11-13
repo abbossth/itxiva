@@ -90,6 +90,8 @@ export interface ILiveArenaPlayer {
   used: number[];
   points: number;
   place: number;
+  /** Jamoaviy arenada jamoa raqami; -1 — individual jang */
+  team?: number;
 }
 
 export interface ILiveGamePlayer extends Document, Omit<ILiveGamePlayerData, "_id"> {
@@ -170,6 +172,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           used: { type: [Number], default: [] },
           points: { type: Number, default: 0 },
           place: { type: Number, default: 0 },
+          team: { type: Number, default: -1 },
         },
         { _id: false }
       ),

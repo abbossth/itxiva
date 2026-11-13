@@ -92,6 +92,27 @@ describe("real vaqt xonasi", () => {
   });
 });
 
+describe("jamoaviy xona", () => {
+  it("jamoadoshga o'q tegmaydi, raqibga tegadi; ro'yxat jamoani brauzerga yetkazadi", () => {
+    const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.5);
+    room.join({ p: "ali", n: "ALI", skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 200, y: 150, shieldUntil: 0, team: 0 });
+    room.join({ p: "olim", n: "OLIM", skin: "rex", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 400, y: 150, shieldUntil: 0, team: 0 });
+    room.join({ p: "vali", n: "VALI", skin: "nova", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 600, y: 150, shieldUntil: 0, team: 1 });
+    room.input("ali", { x: 200, y: 150, shots: [{ id: 1, x: 230, y: 150, a: 0 }], hits: [{ target: "olim", shot: 1 }] }, START + 1000);
+    expect(room.players.get("olim")!.lives).toBe(3);
+    room.input("ali", { x: 200, y: 150, shots: [{ id: 2, x: 230, y: 150, a: 0 }], hits: [{ target: "vali", shot: 2 }] }, START + 2000);
+    expect(room.players.get("vali")!.lives).toBe(2);
+    const st = newClientState();
+    decodeRoomMessage(room.rosterMessage(), st, "ali", null);
+    const d = decodeRoomMessage(room.frame(START + 2100, "ali", { pickups: 0, feed: 0 }), st, "ali", { weapon: "Lazer-1", cooldown: 0.36, name: "ALI", skin: "bolt" })!;
+    expect(d.world.peers.map((p) => [p.id, p.team])).toEqual([
+      ["ali", 0],
+      ["olim", 0],
+      ["vali", 1],
+    ]);
+  });
+});
+
 describe("bilet va imzo", () => {
   const t: ArenaTicket = { g: "g1", r: 2, role: "player", p: "p1", n: "Ali", skin: "bolt", lives: 3, maxLives: 3, weapon: "Lazer-1", cooldown: 0.36, x: 1, y: 2, shieldUntil: 0, st: 1, en: 2, exp: Date.now() + 60_000 };
   it("to'g'ri bilet o'qiladi, buzilgan yoki muddati o'tgani rad etiladi", async () => {

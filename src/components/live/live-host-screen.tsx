@@ -160,7 +160,9 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     if (state.status !== "arena" || !a || a.ended || arenaEnding.current === a.round) return;
     if (arenaEndsAt.current?.round !== a.round) arenaEndsAt.current = { round: a.round, at: Date.now() + a.startsInMs + a.remainingMs };
     // Bittadan boshqa hamma chiqib ketsa — g'olib aniq, jang tugaydi
-    const decided = a.rows.length >= 2 && a.startsInMs === 0 && a.alive <= 1;
+    // Jamoaviy arenada — bitta jamoa qolganda
+    const aliveTeams = a.teams ? new Set(a.rows.filter((r) => !r.out).map((r) => r.team)).size : 0;
+    const decided = a.startsInMs === 0 && (a.teams ? a.teams.length >= 2 && aliveTeams <= 1 : a.rows.length >= 2 && a.alive <= 1);
     // Mutlaq muddat: har soniyalik so'rov taymerni qaytadan boshlamasin
     if (decided && arenaDecidedAt.current?.round !== a.round) arenaDecidedAt.current = { round: a.round, at: Date.now() + 3000 };
     const deadline = decided ? arenaDecidedAt.current!.at : arenaEndsAt.current.at + 2000;

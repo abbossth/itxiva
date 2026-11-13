@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, HIT_GRACE_MS, MAP_H, MAP_W, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, freeSpot, rollPower, type PowerKind } from "./pvp";
+import { BULLET_RANGE, HIT_GRACE_MS, MAP_H, MAP_W, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, freeSpot, rollPower, sameTeam, type PowerKind } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -21,6 +21,8 @@ export interface RoomJoin {
   x: number;
   y: number;
   shieldUntil: number;
+  /** Jamoaviy arenada jamoa; -1 — individual */
+  team?: number;
 }
 
 export interface RoomPlayer {
@@ -29,6 +31,7 @@ export interface RoomPlayer {
   i: number;
   name: string;
   skin: string;
+  team: number;
   weapon: string;
   cooldown: number;
   lives: number;
@@ -123,6 +126,7 @@ export class PvpRoom {
       i: this.players.size,
       name: t.n,
       skin: t.skin,
+      team: typeof t.team === "number" ? t.team : -1,
       weapon: t.weapon,
       cooldown: t.cooldown,
       lives: t.lives,
@@ -176,7 +180,7 @@ export class PvpRoom {
       const shot = p.shots.get(sid);
       if (!shot || p.used.has(sid) || typeof h.target !== "string" || h.target === id) continue;
       const t = this.players.get(h.target);
-      if (!t || t.out) continue;
+      if (!t || t.out || sameTeam(p.team, t.team)) continue;
       if (Math.hypot(t.x - shot.x, t.y - shot.y) > BULLET_RANGE + 260) continue;
       p.used.add(sid);
       if (p.used.size > 500) p.used = new Set([...p.used].slice(-200));
@@ -259,7 +263,7 @@ export class PvpRoom {
 
   /** O'yinchilar ro'yxati (ism, qahramon) — faqat o'zgarganda */
   rosterMessage(): string {
-    return JSON.stringify({ t: "r", v: this.rosterVer, l: [...this.players.values()].map((p) => [p.i, p.id, p.name, p.skin]) });
+    return JSON.stringify({ t: "r", v: this.rosterVer, l: [...this.players.values()].map((p) => [p.i, p.id, p.name, p.skin, p.team]) });
   }
 
   /** Kadr: barcha o'yinchilar holati, yangi o'qlar, (o'zgargan bo'lsa) sovg'alar va lenta, o'z holati */
@@ -305,7 +309,7 @@ export class PvpRoom {
 // ---- Brauzer tomoni: ixcham xabarni oddiy ko'rinishga aylantirish ----
 
 export interface RoomClientState {
-  roster: Map<number, { id: string; name: string; skin: string; cooldown?: number }>;
+  roster: Map<number, { id: string; name: string; skin: string; team: number; cooldown?: number }>;
   pickups: PvpPickup[];
   feed: PvpFeedView[];
   feedRaw: [number, number, string, string | null, number][];
@@ -334,7 +338,7 @@ export function decodeRoomMessage(
     return null;
   }
   if (m.t === "r") {
-    st.roster = new Map((m.l as [number, string, string, string][]).map(([i, id, name, skin]) => [i, { id, name, skin }]));
+    st.roster = new Map((m.l as [number, string, string, string, number?][]).map(([i, id, name, skin, team]) => [i, { id, name, skin, team: typeof team === "number" ? team : -1 }]));
     return null;
   }
   if (m.t !== "f") return null;
@@ -373,6 +377,7 @@ export function decodeRoomMessage(
       powers,
       shots: shotsBy.get(i) ?? [],
       isMe: r.id === meId,
+      team: r.team,
     });
   }
   const world: PvpWorld = {

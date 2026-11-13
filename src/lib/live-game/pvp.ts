@@ -85,6 +85,50 @@ export const SPAWNS = [
   { x: 860, y: 700 },
   { x: 1540, y: 700 },
 ];
+// ---- Jamoaviy arena: jamoadoshlar bir-biriga o'q tekkiza olmaydi, har jamoa o'z burchagidan chiqadi ----
+
+/** Jamoa ranglari (TEAM_NAMES tartibida: Qizillar, Ko'klar, Sariqlar, Yashillar) */
+export const TEAM_COLORS = ["#f43f5e", "#3b82f6", "#facc15", "#22c55e"];
+export const teamColor = (team: number | null | undefined) => (typeof team === "number" && team >= 0 ? TEAM_COLORS[team % TEAM_COLORS.length] : null);
+/** Ikkalasi bitta jamoada (individual jangda — hech qachon) */
+export const sameTeam = (a: number | null | undefined, b: number | null | undefined) => typeof a === "number" && a >= 0 && a === b;
+
+/** Jamoa bazalari: to'rt burchak */
+const TEAM_BASES = [
+  { x: 170, y: 170 },
+  { x: 2230, y: 1230 },
+  { x: 2230, y: 170 },
+  { x: 170, y: 1230 },
+];
+/** Jamoa a'zosining paydo bo'lish joyi: o'z burchagida, bir-biriga yopishmasdan */
+export function teamSpawn(team: number, i: number): { x: number; y: number } {
+  const b = TEAM_BASES[team % TEAM_BASES.length];
+  const dx = b.x < MAP_W / 2 ? 1 : -1;
+  const dy = b.y < MAP_H / 2 ? 1 : -1;
+  const col = i % 4;
+  const row = Math.floor(i / 4);
+  return resolve(b.x + dx * col * 58, b.y + dy * row * 58);
+}
+
+/** Jamoalar tartibi: ko'proq tirik a'zo, keyin jami jon, keyin yiqitishlar */
+export function teamArenaStandings(rows: { team: number; lives: number; out: boolean; kills: number }[]) {
+  const by = new Map<number, { team: number; alive: number; lives: number; kills: number; members: number }>();
+  for (const r of rows) {
+    if (r.team < 0) continue;
+    const t = by.get(r.team) ?? { team: r.team, alive: 0, lives: 0, kills: 0, members: 0 };
+    t.members++;
+    t.kills += r.kills;
+    if (!r.out) {
+      t.alive++;
+      t.lives += Math.max(0, r.lives);
+    }
+    by.set(r.team, t);
+  }
+  return [...by.values()].sort((a, b) => b.alive - a.alive || b.lives - a.lives || b.kills - a.kills);
+}
+/** G'olib jamoaning har a'zosiga */
+export const TEAM_WIN_BONUS = 400;
+
 export function spawnPoint(i: number): { x: number; y: number } {
   const s = SPAWNS[i % SPAWNS.length];
   const ring = Math.floor(i / SPAWNS.length);
@@ -236,7 +280,13 @@ export interface ShotHit {
  * O'qlarni suradi: devorga, chegaraga urilgan yoki masofasi tugaganlari o'chadi.
  * O'q egasidan boshqa o'yinchiga tegsa — o'chadi va `hits` ga yoziladi (jonni faqat server ayiradi).
  */
-export function stepShots(shots: Shot[], dt: number, targets: { id: string; x: number; y: number }[]): { shots: Shot[]; hits: ShotHit[]; walls: { x: number; y: number }[] } {
+export function stepShots(
+  shots: Shot[],
+  dt: number,
+  targets: { id: string; x: number; y: number }[],
+  /** Jamoadosh: o'q uning ustidan o'tib ketadi */
+  ally?: (owner: string, target: string) => boolean
+): { shots: Shot[]; hits: ShotHit[]; walls: { x: number; y: number }[] } {
   const hits: ShotHit[] = [];
   const walls: { x: number; y: number }[] = [];
   const out: Shot[] = [];
@@ -255,7 +305,7 @@ export function stepShots(shots: Shot[], dt: number, targets: { id: string; x: n
       } else if (s.dist > BULLET_RANGE) alive = false;
       else {
         for (const t of targets) {
-          if (t.id === s.owner) continue;
+          if (t.id === s.owner || ally?.(s.owner, t.id)) continue;
           if ((s.x - t.x) ** 2 + (s.y - t.y) ** 2 <= (PLAYER_R + 4) ** 2) {
             hits.push({ shot: s.id, owner: s.owner, target: t.id, x: s.x, y: s.y });
             alive = false;
