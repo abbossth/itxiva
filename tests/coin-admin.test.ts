@@ -116,3 +116,44 @@ describe("mentor: xato yozuvni tuzatish", () => {
     expect((await admin.editCoinEntryAction({ entryId: buy._id.toString(), coin: 0, xp: 0, reason: "Qaytarish" })).success).toBe(false);
   });
 });
+
+describe("mentor: guruhda bir xil xato yozuvlarni birdaniga bekor qilish", () => {
+  it("bir kunda bir xil sabab bilan yozilgan jarimalar bitta to'plam; tanlanganlari bekor qilinadi", async () => {
+    const { mentor, ali, vali } = await seed();
+    const g = (await User.findById(ali._id).lean())!.groupId!;
+    const olim = await User.create({ login: "olim", fullName: "OLIM", role: "student", groupId: g, passwordHash: "x", spendableBalance: 50, totalCoins: 50, xp: 50 });
+    for (const s of [ali, vali, olim]) {
+      await awardCoins({ studentId: s._id, coin: -5, type: "penalty", description: "Darsga kelmagani uchun", idempotencyKey: `penalty:d1:${s._id}` });
+    }
+    await awardCoins({ studentId: ali._id, coin: -10, type: "penalty", description: "Vazifa topshirilmadi" });
+    await awardCoins({ studentId: ali._id, coin: 15, type: "bonus", description: "Bonus" });
+
+    actAs(sessionFor(mentor));
+    const res = await admin.getGroupCoinBatchesAction(String(g), "minus");
+    if (!res.success) throw new Error(res.message);
+    expect(res.data.batches.map((b) => [b.description, b.entries.length, b.amount, b.total])).toEqual([
+      ["Darsga kelmagani uchun", 3, -5, -15],
+      ["Vazifa topshirilmadi", 1, -10, -10],
+    ]);
+    const plus = await admin.getGroupCoinBatchesAction(String(g), "plus");
+    expect(plus.success && plus.data.batches.map((b) => b.description)).toEqual(["Bonus"]);
+
+    // Olimnikini qoldirib, qolgan ikkitasini bekor qilish
+    const batch = res.data.batches[0];
+    const ids = batch.entries.filter((e) => e.name !== "OLIM").map((e) => e.id);
+    const v = await admin.voidCoinEntriesAction({ entryIds: ids, reason: "Dars bekor qilingan edi" });
+    expect(v.success && v.data).toMatchObject({ voided: 2, skipped: [] });
+    expect(v.success && v.data.byStudent[String(ali._id)]).toBe(5);
+    expect((await user(ali._id)).spendableBalance).toBe(100 - 5 - 10 + 15 + 5);
+    expect((await user(vali._id)).spendableBalance).toBe(5);
+    expect((await user(olim._id)).spendableBalance).toBe(45);
+    // Takror bosilsa — hech narsa o'zgarmaydi
+    const again = await admin.voidCoinEntriesAction({ entryIds: ids, reason: "Dars bekor qilingan edi" });
+    expect(again.success && again.data.voided).toBe(0);
+    expect((await user(ali._id)).spendableBalance).toBe(105);
+    // To'plamda endi faqat Olim qoldi
+    const after = await admin.getGroupCoinBatchesAction(String(g), "minus");
+    expect(after.success && after.data.batches.find((b) => b.description === "Darsga kelmagani uchun")?.entries.map((e) => e.name)).toEqual(["OLIM"]);
+    expect(await AuditLog.countDocuments({ action: "VOID_COIN_ENTRY" })).toBe(2);
+  });
+});

@@ -13,6 +13,7 @@ import {
   ChevronRight,
   UserRound,
   Coins,
+  Undo2,
 } from "lucide-react";
 import { IGroupData } from "@/lib/db/models/group.model";
 import { IUserData } from "@/lib/db/models/user.model";
@@ -27,7 +28,7 @@ import { useToast } from "@/components/ui/toast";
 import { StudentImportModal } from "@/components/mentor/student-import-modal";
 import { ResetPasswordModal } from "@/components/mentor/reset-password-modal";
 import { CredentialsExport } from "@/components/mentor/credentials-export";
-import { GrantCoinsDialog } from "@/components/mentor/coin-admin-dialogs";
+import { BulkVoidDialog, GrantCoinsDialog } from "@/components/mentor/coin-admin-dialogs";
 import { moveStudentAction, deleteStudentAction } from "@/actions/student.actions";
 import { formatDateUz } from "@/lib/utils";
 import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "@/components/ui/table-controls";
@@ -72,6 +73,9 @@ export function GroupStudentsView({
   // Coin berish: bitta o'quvchi yoki belgilanganlar
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [grantFor, setGrantFor] = useState<{ id: string; name: string }[] | null>(null);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const onVoided = (byStudent: Record<string, number>) =>
+    setStudents((list) => list.map((s) => (byStudent[s._id.toString()] ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + byStudent[s._id.toString()]) } : s)));
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -174,6 +178,9 @@ export function GroupStudentsView({
           />
           Hammasini belgilash
         </label>
+        <Button variant="secondary" size="sm" className="gap-1.5 min-h-[40px] ml-auto" onClick={() => setVoidOpen(true)}>
+          <Undo2 className="w-4 h-4" /> Xato coinlarni bekor qilish
+        </Button>
         {selected.size > 0 && (
           <>
             <Button
@@ -396,6 +403,7 @@ export function GroupStudentsView({
         )}
       </div>
 
+      <BulkVoidDialog groupId={group._id.toString()} open={voidOpen} onOpenChange={setVoidOpen} onDone={onVoided} />
       <GrantCoinsDialog students={grantFor ?? []} open={Boolean(grantFor)} onOpenChange={(o) => !o && setGrantFor(null)} onDone={onGranted} />
 
       {/* Move Student Modal */}
