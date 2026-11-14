@@ -16,6 +16,7 @@ const { Quiz } = await import("@/lib/db/models/quiz.model");
 const { QuizSubmission } = await import("@/lib/db/models/quiz-submission.model");
 const { QuizRun } = await import("@/lib/db/models/quiz-run.model");
 const { CoinLedger } = await import("@/lib/db/models/coin-ledger.model");
+const { AppSettings } = await import("@/lib/db/models/app-settings.model");
 const game = await import("@/actions/quiz-game.actions");
 const { answerPoints, questionTimeLimit } = await import("@/lib/quiz-game");
 const { awardQuizPlaces } = await import("@/lib/quiz-places");
@@ -157,10 +158,37 @@ describe("o'yin jarayoni", () => {
     expect((await game.startQuizGameAction(quizId)).success).toBe(false);
   });
 
-  it("tugatilgan test qayta o'ynalmaydi; mentor yangi savol qo'shsa — faqat yangisi o'ynaladi", async () => {
+  it("tugatilgan testni qayta ishlash mumkin: coin berilmaydi, natija va reyting o'zgarmaydi", async () => {
+    await AppSettings.create({ key: "global", gamification: { enabled: true } });
+    const { ali, quizId } = await seed();
+    await play(ali, quizId, ["4", ["2"], "Toshkent"]);
+    const before = await QuizSubmission.findOne({ studentId: ali._id }).lean();
+    const coinsBefore = (await User.findById(ali._id).lean())?.totalCoins;
+    const ledgerBefore = await CoinLedger.countDocuments({ studentId: ali._id });
+    expect(coinsBefore).toBeGreaterThan(0);
+
+    actAs(sessionFor(ali));
+    const start = await game.startQuizGameAction(quizId);
+    expect(start.success && start.data).toMatchObject({ practice: true, total: 3 });
+    const res = await play(ali, quizId, ["4", ["2", "4"], "Toshkent"], 200);
+    expect(res.data).toMatchObject({ practice: true, finished: true });
+    expect(res.data.final).toMatchObject({ totalScore: 6, maxScore: 6, correct: 3, total: 3 });
+
+    const after = await QuizSubmission.findOne({ studentId: ali._id }).lean();
+    expect(after?.totalScore).toBe(before?.totalScore);
+    expect(after?.answers).toHaveLength(3);
+    expect(after?.game?.score).toBe(before?.game?.score);
+    expect((await User.findById(ali._id).lean())?.totalCoins).toBe(coinsBefore);
+    expect(await CoinLedger.countDocuments({ studentId: ali._id })).toBe(ledgerBefore);
+
+    // Yana qayta ishlash mumkin
+    actAs(sessionFor(ali));
+    expect((await game.startQuizGameAction(quizId)).success).toBe(true);
+  });
+
+  it("mentor yangi savol qo'shsa — faqat yangisi o'ynaladi (oddiy raund, qayta ishlash emas)", async () => {
     const { ali, quiz, quizId } = await seed();
     await play(ali, quizId, ["4", ["2", "4"], "Toshkent"]);
-    expect((await game.startQuizGameAction(quizId)).success).toBe(false);
 
     await Quiz.updateOne({ _id: quiz._id }, { $push: { questions: { type: "single_choice", prompt: "3 + 3?", options: ["6", "7"], correctAnswers: ["6"], points: 1 } } });
     const res = await play(ali, quizId, ["6"]);

@@ -143,7 +143,8 @@ export function QuizGame({ quiz, submission, lessonId }: QuizGameProps) {
           }
         }
         if (fb.finished) {
-          requestRewardCheck();
+          // Qayta ishlashda coin berilmaydi — mukofot oynasini kutish shart emas
+          if (!fb.practice) requestRewardCheck();
           void loadBoard();
         }
       } finally {
@@ -158,7 +159,7 @@ export function QuizGame({ quiz, submission, lessonId }: QuizGameProps) {
     if (feedback.finished) {
       setPhase("results");
       // To'g'ri javoblar va tushuntirishlar bilan batafsil sharh serverdan qayta yuklanadi
-      router.refresh();
+      if (!feedback.practice) router.refresh();
       return;
     }
     void showQuestion(runId);
@@ -207,6 +208,11 @@ export function QuizGame({ quiz, submission, lessonId }: QuizGameProps) {
       board={board}
       final={feedback?.final ?? null}
       score={feedback?.score ?? null}
+      practice={Boolean(feedback?.finished && feedback.practice)}
+      canRetake={Boolean(submission) && pending.length === 0}
+      busy={busy}
+      error={error}
+      onRetake={start}
       effects={effects}
     />
   );
@@ -393,6 +399,11 @@ function QuestionScreen({
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
               <span>
                 {question.index + 1} / {question.total}-savol
+                {question.practice && (
+                  <span className="ml-2 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-200">
+                    Qayta ishlash · coin yo&apos;q
+                  </span>
+                )}
               </span>
               <span className="text-slate-400">{question.points} ball</span>
             </div>
@@ -575,6 +586,7 @@ function FeedbackScreen({
 
         <p className="text-sm font-semibold text-white/80">
           Jami: <span className="font-mono font-black text-white">{formatNumberUz(feedback.score)}</span> ochko
+          {feedback.practice && <span className="block text-xs font-medium text-white/70">Qayta ishlash — coin berilmaydi</span>}
         </p>
 
         <button
@@ -600,6 +612,11 @@ function ResultsScreen({
   board,
   final,
   score,
+  practice,
+  canRetake,
+  busy,
+  error,
+  onRetake,
   effects,
 }: {
   quiz: IQuizData;
@@ -608,25 +625,39 @@ function ResultsScreen({
   board: QuizLeaderboard | null;
   final: GameFeedback["final"] | null;
   score: number | null;
+  /** Qayta ishlash hozirgina tugadi: shu raund natijasi ko'rsatiladi (saqlanmagan) */
+  practice: boolean;
+  canRetake: boolean;
+  busy: boolean;
+  error: string | null;
+  onRetake: () => void;
   effects: boolean;
 }) {
   const [showReview, setShowReview] = useState(false);
   const myRow = board?.rows.find((r) => r.isMe);
-  const totalPoints = myRow?.score ?? score;
+  const totalPoints = practice ? score : myRow?.score ?? score;
+  const activePractice = board?.activeRun?.practice ? board.activeRun : null;
   const shown = useCountUp(totalPoints ?? 0, 1100);
   const rank = board?.myRank ?? null;
   const celebrated = useRef(false);
   const ended = board?.ended ?? false;
 
   useEffect(() => {
-    if (!effects || celebrated.current || !rank || rank > 3 || !final) return;
+    if (!effects || celebrated.current || !rank || rank > 3 || !final || practice) return;
     celebrated.current = true;
     void fireConfetti({ particleCount: 110, spread: 90, origin: { y: 0.4 }, zIndex: 80 });
-  }, [effects, rank, final]);
+  }, [effects, rank, final, practice]);
 
   const totalScore = final?.totalScore ?? submission?.totalScore ?? 0;
   const maxScore = final?.maxScore ?? submission?.maxScore ?? 0;
   const status = final?.status ?? submission?.status;
+  const correctText = practice && final
+    ? `${final.correct}/${final.total}`
+    : myRow?.correct !== null && myRow?.correct !== undefined
+    ? `${myRow.correct}/${myRow.total}`
+    : final
+    ? `${final.correct}/${final.total}`
+    : "—";
 
   return (
     <div className="space-y-4">
@@ -637,7 +668,9 @@ function ResultsScreen({
           </span>
           {totalPoints !== null ? (
             <>
-              <p className="text-xs font-black uppercase tracking-[0.3em] text-teal-200">O&apos;yin tugadi</p>
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-teal-200">
+                {practice ? "Qayta ishlash tugadi" : "O'yin tugadi"}
+              </p>
               <p className="font-mono text-6xl font-black tabular-nums">{formatNumberUz(shown)}</p>
               <p className="-mt-2 text-sm font-bold text-slate-300">ochko</p>
             </>
@@ -646,17 +679,35 @@ function ResultsScreen({
           )}
 
           <div className="grid w-full max-w-md grid-cols-3 gap-2 text-center">
-            <Stat label="O'rin" value={rank ? `${rank}/${board?.players ?? rank}` : "—"} />
-            <Stat
-              label="To'g'ri"
-              value={myRow?.correct !== null && myRow?.correct !== undefined ? `${myRow.correct}/${myRow.total}` : final ? `${final.correct}/${final.total}` : "—"}
-            />
+            <Stat label="O'rin" value={practice ? "—" : rank ? `${rank}/${board?.players ?? rank}` : "—"} />
+            <Stat label="To'g'ri" value={correctText} />
             <Stat label="Ball" value={status === "graded" ? `${totalScore}/${maxScore}` : "Tekshirilmoqda"} />
           </div>
           {final && final.maxStreak > 1 && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
               <Flame className="h-4 w-4 text-orange-400" /> Eng uzun seriya: {final.maxStreak} ta
             </span>
+          )}
+          {practice && (
+            <p className="max-w-md text-xs text-slate-300">
+              Bu qayta ishlash natijasi: coin berilmadi, birinchi natijangiz va reytingdagi o&apos;rningiz o&apos;zgarmaydi.
+            </p>
+          )}
+
+          {canRetake && (
+            <div className="flex w-full flex-col items-center gap-1.5 pt-1">
+              {error && <p className="rounded-xl bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-200">{error}</p>}
+              <button
+                type="button"
+                onClick={onRetake}
+                disabled={busy}
+                className="inline-flex min-h-[52px] w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-2xl bg-teal-400 text-base font-black text-slate-950 shadow-lg shadow-teal-500/30 transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
+              >
+                <RotateCcw className="h-5 w-5" />
+                {activePractice ? `Davom ettirish (${activePractice.index + 1}/${activePractice.total})` : "Qayta ishlash"}
+              </button>
+              {!practice && <p className="text-[11px] text-slate-400">Qayta ishlaganda to&apos;g&apos;ri javoblar uchun coin berilmaydi.</p>}
+            </div>
           )}
         </div>
       </GameShell>

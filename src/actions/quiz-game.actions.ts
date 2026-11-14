@@ -34,6 +34,8 @@ export interface GameQuestion {
   total: number;
   /** Qolgan vaqt (ms): sahifa yangilansa vaqt qaytadan boshlanmaydi */
   remainingMs: number;
+  /** Qayta ishlash (mashq): coin berilmaydi */
+  practice: boolean;
 }
 
 export interface GameProgress {
@@ -42,6 +44,8 @@ export interface GameProgress {
   total: number;
   score: number;
   streak: number;
+  /** Qayta ishlash (mashq): coin berilmaydi, natija va reyting o'zgarmaydi */
+  practice: boolean;
 }
 
 export interface GameFeedback {
@@ -56,6 +60,7 @@ export interface GameFeedback {
   streak: number;
   score: number;
   finished: boolean;
+  practice: boolean;
   /** O'yin tugaganda: test bali */
   final?: { totalScore: number; maxScore: number; status: string; correct: number; total: number; maxStreak: number };
 }
@@ -86,11 +91,13 @@ const progressOf = (run: IQuizRun): GameProgress => ({
   total: run.questionIds.length,
   score: run.score,
   streak: run.streak,
+  practice: Boolean(run.practice),
 });
 
 /**
  * O'yinni boshlaydi yoki tugallanmaganini davom ettiradi. Faqat hali javob berilmagan savollar o'ynaladi
- * (topshirilgandan keyin mentor qo'shgan savollar — alohida raund).
+ * (topshirilgandan keyin mentor qo'shgan savollar — alohida raund). Hammasiga javob berilgan bo'lsa —
+ * qayta ishlash (mashq): barcha savollar, lekin natija saqlanmaydi va coin berilmaydi.
  */
 export async function startQuizGameAction(quizId: string): Promise<Result<GameProgress>> {
   try {
@@ -105,12 +112,15 @@ export async function startQuizGameAction(quizId: string): Promise<Result<GamePr
 
     const submission = await QuizSubmission.findOne({ quizId: quiz._id, studentId: user.userId }).select("answers.questionId").lean();
     const answered = new Set((submission?.answers ?? []).map((a) => a.questionId));
-    const questionIds = quiz.questions.map((q) => String(q._id)).filter((id) => !answered.has(id));
-    if (questionIds.length === 0) return fail("Siz bu testni allaqachon topshirgansiz");
+    const allIds = quiz.questions.map((q) => String(q._id));
+    let questionIds = allIds.filter((id) => !answered.has(id));
+    const practice = questionIds.length === 0;
+    if (practice) questionIds = allIds;
+    if (questionIds.length === 0) return fail("Testda savol yo'q");
 
     await QuizRun.init();
     try {
-      const run = await QuizRun.create({ quizId: quiz._id, lessonId, studentId: user.userId, questionIds });
+      const run = await QuizRun.create({ quizId: quiz._id, lessonId, studentId: user.userId, questionIds, practice });
       return { success: true, data: progressOf(run) };
     } catch (error) {
       // Ikki marta bosilgan: birinchi yaratilgani davom etadi
@@ -162,6 +172,7 @@ export async function nextQuizQuestionAction(runId: string): Promise<Result<Game
         index: run.index,
         total: run.questionIds.length,
         remainingMs,
+        practice: Boolean(run.practice),
       },
     };
   } catch (err) {
@@ -237,10 +248,13 @@ export async function answerQuizQuestionAction(runId: string, questionId: string
       streak,
       score: updated.score,
       finished: last,
+      practice: Boolean(updated.practice),
     };
 
     if (last) {
-      const final = await finalizeRun(updated, quiz.questions as IQuizQuestion[], user.userId);
+      const final = updated.practice
+        ? practiceResult(updated, quiz.questions as IQuizQuestion[])
+        : await finalizeRun(updated, quiz.questions as IQuizQuestion[], user.userId);
       if (final) feedback.final = final;
     }
     return { success: true, data: feedback };
@@ -248,6 +262,22 @@ export async function answerQuizQuestionAction(runId: string, questionId: string
     unstable_rethrow(err);
     return fail(err instanceof Error ? err.message : "Javobni yuborib bo'lmadi");
   }
+}
+
+/** Qayta ishlash tugadi: faqat natija hisoblanadi — hech narsa yozilmaydi, coin berilmaydi */
+function practiceResult(run: IQuizRun, allQuestions: IQuizQuestion[]) {
+  const byId = new Map(allQuestions.map((q) => [String(q._id), q]));
+  const questions = run.questionIds.map((id) => byId.get(id)).filter((q): q is IQuizQuestion => Boolean(q));
+  const answers = run.answers.filter((a) => byId.has(a.questionId));
+  const pendingOpen = answers.some((a) => byId.get(a.questionId)?.type === "open_ended" && a.isCorrect === undefined);
+  return {
+    totalScore: answers.reduce((s, a) => s + (a.pointsAwarded ?? 0), 0),
+    maxScore: questions.reduce((s, q) => s + q.points, 0),
+    status: pendingOpen ? "submitted" : "graded",
+    correct: answers.filter((a) => a.isCorrect === true && byId.get(a.questionId)?.type !== "open_ended").length,
+    total: questions.length,
+    maxStreak: run.maxStreak,
+  };
 }
 
 /** O'yin tugadi: javoblar oddiy test topshirig'i sifatida yoziladi (coin, AI tekshiruv — o'sha yo'l bilan) */
@@ -306,7 +336,7 @@ export interface QuizLeaderboard {
   ended: boolean;
   prizes: number[];
   /** Tugallanmagan o'yin bo'lsa — davom ettirish uchun */
-  activeRun: { index: number; total: number; score: number } | null;
+  activeRun: { index: number; total: number; score: number; practice: boolean } | null;
   /** Ovoz, titrash va konfetti (o'quvchi profilda o'chirib qo'yishi mumkin) */
   effects: boolean;
 }
@@ -323,7 +353,7 @@ export async function getQuizLeaderboardAction(quizId: string): Promise<Result<Q
     const [subs, groupStudents, active, me] = await Promise.all([
       QuizSubmission.find({ quizId: quiz._id }).select("studentId game").lean(),
       User.find({ role: "student", groupId: user.groupId }).select("_id fullName").lean(),
-      QuizRun.findOne({ quizId: quiz._id, studentId: user.userId, finishedAt: null }).select("index questionIds score").lean(),
+      QuizRun.findOne({ quizId: quiz._id, studentId: user.userId, finishedAt: null }).select("index questionIds score practice").lean(),
       User.findById(user.userId).select("celebrationsEnabled").lean(),
     ]);
     const names = new Map(groupStudents.map((s) => [s._id.toString(), s.fullName]));
@@ -365,7 +395,9 @@ export async function getQuizLeaderboardAction(quizId: string): Promise<Result<Q
         endsAt: endsAt.toISOString(),
         ended: Date.now() >= endsAt.getTime(),
         prizes: QUIZ_PLACE_COINS,
-        activeRun: active ? { index: active.index, total: active.questionIds.length, score: active.score } : null,
+        activeRun: active
+          ? { index: active.index, total: active.questionIds.length, score: active.score, practice: Boolean(active.practice) }
+          : null,
         effects: me?.celebrationsEnabled !== false,
       },
     };

@@ -28,6 +28,8 @@ export interface IQuizRunData {
   streak: number;
   maxStreak: number;
   finishedAt?: Date | string | null;
+  /** Qayta ishlash (mashq): natija QuizSubmission ga yozilmaydi, coin va reyting o'zgarmaydi */
+  practice?: boolean;
   createdAt?: Date | string;
 }
 
@@ -61,6 +63,7 @@ const QuizRunSchema = new Schema<IQuizRun>(
     streak: { type: Number, default: 0 },
     maxStreak: { type: Number, default: 0 },
     finishedAt: { type: Date, default: null },
+    practice: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
