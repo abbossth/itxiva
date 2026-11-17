@@ -55,6 +55,8 @@ export interface ILiveGamePlayerData {
   arenaVote?: { round: number; map: string } | null;
   /** "Galaktika poygasi 3D": joriy poygadagi holati */
   galaxy?: ILiveGalaxyPlayer | null;
+  /** "Yashil zona": joriy raunddagi holati */
+  zone?: ILiveZonePlayer | null;
   createdAt?: Date | string;
 }
 
@@ -68,6 +70,22 @@ export interface ILiveGalaxyPlayer {
   turbo: number;
   /** Kema rangi (tartib raqami) */
   ship: number;
+  points: number;
+  place: number;
+}
+
+export interface ILiveZonePlayer {
+  round: number;
+  x: number;
+  y: number;
+  /** Oxirgi joylashuv qabul qilingan vaqt (ms) — tezlik tekshiruvi uchun */
+  at: number;
+  speed: number;
+  color: number;
+  out: boolean;
+  /** Qaysi to'lqinda o'chgan (-1 — o'chmagan) */
+  outWave: number;
+  stars: number;
   points: number;
   place: number;
 }
@@ -192,6 +210,25 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
       default: [],
     },
     arenaVote: { type: new Schema({ round: Number, map: String }, { _id: false }), default: null },
+    zone: {
+      type: new Schema(
+        {
+          round: Number,
+          x: { type: Number, default: 50 },
+          y: { type: Number, default: 31 },
+          at: { type: Number, default: 0 },
+          speed: { type: Number, default: 15 },
+          color: { type: Number, default: 0 },
+          out: { type: Boolean, default: false },
+          outWave: { type: Number, default: -1 },
+          stars: { type: Number, default: 0 },
+          points: { type: Number, default: 0 },
+          place: { type: Number, default: 0 },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     galaxy: {
       type: new Schema(
         {

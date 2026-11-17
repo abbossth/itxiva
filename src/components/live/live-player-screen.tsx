@@ -19,6 +19,7 @@ import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { MinigamePlayer } from "./live-minigame";
 import { LivePrizes } from "./live-prizes";
 import { GalaxyPlayer } from "./galaxy/galaxy-race";
+import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
 import { ModeIntro } from "./live-intro";
@@ -80,7 +81,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
 
   // Deploydan keyingi avtomatik yangilanish savol/jang/mini-o'yin o'rtasida bo'lmasin (VersionWatcher kutadi)
   useEffect(() => {
-    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame" || state.status === "galaxy";
+    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame" || state.status === "galaxy" || state.status === "zone";
     document.documentElement.dataset.liveBusy = busy ? "1" : "0";
     return () => {
       delete document.documentElement.dataset.liveBusy;
@@ -260,6 +261,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           )
         ) : state.status === "arena" && state.arena ? (
           <ArenaPlayer key={state.arena.round} gameId={state.id} arena={state.arena} myName={state.me?.name ?? "Siz"} />
+        ) : state.status === "zone" && state.zone ? (
+          <ZonePlayer gameId={state.id} z={state.zone} />
         ) : state.status === "galaxy" && state.galaxy ? (
           <GalaxyPlayer gameId={state.id} g={state.galaxy} />
         ) : state.status === "minigame" && state.minigame ? (

@@ -19,6 +19,14 @@ export interface ModeTheme {
 }
 
 export const MODE_THEMES: Record<LiveGameMode, ModeTheme> = {
+  zone: {
+    emoji: "🟢",
+    bg: ["#03130c", "#06281b", "#0b1e3a"],
+    glow: ["rgba(34,197,94,0.26)", "rgba(56,189,248,0.18)"],
+    accent: "#4ade80",
+    floaters: ["🤖", "⭐", "🟢"],
+    music: { transpose: 5, tempo: 1.18, wave: "square", minor: false },
+  },
   galaxy: {
     emoji: "🚀",
     bg: ["#02030f", "#120a3a", "#2a0b4a"],

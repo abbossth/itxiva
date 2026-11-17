@@ -48,6 +48,8 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { awardCoins } from "@/lib/gamification/award";
+import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaves } from "@/lib/live-game/zone";
+import { resolveZoneWaves } from "@/lib/live-game/zone-server";
 import {
   GALAXY_EVERY,
   GALAXY_FINAL_SECONDS,
@@ -82,6 +84,12 @@ function slotsOf(players: { _id: unknown; createdAt?: Date | string }[]): string
 }
 
 /** Shu savoldan keyin jang bormi (oxirgisidan keyin — final) */
+/** "Yashil zona": har 3 savoldan keyin raund (oxirgi savoldan keyin — final, alohida) */
+function zoneRoundDue(mode: LiveGameMode, index: number, total: number, done: number[]): boolean {
+  if (mode !== "zone" || index < 0 || index >= total - 1 || done.includes(index)) return false;
+  return (index + 1) % ZONE_EVERY === 0;
+}
+
 /** "Galaktika poygasi 3D": har 3 savoldan keyin poyga (oxirgi savoldan keyin — final, alohida) */
 function galaxyRoundDue(mode: LiveGameMode, index: number, total: number, done: number[]): boolean {
   if (mode !== "galaxy" || index < 0 || index >= total - 1 || done.includes(index)) return false;
@@ -200,7 +208,7 @@ export async function createLiveGameAction(input: {
       options:
         input.mode === "arena"
           ? { minigames: false, arena: true, teamArena: false }
-          : input.mode === "galaxy"
+          : input.mode === "galaxy" || input.mode === "zone"
           ? { minigames: false, arena: false, teamArena: false }
           : { minigames: input.minigames !== false, arena: input.arena === true, teamArena: input.mode === "team" && input.arena === true && input.teamArena === true },
       cells: input.mode === "territory" ? emptyCells() : [],
@@ -239,7 +247,7 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds arena arenaRounds galaxy galaxyRounds").lean();
+    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds arena arenaRounds galaxy galaxyRounds zone zoneRounds").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
     // Har 3 savoldan keyin — qisqa o'yin (bir marta)
@@ -261,6 +269,13 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
       await startGalaxy(game._id, game.index, false);
       return { success: true, data: { finished: false } };
     }
+    // "Yashil zona": har 3 savoldan keyin raund
+    const zoneRounds = game.zoneRounds ?? [];
+    if (game.status === "reveal" && zoneRoundDue(game.mode, game.index, game.questions.length, zoneRounds)) {
+      await startZone(game._id, game.index, false);
+      return { success: true, data: { finished: false } };
+    }
+    if (game.status === "zone" && !game.zone?.endedAt) await endZone(game._id);
     // Qisqa o'yindan keyin: tugamagan bo'lsa — avval natijasi hisoblanadi
     if (game.status === "minigame" && !game.minigame?.endedAt) await endMinigame(game._id);
     // Poygadan keyin: tugamagan bo'lsa — avval ochkolar
@@ -273,6 +288,10 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
       const finalKey = game.questions.length - 1;
       if (game.options?.arena && !rounds.includes(finalKey) && game.status !== "arena") {
         await startArena(game._id, finalKey, PVP_SECONDS, game.mode === "team" && Boolean(game.options?.teamArena));
+        return { success: true, data: { finished: false } };
+      }
+      if (game.mode === "zone" && !zoneRounds.includes(finalKey) && game.status !== "zone") {
+        await startZone(game._id, finalKey, true);
         return { success: true, data: { finished: false } };
       }
       if (game.mode === "galaxy" && !galaxyRounds.includes(finalKey) && game.status !== "galaxy") {
@@ -670,6 +689,153 @@ function galaxyView(game: Pick<ILiveGame, "galaxy" | "status">, players: ILiveGa
   };
 }
 
+/** "Yashil zona" raundi boshlanadi: robotlar maydon o'rtasida, tezlik — shu bosqichdagi to'g'ri javoblarga qarab */
+async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: boolean) {
+  const startedAt = new Date(Date.now() + ZONE_INTRO_S * 1000);
+  const endsAt = new Date(startedAt.getTime() + zoneDurationMs(final));
+  const res = await LiveGame.updateOne(
+    { _id: gameId, zoneRounds: { $ne: round }, status: { $in: ["reveal", "minigame"] } },
+    {
+      $set: {
+        status: "zone",
+        zone: { round, final, seed: seedOf(`${gameId}:zone:${round}`), startedAt, endsAt, resolved: 0, endedAt: null },
+        questionStartedAt: null,
+      },
+      $push: { zoneRounds: round },
+    }
+  );
+  if (res.modifiedCount === 0) return;
+  const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt").sort({ createdAt: 1 }).lean();
+  if (players.length === 0) return;
+  await LiveGamePlayer.bulkWrite(
+    players.map((p, i) => {
+      const correct = p.answers.filter((a) => a.isCorrect && (final || a.index > round - ZONE_EVERY)).length;
+      const pos = zoneSpawn(i, players.length);
+      return {
+        updateOne: {
+          filter: { _id: p._id },
+          update: {
+            $set: {
+              zone: {
+                round,
+                x: pos.x,
+                y: pos.y,
+                at: 0,
+                speed: zoneSpeed(final ? Math.ceil(correct / 2) : correct),
+                color: i % ROBOT_COLORS.length,
+                out: false,
+                outWave: -1,
+                stars: 0,
+                points: 0,
+                place: 0,
+              },
+            },
+          },
+        },
+      };
+    })
+  );
+}
+
+/** Raund tugadi: qolgan to'lqinlar hisoblanadi, omon qolish va yulduzlar uchun ochko (bir marta) */
+async function endZone(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
+  const current = await LiveGame.findById(gameId).select("groupId status zone").lean();
+  if (!current?.zone || current.status !== "zone" || current.zone.endedAt) return false;
+  // Vaqt tugagan bo'lsa — oxirgi to'lqinlar ham hisoblansin (muddatidan oldin tugatilsa — hisoblanganicha)
+  await resolveZoneWaves(current as Parameters<typeof resolveZoneWaves>[0]);
+  const game = await LiveGame.findOneAndUpdate(
+    { _id: gameId, status: "zone", "zone.endedAt": null },
+    { $set: { "zone.endedAt": new Date() } },
+    { returnDocument: "after" }
+  );
+  const z = game?.zone;
+  if (!game || !z) return false;
+  const waves = zoneWaves(z.seed, Boolean(z.final)).length;
+  const played = Math.min(waves, z.resolved ?? 0);
+  const players = await LiveGamePlayer.find({ gameId: game._id, "zone.round": z.round }).select("name zone").lean();
+  const scored = players
+    .map((p) => {
+      const survived = p.zone?.out ? Math.max(0, p.zone.outWave ?? 0) : played;
+      return { id: p._id.toString(), name: p.name, pts: zonePoints(survived, waves, p.zone?.stars ?? 0, Boolean(z.final)), survivor: !p.zone?.out };
+    })
+    .sort((a, b) => b.pts - a.pts);
+  await Promise.all(
+    scored.map((r, i) =>
+      LiveGamePlayer.updateOne({ _id: r.id, "zone.round": z.round }, { $inc: { score: r.pts }, $set: { "zone.points": r.pts, "zone.place": i + 1 } })
+    )
+  );
+  const survivors = scored.filter((r) => r.survivor);
+  if (survivors.length > 0) {
+    const names = survivors.slice(0, 3).map((r) => r.name).join(", ");
+    await pushEvents(game._id, [{ text: `🟢 Zonada omon qoldi: ${names}${survivors.length > 3 ? ` va yana ${survivors.length - 3} kishi` : ""}`, kind: "info" }]);
+  }
+  await saveRanks(game._id, game.mode);
+  return true;
+}
+
+export async function endZoneAction(gameId: string): Promise<Result<{ ended: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: { ended: await endZone(gameId) } };
+  } catch (err) {
+    return errorOf(err, "Raundni yakunlab bo'lmadi");
+  }
+}
+
+export interface LiveZoneRow {
+  id: string;
+  name: string;
+  color: number;
+  out: boolean;
+  outWave: number;
+  stars: number;
+  points: number;
+  place: number;
+}
+
+export interface LiveZoneView {
+  round: number;
+  final: boolean;
+  seed: number;
+  startsInMs: number;
+  remainingMs: number;
+  /** Hisoblangan to'lqinlar */
+  resolved: number;
+  ended: boolean;
+  rows: LiveZoneRow[];
+}
+
+function zoneView(game: Pick<ILiveGame, "zone" | "status">, players: ILiveGamePlayer[]): LiveZoneView | null {
+  const z = game.zone;
+  if (game.status !== "zone" || !z) return null;
+  const now = Date.now();
+  const rows = players
+    .filter((p) => p.zone?.round === z.round)
+    .map((p) => ({
+      id: p._id.toString(),
+      name: p.name,
+      color: p.zone?.color ?? 0,
+      out: Boolean(p.zone?.out),
+      outWave: p.zone?.outWave ?? -1,
+      stars: p.zone?.stars ?? 0,
+      points: p.zone?.points ?? 0,
+      place: p.zone?.place ?? 0,
+    }))
+    .sort((a, b) => (z.endedAt ? a.place - b.place : Number(a.out) - Number(b.out) || b.stars - a.stars));
+  return {
+    round: z.round,
+    final: Boolean(z.final),
+    seed: z.seed,
+    startsInMs: Math.max(0, new Date(z.startedAt).getTime() - now),
+    remainingMs: Math.max(0, new Date(z.endsAt).getTime() - now),
+    resolved: z.resolved ?? 0,
+    ended: Boolean(z.endedAt),
+    rows,
+  };
+}
+
 /** Arena tugadi: bonus ochkolar qo'shiladi (bir marta) */
 async function endArena(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
   const game = await LiveGame.findOneAndUpdate(
@@ -930,6 +1096,9 @@ export interface LiveHostState {
   /** Joriy savol — bonus raund (×2) */
   bonus: boolean;
   arena: LiveArenaView | null;
+  /** "Yashil zona" (davom etayotgan bo'lsa) va shu natijadan keyin raund bo'ladimi */
+  zone: LiveZoneView | null;
+  zoneNext: boolean;
   /** "Galaktika poygasi 3D" (davom etayotgan bo'lsa) */
   galaxy: LiveGalaxyView | null;
   /** Shu natijadan keyin (yoki oxirida) poyga bo'ladimi */
@@ -1035,6 +1204,11 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
           return v ? { ...v, ws: v.ended ? null : await arenaSocketUrl(game, null) } : null;
         })(),
         arenaNext: Boolean(game.options?.arena && !(game.arenaRounds ?? []).includes(game.questions.length - 1)),
+        zone: zoneView(game, players),
+        zoneNext:
+          game.status === "reveal" &&
+          (zoneRoundDue(game.mode, game.index, game.questions.length, game.zoneRounds ?? []) ||
+            (game.mode === "zone" && game.index === game.questions.length - 1 && !(game.zoneRounds ?? []).includes(game.index))),
         galaxy: galaxyView(game, players),
         galaxyNext:
           game.status === "reveal" &&
@@ -1394,6 +1568,26 @@ export interface LivePlayerState {
   standings: ReturnType<typeof teamStandings>;
   top: { name: string; score: number; coins: number }[];
   minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number }) | null;
+  /** "Yashil zona": o'z roboti va natijasi */
+  zone: {
+    round: number;
+    final: boolean;
+    seed: number;
+    startsInMs: number;
+    remainingMs: number;
+    ended: boolean;
+    joined: boolean;
+    x: number;
+    y: number;
+    speed: number;
+    color: number;
+    out: boolean;
+    outWave: number;
+    points: number;
+    place: number;
+    total: number;
+    top: { name: string; points: number; survivor: boolean }[];
+  } | null;
   /** "Galaktika poygasi 3D": o'z kemasi, turbo zaryadlari va natijasi */
   galaxy: {
     round: number;
@@ -1591,6 +1785,30 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             myValue: my?.played ? my.value : -1,
             myPoints: my?.points ?? 0,
             place: my && my.value > 0 ? myIndex + 1 : 0,
+          };
+        })(),
+        zone: (() => {
+          const v = zoneView(game, players);
+          if (!v) return null;
+          const my = mine?.zone?.round === v.round ? mine.zone : null;
+          return {
+            round: v.round,
+            final: v.final,
+            seed: v.seed,
+            startsInMs: v.startsInMs,
+            remainingMs: v.remainingMs,
+            ended: v.ended,
+            joined: Boolean(my),
+            x: my?.x ?? 50,
+            y: my?.y ?? 31,
+            speed: my?.speed ?? 15,
+            color: my?.color ?? 0,
+            out: Boolean(my?.out),
+            outWave: my?.outWave ?? -1,
+            points: my?.points ?? 0,
+            place: my?.place ?? 0,
+            total: v.rows.length,
+            top: v.ended ? v.rows.slice(0, 5).map((r) => ({ name: r.name, points: r.points, survivor: !r.out })) : [],
           };
         })(),
         galaxy: (() => {

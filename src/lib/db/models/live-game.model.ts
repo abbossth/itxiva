@@ -6,7 +6,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
 export { LIVE_GAME_MODES, type LiveGameMode };
 export type LiveGameSource = "today" | "all";
-export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "galaxy" | "finished";
+export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "galaxy" | "zone" | "finished";
 export type LiveQuestionType = "single_choice" | "multiple_choice" | "short_answer";
 
 export interface ILiveQuestion {
@@ -48,6 +48,17 @@ export interface ILiveGalaxy {
   endedAt?: Date | string | null;
 }
 
+export interface ILiveZone {
+  round: number;
+  final: boolean;
+  seed: number;
+  startedAt: Date | string;
+  endsAt: Date | string;
+  /** Natijasi hisoblangan to'lqinlar soni */
+  resolved: number;
+  endedAt?: Date | string | null;
+}
+
 export interface ILiveGameData {
   _id: string | mongoose.Types.ObjectId;
   mentorId: string | mongoose.Types.ObjectId;
@@ -85,6 +96,9 @@ export interface ILiveGameData {
   galaxy?: ILiveGalaxy | null;
   /** Poyga o'tkazilgan savollar (oxirgisi — final) */
   galaxyRounds?: number[];
+  /** "Yashil zona": joriy yoki oxirgi raund */
+  zone?: ILiveZone | null;
+  zoneRounds?: number[];
   finishedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
@@ -161,7 +175,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
     prizes: { type: [Number], default: [10, 7, 5] },
-    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "galaxy", "finished"], default: "lobby" },
+    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "galaxy", "zone", "finished"], default: "lobby" },
     index: { type: Number, default: -1 },
     questionStartedAt: { type: Date, default: null },
     questions: { type: [LiveQuestionSchema], default: [] },
@@ -194,6 +208,22 @@ const LiveGameSchema = new Schema<ILiveGame>(
       default: null,
     },
     galaxyRounds: { type: [Number], default: [] },
+    zone: {
+      type: new Schema(
+        {
+          round: Number,
+          final: Boolean,
+          seed: Number,
+          startedAt: Date,
+          endsAt: Date,
+          resolved: { type: Number, default: 0 },
+          endedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    zoneRounds: { type: [Number], default: [] },
     cells: { type: [Number], default: [] },
     cracks: { type: [Number], default: [] },
     known: { type: [Number], default: [] },

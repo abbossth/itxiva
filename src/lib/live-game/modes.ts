@@ -31,6 +31,11 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
     tagline: "Savol — jang — savol: hamma hammaga qarshi",
     rules: ["Har 3 savoldan keyin 45 soniyalik otishma", "To'g'ri javoblar — ko'proq jon va kuchliroq qurol", "Oxirida 2 daqiqalik katta final jang"],
   },
+  zone: {
+    title: "Yashil zona",
+    tagline: "Savol — zonaga yugur — savol!",
+    rules: ["Har 3 savoldan keyin: yashil zona yonadi — vaqt tugaguncha unga kiring", "Tashqarida qolgan robot o'chadi · zona har safar kichrayadi va ko'chadi", "⭐ yulduzlar ochko beradi · to'g'ri javob — tezroq robot · oxirida final"],
+  },
   galaxy: {
     title: "Galaktika poygasi 3D",
     tagline: "Savol — kosmik poyga — savol!",

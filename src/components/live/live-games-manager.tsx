@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Orbit, Pickaxe, Plus, Rocket, Swords, Users } from "lucide-react";
+import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Orbit, Pickaxe, Plus, Rocket, Swords, Target, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = {
   bridge: Footprints,
   gold: Pickaxe,
   galaxy: Orbit,
+  zone: Target,
 };
 export const MODE_COLORS: Record<LiveGameMode, string> = {
   classic: "from-orange-500 to-rose-600",
@@ -39,9 +40,10 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
   bridge: "from-sky-400 to-cyan-700",
   gold: "from-yellow-400 to-amber-700",
   galaxy: "from-violet-500 via-fuchsia-500 to-cyan-500",
+  zone: "from-green-400 via-emerald-500 to-sky-600",
 };
 
-const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", galaxy: "3D poyga", finished: "Yakunlangan" } as const;
+const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", galaxy: "3D poyga", zone: "Yashil zona", finished: "Yakunlangan" } as const;
 
 export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
   const [open, setOpen] = useState(false);
@@ -276,7 +278,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             )}
           </Field>
 
-          {mode !== "arena" && mode !== "galaxy" && (
+          {mode !== "arena" && mode !== "galaxy" && mode !== "zone" && (
           <>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={minigames} onChange={(e) => setMinigames(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
