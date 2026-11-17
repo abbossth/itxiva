@@ -596,9 +596,9 @@ const COLORS = [
   { name: "QIZIL", hex: "#ef4444" },
   { name: "KO'K", hex: "#3b82f6" },
   { name: "YASHIL", hex: "#22c55e" },
-  { name: "SARIQ", hex: "#eab308" },
+  { name: "SARIQ", hex: "#facc15" },
   { name: "BINAFSHA", hex: "#a855f7" },
-  { name: "PUSHTI", hex: "#ec4899" },
+  { name: "OQ", hex: "#f8fafc" },
 ];
 
 /** So'z bir rangni aytadi, lekin boshqa rangda yozilgan — RANG tanlanadi */

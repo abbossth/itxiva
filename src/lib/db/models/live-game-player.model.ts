@@ -53,7 +53,23 @@ export interface ILiveGamePlayerData {
   arena?: ILiveArenaPlayer | null;
   /** Jang oldidan xarita uchun ovozi (qaysi jang uchun) */
   arenaVote?: { round: number; map: string } | null;
+  /** "Galaktika poygasi 3D": joriy poygadagi holati */
+  galaxy?: ILiveGalaxyPlayer | null;
   createdAt?: Date | string;
+}
+
+export interface ILiveGalaxyPlayer {
+  round: number;
+  /** Uchgan masofa (m) va yonlama joyi (-1…1) */
+  d: number;
+  x: number;
+  orbs: number;
+  /** Turbo zaryadlari (to'g'ri javoblarga qarab) */
+  turbo: number;
+  /** Kema rangi (tartib raqami) */
+  ship: number;
+  points: number;
+  place: number;
 }
 
 export interface ILivePrize {
@@ -176,6 +192,22 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
       default: [],
     },
     arenaVote: { type: new Schema({ round: Number, map: String }, { _id: false }), default: null },
+    galaxy: {
+      type: new Schema(
+        {
+          round: Number,
+          d: { type: Number, default: 0 },
+          x: { type: Number, default: 0 },
+          orbs: { type: Number, default: 0 },
+          turbo: { type: Number, default: 1 },
+          ship: { type: Number, default: 0 },
+          points: { type: Number, default: 0 },
+          place: { type: Number, default: 0 },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
     arena: {
       type: new Schema(
         {

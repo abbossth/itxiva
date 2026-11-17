@@ -48,6 +48,17 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { awardCoins } from "@/lib/gamification/award";
+import {
+  GALAXY_EVERY,
+  GALAXY_FINAL_SECONDS,
+  GALAXY_INTRO_S,
+  GALAXY_SECONDS,
+  SHIP_COLORS,
+  galaxyPoints,
+  galaxyStandings,
+  galaxyTurbo,
+  seedOf,
+} from "@/lib/live-game/galaxy";
 import { MAP_IDS, MAP_VOTE_S, PVP_INTRO_S, PVP_SECONDS, isMapId, mapOf, pickMap, pvpStandings, teamArenaStandings, type MapId } from "@/lib/live-game/pvp";
 import { invalidateLiveSnapshot, liveSnapshot } from "@/lib/live-game/live-cache";
 import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic, makeCracks, raceFinish, revealAdventure, type AdvPlayer } from "@/lib/live-game/adventures";
@@ -71,6 +82,12 @@ function slotsOf(players: { _id: unknown; createdAt?: Date | string }[]): string
 }
 
 /** Shu savoldan keyin jang bormi (oxirgisidan keyin — final) */
+/** "Galaktika poygasi 3D": har 3 savoldan keyin poyga (oxirgi savoldan keyin — final, alohida) */
+function galaxyRoundDue(mode: LiveGameMode, index: number, total: number, done: number[]): boolean {
+  if (mode !== "galaxy" || index < 0 || index >= total - 1 || done.includes(index)) return false;
+  return (index + 1) % GALAXY_EVERY === 0;
+}
+
 function arenaRoundDue(mode: LiveGameMode, index: number, total: number, done: number[]): boolean {
   if (mode !== "arena" || index < 0 || index >= total - 1 || done.includes(index)) return false;
   return (index + 1) % ARENA_EVERY === 0;
@@ -183,6 +200,8 @@ export async function createLiveGameAction(input: {
       options:
         input.mode === "arena"
           ? { minigames: false, arena: true, teamArena: false }
+          : input.mode === "galaxy"
+          ? { minigames: false, arena: false, teamArena: false }
           : { minigames: input.minigames !== false, arena: input.arena === true, teamArena: input.mode === "team" && input.arena === true && input.teamArena === true },
       cells: input.mode === "territory" ? emptyCells() : [],
       cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
@@ -220,7 +239,7 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds arena arenaRounds").lean();
+    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds arena arenaRounds galaxy galaxyRounds").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
     // Har 3 savoldan keyin — qisqa o'yin (bir marta)
@@ -236,8 +255,16 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
       await startArena(game._id, game.index, ROUND_SECONDS);
       return { success: true, data: { finished: false } };
     }
+    // "Galaktika poygasi 3D": har 3 savoldan keyin poyga
+    const galaxyRounds = game.galaxyRounds ?? [];
+    if (game.status === "reveal" && galaxyRoundDue(game.mode, game.index, game.questions.length, galaxyRounds)) {
+      await startGalaxy(game._id, game.index, false);
+      return { success: true, data: { finished: false } };
+    }
     // Qisqa o'yindan keyin: tugamagan bo'lsa — avval natijasi hisoblanadi
     if (game.status === "minigame" && !game.minigame?.endedAt) await endMinigame(game._id);
+    // Poygadan keyin: tugamagan bo'lsa — avval ochkolar
+    if (game.status === "galaxy" && !game.galaxy?.endedAt) await endGalaxy(game._id);
     // Jangdan keyin: tugamagan bo'lsa — avval bonuslar hisoblanadi
     if (game.status === "arena" && !game.arena?.endedAt) await endArena(game._id);
     const next = game.index + 1;
@@ -246,6 +273,10 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
       const finalKey = game.questions.length - 1;
       if (game.options?.arena && !rounds.includes(finalKey) && game.status !== "arena") {
         await startArena(game._id, finalKey, PVP_SECONDS, game.mode === "team" && Boolean(game.options?.teamArena));
+        return { success: true, data: { finished: false } };
+      }
+      if (game.mode === "galaxy" && !galaxyRounds.includes(finalKey) && game.status !== "galaxy") {
+        await startGalaxy(game._id, finalKey, true);
         return { success: true, data: { finished: false } };
       }
       await finishLiveGame(game._id);
@@ -514,6 +545,131 @@ export async function voteArenaMapAction(gameId: string, round: number, map: str
   }
 }
 
+/**
+ * Kosmik poyga boshlanadi: trassa urug'i, sanoq va har o'yinchiga kema rangi va turbo zaryadlari
+ * (shu bosqichdagi to'g'ri javoblarga qarab; finalda — butun o'yin bo'yicha).
+ */
+async function startGalaxy(gameId: mongoose.Types.ObjectId, round: number, final: boolean) {
+  const startedAt = new Date(Date.now() + GALAXY_INTRO_S * 1000);
+  const endsAt = new Date(startedAt.getTime() + (final ? GALAXY_FINAL_SECONDS : GALAXY_SECONDS) * 1000);
+  const res = await LiveGame.updateOne(
+    { _id: gameId, galaxyRounds: { $ne: round }, status: { $in: ["reveal", "minigame"] } },
+    {
+      $set: {
+        status: "galaxy",
+        galaxy: { round, final, seed: seedOf(`${gameId}:${round}`), startedAt, endsAt, endedAt: null },
+        questionStartedAt: null,
+      },
+      $push: { galaxyRounds: round },
+    }
+  );
+  if (res.modifiedCount === 0) return;
+  const players = await LiveGamePlayer.find({ gameId }).select("answers createdAt").sort({ createdAt: 1 }).lean();
+  if (players.length === 0) return;
+  await LiveGamePlayer.bulkWrite(
+    players.map((p, i) => {
+      const correct = p.answers.filter((a) => a.isCorrect && (final || a.index > round - GALAXY_EVERY)).length;
+      return {
+        updateOne: {
+          filter: { _id: p._id },
+          update: {
+            $set: {
+              galaxy: { round, d: 0, x: 0, orbs: 0, turbo: galaxyTurbo(correct, final), ship: i % SHIP_COLORS.length, points: 0, place: 0 },
+            },
+          },
+        },
+      };
+    })
+  );
+}
+
+/** Poyga tugadi: o'rinlar va kristallar bo'yicha ochko qo'shiladi (bir marta) */
+async function endGalaxy(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
+  const game = await LiveGame.findOneAndUpdate(
+    { _id: gameId, status: "galaxy", "galaxy.endedAt": null },
+    { $set: { "galaxy.endedAt": new Date() } },
+    { returnDocument: "after" }
+  );
+  const g = game?.galaxy;
+  if (!game || !g) return false;
+  const players = await LiveGamePlayer.find({ gameId: game._id, "galaxy.round": g.round }).select("name galaxy").lean();
+  const order = galaxyStandings(players.map((p) => ({ id: p._id.toString(), name: p.name, d: p.galaxy?.d ?? 0, orbs: p.galaxy?.orbs ?? 0 })));
+  await Promise.all(
+    order.map((r, i) => {
+      const pts = galaxyPoints(i + 1, r.orbs, g.final);
+      return LiveGamePlayer.updateOne(
+        { _id: r.id, "galaxy.round": g.round },
+        { $inc: { score: pts }, $set: { "galaxy.points": pts, "galaxy.place": i + 1 } }
+      );
+    })
+  );
+  if (order[0]) {
+    await pushEvents(game._id, [{ text: `🚀 ${order[0].name} ${g.final ? "final " : ""}poygada birinchi! (${Math.round(order[0].d)} m)`, kind: "info" }]);
+  }
+  await saveRanks(game._id, game.mode);
+  return true;
+}
+
+export async function endGalaxyAction(gameId: string): Promise<Result<{ ended: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: { ended: await endGalaxy(gameId) } };
+  } catch (err) {
+    return errorOf(err, "Poygani yakunlab bo'lmadi");
+  }
+}
+
+export interface LiveGalaxyRow {
+  id: string;
+  name: string;
+  d: number;
+  orbs: number;
+  ship: number;
+  points: number;
+  place: number;
+}
+
+export interface LiveGalaxyView {
+  round: number;
+  final: boolean;
+  seed: number;
+  startsInMs: number;
+  remainingMs: number;
+  ended: boolean;
+  /** Masofa bo'yicha tartiblangan */
+  rows: LiveGalaxyRow[];
+}
+
+function galaxyView(game: Pick<ILiveGame, "galaxy" | "status">, players: ILiveGamePlayer[]): LiveGalaxyView | null {
+  const g = game.galaxy;
+  if (game.status !== "galaxy" || !g) return null;
+  const now = Date.now();
+  const rows = galaxyStandings(
+    players
+      .filter((p) => p.galaxy?.round === g.round)
+      .map((p) => ({
+        id: p._id.toString(),
+        name: p.name,
+        d: Math.round(p.galaxy?.d ?? 0),
+        orbs: p.galaxy?.orbs ?? 0,
+        ship: p.galaxy?.ship ?? 0,
+        points: p.galaxy?.points ?? 0,
+        place: p.galaxy?.place ?? 0,
+      }))
+  );
+  return {
+    round: g.round,
+    final: Boolean(g.final),
+    seed: g.seed,
+    startsInMs: Math.max(0, new Date(g.startedAt).getTime() - now),
+    remainingMs: Math.max(0, new Date(g.endsAt).getTime() - now),
+    ended: Boolean(g.endedAt),
+    rows,
+  };
+}
+
 /** Arena tugadi: bonus ochkolar qo'shiladi (bir marta) */
 async function endArena(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
   const game = await LiveGame.findOneAndUpdate(
@@ -774,6 +930,10 @@ export interface LiveHostState {
   /** Joriy savol — bonus raund (×2) */
   bonus: boolean;
   arena: LiveArenaView | null;
+  /** "Galaktika poygasi 3D" (davom etayotgan bo'lsa) */
+  galaxy: LiveGalaxyView | null;
+  /** Shu natijadan keyin (yoki oxirida) poyga bo'ladimi */
+  galaxyNext: boolean;
   /** Oxirgi savoldan keyin arena bo'ladimi (hali o'tkazilmagan) */
   arenaNext: boolean;
   /** "Kiber arena": shu natijadan keyin jang bo'ladimi */
@@ -875,6 +1035,11 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
           return v ? { ...v, ws: v.ended ? null : await arenaSocketUrl(game, null) } : null;
         })(),
         arenaNext: Boolean(game.options?.arena && !(game.arenaRounds ?? []).includes(game.questions.length - 1)),
+        galaxy: galaxyView(game, players),
+        galaxyNext:
+          game.status === "reveal" &&
+          (galaxyRoundDue(game.mode, game.index, game.questions.length, game.galaxyRounds ?? []) ||
+            (game.mode === "galaxy" && game.index === game.questions.length - 1 && !(game.galaxyRounds ?? []).includes(game.index))),
         introMs: introLeft(game),
         arenaRoundNext: game.status === "reveal" && arenaRoundDue(game.mode, game.index, game.questions.length, game.arenaRounds ?? []),
         goal: goalOf(game.mode, game.questions.length),
@@ -1229,6 +1394,23 @@ export interface LivePlayerState {
   standings: ReturnType<typeof teamStandings>;
   top: { name: string; score: number; coins: number }[];
   minigame: (Omit<LiveMinigameView, "progress"> & { myValue: number; myPoints: number; place: number }) | null;
+  /** "Galaktika poygasi 3D": o'z kemasi, turbo zaryadlari va natijasi */
+  galaxy: {
+    round: number;
+    final: boolean;
+    seed: number;
+    startsInMs: number;
+    remainingMs: number;
+    ended: boolean;
+    joined: boolean;
+    turbo: number;
+    ship: number;
+    points: number;
+    place: number;
+    total: number;
+    /** Tugaganda: eng yaxshilari */
+    top: { name: string; d: number; points: number }[];
+  } | null;
   bonus: boolean;
   arena: {
     /** Real vaqt xonasi manzili (o'yinchi bileti bilan); null — HTTP so'rovlar */
@@ -1409,6 +1591,26 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             myValue: my?.played ? my.value : -1,
             myPoints: my?.points ?? 0,
             place: my && my.value > 0 ? myIndex + 1 : 0,
+          };
+        })(),
+        galaxy: (() => {
+          const v = galaxyView(game, players);
+          if (!v) return null;
+          const my = mine?.galaxy?.round === v.round ? mine.galaxy : null;
+          return {
+            round: v.round,
+            final: v.final,
+            seed: v.seed,
+            startsInMs: v.startsInMs,
+            remainingMs: v.remainingMs,
+            ended: v.ended,
+            joined: Boolean(my),
+            turbo: my?.turbo ?? 0,
+            ship: my?.ship ?? 0,
+            points: my?.points ?? 0,
+            place: my?.place ?? 0,
+            total: v.rows.length,
+            top: v.ended ? v.rows.slice(0, 5).map((r) => ({ name: r.name, d: r.d, points: r.points })) : [],
           };
         })(),
         bonus: game.bonusIndex === game.index && game.index >= 0,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Check, Crown, Music, Pause, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -9,6 +9,7 @@ import {
   cancelLiveGameAction,
   endMinigameAction,
   endArenaAction,
+  endGalaxyAction,
   finishLiveGameAction,
   resolveArenaVoteAction,
   revealLiveQuestionAction,
@@ -29,6 +30,7 @@ import { LivePodium } from "./live-podium";
 import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, useMusicChoice, type MusicChoice } from "./live-track";
 import { MinigameHost } from "./live-minigame";
 import { ArenaHost } from "./arena/arena-screens";
+import { GalaxyHost } from "./galaxy/galaxy-host";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -91,6 +93,8 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const autoFired = useRef<string | null>(null);
   const minigameEnding = useRef<number | null>(null);
   const minigameEndsAt = useRef<{ round: number; at: number } | null>(null);
+  const galaxyEnding = useRef<number | null>(null);
+  const galaxyEndsAt = useRef<{ round: number; at: number } | null>(null);
   const revealing = useRef<number | null>(null);
   const allDoneAt = useRef<{ index: number; at: number } | null>(null);
   const known = useRef(new Set(initial.players.map((p) => p.id)));
@@ -106,7 +110,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
 
   // Deploydan keyingi avtomatik yangilanish savol/jang/mini-o'yin o'rtasida bo'lmasin (VersionWatcher kutadi)
   useEffect(() => {
-    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame";
+    const busy = state.status === "question" || state.status === "arena" || state.status === "minigame" || state.status === "galaxy";
     document.documentElement.dataset.liveBusy = busy ? "1" : "0";
     return () => {
       delete document.documentElement.dataset.liveBusy;
@@ -227,11 +231,14 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       return;
     }
     liveMusic.play(
-      state.status === "question" || state.status === "arena" || (state.status === "minigame" && !state.minigame?.ended)
+      state.status === "question" ||
+        state.status === "arena" ||
+        (state.status === "galaxy" && !state.galaxy?.ended) ||
+        (state.status === "minigame" && !state.minigame?.ended)
         ? "question"
         : "board"
     );
-  }, [synthOn, state.status, state.minigame?.ended]);
+  }, [synthOn, state.status, state.minigame?.ended, state.galaxy?.ended]);
   useEffect(() => {
     liveMusic.setBoost(state.status === "question" && remaining > 0 && remaining <= 5000);
   }, [remaining, state.status]);
@@ -287,12 +294,14 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       ? `m${state.index}`
       : state.status === "arena" && state.arena?.ended
       ? `a${state.arena.round}`
+      : state.status === "galaxy" && state.galaxy?.ended
+      ? `g${state.galaxy.round}`
       : null;
   useEffect(() => {
     if (!autoplay || !autoKey || autoFired.current === autoKey) return;
     const key = autoKey;
     // Oxirgi savoldan keyin: arena bo'lsa — arenaga, aks holda g'oliblar
-    const last = key.startsWith("r") && state.index + 1 >= state.total && !state.arenaNext;
+    const last = key.startsWith("r") && state.index + 1 >= state.total && !state.arenaNext && !state.galaxyNext;
     const deadline = Date.now() + (key.startsWith("m") ? 6 : autoDelayFor(state.mode)) * 1000;
     const id = setInterval(() => {
       const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
@@ -303,7 +312,7 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       void actRef.current(() => (last ? finishLiveGameAction(state.id) : startLiveQuestionAction(state.id)));
     }, 250);
     return () => clearInterval(id);
-  }, [autoplay, autoKey, state.index, state.total, state.mode, state.id, state.arenaNext]);
+  }, [autoplay, autoKey, state.index, state.total, state.mode, state.id, state.arenaNext, state.galaxyNext]);
   const autoLeft = autoplay && autoKey && auto?.key === autoKey ? auto.left : null;
 
   // Qisqa o'yin vaqti tugasa — natija hisoblanadi (oxirgi natijalar yetib kelishi uchun biroz kutiladi)
@@ -316,7 +325,10 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     const t = setTimeout(() => {
       minigameEnding.current = m.round;
       void endMinigameAction(state.id).then(
-        () => refresh(),
+        (res) => {
+          if (!res.success && minigameEnding.current === m.round) minigameEnding.current = null;
+          void refresh();
+        },
         () => {
           if (minigameEnding.current === m.round) minigameEnding.current = null;
           void refresh();
@@ -325,6 +337,29 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
     }, wait);
     return () => clearTimeout(t);
   }, [state.status, state.minigame, state.id, refresh]);
+
+  // Kosmik poyga vaqti tugasa — ochkolar hisoblanadi (oxirgi masofalar yetib kelishi uchun biroz kutiladi)
+  useEffect(() => {
+    const g = state.galaxy;
+    if (state.status !== "galaxy" || !g || g.ended || galaxyEnding.current === g.round) return;
+    if (galaxyEndsAt.current?.round !== g.round) galaxyEndsAt.current = { round: g.round, at: Date.now() + g.remainingMs };
+    const wait = Math.max(0, galaxyEndsAt.current.at + 1800 - Date.now());
+    const t = setTimeout(() => {
+      galaxyEnding.current = g.round;
+      void endGalaxyAction(state.id).then(
+        (res) => {
+          // Xato bo'lsa keyingi yangilanishda qayta uriniladi
+          if (!res.success && galaxyEnding.current === g.round) galaxyEnding.current = null;
+          void refresh();
+        },
+        () => {
+          if (galaxyEnding.current === g.round) galaxyEnding.current = null;
+          void refresh();
+        }
+      );
+    }, wait);
+    return () => clearTimeout(t);
+  }, [state.status, state.galaxy, state.id, refresh]);
 
   const Icon = MODE_ICONS[state.mode];
   const isLast = state.index + 1 >= state.total;
@@ -494,6 +529,43 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
               }
             />
           </div>
+        )}
+        {state.status === "galaxy" && state.galaxy && (
+          <GalaxyHost
+            key={state.galaxy.round}
+            g={state.galaxy}
+            sound={sound}
+            actions={
+              <>
+                {autoLeft !== null && (
+                  <Button variant="ghost" onClick={() => writeAuto(false)} className="gap-1.5 text-slate-300 hover:text-white">
+                    <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => act(() => startLiveQuestionAction(state.id))}
+                  disabled={busy}
+                  className="inline-flex min-h-[48px] cursor-pointer items-center gap-2 rounded-xl bg-amber-400 px-6 text-base font-black text-slate-900 disabled:opacity-60"
+                >
+                  {state.galaxy.final ? (
+                    <>
+                      <Crown className="h-5 w-5" /> G&apos;oliblar
+                    </>
+                  ) : state.galaxy.ended ? (
+                    <>
+                      Keyingi savol <SkipForward className="h-5 w-5" />
+                    </>
+                  ) : (
+                    <>
+                      Poygani tugatish <SkipForward className="h-5 w-5" />
+                    </>
+                  )}
+                  {autoLeft !== null ? ` (${autoLeft})` : ""}
+                </button>
+              </>
+            }
+          />
         )}
         {intro !== null && <ModeIntro mode={state.mode} ms={intro} sound={sound} />}
         {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
@@ -725,7 +797,12 @@ function RevealView({
             <Pause className="h-4 w-4" /> Avtoni to&apos;xtatish
           </Button>
         )}
-        {state.arenaRoundNext ? (
+        {state.galaxyNext ? (
+          <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 px-8 text-lg font-black text-white disabled:opacity-60">
+            <Rocket className="h-5 w-5" /> {isLast ? "Final poygaga!" : "Poygaga!"}
+            {autoLeft !== null ? ` (${autoLeft})` : ""}
+          </button>
+        ) : state.arenaRoundNext ? (
           <button type="button" onClick={onNext} disabled={busy} className="inline-flex min-h-[56px] cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-indigo-600 px-8 text-lg font-black text-white disabled:opacity-60">
             <Swords className="h-5 w-5" /> Jangga!{autoLeft !== null ? ` (${autoLeft})` : ""}
           </button>

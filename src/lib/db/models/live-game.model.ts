@@ -6,7 +6,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
 export { LIVE_GAME_MODES, type LiveGameMode };
 export type LiveGameSource = "today" | "all";
-export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "finished";
+export type LiveGameStatus = "lobby" | "question" | "reveal" | "minigame" | "arena" | "galaxy" | "finished";
 export type LiveQuestionType = "single_choice" | "multiple_choice" | "short_answer";
 
 export interface ILiveQuestion {
@@ -36,6 +36,16 @@ export interface ILiveMinigame {
   endedAt?: Date | string | null;
   /** Omad g'ildiragi: server tanlagan segment, o'yinchi va natija */
   wheel?: { segment: number; effect: string; playerId: string; name: string } | null;
+}
+
+export interface ILiveGalaxy {
+  round: number;
+  final: boolean;
+  /** Trassa urug'i — hamma bir xil trassada uchadi */
+  seed: number;
+  startedAt: Date | string;
+  endsAt: Date | string;
+  endedAt?: Date | string | null;
 }
 
 export interface ILiveGameData {
@@ -71,6 +81,10 @@ export interface ILiveGameData {
   bonusIndex?: number | null;
   /** Oxirgi bosqich — otishmali arena */
   arena?: ILiveArena | null;
+  /** "Galaktika poygasi 3D": joriy yoki oxirgi poyga */
+  galaxy?: ILiveGalaxy | null;
+  /** Poyga o'tkazilgan savollar (oxirgisi — final) */
+  galaxyRounds?: number[];
   finishedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
@@ -147,7 +161,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     source: { type: String, enum: ["today", "all"], required: true },
     teams: { type: Number, default: 2, min: 2, max: 4 },
     prizes: { type: [Number], default: [10, 7, 5] },
-    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "finished"], default: "lobby" },
+    status: { type: String, enum: ["lobby", "question", "reveal", "minigame", "arena", "galaxy", "finished"], default: "lobby" },
     index: { type: Number, default: -1 },
     questionStartedAt: { type: Date, default: null },
     questions: { type: [LiveQuestionSchema], default: [] },
@@ -172,6 +186,14 @@ const LiveGameSchema = new Schema<ILiveGame>(
     },
     minigameRounds: { type: [Number], default: [] },
     arenaRounds: { type: [Number], default: [] },
+    galaxy: {
+      type: new Schema(
+        { round: Number, final: Boolean, seed: Number, startedAt: Date, endsAt: Date, endedAt: { type: Date, default: null } },
+        { _id: false }
+      ),
+      default: null,
+    },
+    galaxyRounds: { type: [Number], default: [] },
     cells: { type: [Number], default: [] },
     cracks: { type: [Number], default: [] },
     known: { type: [Number], default: [] },

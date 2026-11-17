@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
-import { getSession } from "@/lib/auth/session";
 import { connectToDatabase } from "@/lib/db/connect";
-import { User } from "@/lib/db/models/user.model";
+import { liveWho as who } from "@/lib/live-game/route-auth";
 import { loadPvpGame, pvpTick, watchPvp, type PvpTickInput } from "@/lib/live-game/pvp-server";
 
 // "Kiber jang" uchun tezkor yo'l: har o'quvchi soniyasiga ~5 marta murojaat qiladi.
@@ -10,25 +9,6 @@ import { loadPvpGame, pvpTick, watchPvp, type PvpTickInput } from "@/lib/live-ga
 // shuning uchun bu oddiy API: parallel, barqaror manzil, foydalanuvchi tekshiruvi qisqa keshlanadi.
 
 export const dynamic = "force-dynamic";
-
-type Who = { userId: string; role: string; groupId: string | null };
-const whoCache = new Map<string, { at: number; v: Who | null }>();
-const WHO_TTL = 10_000;
-
-async function who(): Promise<Who | null> {
-  const s = await getSession();
-  if (!s) return null;
-  const key = `${s.userId}:${s.sessionVersion ?? 0}:${s.role}`;
-  const c = whoCache.get(key);
-  if (c && Date.now() - c.at < WHO_TTL) return c.v;
-  await connectToDatabase();
-  const u = await User.findById(s.userId).select("groupId role mustChangePassword sessionVersion").lean();
-  const ok = u && u.role === s.role && (u.sessionVersion ?? 0) === (s.sessionVersion ?? 0) && !u.mustChangePassword;
-  const v: Who | null = ok ? { userId: s.userId, role: s.role, groupId: u.groupId ? u.groupId.toString() : null } : null;
-  if (whoCache.size > 2000) whoCache.clear();
-  whoCache.set(key, { at: Date.now(), v });
-  return v;
-}
 
 const err = (error: string, status: number) => NextResponse.json({ success: false, error }, { status, headers: { "Cache-Control": "no-store" } });
 const ok = (data: unknown) => NextResponse.json({ success: true, data }, { headers: { "Cache-Control": "no-store" } });

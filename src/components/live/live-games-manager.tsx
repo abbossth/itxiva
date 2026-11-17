@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Pickaxe, Plus, Rocket, Swords, Users } from "lucide-react";
+import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Orbit, Pickaxe, Plus, Rocket, Swords, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = {
   rocket: Rocket,
   bridge: Footprints,
   gold: Pickaxe,
+  galaxy: Orbit,
 };
 export const MODE_COLORS: Record<LiveGameMode, string> = {
   classic: "from-orange-500 to-rose-600",
@@ -37,9 +38,10 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
   rocket: "from-indigo-400 to-violet-700",
   bridge: "from-sky-400 to-cyan-700",
   gold: "from-yellow-400 to-amber-700",
+  galaxy: "from-violet-500 via-fuchsia-500 to-cyan-500",
 };
 
-const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", finished: "Yakunlangan" } as const;
+const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", galaxy: "3D poyga", finished: "Yakunlangan" } as const;
 
 export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
   const [open, setOpen] = useState(false);
@@ -274,14 +276,14 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             )}
           </Field>
 
-          {mode !== "arena" && (
+          {mode !== "arena" && mode !== "galaxy" && (
           <>
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={minigames} onChange={(e) => setMinigames(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
             <span>
               <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">Savollar orasida qisqa o&apos;yinlar</span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
-                Har 3 savoldan keyin tasodifiy: mo&apos;ljalga otish, omad g&apos;ildiragi yoki bonus raund (×2)
+                Har 3 savoldan keyin: omad g&apos;ildiragi (🎁 Super priz, 🎡 Super baraban), xotira, tez hisob, rang tuzog&apos;i, reaksiya, mo&apos;ljal yoki bonus (×2)
               </span>
             </span>
           </label>
