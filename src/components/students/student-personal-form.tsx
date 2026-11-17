@@ -290,12 +290,23 @@ export function StudentPersonalForm(props: Props) {
             title="Tug'ilganlik haqidagi guvohnoma"
             filled={countFilled(form, BIRTH_CERT_KEYS)}
             total={BIRTH_CERT_KEYS.length}
-            summary={joinFilled(form.birthCertNumber, form.birthCertIssuedBy)}
+            summary={joinFilled(form.birthCertNumber, form.pinfl && `JSHSHIR ${form.pinfl}`, form.birthCertIssuedBy)}
             defaultOpen
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field htmlFor="sp-bc-number" label="Seriya va raqami">
                 <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
+              </Field>
+              <Field htmlFor="sp-bc-pinfl" label="JSHSHIR (PINFL)" hint="14 ta raqam">
+                <Input
+                  id="sp-bc-pinfl"
+                  inputMode="numeric"
+                  placeholder="00000000000000"
+                  value={form.pinfl}
+                  onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
+                  autoComplete="off"
+                  className="font-mono"
+                />
               </Field>
               <Field htmlFor="sp-bc-date" label="Berilgan sana">
                 <Input id="sp-bc-date" type="date" {...text("birthCertIssuedAt")} />

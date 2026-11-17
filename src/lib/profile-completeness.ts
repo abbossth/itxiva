@@ -6,7 +6,8 @@ export type DocumentType = "birthCert" | "passport";
 
 export const BASIC_KEYS = ["birthDate", "gender", "phone", "school", "address"] as const;
 export const PARENT_KEYS = ["fatherName", "fatherPhone", "motherName", "motherPhone"] as const;
-export const BIRTH_CERT_KEYS = ["birthCertNumber", "birthCertIssuedAt", "birthCertIssuedBy"] as const;
+// JSHSHIR yangi guvohnomalarda ham yozilgan — u ikkala hujjat bilan birga ko'rsatiladi
+export const BIRTH_CERT_KEYS = ["birthCertNumber", "pinfl", "birthCertIssuedAt", "birthCertIssuedBy"] as const;
 export const PASSPORT_KEYS = ["passportNumber", "pinfl", "passportIssuedAt", "passportExpiresAt", "passportIssuedBy"] as const;
 
 /** Profil 100% to'ldirilganda bir marta beriladigan coin */

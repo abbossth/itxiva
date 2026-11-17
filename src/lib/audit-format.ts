@@ -59,6 +59,7 @@ const ACTIONS: Record<string, { label: string; tone: AuditTone; category: AuditC
   VOID_COIN_ENTRY: { label: "Coin yozuvi bekor qilindi", tone: "danger", category: "students" },
   UPDATE_STUDENT_PROFILE: { label: "O'quvchi ma'lumotlari yangilandi", tone: "teal", category: "students" },
   UPDATE_STUDENT_PHOTO: { label: "O'quvchi rasmi yangilandi", tone: "teal", category: "students" },
+  IMPORT_STUDENT_DOCUMENTS: { label: "O'quvchilar JSHSHIR va hujjat raqamlari import qilindi", tone: "teal", category: "students" },
   STUDENT_UPDATE_OWN_PROFILE: { label: "O'quvchi o'z ma'lumotlarini yangiladi", tone: "teal", category: "students" },
   STUDENT_UPDATE_OWN_PHOTO: { label: "O'quvchi o'z rasmini yangiladi", tone: "teal", category: "students" },
   IMPORT_STUDENTS: { label: "O'quvchilar qo'shildi", tone: "success", category: "students" },

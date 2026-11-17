@@ -111,7 +111,7 @@ const filledBase = {
   motherName: "Malika Aliyeva",
   motherPhone: "+998 93 333 33 33",
 };
-const birthCert = { birthCertNumber: "I-XR 1234567", birthCertIssuedAt: "2013-05-20", birthCertIssuedBy: "Xiva FHDY" };
+const birthCert = { birthCertNumber: "I-XR 1234567", pinfl: "12345678901234", birthCertIssuedAt: "2013-05-20", birthCertIssuedBy: "Xiva FHDY" };
 const passport = {
   passportNumber: "AD 1234567",
   pinfl: "12345678901234",
@@ -124,7 +124,7 @@ describe("profil to'liqligi: guvohnoma yoki pasport", () => {
   const now = new Date("2026-10-19T12:00:00Z");
 
   it("faqat tanlangan (yoki to'ldirilgan) hujjat hisobga olinadi", () => {
-    expect(profileCompleteness({ ...filledBase, ...birthCert }, now)).toMatchObject({ documentType: "birthCert", complete: true, total: 12 });
+    expect(profileCompleteness({ ...filledBase, ...birthCert }, now)).toMatchObject({ documentType: "birthCert", complete: true, total: 13 });
     expect(profileCompleteness({ ...filledBase, ...passport }, now)).toMatchObject({ documentType: "passport", complete: true, total: 14 });
     // Pasport tanlangan bo'lsa guvohnoma yetmaydi
     expect(profileCompleteness({ ...filledBase, ...birthCert, documentType: "passport" }, now).complete).toBe(false);
@@ -180,7 +180,7 @@ describe("bir martalik topshiriqlar", () => {
 
     const before = await oneTimeTasks(student._id.toString());
     expect(before.map((t) => t.id)).toEqual(["profile"]);
-    expect(before[0]).toMatchObject({ done: false, coins: 10, progress: { current: 9, target: 12 } });
+    expect(before[0]).toMatchObject({ done: false, coins: 10, progress: { current: 9, target: 13 } });
 
     await actions.updateOwnProfileAction({ ...filledBase, ...birthCert });
     const after = await oneTimeTasks(student._id.toString());

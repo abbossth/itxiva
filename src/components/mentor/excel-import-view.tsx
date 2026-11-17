@@ -183,7 +183,7 @@ export function ExcelImportView() {
         <ShieldCheck className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
         <span>
           Bazada bor o&apos;quvchilarning <strong>login va paroli o&apos;zgarmaydi</strong> — faqat guruhi yangilanadi. Fayl
-          brauzeringizda o&apos;qiladi: JSHSHIR va pasport ma&apos;lumotlari serverga yuborilmaydi.
+          brauzeringizda o&apos;qiladi: serverga faqat ism, guruh va dars jadvali yuboriladi.
         </span>
       </div>
 
