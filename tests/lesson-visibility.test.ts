@@ -71,7 +71,8 @@ describe("vazifa va test guruh bo'yicha", () => {
     expect(opened.homework?.isEnabled).toBe(true);
     // Muddat — kamida bir haftadan keyingi dars boshlanishi
     expect(opened.homework?.dueAt).toBeInstanceOf(Date);
-    expect(new Date(opened.homework!.dueAt!).getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
+    // Oxirgi dars kunidan 7 kun: vazifa dars kunining ertasi ochilgan bo'lsa ham kamida 5 kun qoladi
+    expect(new Date(opened.homework!.dueAt!).getTime()).toBeGreaterThan(Date.now() + 5 * 24 * 60 * 60 * 1000);
     expect(notifyGroup).toHaveBeenCalledWith(lesson.groupId, "lesson_new", expect.objectContaining({ homeworkOpened: true }));
     expect(notifyGroup).toHaveBeenCalledWith(lesson.groupId, "exam_new", expect.objectContaining({ kind: "quiz" }));
 

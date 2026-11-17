@@ -62,6 +62,11 @@ async function playQuestions(mentor: U, id: string, n: number) {
   }
 }
 
+/** Birinchi qisqa o'yin har doim g'ildirak — boshqa turlarni sinash uchun u o'tgan deb belgilanadi */
+async function skipFirstWheel(id: string) {
+  await LiveGame.updateOne({ _id: id }, { $set: { minigameRounds: [-1] } });
+}
+
 beforeAll(startDb);
 afterAll(stopDb);
 beforeEach(async () => {
@@ -94,6 +99,42 @@ describe("qoidalar", () => {
     expect(mg.clampMinigameValue("target", -3)).toBe(0);
   });
 
+  it("yangi o'yinlar: xotira ×80, hisob va rang ×40, reaksiya — eng tezlarga o'rin bo'yicha; odam bo'lmagan tezlik hisoblanmaydi", () => {
+    expect(mg.minigamePoints("memory", [{ id: "a", value: 7 }]).get("a")).toBe(560);
+    expect(mg.minigamePoints("math", [{ id: "a", value: 12 }]).get("a")).toBe(480);
+    expect(mg.minigamePoints("colors", [{ id: "a", value: 99 }]).get("a")).toBe(40 * 40);
+    const r = mg.minigamePoints("reaction", [
+      { id: "slow", value: 450 },
+      { id: "fast", value: 210 },
+      { id: "mid", value: 300 },
+      { id: "late", value: 900 },
+      { id: "none", value: 0 },
+    ]);
+    expect([r.get("fast"), r.get("mid"), r.get("slow"), r.get("late"), r.get("none")]).toEqual([500, 350, 250, 150, 0]);
+    expect(mg.clampMinigameValue("reaction", 80)).toBe(0);
+    expect(mg.clampMinigameValue("reaction", 250)).toBe(250);
+    expect(mg.clampMinigameValue("wheel", 5)).toBe(0);
+    expect(mg.minigameBetter("reaction", 200, 300)).toBe(true);
+    expect(mg.minigameBetter("reaction", 0, 300)).toBe(false);
+  });
+
+  it("sovg'alar: quti 5–20, super baraban 5–50 (5 ga karrali); g'ildirak vaznlari jami 100", () => {
+    expect(mg.WHEEL.reduce((s, w) => s + w.weight, 0)).toBe(100);
+    for (let r = 0; r < 1; r += 0.01) {
+      const box = mg.openBox(r);
+      expect(box).toBeGreaterThanOrEqual(5);
+      expect(box).toBeLessThanOrEqual(20);
+      const coins = mg.SUPER_WHEEL[mg.spinSuperWheel(r)].coins;
+      expect(coins % 5).toBe(0);
+      expect(coins).toBeGreaterThanOrEqual(5);
+      expect(coins).toBeLessThanOrEqual(50);
+    }
+    expect(mg.SUPER_WHEEL.map((w) => w.coins)).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45, 50]);
+    expect(mg.prizeOf("super")).toBe("box");
+    expect(mg.prizeOf("superWheel")).toBe("superWheel");
+    expect(mg.prizeOf("p500")).toBeNull();
+  });
+
   it("×2 keyingi to'g'ri javobda ishlaydi va bonus raund bilan qo'shiladi", () => {
     const p = { score: 0, streak: 0, lives: 3, eliminated: false, double: true };
     expect(modes.scoreAnswer("classic", p, { isCorrect: true, elapsedMs: 0, limitSec: 10 })).toMatchObject({ points: 2000, double: false });
@@ -106,6 +147,7 @@ describe("o'yin ichida", () => {
   it("mo'ljalga otish: 3-savoldan keyin boshlanadi, natija vaqt oynasida qabul qilinadi, ochko qo'shiladi, keyin 4-savol", async () => {
     const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
+    await skipFirstWheel(id);
     vi.spyOn(Math, "random").mockReturnValue(0); // tur: mo'ljal
     await live.startLiveQuestionAction(id);
     let g = await LiveGame.findById(id).lean();
@@ -144,6 +186,7 @@ describe("o'yin ichida", () => {
   it("bonus raund: keyingi savolda ochko ikki baravar", async () => {
     const { mentor, ali, id } = await seed();
     await playQuestions(mentor, id, 3);
+    await skipFirstWheel(id);
     vi.spyOn(Math, "random").mockReturnValue(0.99); // tur: bonus
     await live.startLiveQuestionAction(id);
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("bonus");
@@ -159,8 +202,8 @@ describe("o'yin ichida", () => {
   it("omad g'ildiragi: har kim o'z g'ildiragini aylantiradi — natija har xil, tugaganda har kimga o'ziniki qo'llanadi", async () => {
     const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
-    // tur: wheel (0.5), keyin o'yinchilar uchun: 0.01 → +500, 0.5 → +100
-    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.5).mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
+    // Birinchi qisqa o'yin har doim g'ildirak; o'yinchilar uchun: 0.01 → +500, 0.5 → +100
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
     await live.startLiveQuestionAction(id);
     spy.mockRestore();
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("wheel");
@@ -191,5 +234,83 @@ describe("o'yin ichida", () => {
     await playQuestions(mentor, id, 3);
     await live.startLiveQuestionAction(id);
     expect(await LiveGame.findById(id).lean()).toMatchObject({ status: "question", index: 3 });
+  });
+
+  it("reaksiya: eng tez (kichik) vaqt saqlanadi, 120 ms dan tezi hisoblanmaydi", async () => {
+    const { mentor, ali, id } = await seed();
+    await playQuestions(mentor, id, 3);
+    await skipFirstWheel(id);
+    // tur: reaksiya (vaznlar: target 2, memory 2, math 2, colors 2, reaction 2 → 0.6 * 15 = 9)
+    vi.spyOn(Math, "random").mockReturnValue(0.6);
+    await live.startLiveQuestionAction(id);
+    vi.restoreAllMocks();
+    expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("reaction");
+    tick(3000);
+    as(ali);
+    await live.submitMinigameAction(id, 2, 0);
+    await live.submitMinigameAction(id, 2, 340);
+    await live.submitMinigameAction(id, 2, 280);
+    await live.submitMinigameAction(id, 2, 310);
+    await live.submitMinigameAction(id, 2, 60);
+    const p = (await LiveGamePlayer.findOne({ studentId: ali._id }).lean())!;
+    expect(p.minigames.find((m) => m.round === 2)?.value).toBe(280);
+    as(mentor);
+    await live.endMinigameAction(id);
+    expect((await LiveGamePlayer.findOne({ studentId: ali._id }).lean())?.score).toBe(500);
+  });
+
+  it("super priz: g'ildirakdan yutiladi, o'yin tugagach quti ochiladi va coin bir marta beriladi", async () => {
+    const { mentor, ali, vali, id } = await seed();
+    await playQuestions(mentor, id, 3);
+    // ali — "super" (quti), vali — "superWheel"
+    const superAt = (effect: string) => {
+      let acc = 0;
+      for (const w of mg.WHEEL) {
+        if (w.effect === effect) return (acc + w.weight / 2) / 100;
+        acc += w.weight;
+      }
+      throw new Error(effect);
+    };
+    const players = await LiveGamePlayer.find({ gameId: id }).sort({ _id: 1 }).lean();
+    const order = players.map((p) => p.studentId.toString());
+    const spy = vi.spyOn(Math, "random");
+    for (const sid of order) spy.mockReturnValueOnce(sid === ali._id.toString() ? superAt("super") : superAt("superWheel"));
+    await live.startLiveQuestionAction(id);
+    spy.mockRestore();
+    as(mentor);
+    await live.endMinigameAction(id);
+
+    const prizesOf = async (u: { _id: import("mongoose").Types.ObjectId }) => (await LiveGamePlayer.findOne({ studentId: u._id }).lean())?.prizes ?? [];
+    expect((await prizesOf(ali)).map((p) => p.kind)).toEqual(["box"]);
+    expect((await prizesOf(vali)).map((p) => p.kind)).toEqual(["superWheel"]);
+
+    // O'yin tugamaguncha ochilmaydi
+    as(ali);
+    expect((await live.openLivePrizeAction(id, 2)).success).toBe(false);
+
+    as(mentor);
+    await live.finishLiveGameAction(id);
+    as(ali);
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.me?.prizes).toEqual([{ round: 2, kind: "box", coins: 0, segment: -1, opened: false }]);
+
+    const balance = async (u: { _id: import("mongoose").Types.ObjectId }) => (await User.findById(u._id).lean())?.spendableBalance ?? 0;
+    const before = await balance(ali);
+    const opened = await live.openLivePrizeAction(id, 2);
+    expect(opened.success).toBe(true);
+    const coins = opened.success ? opened.data.coins : 0;
+    expect(coins).toBeGreaterThanOrEqual(5);
+    expect(coins).toBeLessThanOrEqual(20);
+    expect(await balance(ali)).toBe(before + coins);
+    // Qayta ochish — o'sha natija, coin ikkinchi marta berilmaydi
+    const again = await live.openLivePrizeAction(id, 2);
+    expect(again.success && again.data.coins).toBe(coins);
+    expect(await balance(ali)).toBe(before + coins);
+
+    as(vali);
+    const wheel = await live.openLivePrizeAction(id, 2);
+    expect(wheel.success && wheel.data.coins).toBe(wheel.success ? mg.SUPER_WHEEL[wheel.data.segment].coins : -1);
+    // Boshqa o'quvchining sovg'asini ocholmaydi (o'ziniki bo'lmagan round)
+    expect((await live.openLivePrizeAction(id, 5)).success).toBe(false);
   });
 });

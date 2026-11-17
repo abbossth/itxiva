@@ -29,7 +29,7 @@ export interface ILiveEvent {
 export interface ILiveMinigame {
   /** Qaysi savol natijasidan keyin (savol raqami) */
   round: number;
-  kind: "tap" | "target" | "wheel" | "bonus";
+  kind: import("@/lib/live-game/minigames").MinigameKind;
   /** O'yin boshlanadigan vaqt (sanoqdan keyin) va tugash vaqti */
   startedAt: Date | string;
   endsAt: Date | string;
@@ -160,7 +160,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
       type: new Schema(
         {
           round: Number,
-          kind: { type: String, enum: ["tap", "target", "wheel", "bonus"] },
+          kind: { type: String, enum: ["tap", "target", "wheel", "bonus", "memory", "math", "colors", "reaction"] },
           startedAt: Date,
           endsAt: Date,
           endedAt: { type: Date, default: null },

@@ -17,6 +17,7 @@ import { fireConfetti } from "@/lib/confetti";
 import { requestRewardCheck } from "@/lib/rewards-client";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { MinigamePlayer } from "./live-minigame";
+import { LivePrizes } from "./live-prizes";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
 import { ModeIntro } from "./live-intro";
@@ -509,6 +510,7 @@ function FinishedView({ state }: { state: LivePlayerState }) {
           <p className="text-4xl font-black">{me.rank}-o&apos;rin</p>
           <p className="font-mono text-lg text-slate-300">{formatNumberUz(me.score)} ochko</p>
           {me.coins > 0 && <p className="rounded-full bg-amber-400/20 px-4 py-1.5 text-lg font-black text-amber-200">+{me.coins} coin</p>}
+          <LivePrizes gameId={state.id} prizes={me.prizes} />
         </>
       ) : (
         <p className="text-slate-300">Bu o&apos;yinda qatnashmadingiz.</p>

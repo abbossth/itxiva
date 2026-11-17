@@ -544,8 +544,42 @@ h1,
   0%, 85% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* Omad g'ildiragi va sovg'alar: halqadagi chiroqlar, ko'rsatkich titrashi, quti silkinishi, nur aylanishi */
+@keyframes live-bulb {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px 2px rgba(253, 224, 71, 0.9); }
+  50% { opacity: 0.35; box-shadow: none; }
+}
+.live-bulb { animation: live-bulb 0.9s ease-in-out infinite; }
+@keyframes live-pointer {
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  50% { transform: translateX(-50%) rotate(-14deg); }
+}
+.live-pointer { animation: live-pointer 0.16s linear infinite; }
+@keyframes live-chest {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-7deg) scale(1.04); }
+  40% { transform: rotate(7deg) scale(1.06); }
+  60% { transform: rotate(-5deg) scale(1.04); }
+  80% { transform: rotate(4deg) scale(1.02); }
+}
+.live-chest { animation: live-chest 0.5s ease-in-out infinite; }
+.live-chest-idle { animation: live-chest 1.6s ease-in-out infinite; }
+@keyframes live-rays { to { transform: rotate(360deg); } }
+.live-rays { animation: live-rays 9s linear infinite; }
+@keyframes live-flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.live-flash { animation: live-flash 0.6s ease-out forwards; }
+@keyframes live-freeze {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.live-freeze { animation: live-freeze 0.25s ease-in-out 3; }
 @media (prefers-reduced-motion: reduce) {
-  .live-banner, .live-pop, .live-float, .live-drop, .live-drift, .live-intro-in, .live-intro-up, .live-intro-ring { animation: none; }
+  .live-banner, .live-pop, .live-float, .live-drop, .live-drift, .live-intro-in, .live-intro-up, .live-intro-ring,
+  .live-bulb, .live-pointer, .live-chest, .live-chest-idle, .live-rays, .live-freeze { animation: none; }
 }
 
 /* Jonli o'yin to'liq ekranda: juda kichik ekranda mazmun sig'masa ham aylantirish chizig'i ko'rinmaydi */

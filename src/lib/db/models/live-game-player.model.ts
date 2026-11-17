@@ -41,6 +41,8 @@ export interface ILiveGamePlayerData {
   prevRank: number;
   /** Qisqa o'yinlar natijasi: round — savol raqami, value — bosish/nishon soni, points — olingan ochko */
   minigames: { round: number; value: number; points: number }[];
+  /** Omad g'ildiragidan yutilgan sovg'alar: o'yin tugagach ochiladi (quti — 5–20, super baraban — 5–50 coin) */
+  prizes?: ILivePrize[];
   /** Sarguzasht rejimlari: masofa (m), balandlik (km), qadam, olmos yoki katak soni */
   progress: number;
   /** Marraga / narigi qirg'oqqa yetgan (poyga, ko'prik) */
@@ -52,6 +54,16 @@ export interface ILiveGamePlayerData {
   /** Jang oldidan xarita uchun ovozi (qaysi jang uchun) */
   arenaVote?: { round: number; map: string } | null;
   createdAt?: Date | string;
+}
+
+export interface ILivePrize {
+  /** Qaysi qisqa o'yindan (savol raqami) */
+  round: number;
+  kind: "box" | "superWheel";
+  /** Ochilgach: coin miqdori va super barabanda tushgan segment */
+  coins: number;
+  segment: number;
+  openedAt?: Date | string | null;
 }
 
 export interface ILiveArenaShot {
@@ -146,6 +158,21 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     },
     minigames: {
       type: [new Schema({ round: Number, value: { type: Number, default: 0 }, points: { type: Number, default: 0 } }, { _id: false })],
+      default: [],
+    },
+    prizes: {
+      type: [
+        new Schema(
+          {
+            round: Number,
+            kind: { type: String, enum: ["box", "superWheel"] },
+            coins: { type: Number, default: 0 },
+            segment: { type: Number, default: -1 },
+            openedAt: { type: Date, default: null },
+          },
+          { _id: false }
+        ),
+      ],
       default: [],
     },
     arenaVote: { type: new Schema({ round: Number, map: String }, { _id: false }), default: null },
