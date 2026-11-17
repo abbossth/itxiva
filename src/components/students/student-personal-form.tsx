@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, Coins, FileText, IdCard, Lock, ShieldCheck, 
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
@@ -75,6 +76,16 @@ function Section({
       </summary>
       <div className="border-t border-slate-100 dark:border-slate-800 px-4 sm:px-5 pt-4 pb-5">{children}</div>
     </details>
+  );
+}
+
+/** Maydon o'ng tomonida nusxalash tugmasi bilan (tahrirlash yopiq bo'lsa ham ishlaydi) */
+function WithCopy({ value, label, children }: { value: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative [&_input]:pr-12">
+      {children}
+      <CopyButton value={value} label={label} className="absolute right-1.5 top-1/2 -translate-y-1/2" />
+    </div>
   );
 }
 
@@ -295,18 +306,22 @@ export function StudentPersonalForm(props: Props) {
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field htmlFor="sp-bc-number" label="Seriya va raqami">
-                <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
+                <WithCopy value={form.birthCertNumber} label="Guvohnoma raqami">
+                  <Input id="sp-bc-number" placeholder="I-XR 1234567" {...text("birthCertNumber")} maxLength={30} autoComplete="off" className="font-mono" />
+                </WithCopy>
               </Field>
               <Field htmlFor="sp-bc-pinfl" label="JSHSHIR (PINFL)" hint="14 ta raqam">
-                <Input
-                  id="sp-bc-pinfl"
-                  inputMode="numeric"
-                  placeholder="00000000000000"
-                  value={form.pinfl}
-                  onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
-                  autoComplete="off"
-                  className="font-mono"
-                />
+                <WithCopy value={form.pinfl} label="JSHSHIR">
+                  <Input
+                    id="sp-bc-pinfl"
+                    inputMode="numeric"
+                    placeholder="00000000000000"
+                    value={form.pinfl}
+                    onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
+                    autoComplete="off"
+                    className="font-mono"
+                  />
+                </WithCopy>
               </Field>
               <Field htmlFor="sp-bc-date" label="Berilgan sana">
                 <Input id="sp-bc-date" type="date" {...text("birthCertIssuedAt")} />
@@ -329,18 +344,22 @@ export function StudentPersonalForm(props: Props) {
           >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field htmlFor="sp-pass-number" label="Seriya va raqami">
-                <Input id="sp-pass-number" placeholder="AB 1234567" {...text("passportNumber")} maxLength={20} autoComplete="off" className="font-mono" />
+                <WithCopy value={form.passportNumber} label="Pasport raqami">
+                  <Input id="sp-pass-number" placeholder="AB 1234567" {...text("passportNumber")} maxLength={20} autoComplete="off" className="font-mono" />
+                </WithCopy>
               </Field>
               <Field htmlFor="sp-pinfl" label="JSHSHIR (PINFL)" hint="14 ta raqam">
-                <Input
-                  id="sp-pinfl"
-                  inputMode="numeric"
-                  placeholder="00000000000000"
-                  value={form.pinfl}
-                  onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
-                  autoComplete="off"
-                  className="font-mono"
-                />
+                <WithCopy value={form.pinfl} label="JSHSHIR">
+                  <Input
+                    id="sp-pinfl"
+                    inputMode="numeric"
+                    placeholder="00000000000000"
+                    value={form.pinfl}
+                    onChange={(e) => set("pinfl", e.target.value.replace(/\D/g, "").slice(0, 14))}
+                    autoComplete="off"
+                    className="font-mono"
+                  />
+                </WithCopy>
               </Field>
               <Field htmlFor="sp-pass-by" label="Kim tomonidan berilgan" className="sm:col-span-2 lg:col-span-1">
                 <Input id="sp-pass-by" placeholder="Masalan: Xiva shahar IIB" {...text("passportIssuedBy")} maxLength={160} />
