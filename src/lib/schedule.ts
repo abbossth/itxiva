@@ -54,9 +54,30 @@ export function dateFromKey(dateKey: string, time = "00:00"): Date {
 }
 
 export function addDaysToKey(dateKey: string, days: number): string {
-  const d = dateFromKey(dateKey, "12:00");
-  d.setUTCDate(d.getUTCDate() + days);
-  return toDateKey(d);
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Sana kaliti qaysi hafta kuniga to'g'ri keladi (1 = Dushanba ... 7 = Yakshanba) */
+export function weekdayOfKey(dateKey: string): number {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1;
+}
+
+// Dam olish kunlari — bu kunlarda dars bo'lmaydi (darslar keyingi dars kuniga suriladi).
+// Har yili takrorlanadigan rasmiy bayramlar ("OO-KK"): Yangi yil, 8-mart, Navro'z, Xotira kuni,
+// Mustaqillik kuni, O'qituvchilar kuni, Konstitutsiya kuni
+const NO_LESSON_MONTH_DAYS = new Set(["01-01", "03-08", "03-21", "05-09", "09-01", "10-01", "12-08"]);
+// Bir martalik dam olish kunlari ("YYYY-MM-DD"), masalan hayitlar yoki ta'til kunlari
+const NO_LESSON_DATES = new Set<string>([]);
+
+export function isNoLessonDay(dateKey: string): boolean {
+  return NO_LESSON_DATES.has(dateKey) || NO_LESSON_MONTH_DAYS.has(dateKey.slice(5));
+}
+
+/** Shu kuni guruhning darsi bormi (jadval kuni va dam olish kuni emas) */
+export function isLessonDay(s: Partial<GroupSchedule> | null | undefined, dateKey: string): boolean {
+  return isValidSchedule(s) && s.days.includes(weekdayOfKey(dateKey)) && !isNoLessonDay(dateKey);
 }
 
 function timeToMinutes(time: string): number {
@@ -145,7 +166,7 @@ export function scheduleKind(s?: Partial<GroupSchedule> | null): "toq" | "juft" 
 
 /** Bugun (yoki berilgan kunda) shu guruhning darsi bormi */
 export function hasLessonOn(s: Partial<GroupSchedule> | null | undefined, date: Date | string | number = new Date()) {
-  return isValidSchedule(s) && s.days.includes(getTashkentParts(date).weekday);
+  return isLessonDay(s, toDateKey(date));
 }
 
 /** Ayni damda dars ketayaptimi (boshlanishidan 15 daqiqa oldin ham "hozir" hisoblanadi) */
@@ -170,10 +191,63 @@ export function getLessonDatesInRange(
   let key = fromKey;
   // 400 kundan ortiq oraliq so'ralmaydi
   for (let i = 0; i < 400 && key <= toKey; i++) {
-    if (s.days.includes(getTashkentParts(dateFromKey(key, "12:00")).weekday)) result.push(key);
+    if (isLessonDay(s, key)) result.push(key);
     key = addDaysToKey(key, 1);
   }
   return result;
+}
+
+/** `fromKey` dan boshlab (shu kun ham) ketma-ket `count` ta dars kuni; dam olish kunlari o'tkazib yuboriladi */
+export function lessonDaysFrom(s: Partial<GroupSchedule> | null | undefined, fromKey: string, count: number): string[] {
+  if (!isValidSchedule(s) || count <= 0) return [];
+  const result: string[] = [];
+  let key = fromKey;
+  for (let i = 0; i < count * 7 + 60 && result.length < count; i++) {
+    if (isLessonDay(s, key)) result.push(key);
+    key = addDaysToKey(key, 1);
+  }
+  return result;
+}
+
+/** `beforeKey` dan OLDINGI `count` ta dars kuni — yaqinidan uzog'iga qarab */
+export function lessonDaysBefore(s: Partial<GroupSchedule> | null | undefined, beforeKey: string, count: number): string[] {
+  if (!isValidSchedule(s) || count <= 0) return [];
+  const result: string[] = [];
+  let key = addDaysToKey(beforeKey, -1);
+  for (let i = 0; i < count * 7 + 60 && result.length < count; i++) {
+    if (isLessonDay(s, key)) result.push(key);
+    key = addDaysToKey(key, -1);
+  }
+  return result;
+}
+
+/** `key` kuni yoki undan oldingi eng yaqin dars kuni (`maxBack` kun ichida); topilmasa null */
+export function lastLessonDayOnOrBefore(
+  s: Partial<GroupSchedule> | null | undefined,
+  key: string,
+  maxBack = 7
+): string | null {
+  if (isLessonDay(s, key)) return key;
+  const [prev] = lessonDaysBefore(s, key, 1);
+  return prev && prev >= addDaysToKey(key, -maxBack) ? prev : null;
+}
+
+/** Uyga vazifa uchun eng kam muddat: dars kunidan keyin kamida shuncha kun */
+export const HOMEWORK_MIN_DAYS = 7;
+
+/**
+ * Uyga vazifa muddati: dars kunidan kamida bir hafta o'tgach bo'ladigan birinchi dars boshlanishi
+ * (17-noyabr seshanba darsi -> 24-noyabr seshanba dars boshlanishi). Jadval bo'lmasa — bir haftadan keyin 23:59.
+ */
+export function homeworkDueAfter(
+  s: Partial<GroupSchedule> | null | undefined,
+  lessonDateKey: string,
+  minDays = HOMEWORK_MIN_DAYS
+): Date {
+  const fromKey = addDaysToKey(lessonDateKey, minDays);
+  if (!isValidSchedule(s)) return dateFromKey(fromKey, "23:59");
+  const [day] = lessonDaysFrom(s, fromKey, 1);
+  return day ? dateFromKey(day, s.startTime) : dateFromKey(fromKey, "23:59");
 }
 
 /** Keyingi dars boshlanish vaqti (hozir ketayotgan dars ham qaytariladi) */
@@ -183,27 +257,17 @@ export function getNextLesson(
 ): { start: Date; end: Date; isNow: boolean; label: string } | null {
   if (!isValidSchedule(s)) return null;
   const todayKey = toDateKey(now);
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 15; i++) {
     const key = addDaysToKey(todayKey, i);
     const start = dateFromKey(key, s.startTime);
     const end = dateFromKey(key, s.endTime);
-    const weekday = getTashkentParts(start).weekday;
-    if (!s.days.includes(weekday) || end.getTime() <= now.getTime()) continue;
+    const weekday = weekdayOfKey(key);
+    if (!isLessonDay(s, key) || end.getTime() <= now.getTime()) continue;
     const isNow = start.getTime() <= now.getTime();
     const dayLabel = i === 0 ? "Bugun" : i === 1 ? "Ertaga" : UZ_WEEKDAYS[weekday - 1];
     return { start, end, isNow, label: `${dayLabel} ${s.startTime}–${s.endTime}` };
   }
   return null;
-}
-
-/** Berilgan dars sanasidan KEYINGI birinchi dars boshlanishi — uyga vazifa muddati uchun */
-export function getNextLessonAfter(
-  s: Partial<GroupSchedule> | null | undefined,
-  lessonDateKey: string
-): Date | null {
-  if (!isValidSchedule(s)) return null;
-  const [next] = getLessonDatesInRange(s, addDaysToKey(lessonDateKey, 1), addDaysToKey(lessonDateKey, 8));
-  return next ? dateFromKey(next, s.startTime) : null;
 }
 
 /** <input type="datetime-local"> uchun qiymat — brauzer qaysi vaqt mintaqasida bo'lmasin, Toshkent vaqti bilan */

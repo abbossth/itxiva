@@ -16,6 +16,8 @@ export interface IAppSettings extends Document {
   gamification?: Record<string, unknown> | null;
   /** Bezaklar (fasl effektlari, bayramlar, daraja bezagi) — `parseAmbience` (src/lib/ambience.ts) bilan o'qiladi */
   ambience?: Record<string, unknown> | null;
+  /** Bir martalik ma'lumot tuzatishlari (ID'lar) — qayta bajarilmasligi uchun */
+  appliedFixes?: string[];
 }
 
 const AppSettingsSchema = new Schema<IAppSettings>(
@@ -27,6 +29,7 @@ const AppSettingsSchema = new Schema<IAppSettings>(
     studentProfileEdit: { type: Boolean, default: false },
     gamification: { type: Schema.Types.Mixed, default: null },
     ambience: { type: Schema.Types.Mixed, default: null },
+    appliedFixes: { type: [String], default: [] },
   },
   { timestamps: true }
 );

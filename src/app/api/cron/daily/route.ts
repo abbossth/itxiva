@@ -5,6 +5,7 @@ import { runGamificationCron } from "@/lib/gamification/cron";
 import { retryFailedAiWork } from "@/lib/ai/retry";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
 import { awardQuizPlaces } from "@/lib/quiz-places";
+import { rollForwardLessons } from "@/lib/lesson-plan";
 
 // Vercel Cron kuniga bir marta chaqiradi (vercel.json). Vercel so'rovga
 // `Authorization: Bearer <CRON_SECRET>` sarlavhasini o'zi qo'shadi.
@@ -38,7 +39,12 @@ export async function GET(req: NextRequest) {
       console.error("Quiz places cron error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties, quizPlaces });
+    // Orqada qolgan darslar (sanasi o'tgan, lekin hali o'tilmagan) jadval bo'yicha oldinga suriladi
+    const lessonDates = await rollForwardLessons().catch((error) => {
+      console.error("Lesson roll-forward error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties, quizPlaces, lessonDates });
   } catch (error) {
     console.error("Daily cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

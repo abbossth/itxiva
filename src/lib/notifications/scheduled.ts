@@ -8,7 +8,7 @@ import { Exam } from "@/lib/db/models/exam.model";
 import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
 import { HomeworkSubmission } from "@/lib/db/models/homework-submission.model";
 import { isTelegramConfigured } from "@/lib/telegram/api";
-import { addDaysToKey, dateFromKey, getTashkentParts, isValidSchedule } from "@/lib/schedule";
+import { addDaysToKey, dateFromKey, getTashkentParts, isNoLessonDay, isValidSchedule } from "@/lib/schedule";
 import { formatDateTimeUz } from "@/lib/utils";
 import { sendNotifications } from "./notify";
 
@@ -119,6 +119,8 @@ export async function sendLessonReminders(now: Date = new Date()): Promise<{ gro
   await connectToDatabase();
 
   const { dateKey, weekday } = getTashkentParts(now);
+  // Dam olish kuni dars bo'lmaydi — eslatma ham ketmaydi
+  if (isNoLessonDay(dateKey)) return { groups: 0, sent: 0 };
   const groups = await Group.find({ isActive: true, "schedule.days": weekday, lessonReminderSentFor: { $ne: dateKey } })
     .select("name schedule")
     .lean();

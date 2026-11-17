@@ -7,7 +7,15 @@ import mongoose from "mongoose";
 import { Lesson, ILesson, ILessonData } from "@/lib/db/models/lesson.model";
 import { Group } from "@/lib/db/models/group.model";
 import { Quiz } from "@/lib/db/models/quiz.model";
-import { addDaysToKey, getLessonDatesInRange, getNextLessonAfter, toDateKey, type GroupSchedule } from "@/lib/schedule";
+import {
+  addDaysToKey,
+  getLessonDatesInRange,
+  homeworkDueAfter,
+  lastLessonDayOnOrBefore,
+  toDateKey,
+  type GroupSchedule,
+} from "@/lib/schedule";
+import { anchorOpenedLesson, replanLessonsFromAnchor } from "@/lib/lesson-plan";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor, requireAuth, requireGroupAccess } from "@/lib/auth/guards";
 import { archiveEntity } from "@/lib/archive";
@@ -443,9 +451,13 @@ export async function setLessonVisibilityAction(params: { lessonId: string; home
     }
     const wasOpen = Boolean(lesson.homework.isEnabled);
     lesson.homework.isEnabled = params.homework;
-    if (params.homework && !lesson.homework.dueAt) {
+    // Muddat bo'lmasa yoki o'tib ketgan bo'lsa (dars orqada qolgan) — oxirgi dars kunidan kamida bir hafta.
+    // Aks holda ochilishi bilan "muddati o'tgan" bo'lib, o'quvchilarga jarima tushardi
+    const now = new Date();
+    if (params.homework && !wasOpen && (!lesson.homework.dueAt || new Date(lesson.homework.dueAt).getTime() <= now.getTime())) {
       const group = await Group.findById(lesson.groupId).select("schedule").lean();
-      lesson.homework.dueAt = getNextLessonAfter(group?.schedule, toDateKey(new Date())) ?? null;
+      const todayKey = toDateKey(now);
+      lesson.homework.dueAt = homeworkDueAfter(group?.schedule, lastLessonDayOnOrBefore(group?.schedule, todayKey) ?? todayKey);
     }
     await lesson.save();
     changes.push(params.homework ? "vazifa ochildi" : "vazifa yopildi");
@@ -470,6 +482,11 @@ export async function setLessonVisibilityAction(params: { lessonId: string; home
     }
   }
 
+  // Vazifa yoki test ochildi — dars o'tilgan: uning sanasi va keyingi darslar jadval bo'yicha to'g'irlanadi
+  if (params.homework === true || params.quiz === true) {
+    await anchorOpenedLesson(lesson._id).catch((error) => console.error("Lesson anchor error:", error));
+  }
+
   await AuditLog.create({
     actorId: mentor.userId,
     action: "SET_LESSON_VISIBILITY",
@@ -477,8 +494,51 @@ export async function setLessonVisibilityAction(params: { lessonId: string; home
   });
   revalidatePath(`/lessons/${lesson._id}`);
   revalidatePath(`/mentor/lessons/${lesson._id}`);
+  revalidatePath("/mentor/lessons");
   revalidatePath("/homework");
   return { success: true, message: changes.join(", ") };
+}
+
+/**
+ * Dars sanalarini qo'lda to'g'irlash: tanlangan dars `dateKey` kuni o'tiladi, chorakdagi qolgan darslar
+ * guruh jadvali bo'yicha oldinga va orqaga taqsimlanadi (dam olish kunlari o'tkazib yuboriladi).
+ * Vazifa muddatlari — kamida bir hafta; ochiq vazifaning muddati faqat uzaytiriladi.
+ */
+export async function replanLessonsAction(params: { lessonId: string; dateKey: string }) {
+  const mentor = await requireMentor();
+  if (typeof params?.lessonId !== "string" || !mongoose.isValidObjectId(params.lessonId)) {
+    return { success: false, message: "Dars topilmadi" };
+  }
+  if (typeof params.dateKey !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(params.dateKey)) {
+    return { success: false, message: "Sanani tanlang" };
+  }
+  await connectToDatabase();
+  const lesson = await Lesson.findById(params.lessonId).select("groupId quarter order title").lean();
+  if (!lesson) return { success: false, message: "Dars topilmadi" };
+
+  const result = await replanLessonsFromAnchor({
+    groupId: lesson.groupId,
+    quarter: lesson.quarter,
+    anchor: { lessonId: lesson._id },
+    anchorKey: params.dateKey,
+    includePast: true,
+  });
+  if (!result) return { success: false, message: "Guruh dars jadvali kiritilmagan — avval Guruhlar bo'limida jadvalni belgilang" };
+
+  await AuditLog.create({
+    actorId: mentor.userId,
+    action: "REPLAN_LESSONS",
+    details: { lessonId: lesson._id, title: lesson.title, order: lesson.order, date: params.dateKey, ...result },
+  });
+
+  revalidatePath("/", "layout");
+  revalidatePath("/lessons");
+  revalidatePath("/mentor/lessons");
+  revalidatePath("/homework");
+  return {
+    success: true,
+    message: `Sanalar to'g'irlandi: ${result.datesChanged} ta dars sanasi, ${result.duesChanged} ta vazifa muddati`,
+  };
 }
 
 export interface LinkedLessonInfo {

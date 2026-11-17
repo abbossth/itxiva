@@ -51,7 +51,7 @@ import {
 import { QuizEditorModal } from "@/components/mentor/quiz-editor-modal";
 import { uploadFileToStorage } from "@/lib/upload-client";
 import { generateHomeworkAction } from "@/actions/ai.actions";
-import { fromTashkentInputValue, getNextLessonAfter, toDateKey, toTashkentInputValue } from "@/lib/schedule";
+import { fromTashkentInputValue, homeworkDueAfter, toDateKey, toTashkentInputValue } from "@/lib/schedule";
 import { Toggle } from "@/components/ui/toggle";
 import { AiAssistantPanel } from "@/components/mentor/ai-assistant-panel";
 import { LessonTabPanel, LessonTabs, selectLessonTab, type LessonTabDef } from "@/components/lessons/lesson-tabs";
@@ -171,11 +171,15 @@ export function LessonEditorForm({
     }
   };
 
-  /** Guruh jadvalidagi keyingi dars boshlanishi — muddatning sukut qiymati */
+  /**
+   * Muddatning sukut qiymati: dars kunidan kamida bir hafta keyingi dars boshlanishi (guruh jadvali bo'yicha).
+   * Dars sanasi o'tib ketgan bo'lsa (dars orqada qolgan) — bugundan hisoblanadi, muddat o'tmishda qolmaydi.
+   */
   const dueFor = (forGroupId: string, forDate: string): string => {
     const schedule = groups.find((g) => g._id.toString() === forGroupId)?.schedule;
-    const next = forDate ? getNextLessonAfter(schedule, forDate) : null;
-    return next ? toTashkentInputValue(next) : "";
+    const today = toDateKey();
+    const base = forDate && forDate > today ? forDate : today;
+    return toTashkentInputValue(homeworkDueAfter(schedule, base));
   };
   const nextLessonDue = (): string => dueFor(groupId, date);
 
@@ -834,17 +838,14 @@ export function LessonEditorForm({
                         type="button"
                         variant="secondary"
                         onClick={() => {
-                          const next = nextLessonDue();
-                          if (next) {
-                            setHwDue(next);
-                            setHwDueTouched(false);
-                          } else toast.error("Guruh jadvali kiritilmagan — muddatni qo'lda tanlang");
+                          setHwDue(nextLessonDue());
+                          setHwDueTouched(false);
                         }}
                         className="shrink-0 gap-1.5"
-                        title="Guruh jadvalidagi keyingi dars boshlanishi"
+                        title="Kamida bir hafta: dars kunidan 7 kun o'tgach bo'ladigan birinchi dars boshlanishi (dam olish kunlari hisobga olinadi)"
                       >
                         <CalendarClock className="w-4 h-4" />
-                        <span className="hidden sm:inline">Keyingi darsgacha</span>
+                        <span className="hidden sm:inline">1 haftaga</span>
                       </Button>
                     </div>
                   </Field>

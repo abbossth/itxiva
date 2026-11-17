@@ -69,8 +69,9 @@ describe("vazifa va test guruh bo'yicha", () => {
     expect((await lessons.setLessonVisibilityAction({ lessonId: String(lesson._id), homework: true, quiz: true })).success).toBe(true);
     const opened = (await Lesson.findById(lesson._id).lean())!;
     expect(opened.homework?.isEnabled).toBe(true);
-    // Muddat guruhning keyingi darsiga qo'yildi
+    // Muddat — kamida bir haftadan keyingi dars boshlanishi
     expect(opened.homework?.dueAt).toBeInstanceOf(Date);
+    expect(new Date(opened.homework!.dueAt!).getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 60 * 60 * 1000);
     expect(notifyGroup).toHaveBeenCalledWith(lesson.groupId, "lesson_new", expect.objectContaining({ homeworkOpened: true }));
     expect(notifyGroup).toHaveBeenCalledWith(lesson.groupId, "exam_new", expect.objectContaining({ kind: "quiz" }));
 
@@ -112,5 +113,16 @@ describe("vazifa va test guruh bo'yicha", () => {
     expect(await lessons.setLessonVisibilityAction({ lessonId: String(copy._id), homework: true })).toMatchObject({ success: false });
     actAs(sessionFor(s82));
     await expect(lessons.setLessonVisibilityAction({ lessonId: String(copy._id), quiz: true })).rejects.toThrow();
+  });
+});
+
+describe("orqada qolgan dars", () => {
+  it("o'tib ketgan muddatli vazifa ochilganda muddat bugundan kamida bir haftaga qo'yiladi", async () => {
+    const { mentor, copy } = await seed();
+    await Lesson.updateOne({ _id: copy._id }, { $set: { "homework.dueAt": new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } });
+    actAs(sessionFor(mentor));
+    expect((await lessons.setLessonVisibilityAction({ lessonId: String(copy._id), homework: true })).success).toBe(true);
+    const opened = (await Lesson.findById(copy._id).lean())!;
+    expect(new Date(opened.homework!.dueAt!).getTime()).toBeGreaterThan(Date.now() + 5 * 24 * 60 * 60 * 1000);
   });
 });

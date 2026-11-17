@@ -5,6 +5,7 @@ import { closeExpiredSessions } from "@/lib/attendance/core";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
 import { finishStaleLiveGames } from "@/lib/live-game/finish";
 import { connectToDatabase } from "@/lib/db/connect";
+import { applyLessonDateFixes } from "@/lib/lesson-plan-fixes";
 
 // Har 5 daqiqada GitHub Actions chaqiradi (.github/workflows/lesson-reminders.yml):
 // Vercel'ning bepul tarifida cron kuniga bir martadan ortiq ishlamaydi.
@@ -30,7 +31,12 @@ export async function GET(req: NextRequest) {
       console.error("Live game cron error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames });
+    // Bir martalik: 1-chorak dars sanalari va vazifa muddatlarini jadval bo'yicha to'g'irlash
+    const lessonDateFix = await applyLessonDateFixes().catch((error) => {
+      console.error("Lesson date fix error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames, lessonDateFix });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

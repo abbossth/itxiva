@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { togglePublishLessonAction, deleteLessonAction } from "@/actions/lesson.actions";
 import { HomeworkJournal } from "@/components/mentor/homework-journal";
+import { ReplanLessonsDialog } from "@/components/mentor/replan-lessons-dialog";
 import type { HomeworkJournal as JournalData, HomeworkOverviewItem, LessonHomeworkStats } from "@/actions/homework.actions";
 import { describeDue } from "@/lib/homework-status";
 import { groupShortName } from "@/lib/group-name";
@@ -42,6 +43,12 @@ export function LessonsManager({
   journal,
 }: LessonsManagerProps) {
   const [lessons, setLessons] = useState<ILessonData[]>(initialLessons);
+  // Server ma'lumoti yangilansa (masalan, sanalar to'g'irlangach router.refresh) ro'yxat ham yangilanadi
+  const [prevInitial, setPrevInitial] = useState(initialLessons);
+  if (initialLessons !== prevInitial) {
+    setPrevInitial(initialLessons);
+    setLessons(initialLessons);
+  }
   const [lessonToDelete, setLessonToDelete] = useState<ILessonData | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -192,6 +199,13 @@ export function LessonsManager({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {view === "list" && (
+            <ReplanLessonsDialog
+              key={`${currentGroupId}-${currentQuarter}-${lessons.length}`}
+              lessons={lessons}
+              schedule={groups.find((g) => g._id.toString() === currentGroupId)?.schedule}
+            />
+          )}
           <div className="relative">
             <select
               id="quarter-select"
