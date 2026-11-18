@@ -1,37 +1,75 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Star } from "lucide-react";
+import { Bot, Star, WifiOff } from "lucide-react";
 import type { LiveZoneView } from "@/actions/live-game.actions";
-import { FIELD, WAVE_MS, zonePhase, zoneWaves, type ZonePeer } from "@/lib/live-game/zone";
-import { playBoom, playFanfare, playTickSound } from "@/lib/sound";
+import { FIELD, WAVE_MS, aliveAt, zonePhase, zoneWave, zoneWaveCount, type ZoneWave } from "@/lib/live-game/zone";
+import { playFanfare, playHeartbeat, playShutdown, playSurvive, playTickSound, playWhoosh, playZoneAppear, playZoneClose } from "@/lib/sound";
 import { cn, formatNumberUz } from "@/lib/utils";
-import { drawZoneField, type DrawRobot } from "./zone-draw";
+import { ZoneFx, drawZoneField, type DrawRobot } from "./zone-draw";
+import { ZoneNet } from "./zone-net";
 
-// "Yashil zona": proyektor. Hamma robotlar soniyasiga ~4 marta /api/live/zone dan o'qiladi va silliq chiziladi.
+// "Yashil zona": proyektor. Hamma robotlar real vaqt xonasidan (tomoshabin) yoki HTTP orqali o'qiladi va silliq chiziladi.
 
 export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: LiveZoneView; sound: boolean; actions: React.ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [info, setInfo] = useState({ wave: 0, waves: z.final ? 5 : 3, secs: 0, countdown: 1, lock: false, alive: 0, total: 0, done: false });
-  const timing = useRef({ startsInMs: z.startsInMs });
+  const waves = zoneWaveCount(z.final);
+  const [info, setInfo] = useState({ wave: 0, waves, secs: 0, countdown: 1, lock: false, alive: 0, total: 0, done: false, caps: "", offline: false });
+  const init = useRef({ startsInMs: z.startsInMs, remainingMs: z.remainingMs, ws: z.ws ?? null });
+  const soundRef = useRef(sound);
+  useEffect(() => {
+    soundRef.current = sound;
+  }, [sound]);
 
   useEffect(() => {
     const el = canvas.current;
     if (!el || z.ended) return;
     const ctx = el.getContext("2d");
     if (!ctx) return;
-    const waves = zoneWaves(z.seed, z.final);
+    const fx = new ZoneFx();
     const t0 = performance.now();
-    const startAt = t0 + timing.current.startsInMs;
-    const startMs = Date.now() + timing.current.startsInMs;
-    const robots = new Map<string, { name: string; x: number; y: number; tx: number; ty: number; color: number; out: boolean; dx: number; dy: number }>();
+    const startAt = t0 + init.current.startsInMs;
+    const endAt = t0 + init.current.remainingMs;
+    const startMs = Date.now() + init.current.startsInMs;
+    const sfx = (f: () => void) => {
+      if (soundRef.current) f();
+    };
+    let outsThisWave = 0;
+    const net = new ZoneNet({
+      gameId,
+      round: z.round,
+      wsUrl: init.current.ws,
+      meId: null,
+      endAt,
+      onOut: (_id, x, y) => {
+        fx.burst(x, y, "#f87171", 24, 22);
+        fx.burst(x, y, "#94a3b8", 10, 10);
+        fx.text(x, y - 4, "💥", "#fca5a5");
+        outsThisWave += 1;
+      },
+    });
+    net.start();
     let raf = 0;
     let last = t0;
-    let lastFetch = 0;
     let lastInfo = 0;
-    let fetching = false;
     let lastTick = 99;
+    let shownWave = -2;
+    let wasLock = false;
     let resolved = 0;
+    let started = init.current.startsInMs <= 0;
+    const layouts = new Map<string, ZoneWave>();
+    const prevShown = new Map<string, { x: number; y: number }>();
+
+    const layoutFor = (w: number): ZoneWave => {
+      const alive = aliveAt([...net.peers.values()].map((p) => p.o - 1), w);
+      const key = `${w}:${alive}`;
+      let l = layouts.get(key);
+      if (!l) {
+        l = zoneWave(z.seed, z.final, w, alive);
+        layouts.set(key, l);
+      }
+      return l;
+    };
 
     const fit = () => {
       const r = el.getBoundingClientRect();
@@ -43,79 +81,74 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
     const ro = new ResizeObserver(fit);
     ro.observe(el);
 
-    const pull = () => {
-      if (fetching) return;
-      fetching = true;
-      void fetch(`/api/live/zone?gameId=${encodeURIComponent(gameId)}`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((res: { success: boolean; data?: { peers: ZonePeer[]; resolved: number } | null } | null) => {
-          const d = res?.success ? res.data : null;
-          if (!d) return;
-          const seen = new Set<string>();
-          for (const [id, name, px, py, color, out] of d.peers) {
-            seen.add(id);
-            const p = robots.get(id);
-            if (p) {
-              p.dx = px - p.tx;
-              p.dy = py - p.ty;
-              p.tx = px;
-              p.ty = py;
-              p.out = out === 1;
-            } else robots.set(id, { name, x: px, y: py, tx: px, ty: py, color, out: out === 1, dx: 0, dy: 0 });
-          }
-          for (const id of [...robots.keys()]) if (!seen.has(id)) robots.delete(id);
-          if (d.resolved > resolved) {
-            resolved = d.resolved;
-            if (sound) playBoom();
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          fetching = false;
-        });
-    };
-
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const wallNow = startMs + (now - startAt);
-      const phase = zonePhase(startMs, wallNow, waves.length);
-      const wave = phase.wave >= 0 ? waves[phase.wave] : null;
-      if (now - lastFetch > 250) {
-        lastFetch = now;
-        pull();
+      const phase = zonePhase(startMs, wallNow, waves);
+      const wave = phase.wave >= 0 ? layoutFor(phase.wave) : null;
+      net.pump(now);
+      fx.step(dt);
+
+      if (phase.wave !== shownWave && phase.wave >= 0 && !phase.done) {
+        shownWave = phase.wave;
+        if (wave) {
+          sfx(() => playZoneAppear(wave.zones.length));
+          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, "#86efac", zc.r * 1.6);
+        }
       }
-      for (const p of robots.values()) {
-        p.x += (p.tx - p.x) * Math.min(1, dt * 8);
-        p.y += (p.ty - p.y) * Math.min(1, dt * 8);
+      if (phase.lock && !wasLock && !phase.done) sfx(playZoneClose);
+      wasLock = phase.lock;
+      if (net.resolved > resolved) {
+        resolved = net.resolved;
+        sfx(outsThisWave > 0 ? playShutdown : playSurvive);
+        outsThisWave = 0;
       }
-      const list: DrawRobot[] = [...robots.entries()].map(([id, p]) => ({ id, name: p.name, x: p.x, y: p.y, color: p.color, out: p.out, dx: p.dx, dy: p.dy }));
+
+      const list: DrawRobot[] = [];
+      for (const p of net.peers.values()) {
+        const sh = net.shown(p.id, now) ?? { x: p.x, y: p.y, moving: false };
+        const prev = prevShown.get(p.id);
+        const ddx = prev ? sh.x - prev.x : 0;
+        const ddy = prev ? sh.y - prev.y : 0;
+        prevShown.set(p.id, { x: sh.x, y: sh.y });
+        const mv = Math.hypot(ddx, ddy) > 0.02;
+        list.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv });
+      }
       drawZoneField(ctx, el.width, el.height, {
         wave,
+        sinceWaveMs: wallNow - phase.waveStartedAt,
         timeLeft: wave && !phase.lock ? Math.max(0, (phase.waveEndsAt - wallNow) / WAVE_MS) : null,
         lock: phase.lock && !phase.done,
         stars: wave ? wave.stars : [],
         robots: list,
         labels: "all",
         t: now / 1000,
+        fx,
       });
       if (now - lastInfo > 150) {
         lastInfo = now;
         const secs = Math.max(0, Math.ceil((phase.waveEndsAt - wallNow) / 1000));
         const countdown = Math.max(0, startAt - now);
         const tickSec = countdown > 0 ? Math.ceil(countdown / 1000) : phase.lock ? 99 : secs;
-        if (sound && tickSec > 0 && tickSec <= 3 && tickSec < lastTick) playTickSound();
+        if (tickSec > 0 && tickSec <= 3 && tickSec < lastTick) sfx(countdown > 0 ? playTickSound : playHeartbeat);
+        if (countdown <= 0 && !started) {
+          started = true;
+          sfx(() => playWhoosh(0.6));
+        }
         lastTick = tickSec;
         setInfo({
           wave: Math.max(0, phase.wave),
-          waves: waves.length,
+          waves,
           secs,
           countdown,
           lock: phase.lock,
           alive: list.filter((r) => !r.out).length,
           total: list.length,
           done: phase.done,
+          caps: wave ? (wave.shared ? "Hamma uchun bitta zona" : `${wave.zones.length} ta zona · ${wave.zones.map((q) => q.cap).join(" + ")} joy`) : "",
+          offline: Boolean(init.current.ws) && !net.live && now - net.lastData > 1500,
         });
       }
     };
@@ -123,27 +156,36 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      net.stop();
     };
-  }, [gameId, z.seed, z.final, z.ended, sound]);
+  }, [gameId, z.round, z.seed, z.final, z.ended, waves]);
 
   useEffect(() => {
-    if (z.ended && sound) playFanfare(z.final);
-  }, [z.ended, z.final, sound]);
+    if (z.ended && soundRef.current) playFanfare(z.final);
+  }, [z.ended, z.final]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-400 via-emerald-500 to-sky-600">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-400 via-emerald-500 to-sky-600 shadow-lg shadow-emerald-500/30">
             <Bot className="h-6 w-6" />
           </span>
           <div>
-            <p className="text-2xl font-black sm:text-4xl">{z.final ? "Final: Yashil zona" : "Yashil zona"}</p>
-            <p className="text-sm text-slate-300">Vaqt tugaguncha yashil zonaga kiring — tashqarida qolgan robot o&apos;chadi!</p>
+            <p className="text-2xl font-black sm:text-4xl">{z.final ? "Final: Yashil zona" : z.mini ? "Qisqa o'yin: Yashil zona" : "Yashil zona"}</p>
+            <p className="text-sm text-slate-300">
+              {info.caps && !z.ended ? <span className="font-bold text-emerald-200">{info.caps}</span> : "Avval bitta umumiy zona, keyin 2–3 ta zona — joyni birinchi kirgan oladi!"}
+              <span className="ml-2 text-slate-400">🟣 loy · ⚡ elektr · ⭐ +30</span>
+            </p>
           </div>
         </div>
         {!z.ended && (
           <div className="flex items-center gap-3">
+            {info.offline && (
+              <span className="flex items-center gap-1.5 rounded-2xl bg-amber-500/20 px-3 py-2 text-sm font-bold text-amber-200">
+                <WifiOff className="h-4 w-4" /> Ulanmoqda
+              </span>
+            )}
             <span className="rounded-2xl bg-white/10 px-4 py-2 text-lg font-black">
               To&apos;lqin {info.wave + 1}/{info.waves}
             </span>
@@ -176,6 +218,14 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       ) : (
         <div className="relative mx-auto w-full min-h-0 flex-1" style={{ maxWidth: `calc((100dvh - 14rem) * ${FIELD.w / FIELD.h})` }}>
           <canvas ref={canvas} className="h-full w-full rounded-3xl" style={{ aspectRatio: `${FIELD.w} / ${FIELD.h}` }} />
+          {info.countdown > 0 && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-3xl bg-slate-950/50">
+              <span key={Math.ceil(info.countdown / 1000)} className="quiz-count font-mono text-9xl font-black">
+                {Math.ceil(info.countdown / 1000)}
+              </span>
+              <p className="text-xl font-bold text-emerald-200">Telefoningizda ekranga bosib robotni yurgizing!</p>
+            </div>
+          )}
           {info.done && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="live-pop rounded-3xl bg-gradient-to-r from-emerald-400 to-sky-500 px-8 py-4 text-4xl font-black">🏁 Raund tugadi!</p>

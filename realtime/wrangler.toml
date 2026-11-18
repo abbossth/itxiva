@@ -6,12 +6,22 @@ compatibility_date = "2026-10-01"
 
 [vars]
 RESULT_URL = "https://www.itxiva.uz/api/live/pvp/result"
+ZONE_RESULT_URL = "https://www.itxiva.uz/api/live/zone/result"
 
 [[durable_objects.bindings]]
 name = "ARENA_ROOM"
 class_name = "ArenaRoom"
 
+# "Yashil zona" xonasi
+[[durable_objects.bindings]]
+name = "ZONE_ROOM"
+class_name = "ZoneRoomDO"
+
 # Bepul tarifda faqat SQLite asosidagi Durable Object'lar
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ArenaRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ZoneRoomDO"]

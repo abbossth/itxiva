@@ -318,15 +318,32 @@ function useReporter(gameId: string, round: number, value: number, active: boole
   useEffect(() => {
     ref.current = value;
   }, [value]);
-  const send = useCallback(() => void submitMinigameAction(gameId, round, ref.current).catch(() => {}), [gameId, round]);
+  // Bir vaqtda bittadan: server amallari navbat bilan bajariladi — sekin internetda to'planib qolsa,
+  // keyingi amallar (savolga javob) ham kutib qoladi. Oldingisi kelmagan bo'lsa — bu safar yuborilmaydi
+  const busy = useRef(false);
+  const sentValue = useRef(-1);
+  const send = useCallback(() => {
+    if (busy.current || ref.current === sentValue.current) return;
+    busy.current = true;
+    const v = ref.current;
+    void submitMinigameAction(gameId, round, v)
+      .then((r) => {
+        if (r?.success) sentValue.current = v;
+      })
+      .catch(() => {})
+      .finally(() => {
+        busy.current = false;
+      });
+  }, [gameId, round]);
   useEffect(() => {
     if (!active) return;
     const id = setInterval(send, 1500);
     return () => {
       clearInterval(id);
-      send();
+      // Oxirgi natija — har holda yuboriladi (oldingisi yo'lda bo'lsa ham)
+      if (ref.current !== sentValue.current) void submitMinigameAction(gameId, round, ref.current).catch(() => {});
     };
-  }, [active, send]);
+  }, [active, send, gameId, round]);
 }
 
 interface GameProps {

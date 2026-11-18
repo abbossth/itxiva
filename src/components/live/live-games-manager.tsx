@@ -138,6 +138,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [teams, setTeams] = useState(2);
   const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
   const [minigames, setMinigames] = useState(true);
+  const [zoneMini, setZoneMini] = useState(true);
   const [arena, setArena] = useState(true);
   const [teamArena, setTeamArena] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -171,7 +172,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, arena, teamArena: mode === "team" && teamArena });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, zoneMini, arena, teamArena: mode === "team" && teamArena });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -289,6 +290,16 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+
+          {minigames && (
+            <label className="ml-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+              <input type="checkbox" checked={zoneMini} onChange={(e) => setZoneMini(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
+              <span>
+                <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">🟢 Qisqa o&apos;yinlarda &quot;Yashil zona&quot; ham chiqsin</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">Ba&apos;zan qisqa o&apos;yin o&apos;rniga hamma robot bilan zonaga yuguradi (2–3 guruh, tuzoqlar)</span>
+              </span>
+            </label>
+          )}
 
           <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
             <input type="checkbox" checked={arena} onChange={(e) => setArena(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />

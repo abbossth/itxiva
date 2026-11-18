@@ -392,3 +392,157 @@ export function playGameStart(): void {
   osc.stop(hit + 0.55);
   for (const fr of [261.63, 329.63, 392, 523.25]) tone(audio, "sawtooth", fr, hit, 0.6, 0.05);
 }
+
+// ---- "Yashil zona" ovozlari ----
+
+/** Yangi zona(lar) yondi: yaltiroq ko'tariluvchi arpedjio + yengil "whoosh" */
+export function playZoneAppear(count = 1): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+  notes.forEach((f, i) => tone(audio, "triangle", f, t + i * 0.06, 0.22, 0.12));
+  for (let k = 1; k < Math.min(3, count); k++) tone(audio, "sine", 1567.98 + k * 200, t + 0.32 + k * 0.1, 0.25, 0.08);
+  playWhoosh(0.25);
+}
+
+/** Zonada joy olindi: "klik" + yorqin "ding" */
+export function playSeatTaken(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "square", 1800, t, 0.03, 0.05);
+  tone(audio, "triangle", 1046.5, t + 0.03, 0.12, 0.2);
+  tone(audio, "triangle", 1567.98, t + 0.1, 0.22, 0.18);
+}
+
+/** Zona to'la — joy yo'q: ikki marta past "bip-bip" */
+export function playZoneFull(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "square", 330, t, 0.1, 0.07);
+  tone(audio, "square", 262, t + 0.13, 0.16, 0.07);
+}
+
+/** Zona yopildi: pasayuvchi "energiya o'chdi" va zarba */
+export function playZoneClose(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(880, t);
+  osc.frequency.exponentialRampToValueAtTime(70, t + 0.45);
+  g.gain.setValueAtTime(0.09, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.55);
+  const k = audio.createOscillator();
+  const kg = audio.createGain();
+  k.frequency.setValueAtTime(150, t + 0.05);
+  k.frequency.exponentialRampToValueAtTime(40, t + 0.4);
+  kg.gain.setValueAtTime(0.5, t + 0.05);
+  kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  k.connect(kg).connect(audio.destination);
+  k.start(t + 0.05);
+  k.stop(t + 0.5);
+}
+
+/** Elektr tuzoq urdi: chirsillagan "zzt" */
+export function playZap(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const src = audio.createBufferSource();
+  src.buffer = getNoise(audio);
+  const f = audio.createBiquadFilter();
+  f.type = "highpass";
+  f.frequency.value = 2500;
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  for (let i = 0; i < 6; i++) {
+    g.gain.setValueAtTime(i % 2 === 0 ? 0.28 : 0.04, t + i * 0.04);
+  }
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  src.connect(f).connect(g).connect(audio.destination);
+  src.start(t);
+  src.stop(t + 0.32);
+  tone(audio, "square", 110, t, 0.25, 0.08);
+}
+
+/** Loyga tushdi: past "blup" */
+export function playSplash(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(420, t);
+  osc.frequency.exponentialRampToValueAtTime(120, t + 0.18);
+  g.gain.setValueAtTime(0.25, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t);
+  osc.stop(t + 0.25);
+}
+
+/** Yulduz yig'ildi: tanga kabi ikki "ting" */
+export function playStarPickup(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  tone(audio, "square", 987.77, t, 0.07, 0.07);
+  tone(audio, "square", 1318.5, t + 0.06, 0.2, 0.07);
+}
+
+/** To'lqindan omon qolindi: quvnoq akkord */
+export function playSurvive(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  [659.25, 830.61, 987.77, 1318.5].forEach((f, i) => tone(audio, "triangle", f, t + i * 0.07, 0.3, 0.16));
+  tone(audio, "sine", 1975.5, t + 0.3, 0.35, 0.08);
+}
+
+/** Robot o'chdi: "elektr qisqa tutashuvi" + pasayuvchi ovoz */
+export function playShutdown(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  playZap();
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(600, t + 0.1);
+  osc.frequency.exponentialRampToValueAtTime(60, t + 0.9);
+  g.gain.setValueAtTime(0.2, t + 0.1);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t + 0.1);
+  osc.stop(t + 1);
+}
+
+/** Oxirgi soniyalar: yurak urishi kabi past "dum-dum" */
+export function playHeartbeat(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  for (const [at, f] of [
+    [0, 90],
+    [0.16, 70],
+  ] as const) {
+    const osc = audio.createOscillator();
+    const g = audio.createGain();
+    osc.frequency.setValueAtTime(f, t + at);
+    osc.frequency.exponentialRampToValueAtTime(40, t + at + 0.14);
+    g.gain.setValueAtTime(0.55, t + at);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.16);
+    osc.connect(g).connect(audio.destination);
+    osc.start(t + at);
+    osc.stop(t + at + 0.2);
+  }
+}

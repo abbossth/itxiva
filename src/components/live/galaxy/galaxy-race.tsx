@@ -76,11 +76,15 @@ function GalaxyRace({ gameId, g }: { gameId: string; g: PlayerGalaxy }) {
     (state: { d: number; x: number; orbs: number }) => {
       if (sending.current) return;
       sending.current = true;
+      // Osilib qolgan so'rov 2,5 s da bekor qilinadi — aks holda keyingilari umuman ketmay, boshqa kemalar qotib qoladi
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 2500);
       void fetch("/api/live/galaxy", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ gameId, round: g.round, ...state }),
-        keepalive: true,
+        cache: "no-store",
+        signal: ctrl.signal,
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((res: { success: boolean; data?: { peers: GalaxyPeer[]; place: number; total: number } } | null) => {
@@ -88,6 +92,7 @@ function GalaxyRace({ gameId, g }: { gameId: string; g: PlayerGalaxy }) {
         })
         .catch(() => {})
         .finally(() => {
+          clearTimeout(timer);
           sending.current = false;
         });
     },

@@ -1,24 +1,35 @@
-// "Kiber jang" real vaqt xonasi (Cloudflare Worker + Durable Object).
+// "Kiber jang" va "Yashil zona" real vaqt xonalari (Cloudflare Worker + Durable Object).
 // Har jang — bitta xona (o'yin:raund). O'yinchilar WebSocket orqali ulanadi, xona soniyasiga ~15 marta hammaga kadr yuboradi,
 // natijalarni (jonlar, yiqitishlar) imzo bilan Vercel'ga qaytaradi — bonuslar u yerda hisoblanadi.
 
 import { PvpRoom } from "../../src/lib/live-game/pvp-room";
-import { hmacSign, verifyTicket, type ArenaTicket } from "../../src/lib/live-game/arena-token";
+import { hmacSign, verifyTicket, verifyToken, type ArenaTicket } from "../../src/lib/live-game/arena-token";
+import { ZoneRoom, type ZoneTicket } from "../../src/lib/live-game/zone-room";
 import type { PvpTickInput } from "../../src/lib/live-game/pvp-types";
 
 export interface Env {
   ARENA_ROOM: DurableObjectNamespace;
+  ZONE_ROOM: DurableObjectNamespace;
   ARENA_SECRET: string;
   RESULT_URL: string;
+  ZONE_RESULT_URL: string;
 }
 
 const ROOM_PATH = /^\/room\/([a-f0-9]{24})\/(\d{1,3})$/;
+const ZONE_PATH = /^\/zone\/([a-f0-9]{24})\/(\d{1,3})$/;
 const FRAME_MS = 66;
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     if (url.pathname === "/") return new Response("itxiva arena: ok");
+    // Sayt "Yashil zona" xonasi bor-yo'qligini shu yerdan tekshiradi (yo'q bo'lsa — HTTP yo'li)
+    if (url.pathname === "/health/zone") return new Response("ok", { headers: { "access-control-allow-origin": "*" } });
+    const zm = url.pathname.match(ZONE_PATH);
+    if (zm) {
+      if (req.headers.get("Upgrade") !== "websocket") return new Response("WebSocket kerak", { status: 426 });
+      return env.ZONE_ROOM.get(env.ZONE_ROOM.idFromName(`${zm[1]}:${zm[2]}`)).fetch(req);
+    }
     const m = url.pathname.match(ROOM_PATH);
     if (!m) return new Response("Topilmadi", { status: 404 });
     if (req.headers.get("Upgrade") !== "websocket") return new Response("WebSocket kerak", { status: 426 });
@@ -134,6 +145,116 @@ export class ArenaRoom implements DurableObject {
       await fetch(this.env.RESULT_URL, { method: "POST", headers: { "content-type": "application/json", "x-arena-sig": sig }, body });
     } catch {
       // keyingi sinxronlashda
+    }
+  }
+}
+
+// ---- "Yashil zona" ----
+
+const ZONE_FRAME_MS = 66;
+
+export class ZoneRoomDO implements DurableObject {
+  private room: ZoneRoom | null = null;
+  private clients = new Map<WebSocket, { id: string | null; roster: number }>();
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private lastSync = 0;
+  private finalSent = false;
+
+  constructor(
+    private state: DurableObjectState,
+    private env: Env
+  ) {}
+
+  async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const m = url.pathname.match(ZONE_PATH);
+    const t = await verifyToken<ZoneTicket>(this.env.ARENA_SECRET, url.searchParams.get("t") ?? "");
+    if (!m || !t || t.k !== "zone" || t.g !== m[1] || t.r !== Number(m[2])) return new Response("Bilet yaroqsiz", { status: 403 });
+    if (!this.room || this.room.startedAt !== t.st) {
+      this.room = new ZoneRoom(t.g, t.r, t.seed, t.fin, t.st, t.en, t.res);
+      this.finalSent = false;
+    }
+
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+    server.accept();
+    let id: string | null = null;
+    if (t.role === "player") {
+      this.room.join(t);
+      id = t.p;
+    }
+    this.clients.set(server, { id, roster: -1 });
+    server.addEventListener("message", (ev) => {
+      if (!id || !this.room) return;
+      let msg: { t?: string; x?: unknown; y?: unknown; s?: unknown } | null = null;
+      try {
+        msg = JSON.parse(typeof ev.data === "string" ? ev.data : "");
+      } catch {
+        return;
+      }
+      if (msg?.t === "in") this.room.input(id, msg, Date.now());
+    });
+    const drop = () => this.clients.delete(server);
+    server.addEventListener("close", drop);
+    server.addEventListener("error", drop);
+    if (!this.timer) this.timer = setInterval(() => this.tick(), ZONE_FRAME_MS);
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private tick() {
+    const room = this.room;
+    if (!room) return;
+    const now = Date.now();
+    room.step(now);
+    const frame = room.frame(now);
+    let roster: string | null = null;
+    for (const [ws, c] of this.clients) {
+      try {
+        if (c.roster !== room.rosterVer) {
+          roster ??= room.rosterMessage();
+          ws.send(roster);
+          c.roster = room.rosterVer;
+        }
+        ws.send(frame);
+      } catch {
+        this.clients.delete(ws);
+      }
+    }
+    // Natija saytga: to'lqin hisoblanganda darhol, aks holda har 2 soniyada, oxirida yakuniy
+    if (now >= room.startedAt && now <= room.endsAt + 1000 && (room.dirty || now - this.lastSync > 2000)) {
+      room.dirty = false;
+      this.lastSync = now;
+      this.state.waitUntil(this.sync());
+    }
+    if (now > room.endsAt + 500 && !this.finalSent) {
+      this.finalSent = true;
+      this.state.waitUntil(this.sync());
+    }
+    if (now > room.endsAt + 20_000 || (this.clients.size === 0 && now > room.endsAt + 2000)) {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      for (const ws of this.clients.keys()) {
+        try {
+          ws.close(1000, "Raund tugadi");
+        } catch {
+          // allaqachon yopilgan
+        }
+      }
+      this.clients.clear();
+    }
+  }
+
+  private async sync() {
+    if (!this.room) return;
+    const body = JSON.stringify(this.room.results());
+    const sig = await hmacSign(this.env.ARENA_SECRET, body);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(this.env.ZONE_RESULT_URL, { method: "POST", headers: { "content-type": "application/json", "x-arena-sig": sig }, body });
+        if (r.ok || r.status === 409) return;
+      } catch {
+        // qayta urinib ko'riladi
+      }
     }
   }
 }

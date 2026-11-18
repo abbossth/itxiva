@@ -88,6 +88,10 @@ export interface ILiveZonePlayer {
   stars: number;
   points: number;
   place: number;
+  /** Joy da'vosi: qaysi to'lqinda, qaysi zonaga, qachon kirgan (-1 — yo'q) */
+  seatWave?: number;
+  seatZone?: number;
+  seatAt?: number;
 }
 
 export interface ILivePrize {
@@ -224,6 +228,9 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           stars: { type: Number, default: 0 },
           points: { type: Number, default: 0 },
           place: { type: Number, default: 0 },
+          seatWave: { type: Number, default: -1 },
+          seatZone: { type: Number, default: -1 },
+          seatAt: { type: Number, default: 0 },
         },
         { _id: false }
       ),

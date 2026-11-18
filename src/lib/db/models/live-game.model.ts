@@ -56,6 +56,10 @@ export interface ILiveZone {
   endsAt: Date | string;
   /** Natijasi hisoblangan to'lqinlar soni */
   resolved: number;
+  /** Real vaqt xonasida (Cloudflare) o'ynaladi — natijalarni xona yuboradi */
+  rt?: boolean;
+  /** Boshqa rejimdagi qisqa o'yin sifatida */
+  mini?: boolean;
   endedAt?: Date | string | null;
 }
 
@@ -74,7 +78,7 @@ export interface ILiveGameData {
   questions: ILiveQuestion[];
   events: ILiveEvent[];
   /** Yaratishda tanlangan qo'shimchalar */
-  options: { minigames: boolean; arena: boolean; /** Jamoaviy jangda arena jamoa bo'lib o'tadi */ teamArena?: boolean };
+  options: { minigames: boolean; arena: boolean; /** Jamoaviy jangda arena jamoa bo'lib o'tadi */ teamArena?: boolean; /** Qisqa o'yinlar orasida "Yashil zona" ham chiqadi */ zone?: boolean };
   /** Joriy yoki oxirgi qisqa o'yin */
   minigame?: ILiveMinigame | null;
   /** O'tkazilgan qisqa o'yinlar (savol raqamlari) */
@@ -181,7 +185,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     questions: { type: [LiveQuestionSchema], default: [] },
     events: { type: [LiveEventSchema], default: [] },
     options: {
-      type: new Schema({ minigames: { type: Boolean, default: true }, arena: { type: Boolean, default: false }, teamArena: { type: Boolean, default: false } }, { _id: false }),
+      type: new Schema({ minigames: { type: Boolean, default: true }, arena: { type: Boolean, default: false }, teamArena: { type: Boolean, default: false }, zone: { type: Boolean, default: false } }, { _id: false }),
       default: () => ({ minigames: true, arena: false, teamArena: false }),
     },
     minigame: {
@@ -217,6 +221,8 @@ const LiveGameSchema = new Schema<ILiveGame>(
           startedAt: Date,
           endsAt: Date,
           resolved: { type: Number, default: 0 },
+          rt: { type: Boolean, default: false },
+          mini: { type: Boolean, default: false },
           endedAt: { type: Date, default: null },
         },
         { _id: false }

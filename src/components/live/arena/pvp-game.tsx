@@ -408,18 +408,28 @@ export function PvpGame({
       for (const id of [...shown.keys()]) if (!world.peers.some((p) => p.id === id)) shown.delete(id);
     };
 
-    // Real vaqt xonasi (WebSocket). 4 s da ulanmasa yoki uzilib qayta ulanmasa — HTTP so'rovlarga o'tiladi
+    // Real vaqt xonasi (WebSocket). 4 s da ulanmasa yoki uzilsa — darhol HTTP so'rovlari bilan davom etiladi,
+    // orqa fonda esa xonaga qayta ulanishga urinib turiladi (0,8 → 5 s); ulangach yana WebSocket'ga qaytadi.
+    // 2,5 s xabar kelmasa — ulanish "osilgan" deb yopiladi. Internet qaytsa / sahifa ochilsa — darhol ulanadi.
     let socket: WebSocket | null = null;
     let wsReady = false;
     let useHttp = !wsUrl;
     let retries = 0;
     let closed = false;
+    let lastMsg = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const room = newClientState();
     const meBase = { weapon: init.weapon, cooldown: init.cooldown, name: myName, skin: init.skin };
     const connect = () => {
       if (!wsUrl || closed) return;
       let opened = false;
-      const sock = new WebSocket(wsUrl);
+      let sock: WebSocket;
+      try {
+        sock = new WebSocket(wsUrl);
+      } catch {
+        useHttp = true;
+        return;
+      }
       socket = sock;
       const fail = setTimeout(() => {
         if (!opened) sock.close();
@@ -427,27 +437,50 @@ export function PvpGame({
       sock.onopen = () => {
         opened = true;
         wsReady = true;
+        useHttp = false;
         retries = 0;
+        lastMsg = performance.now();
         clearTimeout(fail);
         smooth.setDelay(120);
       };
       sock.onmessage = (ev) => {
+        lastMsg = performance.now();
         const d = decodeRoomMessage(String(ev.data), room, init.playerId, meBase);
         if (d) apply(d, claim);
       };
       sock.onclose = () => {
         clearTimeout(fail);
-        wsReady = false;
+        if (socket === sock) {
+          socket = null;
+          wsReady = false;
+        }
         if (closed) return;
-        if (retries < 3) {
-          retries++;
-          setTimeout(connect, 800 * retries);
-        } else {
-          useHttp = true;
-          smooth.setDelay(350);
+        // Ulanish yo'q paytda o'yin to'xtamasin — HTTP bilan davom
+        useHttp = true;
+        smooth.setDelay(350);
+        retries = Math.min(retries + 1, 6);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(connect, Math.min(5000, 800 * retries));
+      };
+      sock.onerror = () => {
+        try {
+          sock.close();
+        } catch {
+          // yopilgan
         }
       };
     };
+    const wake = () => {
+      if (document.visibilityState === "hidden" || closed || wsReady || !wsUrl) return;
+      if (retryTimer) clearTimeout(retryTimer);
+      retries = 0;
+      connect();
+    };
+    window.addEventListener("online", wake);
+    document.addEventListener("visibilitychange", wake);
+    const stale = setInterval(() => {
+      if (wsReady && socket && performance.now() - lastMsg > 2500) socket.close();
+    }, 1000);
     connect();
 
     const tick = () => {
@@ -783,6 +816,10 @@ export function PvpGame({
       ro.disconnect();
       closed = true;
       socket?.close();
+      clearInterval(stale);
+      if (retryTimer) clearTimeout(retryTimer);
+      window.removeEventListener("online", wake);
+      document.removeEventListener("visibilitychange", wake);
       if (bannerTimer) clearTimeout(bannerTimer);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);

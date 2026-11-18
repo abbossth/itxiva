@@ -63,20 +63,31 @@ export async function hmacVerify(secret: string, data: string, sig: string): Pro
   }
 }
 
-export async function signTicket(secret: string, t: ArenaTicket): Promise<string> {
+/** Imzolangan bilet (har xil xonalar uchun umumiy): base64url(JSON).imzo */
+export async function signToken<T extends { exp: number }>(secret: string, t: T): Promise<string> {
   const body = b64url(enc.encode(JSON.stringify(t)));
   return `${body}.${await hmacSign(secret, body)}`;
 }
 
 /** Bilet to'g'ri, buzilmagan va muddati o'tmagan bo'lsa — mazmuni */
-export async function verifyTicket(secret: string, token: string, now = Date.now()): Promise<ArenaTicket | null> {
+export async function verifyToken<T extends { exp: number }>(secret: string, token: string, now = Date.now()): Promise<T | null> {
   const [body, sig] = String(token ?? "").split(".");
   if (!body || !sig || !(await hmacVerify(secret, body, sig))) return null;
   try {
-    const t = JSON.parse(new TextDecoder().decode(fromB64url(body))) as ArenaTicket;
-    if (typeof t.exp !== "number" || t.exp < now) return null;
+    const t = JSON.parse(new TextDecoder().decode(fromB64url(body))) as T;
+    if (typeof t?.exp !== "number" || t.exp < now) return null;
     return t;
   } catch {
     return null;
   }
+}
+
+export async function signTicket(secret: string, t: ArenaTicket): Promise<string> {
+  return signToken(secret, t);
+}
+
+/** Arena bileti (boshqa xona bileti — masalan "Yashil zona" — bu yerda yaroqsiz) */
+export async function verifyTicket(secret: string, token: string, now = Date.now()): Promise<ArenaTicket | null> {
+  const t = await verifyToken<ArenaTicket & { k?: string }>(secret, token, now);
+  return t && !t.k ? t : null;
 }

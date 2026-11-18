@@ -1,16 +1,46 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Star } from "lucide-react";
+import { Bot, Star, WifiOff } from "lucide-react";
 import type { LivePlayerState } from "@/actions/live-game.actions";
-import { FIELD, STAR_R, ROBOT_R, WAVE_MS, insideZone, zonePhase, zoneWaves, type ZonePeer } from "@/lib/live-game/zone";
+import {
+  FIELD,
+  ROBOT_R,
+  SLOW_FACTOR,
+  STAR_R,
+  WAVE_MS,
+  ZAP_STUN_MS,
+  aliveAt,
+  onTrap,
+  zapActive,
+  zonePhase,
+  zoneWave,
+  zoneWaveCount,
+  type ZoneWave,
+} from "@/lib/live-game/zone";
 import { haptic } from "@/lib/haptics";
-import { playBoom, playCheckInSound, playCorrectSound, playTickSound } from "@/lib/sound";
+import {
+  playHeartbeat,
+  playSeatTaken,
+  playShutdown,
+  playSplash,
+  playStarPickup,
+  playSurvive,
+  playTickSound,
+  playWhoosh,
+  playZap,
+  playZoneAppear,
+  playZoneClose,
+  playZoneFull,
+  unlockSound,
+} from "@/lib/sound";
 import { cn, formatNumberUz } from "@/lib/utils";
-import { drawZoneField, toField, type DrawRobot } from "./zone-draw";
+import { ZoneFx, drawZoneField, toField, type DrawRobot } from "./zone-draw";
+import { ZoneNet } from "./zone-net";
 
 // "Yashil zona": o'quvchi ekrani. Robot ekranga bosilgan (yoki sudralgan) joyga yuradi, klaviaturada ←↑→↓ / WASD.
-// Joy soniyasiga ~4 marta serverga yuboriladi; boshqa robotlar javobdan olinadi va silliq ko'rsatiladi.
+// O'z roboti darhol (kechikishsiz) yuradi; joy real vaqt xonasiga ~20 marta/s yuboriladi (yo'q bo'lsa — HTTP).
+// Boshqa robotlar silliq (bufer + oraliqni to'ldirish) ko'rsatiladi.
 
 type PlayerZone = NonNullable<LivePlayerState["zone"]>;
 
@@ -31,7 +61,7 @@ export function ZonePlayer({ gameId, z }: { gameId: string; z: PlayerZone }) {
 function ZoneResult({ z }: { z: PlayerZone }) {
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : "Raund"} tugadi</p>
+      <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : z.mini ? "Qisqa o'yin" : "Raund"} tugadi</p>
       <p className="live-pop text-4xl font-black">{z.out ? `${z.outWave + 1}-to'lqinda o'chdingiz` : "🟢 Oxirigacha omon qoldingiz!"}</p>
       {z.place > 0 && <p className="text-2xl font-black">{z.place}-o&apos;rin</p>}
       {z.points > 0 && <p className="live-pop font-mono text-4xl font-black text-emerald-300">+{formatNumberUz(z.points)}</p>}
@@ -55,18 +85,29 @@ interface Hud {
   secs: number;
   countdown: number;
   lock: boolean;
-  inside: boolean;
+  /** 0 — zonada emas, >0 — joyli, <0 — joy yetmadi */
+  seat: number;
   stars: number;
   alive: number;
   total: number;
   out: boolean;
   done: boolean;
+  stunned: boolean;
+  slowed: boolean;
+  offline: boolean;
 }
+
+type Banner = { text: string; tone: "good" | "bad" | "info"; key: number };
+
+/** Ro'yxat matni: "6 + 3 + 3 joy" */
+const capsText = (w: ZoneWave) => (w.shared ? "Hamma uchun bitta zona!" : `${w.zones.length} ta zona: ${w.zones.map((z) => z.cap).join(" + ")} joy`);
 
 function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [hud, setHud] = useState<Hud>({ wave: 0, waves: z.final ? 5 : 3, secs: 0, countdown: 1, lock: false, inside: false, stars: 0, alive: z.total, total: z.total, out: z.out, done: false });
-  const [banner, setBanner] = useState<{ text: string; good: boolean; key: number } | null>(null);
+  const waves = zoneWaveCount(z.final);
+  const [hud, setHud] = useState<Hud>({ wave: 0, waves, secs: 0, countdown: 1, lock: false, seat: 0, stars: 0, alive: z.total, total: z.total, out: z.out, done: false, stunned: false, slowed: false, offline: false });
+  const [banner, setBanner] = useState<Banner | null>(null);
+  const bannerKey = useRef(0);
   // O'yin holati (kadrlar orasida, React'dan tashqarida)
   const sim = useRef({
     x: z.x,
@@ -75,17 +116,9 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     dy: 0,
     target: null as { x: number; y: number } | null,
     keys: { up: false, down: false, left: false, right: false },
-    stars: 0,
-    taken: new Set<number>(),
-    out: z.out,
-    resolved: 0,
-    peers: new Map<string, { name: string; x: number; y: number; tx: number; ty: number; color: number; out: boolean; dx: number; dy: number }>(),
-    alive: z.total,
-    total: z.total,
-    sending: false,
   });
-  // Vaqt: sahifa ochilgan paytdagi qiymatlar (har yangilanishda sahna qayta qurilmasin)
-  const timing = useRef({ startsInMs: z.startsInMs, remainingMs: z.remainingMs });
+  // Vaqt va manzil: sahifa ochilgan paytdagi qiymatlar (har yangilanishda sahna qayta qurilmasin)
+  const init = useRef({ startsInMs: z.startsInMs, remainingMs: z.remainingMs, ws: z.ws, playerId: z.playerId, out: z.out });
 
   useEffect(() => {
     const el = canvas.current;
@@ -93,17 +126,56 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     const ctx = el.getContext("2d");
     if (!ctx) return;
     const s = sim.current;
-    const waves = zoneWaves(z.seed, z.final);
+    const fx = new ZoneFx();
     const t0 = performance.now();
-    const { startsInMs, remainingMs } = timing.current;
+    const { startsInMs, remainingMs, ws, playerId } = init.current;
     const startAt = t0 + startsInMs;
     const endAt = t0 + remainingMs;
     const startMs = Date.now() + startsInMs;
+    const say = (text: string, tone: Banner["tone"]) => setBanner({ text, tone, key: ++bannerKey.current });
+
+    const net = new ZoneNet({
+      gameId,
+      round: z.round,
+      wsUrl: ws,
+      meId: playerId || null,
+      endAt,
+      onOut: (_id, x, y) => {
+        fx.burst(x, y, "#f87171", 22, 22);
+        fx.burst(x, y, "#94a3b8", 10, 10);
+      },
+    });
+    net.start();
+
     let raf = 0;
     let last = t0;
-    let lastSend = 0;
     let lastHud = 0;
-    let lastTickSec = 99;
+    let lastBeat = 99;
+    let lastCount = 99;
+    let shownWave = -2;
+    let wasLock = false;
+    let resolved = 0;
+    let out = init.current.out;
+    let mySeat = 0;
+    let stars = 0;
+    const taken = new Set<number>();
+    let stunUntil = 0;
+    let zapImmuneUntil = 0;
+    let inSlow = false;
+    const layouts = new Map<string, ZoneWave>();
+    const prevShown = new Map<string, { x: number; y: number }>();
+
+    const layoutFor = (w: number): ZoneWave => {
+      const outs = [...net.peers.values()].map((p) => p.o - 1);
+      outs.push(out ? (net.me?.o ?? 1) - 1 : -1);
+      const key = `${w}:${aliveAt(outs, w)}`;
+      let l = layouts.get(key);
+      if (!l) {
+        l = zoneWave(z.seed, z.final, w, aliveAt(outs, w));
+        layouts.set(key, l);
+      }
+      return l;
+    };
 
     const fit = () => {
       const r = el.getBoundingClientRect();
@@ -115,74 +187,72 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     const ro = new ResizeObserver(fit);
     ro.observe(el);
 
-    const send = () => {
-      if (s.sending) return;
-      s.sending = true;
-      const sent = { x: s.x, y: s.y };
-      void fetch("/api/live/zone", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ gameId, round: z.round, x: sent.x, y: sent.y, stars: s.stars }),
-        keepalive: true,
-      })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((res: { success: boolean; data?: { peers: ZonePeer[]; resolved: number; out: boolean; outWave: number; alive: number; total: number; x: number; y: number } } | null) => {
-          const d = res?.success ? res.data : null;
-          if (!d) return;
-          const seen = new Set<string>();
-          for (const [id, name, px, py, color, out] of d.peers) {
-            seen.add(id);
-            const p = s.peers.get(id);
-            if (p) {
-              p.dx = px - p.tx;
-              p.dy = py - p.ty;
-              p.tx = px;
-              p.ty = py;
-              p.out = out === 1;
-            } else {
-              s.peers.set(id, { name, x: px, y: py, tx: px, ty: py, color, out: out === 1, dx: 0, dy: 0 });
-            }
-          }
-          for (const id of [...s.peers.keys()]) if (!seen.has(id)) s.peers.delete(id);
-          // Server joyni cheklagan bo'lsa (yuborilgan joydan farq qiladi) — tuzatiladi. Javob kelguncha robot
-          // yurib ulgurgan bo'ladi, shuning uchun hozirgi joy bilan emas, yuborilgani bilan solishtiriladi
-          if (Math.hypot(d.x - sent.x, d.y - sent.y) > 1.5) {
-            s.x = d.x;
-            s.y = d.y;
-            s.target = null;
-          }
-          s.alive = d.alive;
-          s.total = d.total;
-          if (d.resolved > s.resolved) {
-            const wasOut = s.out;
-            s.resolved = d.resolved;
-            s.out = d.out;
-            if (d.out && !wasOut) {
-              setBanner({ text: "💥 Zonadan tashqarida qoldingiz!", good: false, key: d.resolved });
-              playBoom();
-              haptic([120, 60, 120]);
-            } else if (!d.out) {
-              setBanner({ text: `🟢 Omon qoldingiz! ${d.resolved}-to'lqin`, good: true, key: d.resolved });
-              playCorrectSound();
-              haptic([30, 30, 30]);
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          s.sending = false;
-        });
-    };
-
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
       // Kuchsiz telefonda kadrlar siyrak bo'lsa ham robot sekinlashib qolmasin
       const dt = Math.min(0.12, (now - last) / 1000);
       last = now;
       const wallNow = startMs + (now - startAt);
-      const phase = zonePhase(startMs, wallNow, waves.length);
-      const wave = phase.wave >= 0 ? waves[phase.wave] : null;
-      const moving = phase.wave >= 0 && !phase.lock && !phase.done && !s.out;
+      const phase = zonePhase(startMs, wallNow, waves);
+      const wave = phase.wave >= 0 ? layoutFor(phase.wave) : null;
+      const since = wallNow - phase.waveStartedAt;
+
+      // Server: o'z holati (o'chdimi, joy)
+      const me = net.me;
+      if (me) {
+        if (me.correct) {
+          s.x = me.correct.x;
+          s.y = me.correct.y;
+          s.target = null;
+          me.correct = null;
+        }
+        if (me.o > 0 && !out) {
+          out = true;
+          fx.burst(s.x, s.y, "#f87171", 30, 26);
+          fx.burst(s.x, s.y, "#fde047", 12, 16);
+          playShutdown();
+          haptic([120, 60, 160]);
+          say(mySeat < 0 ? "💥 Zona to'la edi — robot o'chdi!" : "💥 Joysiz qoldingiz — robot o'chdi!", "bad");
+        }
+        if (!out && !phase.lock && me.seat !== mySeat) {
+          if (me.seat > 0) {
+            playSeatTaken();
+            haptic([20, 30, 20]);
+            fx.ring(s.x, s.y, "#4ade80", 5);
+            fx.text(s.x, s.y - 4, "Joy olindi!", "#86efac");
+          } else if (me.seat < 0) {
+            playZoneFull();
+            haptic([60]);
+            say("⛔ Bu zona to'la! Boshqasiga yuguring", "bad");
+          }
+        }
+        mySeat = me.seat;
+      }
+      if (net.resolved > resolved) {
+        resolved = net.resolved;
+        if (!out) {
+          playSurvive();
+          haptic([30, 30, 30]);
+          fx.burst(s.x, s.y, "#4ade80", 18, 16);
+          say(`🟢 Omon qoldingiz! ${resolved}/${waves}`, "good");
+        }
+      }
+
+      // To'lqin boshlandi / yopildi
+      if (phase.wave !== shownWave && phase.wave >= 0 && !phase.done) {
+        shownWave = phase.wave;
+        if (wave) {
+          playZoneAppear(wave.zones.length);
+          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, "#86efac", zc.r * 1.6);
+          if (!out) say(capsText(wave), "info");
+        }
+        taken.clear();
+      }
+      if (phase.lock && !wasLock && !phase.done) playZoneClose();
+      wasLock = phase.lock;
+
+      const moving = phase.wave >= 0 && !phase.lock && !phase.done && !out;
+      const stunned = now < stunUntil;
 
       // Harakat: klaviatura yo'nalishi yoki bosilgan nuqtaga
       let vx = (s.keys.right ? 1 : 0) - (s.keys.left ? 1 : 0);
@@ -198,68 +268,129 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         }
       }
       const len = Math.hypot(vx, vy);
-      if (moving && len > 0) {
-        // Nuqtaga — undan o'tib ketmasdan; klaviaturada — doim to'liq tezlikda (diagonalda ham)
-        const stepLen = Math.min(s.target ? len : Infinity, z.speed * dt);
-        s.x = Math.max(0, Math.min(FIELD.w, s.x + (vx / len) * stepLen));
-        s.y = Math.max(0, Math.min(FIELD.h, s.y + (vy / len) * stepLen));
-        s.dx = vx;
-        s.dy = vy;
-        // Yulduz yig'ish
-        if (wave) {
+      let walking = false;
+      if (wave && moving) {
+        // Tuzoqlar: loy — sekin; yoniq elektr — qotib qoladi
+        let slow = false;
+        for (const tr of wave.traps) {
+          if (!onTrap(s.x, s.y, tr)) continue;
+          if (tr.kind === "slow") slow = true;
+          else if (zapActive(tr, since) && now > zapImmuneUntil) {
+            stunUntil = now + ZAP_STUN_MS;
+            zapImmuneUntil = stunUntil + 700;
+            playZap();
+            haptic([80, 40, 80]);
+            fx.burst(s.x, s.y, "#fde047", 20, 20);
+            fx.text(s.x, s.y - 4, "⚡ Tok urdi!", "#fde047");
+          }
+        }
+        if (slow && !inSlow) {
+          playSplash();
+          fx.burst(s.x, s.y, "#c084fc", 10, 8);
+        }
+        inSlow = slow;
+        if (!stunned && now >= stunUntil && len > 0) {
+          // Nuqtaga — undan o'tib ketmasdan; klaviaturada — doim to'liq tezlikda (diagonalda ham)
+          const speed = z.speed * (slow ? SLOW_FACTOR : 1);
+          const stepLen = Math.min(s.target ? len : Infinity, speed * dt);
+          s.x = Math.max(0, Math.min(FIELD.w, s.x + (vx / len) * stepLen));
+          s.y = Math.max(0, Math.min(FIELD.h, s.y + (vy / len) * stepLen));
+          s.dx = vx;
+          s.dy = vy;
+          walking = stepLen > 0;
+          // Yulduz yig'ish
           for (const st of wave.stars) {
-            if (s.taken.has(st.id)) continue;
+            if (taken.has(st.id)) continue;
             if (Math.hypot(st.x - s.x, st.y - s.y) < STAR_R + ROBOT_R) {
-              s.taken.add(st.id);
-              s.stars += 1;
-              playCheckInSound(1);
+              taken.add(st.id);
+              stars += 1;
+              playStarPickup();
               haptic([10]);
+              fx.burst(st.x, st.y, "#fde047", 14, 14);
+              fx.text(st.x, st.y - 3, "+30", "#fde047");
             }
           }
         }
       }
+      net.send(s.x, s.y, stars);
+      net.pump(now);
+      fx.step(dt);
 
-      // Boshqa robotlar silliq
-      for (const p of s.peers.values()) {
-        p.x += (p.tx - p.x) * Math.min(1, dt * 8);
-        p.y += (p.ty - p.y) * Math.min(1, dt * 8);
+      const robots: DrawRobot[] = [];
+      for (const p of net.peers.values()) {
+        const sh = net.shown(p.id, now) ?? { x: p.x, y: p.y, moving: false };
+        const prev = prevShown.get(p.id);
+        const ddx = prev ? sh.x - prev.x : 0;
+        const ddy = prev ? sh.y - prev.y : 0;
+        prevShown.set(p.id, { x: sh.x, y: sh.y });
+        const mv = Math.hypot(ddx, ddy) > 0.02;
+        robots.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv });
+      }
+      robots.push({ id: "me", name: "Siz", x: s.x, y: s.y, color: z.color, out, me: true, dx: s.dx, dy: s.dy, seat: mySeat, stunned: now < stunUntil, moving: walking });
+
+      // Yo'l ko'rsatkich: joyim bo'lmasa — eng yaqin bo'sh zonaga
+      let guide: { x: number; y: number } | null = null;
+      if (wave && moving && mySeat <= 0) {
+        const seatedIn = wave.zones.map((_, zi) => robots.filter((r) => !r.out && r.seat === zi + 1).length);
+        let best = Infinity;
+        wave.zones.forEach((zc, zi) => {
+          if (zc.cap > 0 && seatedIn[zi] >= zc.cap) return;
+          const d = Math.hypot(zc.cx - s.x, zc.cy - s.y);
+          if (d < best) {
+            best = d;
+            guide = { x: zc.cx, y: zc.cy };
+          }
+        });
       }
 
-      // Sanoq paytida ham so'raladi — boshqa robotlar startdan oldin ko'rinsin (yurish server tomonda bloklangan)
-      if (now - lastSend > 250 && now <= endAt + 2500) {
-        lastSend = now;
-        send();
-      }
-
-      const robots: DrawRobot[] = [...s.peers.entries()].map(([id, p]) => ({ id, name: p.name, x: p.x, y: p.y, color: p.color, out: p.out, dx: p.dx, dy: p.dy }));
-      robots.push({ id: "me", name: "Siz", x: s.x, y: s.y, color: z.color, out: s.out, me: true, dx: s.dx, dy: s.dy });
       drawZoneField(ctx, el.width, el.height, {
         wave,
+        sinceWaveMs: since,
         timeLeft: wave && !phase.lock ? Math.max(0, (phase.waveEndsAt - wallNow) / WAVE_MS) : null,
         lock: phase.lock && !phase.done,
-        stars: wave ? wave.stars.filter((st) => !s.taken.has(st.id)) : [],
+        stars: wave ? wave.stars.filter((st) => !taken.has(st.id)) : [],
         robots,
         labels: "near",
+        guide,
+        target: s.target,
         t: now / 1000,
+        fx,
       });
 
       if (now - lastHud > 120) {
         lastHud = now;
         const secs = Math.max(0, Math.ceil((phase.waveEndsAt - wallNow) / 1000));
-        if (moving && secs <= 3 && secs > 0 && secs < lastTickSec) playTickSound();
-        lastTickSec = phase.lock ? 99 : secs;
+        const countdown = Math.max(0, startAt - now);
+        // Sanoq: 3-2-1 va "start"
+        const cnt = Math.ceil(countdown / 1000);
+        if (cnt !== lastCount) {
+          if (cnt > 0 && cnt <= 3) playTickSound();
+          if (cnt === 0 && lastCount <= 3) playWhoosh(0.6);
+          lastCount = cnt;
+        }
+        // Oxirgi 3 soniya — yurak urishi
+        if (moving && secs <= 3 && secs > 0 && secs < lastBeat) {
+          playHeartbeat();
+          if (mySeat <= 0) haptic([25]);
+        }
+        lastBeat = phase.lock ? 99 : secs;
+        const outs = [...net.peers.values()].map((p) => p.o - 1);
+        outs.push(out ? (net.me?.o ?? 1) - 1 : -1);
         setHud({
           wave: Math.max(0, phase.wave),
-          waves: waves.length,
+          waves,
           secs,
-          countdown: Math.max(0, startAt - now),
+          countdown,
           lock: phase.lock,
-          inside: wave ? insideZone(s.x, s.y, wave) : false,
-          stars: s.stars,
-          alive: s.alive,
-          total: s.total,
-          out: s.out,
+          seat: mySeat,
+          stars,
+          alive: aliveAt(outs, Math.min(waves, resolved)),
+          total: Math.max(outs.length, net.total),
+          out,
           done: phase.done,
+          stunned: now < stunUntil,
+          slowed: inSlow && moving,
+          offline: Boolean(ws) && !net.live && now - net.lastData > 1500,
         });
       }
     };
@@ -284,11 +415,12 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      net.stop();
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [gameId, z.round, z.seed, z.final, z.speed, z.color]);
+  }, [gameId, z.round, z.seed, z.final, z.speed, z.color, waves]);
 
   // Bosilgan / sudralgan joyga yurish
   const point = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -304,8 +436,20 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     return () => clearTimeout(t);
   }, [banner]);
 
+  const status = hud.out
+    ? { text: "👀 O'chdingiz — tomosha qiling", cls: "bg-slate-800/90" }
+    : hud.stunned
+    ? { text: "⚡ Tok urdi — qotib qoldingiz!", cls: "bg-amber-500 text-slate-950" }
+    : hud.seat > 0
+    ? { text: "✅ Joy olindi — zonadan chiqmang!", cls: "bg-emerald-500 text-white" }
+    : hud.seat < 0
+    ? { text: "⛔ Zona to'la — boshqasiga!", cls: "bg-rose-600 text-white" }
+    : hud.slowed
+    ? { text: "🟣 Loy — sekin yuryapsiz", cls: "bg-purple-600 text-white" }
+    : { text: "🏃 Zonaga yuguring!", cls: "bg-rose-500/90 text-white" };
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" onPointerDown={unlockSound}>
       <div className="flex items-center justify-between gap-2 text-sm font-bold">
         <span className="rounded-xl bg-white/10 px-3 py-1.5">
           To&apos;lqin {hud.wave + 1}/{hud.waves}
@@ -314,7 +458,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         <span className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-amber-200">
           <Star className="h-4 w-4" /> {hud.stars}
         </span>
-        <span className={cn("min-w-14 rounded-xl px-3 py-1.5 text-center font-mono text-xl font-black", hud.lock ? "bg-rose-500/30" : hud.secs <= 3 ? "bg-rose-500 text-white" : "bg-emerald-500/25")}>
+        <span className={cn("min-w-14 rounded-xl px-3 py-1.5 text-center font-mono text-xl font-black", hud.lock ? "bg-rose-500/30" : hud.secs <= 3 ? "quiz-shake bg-rose-500 text-white" : "bg-emerald-500/25")}>
           {hud.countdown > 0 ? "—" : hud.lock ? "⛔" : hud.secs}
         </span>
       </div>
@@ -331,32 +475,34 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
           }}
         />
         {hud.countdown > 0 && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/50 text-center">
-            <p className="text-sm font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : "Yashil zona"}</p>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/55 px-4 text-center">
+            <p className="text-sm font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : z.mini ? "Qisqa o'yin · Yashil zona" : "Yashil zona"}</p>
             <span key={Math.ceil(hud.countdown / 1000)} className="quiz-count font-mono text-7xl font-black">
               {Math.ceil(hud.countdown / 1000)}
             </span>
-            <p className="max-w-xs text-sm font-semibold text-slate-200">Ekranga bosing — robot o&apos;sha joyga yuradi (yoki ←↑→↓). Vaqt tugaguncha yashil zonaga kiring!</p>
+            <p className="max-w-sm text-sm font-semibold text-slate-200">
+              Ekranga bosing — robot o&apos;sha joyga yuradi (yoki ←↑→↓). Avval hamma uchun bitta zona, keyin 2–3 ta zona: joyni birinchi kirgan oladi!
+            </p>
+            <p className="text-xs font-bold text-slate-300">🟣 loy sekinlatadi · ⚡ yoniq elektrga tegsangiz qotib qolasiz · ⭐ = +30</p>
           </div>
         )}
-        {!hud.countdown && !hud.out && !hud.done && !hud.lock && (
-          <p
-            className={cn(
-              "pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full px-4 py-1 text-sm font-black",
-              hud.inside ? "bg-emerald-500 text-white" : "bg-rose-500/90 text-white"
-            )}
-          >
-            {hud.inside ? "✅ Zonadasiz" : "🏃 Zonaga yuguring!"}
-          </p>
+        {!hud.countdown && !hud.done && !hud.lock && (
+          <p className={cn("pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-sm font-black shadow-lg", status.cls)}>{status.text}</p>
         )}
-        {hud.out && !hud.done && (
-          <p className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-slate-800/90 px-4 py-1 text-sm font-black">
-            👀 O&apos;chdingiz — tomosha qiling
+        {hud.offline && !hud.done && (
+          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-slate-900/90 px-3 py-1 text-xs font-bold text-amber-200">
+            <WifiOff className="h-3.5 w-3.5" /> Aloqa tiklanmoqda…
           </p>
         )}
         {banner && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <p key={banner.key} className={cn("live-pop rounded-3xl px-6 py-3 text-2xl font-black shadow-2xl", banner.good ? "bg-emerald-500" : "bg-rose-600")}>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+            <p
+              key={banner.key}
+              className={cn(
+                "live-pop rounded-3xl px-6 py-3 text-center text-2xl font-black shadow-2xl",
+                banner.tone === "good" ? "bg-emerald-500" : banner.tone === "bad" ? "bg-rose-600" : "bg-sky-600/95"
+              )}
+            >
               {banner.text}
             </p>
           </div>

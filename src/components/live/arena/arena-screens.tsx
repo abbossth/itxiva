@@ -137,32 +137,72 @@ function ArenaFight({
           busy = false;
         }
       }
-      if (alive) timer = setTimeout(poll, WATCH_MS);
+      // Xonaga qayta ulangach — HTTP so'rovlar to'xtaydi
+      if (alive && !live) timer = setTimeout(poll, WATCH_MS);
+      else polling = false;
     };
+    // Real vaqt xonasi: uzilsa — HTTP bilan ko'rsatishda davom etiladi va orqa fonda qayta ulaniladi
     let sock: WebSocket | null = null;
-    if (wsUrl) {
-      const room = newClientState();
+    let live = false;
+    let lastMsg = 0;
+    let retries = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let polling = false;
+    const room = newClientState();
+    const startPoll = () => {
+      if (polling || !alive) return;
+      polling = true;
+      void poll();
+    };
+    const connect = () => {
+      if (!wsUrl || !alive) return;
       let opened = false;
-      sock = new WebSocket(wsUrl);
+      let s: WebSocket;
+      try {
+        s = new WebSocket(wsUrl);
+      } catch {
+        startPoll();
+        return;
+      }
+      sock = s;
       const fallback = setTimeout(() => {
-        if (!opened) sock?.close();
+        if (!opened) s.close();
       }, 4000);
-      sock.onopen = () => {
+      s.onopen = () => {
         opened = true;
+        live = true;
+        retries = 0;
+        lastMsg = performance.now();
         clearTimeout(fallback);
       };
-      sock.onmessage = (ev) => {
+      s.onmessage = (ev) => {
+        lastMsg = performance.now();
         const d = decodeRoomMessage(String(ev.data), room, null, null);
         if (d && alive) onWorld(d.world);
       };
-      sock.onclose = () => {
+      s.onclose = () => {
         clearTimeout(fallback);
-        if (alive) void poll();
+        if (sock === s) {
+          sock = null;
+          live = false;
+        }
+        if (!alive) return;
+        startPoll();
+        retries = Math.min(retries + 1, 6);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(connect, Math.min(5000, 800 * retries));
       };
-    } else void poll();
+    };
+    const stale = setInterval(() => {
+      if (live && sock && performance.now() - lastMsg > 2500) sock.close();
+    }, 1000);
+    if (wsUrl) connect();
+    else startPoll();
     return () => {
       alive = false;
       sock?.close();
+      clearInterval(stale);
+      if (retryTimer) clearTimeout(retryTimer);
       if (timer) clearTimeout(timer);
     };
   }, [gameId, wsUrl]);

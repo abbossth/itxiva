@@ -48,8 +48,8 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { awardCoins } from "@/lib/gamification/award";
-import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaves } from "@/lib/live-game/zone";
-import { resolveZoneWaves } from "@/lib/live-game/zone-server";
+import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaveCount } from "@/lib/live-game/zone";
+import { resolveZoneWaves, zoneRealtimeEnabled, zoneSocketUrl } from "@/lib/live-game/zone-server";
 import {
   GALAXY_EVERY,
   GALAXY_FINAL_SECONDS,
@@ -170,6 +170,8 @@ export async function createLiveGameAction(input: {
   prizes?: number[];
   /** Savollar orasida qisqa o'yinlar (sukutda yoqilgan) */
   minigames?: boolean;
+  /** Qisqa o'yinlar orasida "Yashil zona" ham chiqsin */
+  zoneMini?: boolean;
   /** Oxirida otishmali arena bosqichi */
   arena?: boolean;
   /** Jamoaviy jangda: arena jamoa bo'lib (jamoadoshlar bir-birini urmaydi) */
@@ -210,7 +212,12 @@ export async function createLiveGameAction(input: {
           ? { minigames: false, arena: true, teamArena: false }
           : input.mode === "galaxy" || input.mode === "zone"
           ? { minigames: false, arena: false, teamArena: false }
-          : { minigames: input.minigames !== false, arena: input.arena === true, teamArena: input.mode === "team" && input.arena === true && input.teamArena === true },
+          : {
+              minigames: input.minigames !== false,
+              arena: input.arena === true,
+              teamArena: input.mode === "team" && input.arena === true && input.teamArena === true,
+              zone: input.minigames !== false && input.zoneMini === true,
+            },
       cells: input.mode === "territory" ? emptyCells() : [],
       cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
     });
@@ -254,6 +261,14 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     if (game.status === "reveal" && game.options?.minigames !== false && minigameDue(game.index, game.questions.length, game.minigameRounds ?? [])) {
       // Birinchi qisqa o'yin har doim omad g'ildiragi (Super priz va Super baraban shu yerdan yutiladi)
       const first = (game.minigameRounds ?? []).length === 0;
+      // Ba'zan qisqa o'yin o'rniga "Yashil zona" raundi (ketma-ket ikki marta emas)
+      const mRounds = game.minigameRounds ?? [];
+      const zRounds = game.zoneRounds ?? [];
+      const lastWasZone = mRounds.length > 0 && zRounds.includes(mRounds[mRounds.length - 1]);
+      if (game.options?.zone && !first && !lastWasZone && Math.random() < ZONE_MINIGAME_CHANCE) {
+        await startZone(game._id, game.index, false, true);
+        return { success: true, data: { finished: false } };
+      }
       await startMinigame(game._id, game.index, (game.minigame?.kind as MinigameKind | undefined) ?? null, first ? "wheel" : undefined);
       return { success: true, data: { finished: false } };
     }
@@ -689,8 +704,15 @@ function galaxyView(game: Pick<ILiveGame, "galaxy" | "status">, players: ILiveGa
   };
 }
 
-/** "Yashil zona" raundi boshlanadi: robotlar maydon o'rtasida, tezlik — shu bosqichdagi to'g'ri javoblarga qarab */
-async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: boolean) {
+/** Qisqa o'yin navbatida "Yashil zona" chiqish ehtimoli (boshqa rejimlarda) */
+const ZONE_MINIGAME_CHANCE = 0.25;
+
+/**
+ * "Yashil zona" raundi boshlanadi: robotlar maydon o'rtasida, tezlik — shu bosqichdagi to'g'ri javoblarga qarab.
+ * `mini` — boshqa rejimdagi qisqa o'yin sifatida (shu savolning qisqa o'yini ham o'ynalgan hisoblanadi).
+ */
+async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: boolean, mini = false) {
+  const rt = await zoneRealtimeEnabled();
   const startedAt = new Date(Date.now() + ZONE_INTRO_S * 1000);
   const endsAt = new Date(startedAt.getTime() + zoneDurationMs(final));
   const res = await LiveGame.updateOne(
@@ -698,10 +720,10 @@ async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: 
     {
       $set: {
         status: "zone",
-        zone: { round, final, seed: seedOf(`${gameId}:zone:${round}`), startedAt, endsAt, resolved: 0, endedAt: null },
+        zone: { round, final, mini, seed: seedOf(`${gameId}:zone:${round}`), startedAt, endsAt, resolved: 0, rt, endedAt: null },
         questionStartedAt: null,
       },
-      $push: { zoneRounds: round },
+      $push: mini ? { zoneRounds: round, minigameRounds: round } : { zoneRounds: round },
     }
   );
   if (res.modifiedCount === 0) return;
@@ -728,6 +750,9 @@ async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: 
                 stars: 0,
                 points: 0,
                 place: 0,
+                seatWave: -1,
+                seatZone: -1,
+                seatAt: 0,
               },
             },
           },
@@ -741,8 +766,9 @@ async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: 
 async function endZone(gameId: mongoose.Types.ObjectId | string): Promise<boolean> {
   const current = await LiveGame.findById(gameId).select("groupId status zone").lean();
   if (!current?.zone || current.status !== "zone" || current.zone.endedAt) return false;
-  // Vaqt tugagan bo'lsa — oxirgi to'lqinlar ham hisoblansin (muddatidan oldin tugatilsa — hisoblanganicha)
-  await resolveZoneWaves(current as Parameters<typeof resolveZoneWaves>[0]);
+  // Vaqt tugagan bo'lsa — oxirgi to'lqinlar ham hisoblansin (muddatidan oldin tugatilsa — hisoblanganicha).
+  // Real vaqt xonasi natijani o'zi yuboradi; yetib kelmagan bo'lsa — oxirgi saqlangan joylar bo'yicha shu yerda
+  await resolveZoneWaves(current as Parameters<typeof resolveZoneWaves>[0], Date.now(), true);
   const game = await LiveGame.findOneAndUpdate(
     { _id: gameId, status: "zone", "zone.endedAt": null },
     { $set: { "zone.endedAt": new Date() } },
@@ -750,7 +776,7 @@ async function endZone(gameId: mongoose.Types.ObjectId | string): Promise<boolea
   );
   const z = game?.zone;
   if (!game || !z) return false;
-  const waves = zoneWaves(z.seed, Boolean(z.final)).length;
+  const waves = zoneWaveCount(Boolean(z.final));
   const played = Math.min(waves, z.resolved ?? 0);
   const players = await LiveGamePlayer.find({ gameId: game._id, "zone.round": z.round }).select("name zone").lean();
   const scored = players
@@ -798,6 +824,8 @@ export interface LiveZoneRow {
 export interface LiveZoneView {
   round: number;
   final: boolean;
+  /** Boshqa rejimdagi qisqa o'yin sifatida */
+  mini: boolean;
   seed: number;
   startsInMs: number;
   remainingMs: number;
@@ -805,6 +833,8 @@ export interface LiveZoneView {
   resolved: number;
   ended: boolean;
   rows: LiveZoneRow[];
+  /** Real vaqt xonasi manzili (proyektor — tomoshabin); null — HTTP yo'li */
+  ws?: string | null;
 }
 
 function zoneView(game: Pick<ILiveGame, "zone" | "status">, players: ILiveGamePlayer[]): LiveZoneView | null {
@@ -827,6 +857,7 @@ function zoneView(game: Pick<ILiveGame, "zone" | "status">, players: ILiveGamePl
   return {
     round: z.round,
     final: Boolean(z.final),
+    mini: Boolean(z.mini),
     seed: z.seed,
     startsInMs: Math.max(0, new Date(z.startedAt).getTime() - now),
     remainingMs: Math.max(0, new Date(z.endsAt).getTime() - now),
@@ -1204,7 +1235,10 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
           return v ? { ...v, ws: v.ended ? null : await arenaSocketUrl(game, null) } : null;
         })(),
         arenaNext: Boolean(game.options?.arena && !(game.arenaRounds ?? []).includes(game.questions.length - 1)),
-        zone: zoneView(game, players),
+        zone: await (async () => {
+          const v = zoneView(game, players);
+          return v ? { ...v, ws: v.ended ? null : await zoneSocketUrl(game, null) } : null;
+        })(),
         zoneNext:
           game.status === "reveal" &&
           (zoneRoundDue(game.mode, game.index, game.questions.length, game.zoneRounds ?? []) ||
@@ -1572,6 +1606,7 @@ export interface LivePlayerState {
   zone: {
     round: number;
     final: boolean;
+    mini: boolean;
     seed: number;
     startsInMs: number;
     remainingMs: number;
@@ -1587,6 +1622,10 @@ export interface LivePlayerState {
     place: number;
     total: number;
     top: { name: string; points: number; survivor: boolean }[];
+    /** Real vaqt xonasi manzili; null — HTTP yo'li */
+    ws: string | null;
+    /** O'z robotining id si (xona kadrlarida o'zini topish uchun) */
+    playerId: string;
   } | null;
   /** "Galaktika poygasi 3D": o'z kemasi, turbo zaryadlari va natijasi */
   galaxy: {
@@ -1787,10 +1826,11 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             place: my && my.value > 0 ? myIndex + 1 : 0,
           };
         })(),
-        zone: (() => {
+        zone: await (async () => {
           const v = zoneView(game, players);
           if (!v) return null;
           const my = mine?.zone?.round === v.round ? mine.zone : null;
+          const ws = mine && my && !v.ended ? await zoneSocketUrl(game, mine) : null;
           return {
             round: v.round,
             final: v.final,
@@ -1798,6 +1838,7 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             startsInMs: v.startsInMs,
             remainingMs: v.remainingMs,
             ended: v.ended,
+            mini: v.mini,
             joined: Boolean(my),
             x: my?.x ?? 50,
             y: my?.y ?? 31,
@@ -1809,6 +1850,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             place: my?.place ?? 0,
             total: v.rows.length,
             top: v.ended ? v.rows.slice(0, 5).map((r) => ({ name: r.name, points: r.points, survivor: !r.out })) : [],
+            ws,
+            playerId: mine ? mine._id.toString() : "",
           };
         })(),
         galaxy: (() => {

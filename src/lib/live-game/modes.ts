@@ -34,7 +34,7 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
   zone: {
     title: "Yashil zona",
     tagline: "Savol — zonaga yugur — savol!",
-    rules: ["Har 3 savoldan keyin: yashil zona yonadi — vaqt tugaguncha unga kiring", "Tashqarida qolgan robot o'chadi · zona har safar kichrayadi va ko'chadi", "⭐ yulduzlar ochko beradi · to'g'ri javob — tezroq robot · oxirida final"],
+    rules: ["Har 3 savoldan keyin: avval hamma uchun bitta zona, keyin 2–3 ta zona (masalan 6+6 yoki 5+5+2 joy)", "Joyni birinchi kirgan oladi · joysiz qolgan robot o'chadi · 🟣 loy sekinlatadi, ⚡ elektr qotiradi", "⭐ yulduzlar ochko beradi · to'g'ri javob — tezroq robot · oxirida final"],
   },
   galaxy: {
     title: "Galaktika poygasi 3D",
