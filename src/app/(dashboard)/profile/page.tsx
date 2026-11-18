@@ -6,6 +6,7 @@ import { ProfileView } from "@/components/profile/profile-view";
 import { MyProfileView } from "@/components/profile/my-profile-view";
 import { getMyProfile } from "@/actions/student-profile.actions";
 import { getTelegramStatus } from "@/actions/telegram.actions";
+import { getMyCharacter } from "@/actions/character.actions";
 
 export const metadata = {
   title: "Mening profilim — ITXiva",
@@ -24,7 +25,7 @@ export default async function ProfilePage() {
   const celebrationsEnabled = user?.celebrationsEnabled !== false;
 
   if (session.role === "student") {
-    const data = await getMyProfile();
+    const [data, character] = await Promise.all([getMyProfile(), getMyCharacter().catch(() => null)]);
     if (!data) notFound();
     return (
       <MyProfileView
@@ -34,6 +35,7 @@ export default async function ProfilePage() {
         login={login}
         telegram={telegram}
         celebrationsEnabled={celebrationsEnabled}
+        character={character}
       />
     );
   }

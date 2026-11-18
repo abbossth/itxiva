@@ -1,5 +1,7 @@
 "use client";
 
+import { CharacterSvg } from "@/components/character/character-svg";
+import type { GameLook } from "@/lib/character/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Crown, Gem, Hourglass, Shield, Sparkles, X, Zap } from "lucide-react";
 import Link from "@/components/ui/link";
@@ -248,14 +250,14 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         {!state.joined && state.status !== "finished" ? (
           <JoinView state={state} busy={busy} onJoin={join} />
         ) : state.status === "lobby" ? (
-          <Waiting title="Siz o'yindasiz!" text="Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi." />
+          <Waiting title="Siz o'yindasiz!" text="Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi." look={me?.look} />
         ) : state.status === "question" ? (
           me?.eliminated ? (
-            <Waiting title="Siz o'yindan chiqdingiz" text="Jonlar tugadi — oxirigacha tomosha qiling." tone="out" />
+            <Waiting title="Siz o'yindan chiqdingiz" text="Jonlar tugadi — oxirigacha tomosha qiling." tone="out" look={me?.look} />
           ) : me?.answered && isAdventure(state.mode) && state.tactics ? (
             <TacticView state={state} onPick={pickTactic} saving={tacticSaving} />
           ) : me?.answered ? (
-            <Waiting title="Javob qabul qilindi" text="Boshqalar javob berishini kuting…" tone="ok" />
+            <Waiting title="Javob qabul qilindi" text="Boshqalar javob berishini kuting…" tone="ok" look={me?.look} />
           ) : (
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
@@ -300,10 +302,15 @@ function JoinView({ state, busy, onJoin }: { state: LivePlayerState; busy: boole
   );
 }
 
-function Waiting({ title, text, tone = "wait" }: { title: string; text: string; tone?: "wait" | "ok" | "out" }) {
+function Waiting({ title, text, tone = "wait", look }: { title: string; text: string; tone?: "wait" | "ok" | "out"; look?: GameLook | null }) {
   const Icon = tone === "ok" ? Check : tone === "out" ? X : Hourglass;
   return (
-    <div className="quiz-pop flex flex-col items-center gap-4 py-14 text-center">
+    <div className="quiz-pop flex flex-col items-center gap-4 py-10 text-center">
+      {look !== undefined && (
+        <Link href="/profile?tab=character" className="group relative" title="Personajni o'zgartirish">
+          <CharacterSvg look={look} size={130} mood={tone === "out" ? "sad" : tone === "ok" ? "jump" : "idle"} />
+        </Link>
+      )}
       <span
         className={cn(
           "flex h-20 w-20 items-center justify-center rounded-full",
@@ -448,9 +455,12 @@ function RevealView({
           me.eliminated && me.lastCorrect !== true ? "bg-rose-700" : ok ? "bg-emerald-600" : "bg-rose-600"
         )}
       >
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/20">
-          {ok ? <Check className="h-8 w-8" strokeWidth={3} /> : <X className="h-8 w-8" strokeWidth={3} />}
-        </span>
+        <div className="flex items-end gap-2">
+          <CharacterSvg look={me.look} size={96} mood={ok ? "cheer" : "sad"} pedestal={false} />
+          <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/20">
+            {ok ? <Check className="h-8 w-8" strokeWidth={3} /> : <X className="h-8 w-8" strokeWidth={3} />}
+          </span>
+        </div>
         <p className="text-3xl font-black lg:text-5xl">{ok ? "To'g'ri!" : me.value === null || me.value === "" ? "Javob bermadingiz" : "Noto'g'ri"}</p>
         {ok && me.lastPoints > 0 && <p className="font-mono text-4xl font-black lg:text-6xl">+{formatNumberUz(me.lastPoints)}</p>}
         {me.lastRank > 0 && (
@@ -510,13 +520,14 @@ function FinishedView({ state }: { state: LivePlayerState }) {
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
       <Crown className="h-14 w-14 text-amber-300" />
+      {me && <CharacterSvg look={me.look} size={140} mood={me.rank > 0 && me.rank <= 3 ? "cheer" : "idle"} />}
       <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">O&apos;yin tugadi</p>
       {me ? (
         <>
           <p className="text-4xl font-black">{me.rank}-o&apos;rin</p>
           <p className="font-mono text-lg text-slate-300">{formatNumberUz(me.score)} ochko</p>
           {me.coins > 0 && <p className="rounded-full bg-amber-400/20 px-4 py-1.5 text-lg font-black text-amber-200">+{me.coins} coin</p>}
-          <LivePrizes gameId={state.id} prizes={me.prizes} />
+          <LivePrizes gameId={state.id} prizes={me.prizes} look={me.look} />
         </>
       ) : (
         <p className="text-slate-300">Bu o&apos;yinda qatnashmadingiz.</p>

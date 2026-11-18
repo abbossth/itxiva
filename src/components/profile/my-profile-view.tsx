@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { CharacterEditor } from "@/components/character/character-editor";
+import type { MyCharacter } from "@/actions/character.actions";
 import Link from "@/components/ui/link";
 import {
   Award,
@@ -53,6 +55,7 @@ const QUEST_STATUS: Record<MyProfileData["quests"][number]["status"], { label: s
 
 const PROFILE_TABS: LessonTabDef[] = [
   { id: "profile", label: "Profil", icon: "profile" },
+  { id: "character", label: "Personajim", icon: "character" },
   { id: "settings", label: "Sozlamalar", icon: "settings" },
 ];
 
@@ -66,7 +69,9 @@ export function MyProfileView({
   login,
   telegram,
   celebrationsEnabled,
+  character,
 }: {
+  character: MyCharacter | null;
   data: MyProfileData;
   userId: string;
   fullName: string;
@@ -331,6 +336,10 @@ export function MyProfileView({
               <AttendancePanel attendance={attendance} />
             </TabsContent>
           </Tabs>
+        </LessonTabPanel>
+
+        <LessonTabPanel id="character" className="space-y-4">
+          {character ? <CharacterEditor initial={character} /> : <p className="text-sm text-slate-500">Personajni yuklab bo&apos;lmadi</p>}
         </LessonTabPanel>
 
         <LessonTabPanel id="settings" className="space-y-4">

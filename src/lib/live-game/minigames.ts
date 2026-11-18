@@ -11,7 +11,7 @@ const MINIGAME_WEIGHT: Partial<Record<MinigameKind, number>> = { target: 2, memo
 export const MINIGAMES: Record<MinigameKind, { title: string; rule: string; seconds: number }> = {
   tap: { title: "Tezkor bosish", rule: "10 soniyada tugmani iloji boricha ko'p bosing!", seconds: 10 },
   target: { title: "Mo'ljalga otish", rule: "Nishonni uring, oltini — +3! Bombaga tegsangiz 2 soniya muzlaysiz", seconds: 15 },
-  wheel: { title: "Omad g'ildiragi", rule: "G'ildirakni aylantiring: ochko, ×2, Super priz yoki Super baraban!", seconds: 12 },
+  wheel: { title: "Omad g'ildiragi", rule: "G'ildirakni aylantiring: ochko, ×2, Super priz yoki Super baraban (coin va personajga sovg'alar)!", seconds: 12 },
   bonus: { title: "Bonus raund", rule: "Keyingi savol ikki baravar ochko beradi!", seconds: 5 },
   memory: { title: "Xotira", rule: "Chiroqlar ketma-ketligini eslab qoling va xuddi shunday bosing", seconds: 25 },
   math: { title: "Tez hisob", rule: "Misollarni yeching. Xato javob — 1,5 soniya pauza", seconds: 20 },
@@ -121,9 +121,9 @@ export function wheelText(effect: WheelEffect): string {
     case "double":
       return "Keyingi to'g'ri javob ×2!";
     case "super":
-      return "SUPER PRIZ! O'yin oxirida sovg'a qutisini ochasiz";
+      return "SUPER PRIZ! O'yin oxirida qutini ochasiz — coin yoki personajga sovg'a";
     case "superWheel":
-      return "SUPER BARABAN! O'yin oxirida uni aylantirasiz";
+      return "SUPER BARABAN! O'yin oxirida aylantirasiz — coin, personaj buyumi yoki kuch";
     case "none":
       return "Bu safar omad kulib boqmadi";
   }
@@ -167,12 +167,17 @@ export const BOX_PRIZES: { coins: number; weight: number }[] = [
   { coins: 20, weight: 6 },
 ];
 
-/** Super baraban: 5, 10, …, 50 coin — kattasi kamdan-kam */
-export const SUPER_WHEEL: { coins: number; color: string; weight: number }[] = [
+/**
+ * Super baraban: 5, 10, …, 50 coin — kattasi kamdan-kam. Ikki bo'lak — personaj uchun:
+ * 🎁 personajga yangi buyum, ⚡ personaj kuchi +1 (coin o'rniga).
+ */
+export const SUPER_WHEEL: { coins: number; color: string; weight: number; gift?: "item" | "power" }[] = [
   { coins: 5, color: "#0ea5e9", weight: 22 },
   { coins: 10, color: "#10b981", weight: 20 },
+  { coins: 0, color: "#22d3ee", weight: 9, gift: "item" },
   { coins: 15, color: "#8b5cf6", weight: 16 },
   { coins: 20, color: "#f97316", weight: 13 },
+  { coins: 0, color: "#fbbf24", weight: 4, gift: "power" },
   { coins: 25, color: "#06b6d4", weight: 10 },
   { coins: 30, color: "#84cc16", weight: 7 },
   { coins: 35, color: "#a855f7", weight: 5 },
@@ -180,6 +185,11 @@ export const SUPER_WHEEL: { coins: number; color: string; weight: number }[] = [
   { coins: 45, color: "#14b8a6", weight: 2 },
   { coins: 50, color: "#eab308", weight: 1.5 },
 ];
+
+/** Super priz qutisidan coin o'rniga personaj buyumi chiqish ehtimoli */
+export const BOX_GIFT_CHANCE = 0.3;
+/** Sovg'a buyumi qolmagan bo'lsa (hammasi bor) — o'rniga shuncha coin */
+export const GIFT_FALLBACK_COINS = 30;
 
 export function openBox(rng: number = Math.random()): number {
   return BOX_PRIZES[weighted(BOX_PRIZES.map((b) => b.weight), rng)].coins;

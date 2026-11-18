@@ -705,3 +705,119 @@ h1,
 @media (prefers-reduced-motion: reduce) {
   .amb-fall, .amb-rise, .amb-bulb, .level-line-glint, .level-float { animation: none; display: none; }
 }
+
+/* ---- O'quvchi personaji (components/character/character-svg.tsx) ----
+   SVG ichidagi har guruh o'z markazi atrofida aylanadi/suriladi (transform-box: fill-box). */
+.chr [class*="chr-"] { transform-box: fill-box; }
+.chr-anim .chr-body { transform-origin: 50% 100%; animation: chr-breathe 2.6s ease-in-out infinite; }
+.chr-anim .chr-blink { transform-origin: 50% 50%; animation: chr-blink 4.2s infinite; }
+.chr-anim .chr-cape { transform-origin: 50% 0%; animation: chr-cape 1.8s ease-in-out infinite; }
+.chr-anim .chr-wings > path:first-child { transform-origin: 100% 50%; animation: chr-wing-l 1.4s ease-in-out infinite; }
+.chr-anim .chr-wings > path:last-child { transform-origin: 0% 50%; animation: chr-wing-r 1.4s ease-in-out infinite; }
+.chr-anim .chr-flame { transform-origin: 50% 0%; animation: chr-flame 0.18s ease-in-out infinite alternate; }
+.chr-anim .chr-pet { animation: chr-hop 1.3s ease-in-out infinite; }
+.chr-anim .chr-prop { transform-origin: 50% 50%; animation: chr-prop 0.12s linear infinite; }
+.chr-anim .chr-twinkle { animation: chr-twinkle 1.6s ease-in-out infinite; }
+.chr-anim .chr-spin { transform-origin: 50% 50%; animation: chr-spin 14s linear infinite; }
+.chr-anim .chr-orbit { transform-origin: 50% 50%; animation: chr-spin 6s linear infinite; }
+.chr-anim .chr-pulse { transform-origin: 50% 50%; animation: chr-pulse 2.4s ease-in-out infinite; }
+.chr-anim .chr-halo { transform-origin: 50% 50%; animation: chr-halo 2s ease-in-out infinite; }
+.chr-anim .chr-scan { animation: chr-scan 1.4s ease-in-out infinite; }
+.chr-anim .chr-arm-l { transform-origin: 50% 8%; }
+.chr-anim .chr-arm-r { transform-origin: 50% 8%; }
+.chr-anim .chr-leg-l, .chr-anim .chr-leg-r { transform-origin: 50% 0%; }
+/* Kayfiyatlar */
+.chr-run .chr-body { animation: chr-run-bob 0.32s ease-in-out infinite !important; }
+.chr-run .chr-leg-l { animation: chr-leg 0.32s ease-in-out infinite; }
+.chr-run .chr-leg-r { animation: chr-leg 0.32s ease-in-out infinite reverse; }
+.chr-run .chr-arm-l { animation: chr-arm 0.32s ease-in-out infinite; }
+.chr-run .chr-arm-r { animation: chr-arm 0.32s ease-in-out infinite reverse; }
+.chr-jump .chr-body { animation: chr-jump 0.9s cubic-bezier(0.3, 0, 0.3, 1) infinite !important; }
+.chr-cheer .chr-body { animation: chr-jump 0.7s cubic-bezier(0.3, 0, 0.3, 1) infinite !important; }
+.chr-cheer .chr-arm-l { animation: chr-cheer-l 0.7s ease-in-out infinite; }
+.chr-cheer .chr-arm-r { animation: chr-cheer-r 0.7s ease-in-out infinite; }
+.chr-sad .chr-body { animation: chr-sad 3s ease-in-out infinite !important; filter: saturate(0.6); }
+.chr-work .chr-arm-r { animation: chr-work 0.6s ease-in-out infinite; }
+.chr-fly .chr-body { animation: chr-fly 1.2s ease-in-out infinite !important; }
+.chr-head-sad { transform: translateY(2px) rotate(-6deg); transform-origin: 50% 100%; }
+
+@keyframes chr-breathe { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-1.5px) scaleY(1.015); } }
+@keyframes chr-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes chr-cape { 0%, 100% { transform: skewX(0deg) scaleX(1); } 50% { transform: skewX(-6deg) scaleX(1.04); } }
+@keyframes chr-wing-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+@keyframes chr-wing-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(14deg); } }
+@keyframes chr-flame { from { transform: scaleY(0.75); opacity: 0.8; } to { transform: scaleY(1.2); opacity: 1; } }
+@keyframes chr-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-5px); } }
+@keyframes chr-prop { 0% { transform: scaleX(1); } 50% { transform: scaleX(0.2); } 100% { transform: scaleX(1); } }
+@keyframes chr-twinkle { 0%, 100% { opacity: 0.25; transform: scale(0.6) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+@keyframes chr-spin { to { transform: rotate(360deg); } }
+@keyframes chr-pulse { 0%, 100% { opacity: 0.7; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes chr-halo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes chr-scan { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes chr-run-bob { 0%, 100% { transform: translateY(0) rotate(4deg); } 50% { transform: translateY(-4px) rotate(4deg); } }
+@keyframes chr-leg { 0%, 100% { transform: rotate(-28deg); } 50% { transform: rotate(28deg); } }
+@keyframes chr-arm { 0%, 100% { transform: rotate(30deg); } 50% { transform: rotate(-30deg); } }
+@keyframes chr-jump { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.06, 0.92); } 45% { transform: translateY(-14px) scale(0.97, 1.04); } 75% { transform: translateY(0) scale(1.04, 0.95); } }
+@keyframes chr-cheer-l { 0%, 100% { transform: rotate(150deg); } 50% { transform: rotate(120deg); } }
+@keyframes chr-cheer-r { 0%, 100% { transform: rotate(-150deg); } 50% { transform: rotate(-120deg); } }
+@keyframes chr-sad { 0%, 100% { transform: translateY(1px); } 50% { transform: translateY(2px); } }
+@keyframes chr-work { 0%, 100% { transform: rotate(-60deg); } 50% { transform: rotate(20deg); } }
+@keyframes chr-fly { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-6px) rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .chr-anim *, .chr-anim .chr-body { animation: none !important; }
+}
+
+/* ---- Sarguzasht maydonlari (adventure-boards.tsx) ---- */
+@keyframes adv-road { to { background-position: -96px 0; } }
+.adv-road { animation: adv-road 0.6s linear infinite; }
+.adv-road-slow { animation: adv-road 2.4s linear infinite; }
+@keyframes adv-scroll-x { to { transform: translateX(-50%); } }
+.adv-scroll-x { animation: adv-scroll-x 40s linear infinite; }
+.adv-scroll-x-fast { animation: adv-scroll-x 14s linear infinite; }
+@keyframes adv-scroll-y { to { background-position: 0 600px; } }
+.adv-stars { animation: adv-scroll-y 30s linear infinite; }
+.adv-stars-fast { animation: adv-scroll-y 9s linear infinite; }
+@keyframes adv-flag { 0%, 100% { transform: skewY(0deg) scaleX(1); } 50% { transform: skewY(-8deg) scaleX(0.92); } }
+.adv-flag { transform-origin: 0 50%; animation: adv-flag 0.8s ease-in-out infinite; }
+@keyframes adv-flame { from { transform: scaleY(0.8) scaleX(0.9); opacity: 0.85; } to { transform: scaleY(1.25) scaleX(1.05); opacity: 1; } }
+.adv-flame { transform-origin: 50% 0; animation: adv-flame 0.12s ease-in-out infinite alternate; }
+@keyframes adv-dust { 0% { opacity: 0.7; transform: translate(0, 0) scale(0.6); } 100% { opacity: 0; transform: translate(-28px, -10px) scale(1.6); } }
+.adv-dust { animation: adv-dust 0.7s ease-out infinite; }
+@keyframes adv-wave { to { transform: translateX(-50%); } }
+.adv-wave { animation: adv-wave 6s linear infinite; }
+.adv-wave-slow { animation: adv-wave 11s linear infinite; }
+@keyframes adv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.adv-bob { animation: adv-bob 2.4s ease-in-out infinite; }
+@keyframes adv-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+.adv-sway { transform-origin: 50% 100%; animation: adv-sway 3s ease-in-out infinite; }
+@keyframes adv-wobble { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+.adv-wobble { animation: adv-wobble 0.3s ease-in-out infinite; }
+@keyframes adv-cell { 0% { transform: scale(0.2) rotate(-20deg); filter: brightness(2); } 60% { transform: scale(1.18) rotate(4deg); } 100% { transform: none; filter: none; } }
+.adv-cell { animation: adv-cell 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes adv-sparkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+.adv-sparkle { animation: adv-sparkle 1.8s ease-in-out infinite; }
+@keyframes adv-coin { 0% { opacity: 0; transform: translateY(10px) scale(0.5); } 30% { opacity: 1; transform: translateY(-24px) scale(1.1); } 100% { opacity: 0; transform: translateY(-60px) scale(0.9); } }
+.adv-coin { animation: adv-coin 1.4s ease-out infinite; }
+@keyframes adv-splash { 0% { opacity: 1; transform: scale(0.3) translateY(0); } 100% { opacity: 0; transform: scale(1.6) translateY(-20px); } }
+.adv-splash { animation: adv-splash 0.9s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .adv-road, .adv-road-slow, .adv-scroll-x, .adv-scroll-x-fast, .adv-stars, .adv-stars-fast, .adv-flag, .adv-flame, .adv-dust, .adv-wave,
+  .adv-wave-slow, .adv-bob, .adv-sway, .adv-wobble, .adv-cell, .adv-sparkle, .adv-coin, .adv-splash { animation: none; }
+}
+
+/* ---- Shohsupa sahnasi (live-podium.tsx) ---- */
+@keyframes podium-beam { 0%, 100% { transform: rotate(-18deg); } 50% { transform: rotate(18deg); } }
+.podium-beam { transform-origin: 50% 0; filter: blur(6px); animation: podium-beam 8s ease-in-out infinite; }
+.podium-beam-fast { animation-duration: 2.2s !important; }
+@keyframes podium-mystery { 0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; } 50% { transform: translateY(-6px) scale(1.02); opacity: 0.9; } }
+.podium-mystery { animation: podium-mystery 2.4s ease-in-out infinite; }
+@keyframes podium-shake { 0%, 100% { transform: translateX(0) rotate(0); } 25% { transform: translateX(-4px) rotate(-2deg); } 75% { transform: translateX(4px) rotate(2deg); } }
+.podium-shake { animation: podium-shake 0.12s linear infinite; }
+@keyframes podium-burst { 0% { opacity: 1; transform: scale(0.3); } 100% { opacity: 0.55; transform: scale(1); } }
+.podium-burst { animation: podium-burst 0.7s ease-out forwards; }
+@keyframes podium-crown { 0% { opacity: 0; transform: translateY(-40px) rotate(-20deg) scale(0.4); } 60% { opacity: 1; transform: translateY(4px) rotate(6deg) scale(1.15); } 100% { opacity: 1; transform: none; } }
+@keyframes podium-crown-idle { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-6px) rotate(6deg); } }
+.podium-crown { animation: podium-crown 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards, podium-crown-idle 3s ease-in-out 1.4s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .podium-beam, .podium-mystery, .podium-shake, .podium-burst, .podium-crown { animation: none; }
+}

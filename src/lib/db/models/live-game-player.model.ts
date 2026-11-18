@@ -57,6 +57,8 @@ export interface ILiveGamePlayerData {
   galaxy?: ILiveGalaxyPlayer | null;
   /** "Yashil zona": joriy raunddagi holati */
   zone?: ILiveZonePlayer | null;
+  /** O'quvchi personaji (qo'shilgan paytdagi ko'rinishi va darajasi) */
+  look?: Record<string, unknown> | null;
   createdAt?: Date | string;
 }
 
@@ -101,6 +103,8 @@ export interface ILivePrize {
   /** Ochilgach: coin miqdori va super barabanda tushgan segment */
   coins: number;
   segment: number;
+  /** Personaj sovg'asi: buyum ("slot:id") yoki "power:N"; null — coin */
+  gift?: string | null;
   openedAt?: Date | string | null;
 }
 
@@ -171,6 +175,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     gameId: { type: Schema.Types.ObjectId, ref: "LiveGame", required: true },
     studentId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     name: { type: String, required: true },
+    look: { type: Schema.Types.Mixed, default: null },
     team: { type: Number, default: 0 },
     score: { type: Number, default: 0 },
     streak: { type: Number, default: 0 },
@@ -206,6 +211,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
             kind: { type: String, enum: ["box", "superWheel"] },
             coins: { type: Number, default: 0 },
             segment: { type: Number, default: -1 },
+            gift: { type: String, default: null },
             openedAt: { type: Date, default: null },
           },
           { _id: false }

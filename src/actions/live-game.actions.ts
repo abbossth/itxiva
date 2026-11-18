@@ -37,6 +37,8 @@ import {
   minigameDue,
   minigamePoints,
   openBox,
+  BOX_GIFT_CHANCE,
+  GIFT_FALLBACK_COINS,
   pickMinigame,
   prizeOf,
   spinSuperWheel,
@@ -48,6 +50,8 @@ import {
   type MinigameKind,
 } from "@/lib/live-game/minigames";
 import { awardCoins } from "@/lib/gamification/award";
+import { MAX_POWER, cleanLook, gameLook, pickGiftItem, type GameLook } from "@/lib/character/catalog";
+import { giftView, grantCharacterGift, type GiftView } from "@/lib/character/grant";
 import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaveCount } from "@/lib/live-game/zone";
 import { resolveZoneWaves, zoneRealtimeEnabled, zoneSocketUrl } from "@/lib/live-game/zone-server";
 import {
@@ -977,6 +981,8 @@ export interface LivePlayerRow {
   effect: { kind: string; text: string; delta: number; items: string[] } | null;
   /** Sarguzasht rejimlari: shu savolda tanlangan taktika */
   tactic: string | null;
+  /** Personaj (eski o'yinlarda — null, standart chiziladi) */
+  look: GameLook | null;
 }
 
 export interface LiveQuestionView {
@@ -1176,6 +1182,7 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): 
       finished: Boolean(p.finished),
       effect: p.effect && p.effect.index === index ? { kind: p.effect.kind, text: p.effect.text, delta: p.effect.delta, items: p.effect.items ?? [] } : null,
       tactic: ans?.tactic ?? null,
+      look: (p.look as GameLook | null | undefined) ?? null,
     };
   });
 
@@ -1359,7 +1366,12 @@ export async function joinLiveGameAction(gameId: string): Promise<Result<{ joine
     const exists = await LiveGamePlayer.exists({ gameId: game._id, studentId: user.userId });
     if (exists) return { success: true, data: { joined: true } };
 
-    const me = await User.findById(user.userId).select("fullName").lean();
+    const me = await User.findById(user.userId).select("fullName character level").lean();
+    // Personaj: o'yin davomida shu ko'rinishda (keyin profilda o'zgartirsa — keyingi o'yinda)
+    const lvl = Math.max(1, me?.level ?? 1);
+    const ch = me?.character;
+    const rawLook = (ch?.look ?? null) as Record<string, unknown> | null;
+    const look = gameLook(cleanLook(rawLook, ch?.owned ?? [], lvl, ch?.power ?? 0, rawLook?.color), lvl);
     let team = 0;
     if (game.mode === "team") {
       const sizes = await LiveGamePlayer.aggregate<{ _id: number; n: number }>([
@@ -1374,6 +1386,7 @@ export async function joinLiveGameAction(gameId: string): Promise<Result<{ joine
         gameId: game._id,
         studentId: user.userId,
         name: me?.fullName ?? user.fullName,
+        look: { ...look },
         team,
         // Omon qolishda kech qo'shilgan bitta jon bilan kiradi
         lives: game.mode === "survival" && game.index >= 0 ? 1 : SURVIVAL_LIVES,
@@ -1534,6 +1547,8 @@ export interface LivePrizeView {
   /** Super barabanda tushgan segment; -1 — hali ochilmagan */
   segment: number;
   opened: boolean;
+  /** Personaj sovg'asi (ochilgan bo'lsa) */
+  gift: GiftView | null;
 }
 
 export interface LivePlayerState {
@@ -1550,6 +1565,8 @@ export interface LivePlayerState {
   correctAnswers: string[];
   me: {
     name: string;
+    /** O'z personaji */
+    look: GameLook | null;
     score: number;
     rank: number;
     /** Oxirgi natijadagi o'rni va undan oldingisi (animatsiya uchun) */
@@ -1750,6 +1767,7 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
         me: mine
           ? {
               name: mine.name,
+              look: (mine.look as GameLook | null | undefined) ?? null,
               score: shownScore(mine),
               rank: rows.findIndex((r) => r.id === mine._id.toString()) + 1,
               lastRank: mine.rank ?? 0,
@@ -1778,6 +1796,7 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
                 coins: p.openedAt ? p.coins : 0,
                 segment: p.openedAt ? p.segment : -1,
                 opened: Boolean(p.openedAt),
+                gift: p.openedAt ? giftView(p.gift) : null,
               })),
             }
           : null,
@@ -1987,7 +2006,7 @@ export async function watchArenaAction(gameId: string): Promise<Result<PvpWorld 
 export async function openLivePrizeAction(
   gameId: string,
   round: number
-): Promise<Result<{ kind: LivePrizeKind; coins: number; segment: number }>> {
+): Promise<Result<{ kind: LivePrizeKind; coins: number; segment: number; gift: GiftView | null }>> {
   try {
     const user = await requireStudent();
     await connectDB();
@@ -1999,11 +2018,32 @@ export async function openLivePrizeAction(
     if (!player || !prize) return fail("Sovg'a topilmadi");
 
     if (!prize.openedAt) {
-      const segment = prize.kind === "superWheel" ? spinSuperWheel() : -1;
-      const coins = prize.kind === "superWheel" ? SUPER_WHEEL[segment].coins : openBox();
+      // Coin yoki personaj sovg'asi (buyum / kuch +1) — natija shu yerda bir marta tanlanadi
+      const u = await User.findById(user.userId).select("character").lean();
+      const owned = u?.character?.owned ?? [];
+      const power = u?.character?.power ?? 0;
+      let segment = -1;
+      let coins = 0;
+      let gift: string | null = null;
+      const giveItem = () => {
+        const it = pickGiftItem(owned);
+        if (it) gift = `${it.slot}:${it.id}`;
+        else coins = GIFT_FALLBACK_COINS;
+      };
+      if (prize.kind === "superWheel") {
+        segment = spinSuperWheel();
+        const seg = SUPER_WHEEL[segment];
+        coins = seg.coins;
+        if (seg.gift === "item") giveItem();
+        else if (seg.gift === "power") {
+          if (power < MAX_POWER) gift = `power:${power + 1}`;
+          else coins = GIFT_FALLBACK_COINS;
+        }
+      } else if (Math.random() < BOX_GIFT_CHANCE) giveItem();
+      else coins = openBox();
       await LiveGamePlayer.updateOne(
         { _id: player._id, prizes: { $elemMatch: { round, openedAt: null } } },
-        { $set: { "prizes.$.coins": coins, "prizes.$.segment": segment, "prizes.$.openedAt": new Date() } }
+        { $set: { "prizes.$.coins": coins, "prizes.$.segment": segment, "prizes.$.gift": gift, "prizes.$.openedAt": new Date() } }
       );
     }
     // Parallel so'rovda boshqasi oldinroq ochgan bo'lishi mumkin — saqlangan natija olinadi
@@ -2011,17 +2051,20 @@ export async function openLivePrizeAction(
     if (!saved?.openedAt) return fail("Sovg'ani ochib bo'lmadi");
 
     const reason = saved.kind === "box" ? "Jonli o'yinda Super priz qutisi" : "Jonli o'yinda Super baraban";
-    await awardCoins({
-      studentId: user.userId,
-      coin: saved.coins,
-      type: "bonus",
-      description: `${reason}: +${saved.coins} coin`,
-      referenceId: game._id,
-      idempotencyKey: `live-prize:${game._id}:${user.userId}:${round}`,
-      notifyReason: reason,
-    });
+    if (saved.gift) await grantCharacterGift(user.userId, saved.gift);
+    if (saved.coins > 0) {
+      await awardCoins({
+        studentId: user.userId,
+        coin: saved.coins,
+        type: "bonus",
+        description: `${reason}: +${saved.coins} coin`,
+        referenceId: game._id,
+        idempotencyKey: `live-prize:${game._id}:${user.userId}:${round}`,
+        notifyReason: reason,
+      });
+    }
     invalidateLiveSnapshot(game._id.toString());
-    return { success: true, data: { kind: saved.kind, coins: saved.coins, segment: saved.segment } };
+    return { success: true, data: { kind: saved.kind, coins: saved.coins, segment: saved.segment, gift: giftView(saved.gift) } };
   } catch (err) {
     return errorOf(err, "Sovg'ani ochib bo'lmadi");
   }

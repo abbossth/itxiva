@@ -15,6 +15,7 @@ import { User } from "@/lib/db/models/user.model";
 import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
+import { WhatsNewModal } from "@/components/news/whats-new-modal";
 import { RewardCelebration } from "@/components/gamification/reward-celebration";
 import { LiveGameNotice } from "@/components/live/live-game-notice";
 import { PenaltyNotice } from "@/components/gamification/penalty-notice";
@@ -106,6 +107,9 @@ export default async function DashboardLayout({
 
       {/* Mentor e'lonlari: kirishda modal oynada (daraja va mukofot oynalari bilan navbat bilan) */}
       {session.role === "student" && <AnnouncementModal waitForLevelUp={Boolean(levelState?.levelUp)} effects={effectsOn} />}
+
+      {/* Platforma yangiliklari: yangi imkoniyat chiqqanda bir marta slaydlar bilan tushuntiriladi (lib/whats-new.ts) */}
+      {session.role === "student" && <WhatsNewModal waitForLevelUp={Boolean(levelState?.levelUp)} />}
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
       <CommandPaletteTrigger role={session.role} gamification={gamification} />

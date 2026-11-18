@@ -1,5 +1,6 @@
 "use client";
 
+import { CharacterSvg } from "@/components/character/character-svg";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
@@ -665,17 +666,19 @@ function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy:
         {state.players.length === 0 ? (
           <p className="self-center text-sm text-slate-400">Hali hech kim qo&apos;shilmadi…</p>
         ) : (
-          state.players.map((p) => (
-            <span
-              key={p.id}
-              className={cn(
-                "quiz-pop inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-base font-black shadow-lg",
-                state.mode === "team" ? `ring-1 ${TEAM_STYLES[p.team]?.soft}` : "bg-white text-slate-900"
-              )}
-            >
-              {state.mode === "team" && <span className={cn("h-2.5 w-2.5 rounded-full", TEAM_STYLES[p.team]?.dot)} />}
-              {p.name}
-            </span>
+          state.players.map((p, i) => (
+            <div key={p.id} className="live-drop flex w-[5.5rem] flex-col items-center sm:w-28" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+              <CharacterSvg look={p.look} size={state.players.length > 24 ? 62 : 80} mood={i % 3 === 0 ? "jump" : "idle"} still={state.players.length > 40} />
+              <span
+                className={cn(
+                  "-mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-xl px-2 py-0.5 text-xs font-black shadow-lg sm:text-sm",
+                  state.mode === "team" ? `ring-1 ${TEAM_STYLES[p.team]?.soft}` : "bg-white text-slate-900"
+                )}
+              >
+                {state.mode === "team" && <span className={cn("h-2 w-2 shrink-0 rounded-full", TEAM_STYLES[p.team]?.dot)} />}
+                <span className="truncate">{p.name.split(" ")[0]}</span>
+              </span>
+            </div>
           ))
         )}
       </div>
@@ -715,28 +718,29 @@ function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy:
 
 function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostState; remaining: number; busy: boolean; onReveal: () => void }) {
   const q = state.question!;
+  // Savol va variantlar ekranning asosiy qismini egallaydi, personajlar qatori — pastda
   return (
-    <div className="space-y-5">
+    <div className="flex min-h-[60vh] flex-1 flex-col gap-4 sm:gap-5">
       {state.bonus && (
         <p className="live-banner mx-auto w-fit rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-300 px-6 py-2 text-xl font-black text-slate-950">⚡ BONUS RAUND — ochko ×2</p>
       )}
-      <div className="flex items-start gap-4">
-        <div className="quiz-pop min-w-0 flex-1 rounded-3xl bg-white px-5 py-6 text-center text-slate-900 shadow-xl sm:px-8 sm:py-10">
-          <p className="whitespace-pre-wrap text-2xl font-black leading-snug sm:text-4xl">{q.prompt}</p>
+      <div className="flex items-stretch gap-4">
+        <div className="quiz-pop flex min-h-[22vh] min-w-0 flex-1 flex-col items-center justify-center rounded-3xl bg-white px-5 py-8 text-center text-slate-900 shadow-xl sm:px-10 sm:py-12">
+          <p className="whitespace-pre-wrap text-3xl font-black leading-snug sm:text-5xl lg:text-6xl">{q.prompt}</p>
           {q.type === "multiple_choice" && <p className="mt-2 text-sm font-semibold text-slate-500">Bir nechta to&apos;g&apos;ri javob</p>}
           {q.type === "short_answer" && <p className="mt-2 text-sm font-semibold text-slate-500">Javobni telefonda yozing</p>}
         </div>
         <TimerBadge ms={remaining} limit={q.timeLimit} big />
       </div>
       {q.options.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid flex-1 auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4">
           {q.options.map((opt, i) => (
             <div
               key={opt}
-              className={cn("quiz-tile flex min-h-[80px] items-center gap-4 rounded-2xl border-b-4 px-5 text-xl font-black shadow-md sm:text-2xl", TILE_COLORS[i % TILE_COLORS.length])}
+              className={cn("quiz-tile flex min-h-[96px] items-center gap-5 rounded-3xl border-b-[6px] px-6 text-2xl font-black shadow-lg sm:text-4xl", TILE_COLORS[i % TILE_COLORS.length])}
               style={{ animationDelay: `${i * 70}ms` }}
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono">{LETTERS[i]}</span>
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/20 font-mono sm:h-16 sm:w-16">{LETTERS[i]}</span>
               <span className="min-w-0 break-words">{opt}</span>
             </div>
           ))}
@@ -752,6 +756,32 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
           <SkipForward className="h-4 w-4" /> Natijani ko&apos;rsatish
         </Button>
       </div>
+      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} />
+    </div>
+  );
+}
+
+/** Savol paytida: hamma o'quvchilarning personajlari — javob berganlar sakraydi (✓), qolganlar o'ylaydi */
+function AnswerCrowd({ players }: { players: LiveHostState["players"] }) {
+  if (players.length === 0) return null;
+  const size = players.length > 28 ? 34 : players.length > 16 ? 42 : 50;
+  const ordered = [...players].sort((a, b) => Number(b.answered) - Number(a.answered));
+  return (
+    <div className="mt-auto flex shrink-0 flex-wrap items-end justify-center gap-x-1 gap-y-1 rounded-3xl bg-black/20 px-3 pb-1.5 pt-3 ring-1 ring-white/5">
+      {ordered.map((p) => (
+        <div key={p.id} className="relative flex flex-col items-center" title={p.name}>
+          <span
+            className={cn(
+              "absolute -top-3 z-10 rounded-full px-1.5 text-[11px] font-black shadow",
+              p.answered ? "live-pop bg-emerald-500 text-white" : "animate-pulse bg-white/15 text-white/70"
+            )}
+          >
+            {p.answered ? "✓" : "…"}
+          </span>
+          <CharacterSvg look={p.look} size={size} mood={p.answered ? "jump" : "idle"} pedestal={false} still={players.length > 36} />
+          <span className="max-w-[4.5rem] truncate text-[10px] font-bold text-white/70">{p.name.split(" ")[0]}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -902,27 +932,52 @@ function RevealView({
 }
 
 function ModePanel({ state }: { state: LiveHostState }) {
-  if (state.mode === "team") {
-    const top = Math.max(1, ...state.standings.map((s) => s.average));
-    return (
-      <div className="space-y-2">
-        {state.standings.map((s, i) => (
-          <div key={s.team} className="flex items-center gap-3">
-            <span className="w-28 shrink-0 truncate text-sm font-black">
+  if (state.mode === "team") return <TeamRace state={state} />;
+  return <ModeRows state={state} />;
+}
+
+/** Jamoalar poygasi: har jamoa o'z yo'lakchasida, a'zolarining personajlari birga yuguradi */
+function TeamRace({ state }: { state: LiveHostState }) {
+  const top = Math.max(1, ...state.standings.map((s) => s.average));
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setGo(true), 150);
+    const s = setTimeout(() => setGo(false), 1900);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(s);
+    };
+  }, [state.index]);
+  return (
+    <div className="space-y-3 rounded-3xl bg-[#0f172a]/70 p-3 ring-1 ring-white/10">
+      {state.standings.map((s, i) => {
+        const members = state.players.filter((p) => p.team === s.team).slice(0, 6);
+        const pct = Math.max(6, (s.average / top) * 88);
+        return (
+          <div key={s.team} className="relative h-20 overflow-hidden rounded-2xl bg-[#1f2937]">
+            <div className={cn("absolute inset-y-0 left-0 opacity-25 transition-[width] duration-[1600ms] ease-out", TEAM_STYLES[s.team]?.bar)} style={{ width: `${pct}%` }} />
+            <div className={cn("absolute inset-x-0 top-1/2 h-[3px] bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.3)_0_40px,transparent_40px_80px)]", go && "adv-road")} />
+            <div className="absolute right-3 top-0 h-full w-3 bg-[repeating-conic-gradient(#fff_0_25%,#111_0_50%)] bg-[length:12px_12px] opacity-70" />
+            <span className="absolute left-3 top-2 z-10 text-sm font-black">
               {i === 0 && "👑 "}
-              {s.name}
+              {s.name} <span className="font-mono text-white/70">· {formatNumberUz(s.average)}</span>
             </span>
-            <div className="h-9 flex-1 overflow-hidden rounded-xl bg-white/10">
-              <div className={cn("flex h-full items-center justify-end rounded-xl px-3 font-mono text-sm font-black transition-[width] duration-700", TEAM_STYLES[s.team]?.bar)} style={{ width: `${Math.max(8, (s.average / top) * 100)}%` }}>
-                {formatNumberUz(s.average)}
-              </div>
+            <div className="absolute bottom-0 flex items-end transition-[left] duration-[1600ms] ease-out" style={{ left: `calc(${pct}% - ${members.length * 22 + 20}px)` }}>
+              {members.map((p, k) => (
+                <span key={p.id} className="-ml-3 first:ml-0" style={{ zIndex: 10 - k }}>
+                  <CharacterSvg look={p.look} size={40} mood={go ? "run" : i === 0 ? "cheer" : "idle"} pedestal={false} />
+                </span>
+              ))}
             </div>
-            <span className="w-10 text-right text-xs text-slate-400">{s.members} ta</span>
+            <span className="absolute bottom-1 right-6 text-[11px] text-white/50">{s.members} ta</span>
           </div>
-        ))}
-      </div>
-    );
-  }
+        );
+      })}
+    </div>
+  );
+}
+
+function ModeRows({ state }: { state: LiveHostState }) {
   const rows = state.players.slice(0, 5);
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
@@ -930,6 +985,7 @@ function ModePanel({ state }: { state: LiveHostState }) {
         {rows.map((p, i) => (
           <li key={p.id} className={cn("flex items-center gap-3 rounded-2xl px-4 py-2.5", p.eliminated ? "bg-white/[0.03] text-white/40" : "bg-white/10")}>
             <span className="w-6 font-mono font-black text-slate-400">{i + 1}</span>
+            <CharacterSvg look={p.look} size={34} headOnly still />
             <span className="min-w-0 flex-1 truncate text-base font-black">{p.name}</span>
             {state.mode === "survival" && <Lives lives={p.lives} max={SURVIVAL_LIVES} />}
             {p.lastPoints > 0 && <span className="font-mono text-xs font-black text-emerald-300">+{p.lastPoints}</span>}

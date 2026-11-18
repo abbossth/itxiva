@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, BookOpen, ClipboardCheck, HelpCircle, Link2, Paperclip, Settings, User, type LucideIcon } from "lucide-react";
+import { Smile, BarChart3, BookOpen, ClipboardCheck, HelpCircle, Link2, Paperclip, Settings, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * Yashirin tablar ham sahifada qoladi — yozilgan javob yoki forma tab almashganda yo'qolmaydi.
  */
 
-export type LessonTabIcon = "lesson" | "materials" | "homework" | "quiz" | "results" | "groups" | "profile" | "settings";
+export type LessonTabIcon = "lesson" | "materials" | "homework" | "quiz" | "results" | "groups" | "profile" | "settings" | "character";
 
 const ICONS: Record<LessonTabIcon, LucideIcon> = {
   lesson: BookOpen,
@@ -23,6 +23,7 @@ const ICONS: Record<LessonTabIcon, LucideIcon> = {
   groups: Link2,
   profile: User,
   settings: Settings,
+  character: Smile,
 };
 
 export interface LessonTabDef {

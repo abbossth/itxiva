@@ -128,7 +128,47 @@ export function playFireworksSound(delays: number[] = [0], volume = 1): void {
     .catch(() => clearTimeout(timer));
 }
 
-function tone(audio: AudioContext, type: OscillatorType, frequency: number, startAt: number, duration: number, peak: number): void {
+// ---- Umumiy "zal": kompressor (baland ovozlar qulog'ni og'ritmasin) va yengil aks-sado (reverb) ----
+// Notalar to'g'ridan-to'g'ri va aks-sado orqali chiqadi — ovoz "quruq" emas, to'liqroq va jonliroq eshitiladi.
+let bus: { ctx: AudioContext; master: AudioNode; reverb: AudioNode } | null = null;
+
+function fxBus(audio: AudioContext) {
+  if (bus && bus.ctx === audio) return bus;
+  const comp = audio.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.knee.value = 12;
+  comp.ratio.value = 4;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.2;
+  comp.connect(audio.destination);
+  // Aks-sado: so'nib boruvchi shovqindan sun'iy "zal" javobi (1,8 s)
+  const len = Math.floor(audio.sampleRate * 1.8);
+  const ir = audio.createBuffer(2, len, audio.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  const conv = audio.createConvolver();
+  conv.buffer = ir;
+  const wet = audio.createGain();
+  wet.gain.value = 0.32;
+  conv.connect(wet).connect(comp);
+  bus = { ctx: audio, master: comp, reverb: conv };
+  return bus;
+}
+
+/** Ovoz manbasini zalga ulash: quruq + aks-sado ulushi */
+function out(audio: AudioContext, node: AudioNode, wet = 0.22) {
+  const b = fxBus(audio);
+  node.connect(b.master);
+  if (wet > 0) {
+    const send = audio.createGain();
+    send.gain.value = wet;
+    node.connect(send).connect(b.reverb);
+  }
+}
+
+function tone(audio: AudioContext, type: OscillatorType, frequency: number, startAt: number, duration: number, peak: number, wet = 0.2): void {
   const osc = audio.createOscillator();
   const gain = audio.createGain();
   osc.type = type;
@@ -136,7 +176,8 @@ function tone(audio: AudioContext, type: OscillatorType, frequency: number, star
   gain.gain.setValueAtTime(0.0001, startAt);
   gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
-  osc.connect(gain).connect(audio.destination);
+  osc.connect(gain);
+  out(audio, gain, wet);
   osc.start(startAt);
   osc.stop(startAt + duration + 0.05);
 }
@@ -246,7 +287,8 @@ export function playDrumroll(seconds = 1.6): void {
     const level = 0.08 + 0.22 * (i / hits);
     gain.gain.setValueAtTime(level, t);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    src.connect(filter).connect(gain).connect(audio.destination);
+    src.connect(filter).connect(gain);
+    out(audio, gain, 0.3);
     src.start(t);
     src.stop(t + 0.06);
   }
@@ -258,7 +300,8 @@ export function playDrumroll(seconds = 1.6): void {
   osc.frequency.exponentialRampToValueAtTime(45, end + 0.35);
   g.gain.setValueAtTime(0.6, end);
   g.gain.exponentialRampToValueAtTime(0.0001, end + 0.45);
-  osc.connect(g).connect(audio.destination);
+  osc.connect(g);
+  out(audio, g, 0.35);
   osc.start(end);
   osc.stop(end + 0.5);
 }
@@ -545,4 +588,184 @@ export function playHeartbeat(): void {
     osc.start(t + at);
     osc.stop(t + at + 0.2);
   }
+}
+
+
+// ---- Shohsupa va tantana: boy ovozlar (timpani, mis cholg'u, tarelka, olqish) ----
+
+/** Timpani zarbasi: past nota, tez pasayadi, uzoq so'nadi */
+function timpani(audio: AudioContext, at: number, freq = 98, level = 0.7) {
+  const osc = audio.createOscillator();
+  const g = audio.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq * 1.6, at);
+  osc.frequency.exponentialRampToValueAtTime(freq, at + 0.08);
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(level, at + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 1.3);
+  osc.connect(g);
+  out(audio, g, 0.35);
+  osc.start(at);
+  osc.stop(at + 1.4);
+  // Zarb "shitirlashi"
+  const n = audio.createBufferSource();
+  n.buffer = getNoise(audio);
+  const f = audio.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.value = 900;
+  const ng = audio.createGain();
+  ng.gain.setValueAtTime(level * 0.35, at);
+  ng.gain.exponentialRampToValueAtTime(0.0001, at + 0.15);
+  n.connect(f).connect(ng);
+  out(audio, ng, 0.2);
+  n.start(at);
+  n.stop(at + 0.2);
+}
+
+/** Tarelka (cymbal): yuqori chastotali shovqin, uzoq so'nadi */
+function cymbal(audio: AudioContext, at: number, level = 0.35, len = 2.2) {
+  const n = audio.createBufferSource();
+  n.buffer = getNoise(audio);
+  n.loop = true;
+  const hp = audio.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 5200;
+  const bp = audio.createBiquadFilter();
+  bp.type = "peaking";
+  bp.frequency.value = 9000;
+  bp.gain.value = 8;
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(level, at + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+  n.connect(hp).connect(bp).connect(g);
+  out(audio, g, 0.4);
+  n.start(at);
+  n.stop(at + len + 0.1);
+}
+
+/** Mis cholg'u (brass): ikki biroz farqli sawtooth, filtri "ochiladi" — karnay ovoziga o'xshaydi */
+function brass(audio: AudioContext, freq: number, at: number, dur: number, level = 0.12) {
+  const f = audio.createBiquadFilter();
+  f.type = "lowpass";
+  f.Q.value = 2;
+  f.frequency.setValueAtTime(400, at);
+  f.frequency.exponentialRampToValueAtTime(Math.min(6000, freq * 6), at + 0.08);
+  f.frequency.exponentialRampToValueAtTime(Math.min(3000, freq * 3), at + dur);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(level, at + 0.04);
+  g.gain.setValueAtTime(level * 0.85, at + Math.max(0.05, dur - 0.12));
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.15);
+  f.connect(g);
+  out(audio, g, 0.3);
+  for (const det of [-6, 6]) {
+    const o = audio.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    o.detune.value = det;
+    o.connect(f);
+    o.start(at);
+    o.stop(at + dur + 0.2);
+  }
+}
+
+/** Qo'ng'iroqcha yaltirashi (uchqunlar) */
+function sparkle(audio: AudioContext, at: number, level = 0.08) {
+  [2093, 2637, 3136, 4186, 3520].forEach((fr, i) => tone(audio, "sine", fr, at + i * 0.045, 0.5, level, 0.5));
+}
+
+/** Olqishlar va olomon shovqini: tasodifiy qarsaklar + "uuu" shovqini (`seconds` davomida, kuchayib so'nadi) */
+export function playApplause(seconds = 3, intensity = 1): void {
+  const audio = running();
+  if (!audio) return;
+  const t0 = audio.currentTime;
+  const claps = Math.round(seconds * 38 * intensity);
+  for (let i = 0; i < claps; i++) {
+    const at = t0 + Math.random() * seconds;
+    const env = Math.sin(((at - t0) / seconds) * Math.PI);
+    const src = audio.createBufferSource();
+    src.buffer = getNoise(audio);
+    const bp = audio.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 900 + Math.random() * 1700;
+    bp.Q.value = 1.4;
+    const g = audio.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.05 + 0.12 * env * intensity, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.06);
+    src.connect(bp).connect(g);
+    out(audio, g, 0.35);
+    src.start(at, Math.random() * 0.5);
+    src.stop(at + 0.08);
+  }
+  // Olomon "uuu"
+  const crowd = audio.createBufferSource();
+  crowd.buffer = getNoise(audio);
+  crowd.loop = true;
+  const lp = audio.createBiquadFilter();
+  lp.type = "bandpass";
+  lp.frequency.value = 520;
+  lp.Q.value = 0.8;
+  const cg = audio.createGain();
+  cg.gain.setValueAtTime(0.0001, t0);
+  cg.gain.exponentialRampToValueAtTime(0.07 * intensity, t0 + seconds * 0.3);
+  cg.gain.exponentialRampToValueAtTime(0.0001, t0 + seconds);
+  crowd.connect(lp).connect(cg);
+  out(audio, cg, 0.3);
+  crowd.start(t0);
+  crowd.stop(t0 + seconds + 0.1);
+}
+
+/**
+ * Shohsupada o'rin ochildi: 3-o'rin — timpani va kichik akkord; 2-o'rin — kattaroq; 1-o'rin — tarelka, mis fanfarasi,
+ * timpani va olqishlar. Baraban sadosidan keyin chalinadi.
+ */
+export function playPodiumReveal(place: 1 | 2 | 3): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime + 0.02;
+  if (place === 3) {
+    timpani(audio, t, 110, 0.6);
+    cymbal(audio, t, 0.14, 1.2);
+    [392, 493.88, 587.33].forEach((f) => brass(audio, f, t + 0.02, 0.5, 0.06));
+    sparkle(audio, t + 0.2, 0.05);
+    playApplause(1.6, 0.5);
+    return;
+  }
+  if (place === 2) {
+    timpani(audio, t, 98, 0.7);
+    timpani(audio, t + 0.18, 130.8, 0.5);
+    cymbal(audio, t, 0.2, 1.6);
+    [440, 554.37, 659.25].forEach((f) => brass(audio, f, t + 0.02, 0.7, 0.07));
+    sparkle(audio, t + 0.25, 0.06);
+    playApplause(2.2, 0.7);
+    return;
+  }
+  // 1-o'rin: katta tantana
+  timpani(audio, t, 87.3, 0.9);
+  timpani(audio, t + 0.12, 87.3, 0.6);
+  cymbal(audio, t, 0.32, 2.6);
+  const melody: [number, number, number][] = [
+    [523.25, 0, 0.16],
+    [659.25, 0.16, 0.16],
+    [783.99, 0.32, 0.16],
+    [1046.5, 0.5, 1.2],
+  ];
+  for (const [f, at, dur] of melody) brass(audio, f, t + at, dur, 0.11);
+  for (const f of [261.63, 329.63, 392, 523.25]) brass(audio, f, t + 0.5, 1.3, 0.07);
+  timpani(audio, t + 0.5, 65.4, 0.9);
+  sparkle(audio, t + 0.55, 0.08);
+  sparkle(audio, t + 1.0, 0.06);
+  playApplause(4, 1);
+}
+
+/** Shohsupa sahnasi ochilganda: "sirli" past akkord va tovushning ko'tarilishi */
+export function playPodiumIntro(): void {
+  const audio = running();
+  if (!audio) return;
+  const t = audio.currentTime;
+  for (const f of [130.81, 155.56, 196]) brass(audio, f, t, 1.4, 0.04);
+  timpani(audio, t, 65.4, 0.5);
+  sparkle(audio, t + 0.6, 0.04);
 }

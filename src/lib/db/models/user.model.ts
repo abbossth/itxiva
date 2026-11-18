@@ -27,6 +27,10 @@ export interface IUserData {
   level?: number;
   /** Yangi daraja: o'quvchi keyingi kirishida tabrik oynasi bir marta ko'rsatiladi */
   pendingLevelUp?: number | null;
+  /** O'quvchi personaji: ko'rinishi, sotib olingan qismlar ("slot:id") va kuch darajasi */
+  character?: { look?: Record<string, unknown> | null; owned?: string[]; power?: number; updatedAt?: Date | null } | null;
+  /** Ko'rilgan "Yangilik" e'lonlari (id) */
+  seenNews?: string[];
   /** Kirish seriyasi (Asia/Tashkent kunlari bo'yicha) */
   streak?: { current: number; best: number; lastDayKey: string | null } | null;
   /** Seriya himoyasi: o'tkazib yuborilgan bir kunni avtomatik yopadi */
@@ -122,6 +126,19 @@ const UserSchema = new Schema<IUser>(
     xp: { type: Number, default: 0, min: 0 },
     level: { type: Number, default: 1, min: 1 },
     pendingLevelUp: { type: Number, default: null },
+    character: {
+      type: new Schema(
+        {
+          look: { type: Schema.Types.Mixed, default: null },
+          owned: { type: [String], default: [] },
+          power: { type: Number, default: 0, min: 0 },
+          updatedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    seenNews: { type: [String], default: [] },
     streak: {
       current: { type: Number, default: 0 },
       best: { type: Number, default: 0 },

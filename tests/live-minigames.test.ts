@@ -124,12 +124,18 @@ describe("qoidalar", () => {
       const box = mg.openBox(r);
       expect(box).toBeGreaterThanOrEqual(5);
       expect(box).toBeLessThanOrEqual(20);
-      const coins = mg.SUPER_WHEEL[mg.spinSuperWheel(r)].coins;
-      expect(coins % 5).toBe(0);
-      expect(coins).toBeGreaterThanOrEqual(5);
-      expect(coins).toBeLessThanOrEqual(50);
+      const seg = mg.SUPER_WHEEL[mg.spinSuperWheel(r)];
+      if (seg.gift) {
+        expect(seg.coins).toBe(0);
+        continue;
+      }
+      expect(seg.coins % 5).toBe(0);
+      expect(seg.coins).toBeGreaterThanOrEqual(5);
+      expect(seg.coins).toBeLessThanOrEqual(50);
     }
-    expect(mg.SUPER_WHEEL.map((w) => w.coins)).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45, 50]);
+    expect(mg.SUPER_WHEEL.filter((w) => !w.gift).map((w) => w.coins)).toEqual([5, 10, 15, 20, 25, 30, 35, 40, 45, 50]);
+    // Personaj uchun bo'laklar: buyum va kuch
+    expect(mg.SUPER_WHEEL.filter((w) => w.gift).map((w) => w.gift)).toEqual(["item", "power"]);
     expect(mg.prizeOf("super")).toBe("box");
     expect(mg.prizeOf("superWheel")).toBe("superWheel");
     expect(mg.prizeOf("p500")).toBeNull();
@@ -292,11 +298,14 @@ describe("o'yin ichida", () => {
     await live.finishLiveGameAction(id);
     as(ali);
     const st = await live.getLivePlayerStateAction(id);
-    expect(st.success && st.data.me?.prizes).toEqual([{ round: 2, kind: "box", coins: 0, segment: -1, opened: false }]);
+    expect(st.success && st.data.me?.prizes).toEqual([{ round: 2, kind: "box", coins: 0, segment: -1, opened: false, gift: null }]);
 
     const balance = async (u: { _id: import("mongoose").Types.ObjectId }) => (await User.findById(u._id).lean())?.spendableBalance ?? 0;
     const before = await balance(ali);
+    // Coin chiqadi (personaj sovg'asi ehtimoli tashqarida)
+    const noGift = vi.spyOn(Math, "random").mockReturnValue(0.9);
     const opened = await live.openLivePrizeAction(id, 2);
+    noGift.mockRestore();
     expect(opened.success).toBe(true);
     const coins = opened.success ? opened.data.coins : 0;
     expect(coins).toBeGreaterThanOrEqual(5);
@@ -310,6 +319,20 @@ describe("o'yin ichida", () => {
     as(vali);
     const wheel = await live.openLivePrizeAction(id, 2);
     expect(wheel.success && wheel.data.coins).toBe(wheel.success ? mg.SUPER_WHEEL[wheel.data.segment].coins : -1);
+
+    // Personaj sovg'asi: qutidan buyum chiqadi — personajga qo'shiladi, coin yechilmaydi/berilmaydi, takror ochilsa ham bir marta
+    as(ali);
+    await LiveGamePlayer.updateOne({ studentId: ali._id, gameId: id }, { $push: { prizes: { round: 99, kind: "box", coins: 0, segment: -1, openedAt: null } } });
+    const bal = await balance(ali);
+    const lucky = vi.spyOn(Math, "random").mockReturnValue(0.01);
+    const gift = await live.openLivePrizeAction(id, 99);
+    lucky.mockRestore();
+    expect(gift.success && gift.data.gift?.kind).toBe("item");
+    const key = gift.success ? gift.data.gift!.key : "";
+    expect((await User.findById(ali._id).lean())?.character?.owned).toContain(key);
+    expect(await balance(ali)).toBe(bal);
+    await live.openLivePrizeAction(id, 99);
+    expect((await User.findById(ali._id).lean())?.character?.owned?.filter((k) => k === key)).toHaveLength(1);
     // Boshqa o'quvchining sovg'asini ocholmaydi (o'ziniki bo'lmagan round)
     expect((await live.openLivePrizeAction(id, 5)).success).toBe(false);
   });
