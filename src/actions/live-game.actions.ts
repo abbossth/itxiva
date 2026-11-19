@@ -52,6 +52,7 @@ import {
 import { awardCoins } from "@/lib/gamification/award";
 import { MAX_POWER, cleanLook, gameLook, pickGiftItem, type GameLook } from "@/lib/character/catalog";
 import { giftView, grantCharacterGift, type GiftView } from "@/lib/character/grant";
+import { EMOTE_GAP_MS, EMOTE_MS, emoteOf, hasEmote } from "@/lib/character/emotes";
 import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaveCount } from "@/lib/live-game/zone";
 import { resolveZoneWaves, zoneRealtimeEnabled, zoneSocketUrl } from "@/lib/live-game/zone-server";
 import {
@@ -833,6 +834,9 @@ export interface LiveZoneView {
   seed: number;
   startsInMs: number;
   remainingMs: number;
+  /** Boshlanish va tugash (server soati, ms) — telefonlar xona soatiga moslab hisoblaydi */
+  startAt: number;
+  endAt: number;
   /** Hisoblangan to'lqinlar */
   resolved: number;
   ended: boolean;
@@ -865,6 +869,8 @@ function zoneView(game: Pick<ILiveGame, "zone" | "status">, players: ILiveGamePl
     seed: z.seed,
     startsInMs: Math.max(0, new Date(z.startedAt).getTime() - now),
     remainingMs: Math.max(0, new Date(z.endsAt).getTime() - now),
+    startAt: new Date(z.startedAt).getTime(),
+    endAt: new Date(z.endsAt).getTime(),
     resolved: z.resolved ?? 0,
     ended: Boolean(z.endedAt),
     rows,
@@ -978,11 +984,13 @@ export interface LivePlayerRow {
   progress: number;
   finished: boolean;
   /** Oxirgi natija ta'siri (faqat shu savolniki) */
-  effect: { kind: string; text: string; delta: number; items: string[] } | null;
+  effect: { kind: string; text: string; delta: number; items: string[]; zaps?: { to: string; m: number; blocked: boolean }[] } | null;
   /** Sarguzasht rejimlari: shu savolda tanlangan taktika */
   tactic: string | null;
   /** Personaj (eski o'yinlarda — null, standart chiziladi) */
   look: GameLook | null;
+  /** Kutish zalidagi harakat (so'nggi soniyalarda bosilgan bo'lsa) */
+  emote: { id: string; at: number } | null;
 }
 
 export interface LiveQuestionView {
@@ -1180,9 +1188,13 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): 
       coins: p.coins ?? 0,
       progress: p.progress ?? 0,
       finished: Boolean(p.finished),
-      effect: p.effect && p.effect.index === index ? { kind: p.effect.kind, text: p.effect.text, delta: p.effect.delta, items: p.effect.items ?? [] } : null,
+      effect:
+        p.effect && p.effect.index === index
+          ? { kind: p.effect.kind, text: p.effect.text, delta: p.effect.delta, items: p.effect.items ?? [], zaps: (p.effect.zaps ?? []).map((z) => ({ to: z.to, m: z.m, blocked: Boolean(z.blocked) })) }
+          : null,
       tactic: ans?.tactic ?? null,
       look: (p.look as GameLook | null | undefined) ?? null,
+      emote: p.emote && Date.now() - p.emote.at < EMOTE_MS ? { id: p.emote.id, at: p.emote.at } : null,
     };
   });
 
@@ -1627,6 +1639,8 @@ export interface LivePlayerState {
     seed: number;
     startsInMs: number;
     remainingMs: number;
+    startAt: number;
+    endAt: number;
     ended: boolean;
     joined: boolean;
     x: number;
@@ -1856,6 +1870,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
             seed: v.seed,
             startsInMs: v.startsInMs,
             remainingMs: v.remainingMs,
+            startAt: v.startAt,
+            endAt: v.endAt,
             ended: v.ended,
             mini: v.mini,
             joined: Boolean(my),
@@ -2067,5 +2083,33 @@ export async function openLivePrizeAction(
     return { success: true, data: { kind: saved.kind, coins: saved.coins, segment: saved.segment, gift: giftView(saved.gift) } };
   } catch (err) {
     return errorOf(err, "Sovg'ani ochib bo'lmadi");
+  }
+}
+
+/**
+ * Kutish zalida personaj harakati (emot): o'quvchi bosadi — proyektorda personaji shu harakatni qiladi.
+ * Faqat egalikdagi (bepul yoki sotib olingan) harakat; tez-tez bosilsa (1,2 s ichida) — e'tiborsiz.
+ */
+export async function playEmoteAction(gameId: string, emoteId: string): Promise<Result<{ played: boolean }>> {
+  try {
+    const user = await requireStudent();
+    const e = emoteOf(String(emoteId));
+    if (!e) return fail("Bunday harakat yo'q");
+    await connectDB();
+    const game = await loadGameForStudent(gameId, user.groupId);
+    if (!game || game.status !== "lobby") return { success: true, data: { played: false } };
+    if (e.price > 0) {
+      const me = await User.findById(user.userId).select("character").lean();
+      if (!hasEmote(e, me?.character?.owned ?? [])) return fail("Bu harakat hali sizda yo'q — «Personajim» bo'limida oching");
+    }
+    const now = Date.now();
+    const res = await LiveGamePlayer.updateOne(
+      { gameId: game._id, studentId: user.userId, $or: [{ emote: null }, { emote: { $exists: false } }, { "emote.at": { $lt: now - EMOTE_GAP_MS } }] },
+      { $set: { emote: { id: e.id, at: now } } }
+    );
+    if (res.modifiedCount > 0) invalidateLiveSnapshot(game._id.toString());
+    return { success: true, data: { played: res.modifiedCount > 0 } };
+  } catch (err) {
+    return errorOf(err, "Harakatni ko'rsatib bo'lmadi");
   }
 }

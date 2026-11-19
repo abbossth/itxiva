@@ -3,7 +3,7 @@
 // Ko'rilganlari `User.seenNews` da saqlanadi. Slayd rasmi `art` bo'yicha komponentda chiziladi.
 // Bu fayl brauzer va server uchun umumiy.
 
-export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emoji";
+export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emotes" | "xp-penalty" | "emoji";
 
 export interface NewsSlide {
   title: string;
@@ -26,6 +26,31 @@ export interface NewsItem {
 }
 
 export const NEWS: NewsItem[] = [
+  {
+    id: "emotes-2026-11",
+    date: "2026-11-19",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Personaj harakatlari va yangi qoidalar",
+    slides: [
+      {
+        art: "emotes",
+        title: "Personajingiz harakat qiladi!",
+        text: "Jonli o'yinning kutish zalida telefoningizda tugmani bosing — personajingiz katta ekranda salom beradi, qo'lini o'pib salomlashadi yoki sakraydi. Bu 3 ta harakat hammaga bepul.",
+      },
+      {
+        art: "character-shop",
+        title: "20 dan ortiq yangi harakat",
+        text: "Raqs, qarsak, kuch ko'rsatish, gitara, karate, sehr, salyut, chempion va boshqalar — «Personajim» → «Harakatlar» bo'limida coin evaziga oching. Personajlar ham yangilandi: endi yanada chiroyli va 3D ko'rinishi sifatliroq.",
+      },
+      {
+        art: "xp-penalty",
+        title: "Diqqat: jarimada XP ham olinadi",
+        text: "Darsni sababsiz qoldirsangiz yoki uyga vazifani muddatida topshirmasangiz — endi coin bilan birga shuncha XP ham kamayadi. Dars sababli deb belgilansa, XP qaytariladi. Darslarga qatnashing va vazifalarni vaqtida topshiring!",
+      },
+    ],
+    cta: { label: "Harakatlarni ko'rish", href: "/profile?tab=character" },
+  },
   {
     id: "character-2026-11",
     date: "2026-11-18",

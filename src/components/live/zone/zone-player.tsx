@@ -118,7 +118,8 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     keys: { up: false, down: false, left: false, right: false },
   });
   // Vaqt va manzil: sahifa ochilgan paytdagi qiymatlar (har yangilanishda sahna qayta qurilmasin)
-  const init = useRef({ startsInMs: z.startsInMs, remainingMs: z.remainingMs, ws: z.ws, playerId: z.playerId, out: z.out });
+  // Vaqt: server soatidagi boshlanish/tugash (xona soatiga moslab hisoblanadi — hamma telefonda bir xil)
+  const init = useRef({ startAt: z.startAt, endAt: z.endAt, ws: z.ws, playerId: z.playerId, out: z.out });
 
   useEffect(() => {
     const el = canvas.current;
@@ -128,10 +129,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     const s = sim.current;
     const fx = new ZoneFx();
     const t0 = performance.now();
-    const { startsInMs, remainingMs, ws, playerId } = init.current;
-    const startAt = t0 + startsInMs;
-    const endAt = t0 + remainingMs;
-    const startMs = Date.now() + startsInMs;
+    const { startAt: startMs, endAt, ws, playerId } = init.current;
     const say = (text: string, tone: Banner["tone"]) => setBanner({ text, tone, key: ++bannerKey.current });
 
     const net = new ZoneNet({
@@ -192,7 +190,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       // Kuchsiz telefonda kadrlar siyrak bo'lsa ham robot sekinlashib qolmasin
       const dt = Math.min(0.12, (now - last) / 1000);
       last = now;
-      const wallNow = startMs + (now - startAt);
+      const wallNow = net.now();
       const phase = zonePhase(startMs, wallNow, waves);
       const wave = phase.wave >= 0 ? layoutFor(phase.wave) : null;
       const since = wallNow - phase.waveStartedAt;
@@ -318,7 +316,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
 
       const robots: DrawRobot[] = [];
       for (const p of net.peers.values()) {
-        const sh = net.shown(p.id, now) ?? { x: p.x, y: p.y, moving: false };
+        const sh = net.shown(p.id) ?? { x: p.x, y: p.y, moving: false };
         const prev = prevShown.get(p.id);
         const ddx = prev ? sh.x - prev.x : 0;
         const ddy = prev ? sh.y - prev.y : 0;
@@ -360,7 +358,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       if (now - lastHud > 120) {
         lastHud = now;
         const secs = Math.max(0, Math.ceil((phase.waveEndsAt - wallNow) / 1000));
-        const countdown = Math.max(0, startAt - now);
+        const countdown = Math.max(0, startMs - wallNow);
         // Sanoq: 3-2-1 va "start"
         const cnt = Math.ceil(countdown / 1000);
         if (cnt !== lastCount) {

@@ -60,10 +60,10 @@ export async function ensurePenalty(params: {
 }
 
 /**
- * Balansdan `wanted` coin yechadi, lekin 0 dan pastga tushirmaydi (reyting hisobi `totalCoins` ham).
- * XP o'zgarmaydi. Haqiqatda yechilgan miqdor va yangi balans qaytadi.
+ * Balansdan `wanted` coin va shuncha XP yechadi, lekin 0 dan pastga tushirmaydi (reyting hisobi `totalCoins` ham).
+ * Haqiqatda yechilgan coin va XP, yangi balans qaytadi. Daraja (level) pasaymaydi — faqat XP kamayadi.
  */
-export async function deductClamped(studentId: Id, wanted: number): Promise<{ applied: number; balanceAfter: number; totalAfter: number }> {
+export async function deductClamped(studentId: Id, wanted: number): Promise<{ applied: number; xpApplied: number; balanceAfter: number; totalAfter: number }> {
   const before = await User.findOneAndUpdate(
     { _id: studentId },
     [
@@ -71,17 +71,20 @@ export async function deductClamped(studentId: Id, wanted: number): Promise<{ ap
         $set: {
           spendableBalance: { $max: [0, { $subtract: [{ $ifNull: ["$spendableBalance", 0] }, wanted] }] },
           totalCoins: { $max: [0, { $subtract: [{ $ifNull: ["$totalCoins", 0] }, wanted] }] },
+          xp: { $max: [0, { $subtract: [{ $ifNull: ["$xp", 0] }, wanted] }] },
         },
       },
     ],
     { returnDocument: "before", updatePipeline: true }
   )
-    .select("spendableBalance totalCoins")
+    .select("spendableBalance totalCoins xp")
     .lean();
   const balanceBefore = Math.max(before?.spendableBalance ?? 0, 0);
   const totalBefore = Math.max(before?.totalCoins ?? 0, 0);
+  const xpBefore = Math.max(before?.xp ?? 0, 0);
   return {
     applied: Math.min(wanted, balanceBefore),
+    xpApplied: Math.min(wanted, xpBefore),
     balanceAfter: Math.max(balanceBefore - wanted, 0),
     totalAfter: Math.max(totalBefore - wanted, 0),
   };

@@ -128,7 +128,7 @@ function Row({ row, place, mode, moved, style }: { row: LivePlayerRow; place: nu
         {top ? <Crown className="h-6 w-6" /> : place}
       </span>
       <span className={cn("-my-2 shrink-0", moved > 0 && "live-pop")} style={{ animationDelay: "1s" }}>
-        <CharacterSvg look={row.look} size={52} headOnly mood={top || moved > 0 ? "cheer" : row.lastCorrect === false ? "sad" : "idle"} />
+        <CharacterSvg look={row.look} size={52} headOnly mood={top || moved > 0 ? "happy" : row.lastCorrect === false ? "sad" : "idle"} />
       </span>
       <span className="min-w-0 flex-1 truncate text-lg font-black sm:text-2xl">{row.name}</span>
       {mode === "survival" && <Lives lives={row.lives} max={SURVIVAL_LIVES} />}

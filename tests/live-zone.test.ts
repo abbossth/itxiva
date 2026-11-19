@@ -16,7 +16,7 @@ const { LiveGamePlayer } = await import("@/lib/db/models/live-game-player.model"
 const live = await import("@/actions/live-game.actions");
 const zn = await import("@/lib/live-game/zone");
 const server = await import("@/lib/live-game/zone-server");
-const { ZoneRoom, decodeZoneMessage } = await import("@/lib/live-game/zone-room");
+const { ZoneRoom, decodeZoneMessage, decodeZoneObject } = await import("@/lib/live-game/zone-room");
 const { hmacSign } = await import("@/lib/live-game/arena-token");
 const maxStepFor = (speed: number, ms: number) => zn.maxStep(speed, ms);
 
@@ -226,6 +226,21 @@ describe("real vaqt xonasi", () => {
     expect(f?.resolved).toBe(2);
     expect(f?.peers.get("b")?.[2]).toBe(2);
     expect(room.results().players).toHaveLength(4);
+    // HTTP zaxira javobi: ro'yxat va kadr bitta obyektda
+    const relay = JSON.parse(room.relayMessage(st + span + zn.WAVE_MS + 600));
+    const r2 = new Map();
+    decodeZoneObject(relay.roster, r2);
+    expect(decodeZoneObject(relay.frame, r2)?.peers.size).toBe(4);
+  });
+
+  it("to'lqin boshidan biroz oldin kelgan harakat qabul qilinadi (telefon soati sal oldinda)", () => {
+    const st = 50_000;
+    const room = new ZoneRoom("h".repeat(24), 2, 5, false, st, st + zn.zoneDurationMs(false));
+    room.join(ticket("a", 50, 31));
+    room.input("a", { x: 52, y: 31 }, st - 600);
+    expect(room.players.get("a")?.x).toBe(50);
+    room.input("a", { x: 52, y: 31 }, st - 100);
+    expect(room.players.get("a")?.x).toBe(52);
   });
 });
 

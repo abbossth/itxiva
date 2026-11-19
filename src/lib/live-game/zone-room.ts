@@ -77,6 +77,8 @@ export interface ZoneRoomResults {
 }
 
 const SPAN = WAVE_MS + LOCK_MS;
+/** To'lqin boshidan biroz oldin kelgan harakat ham qabul qilinadi (telefon soati sal oldinda bo'lsa) */
+const EARLY_MS = 250;
 
 const num = (v: unknown, min: number, max: number, def: number) => {
   const n = Number(v);
@@ -144,8 +146,8 @@ export class ZoneRoom {
 
   /** Hozir yurish mumkin bo'lgan to'lqin (-1 — mumkin emas) */
   private movingWave(now: number): number {
-    if (now < this.startedAt) return -1;
-    const w = Math.floor((now - this.startedAt) / SPAN);
+    if (now + EARLY_MS < this.startedAt) return -1;
+    const w = Math.floor((now + EARLY_MS - this.startedAt) / SPAN);
     if (w >= this.waves || w < this.resolved) return -1;
     const within = now - (this.startedAt + w * SPAN);
     if (within <= WAVE_MS + ROOM_GRACE_MS) return w;
@@ -198,6 +200,11 @@ export class ZoneRoom {
   shownWave(now: number): number {
     if (now < this.startedAt) return -1;
     return Math.min(this.waves - 1, Math.floor((now - this.startedAt) / SPAN));
+  }
+
+  /** HTTP zaxira yo'li (WebSocket ishlamasa): ro'yxat va kadr bitta javobda */
+  relayMessage(now: number): string {
+    return `{"roster":${this.rosterMessage()},"frame":${this.frame(now)}}`;
   }
 
   rosterMessage(): string {
@@ -253,6 +260,10 @@ export function decodeZoneMessage(raw: string, roster: Map<number, ZoneClientPee
   } catch {
     return null;
   }
+  return decodeZoneObject(m, roster);
+}
+
+export function decodeZoneObject(m: { t?: string; n?: number; r?: number; p?: unknown[] } | null, roster: Map<number, ZoneClientPeer>): ZoneRoomFrame | null {
   if (!m || !Array.isArray(m.p)) return null;
   if (m.t === "r") {
     for (const row of m.p as [number, string, string, number][]) roster.set(row[0], { id: row[1], name: row[2], color: row[3] });

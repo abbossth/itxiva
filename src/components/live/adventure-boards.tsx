@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LiveHostState, LivePlayerRow } from "@/actions/live-game.actions";
 import type { GameLook } from "@/lib/character/catalog";
 import { GRID_H, GRID_W, PLANKS, ROCKET_MILESTONES } from "@/lib/live-game/adventures";
 import { CharacterSvg, type CharMood } from "@/components/character/character-svg";
 import { cn, formatNumberUz } from "@/lib/utils";
+import { playHurt, playZap } from "@/lib/sound";
+import { useViewportHeight } from "./live-ui";
 
 // Sarguzasht rejimlarining proyektordagi maydonlari: poyga yo'li, osmon, ko'prik, kon va hudud xaritasi.
 // Har o'quvchi o'z personaji bilan: natijada avvalgi joyidan yangisiga yuguradi/uchadi/sakraydi,
@@ -44,13 +46,13 @@ function useMoving(key: number, ms: number) {
 }
 
 /** Natijadan keyingi kayfiyat: oldinga — xursand, orqaga — xafa */
-const afterMood = (p: LivePlayerRow): CharMood => ((p.effect?.delta ?? 0) > 0 || p.finished ? "cheer" : (p.effect?.delta ?? 0) < 0 ? "sad" : "idle");
+const afterMood = (p: LivePlayerRow): CharMood => ((p.effect?.delta ?? 0) > 0 || p.finished ? "happy" : (p.effect?.delta ?? 0) < 0 ? "sad" : "idle");
 
-export function AdventureBoard({ state }: { state: LiveHostState }) {
+export function AdventureBoard({ state, sound = true }: { state: LiveHostState; sound?: boolean }) {
   const slotOf = (id: string) => state.slots.indexOf(id);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {state.mode === "race" && <RaceBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} />}
+      {state.mode === "race" && <RaceBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} sound={sound} />}
       {state.mode === "rocket" && <RocketBoard players={state.players} slotOf={slotOf} index={state.index} />}
       {state.mode === "bridge" && <BridgeBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} planks={state.planks ?? []} />}
       {state.mode === "gold" && <GoldBoard players={state.players} slotOf={slotOf} index={state.index} />}
@@ -93,17 +95,74 @@ function NameTag({ name, color, className }: { name: string; color: string; clas
 }
 
 // ---- Robot poyga: yugurish yo'lakchalari ----
-function RaceBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[]; goal: number; slotOf: (id: string) => number; index: number }) {
+/** To'r zarbalari ketma-ketligi: har biri shuncha davom etadi (ms) */
+const STRIKE_MS = 1900;
+const STRIKES_START_MS = 1700;
+
+type Strike = { from: string; to: string; m: number; blocked: boolean };
+
+function RaceBoard({ players, goal, slotOf, index, sound }: { players: LivePlayerRow[]; goal: number; slotOf: (id: string) => number; index: number; sound: boolean }) {
   const arrived = useArrived(index);
   const moving = useMoving(index, 1600);
-  const lanes = players.slice(0, 10);
+  // Ekran balandligiga moslash: nechta yo'lakcha sig'sa, shuncha; personaj yo'lakcha balandligiga qarab
+  // Maydon balandligi = ekran − sarlavha, yozuv va tugmalar (skrollsiz sig'adi)
+  const vh = useViewportHeight();
+  const total = Math.max(280, vh - 250);
+  const laneArea = total * 0.8 - 12;
+  const maxLanes = Math.max(4, Math.min(10, Math.floor(laneArea / 34)));
+  const lanes = players.slice(0, maxLanes);
+  const laneH = Math.max(30, Math.min(70, Math.floor(laneArea / Math.max(1, lanes.length))));
+  const charSize = Math.round(laneH * 0.92);
+  const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+  const laneOf = (id: string) => lanes.findIndex((p) => p.id === id);
+
+  // Elektr to'rlar: kim kimga tashladi (ketma-ket ko'rsatiladi)
+  // Ro'yxat har so'rovda yangi obyekt bo'lib keladi — animatsiya faqat zarbalar o'zgarganda qayta boshlanadi
+  const sig = players.flatMap((p) => (p.effect?.zaps ?? []).map((z) => `${p.id}>${z.to}:${z.m}:${z.blocked ? 1 : 0}`)).join("|");
+  const strikes: Strike[] = useMemo(
+    () =>
+      sig
+        ? sig.split("|").map((t) => {
+            const [from, rest] = t.split(">");
+            const [to, m, b] = rest.split(":");
+            return { from, to, m: Number(m), blocked: b === "1" };
+          })
+        : [],
+    [sig]
+  );
+  const [cur, setCur] = useState(-1);
+  const soundOn = useRef(sound);
+  useEffect(() => {
+    soundOn.current = sound;
+  }, [sound]);
+  useEffect(() => {
+    if (strikes.length === 0) return;
+    const timers = strikes.map((st, k) =>
+      setTimeout(() => {
+        setCur(k);
+        if (soundOn.current) (st.blocked ? playHurt : playZap)();
+      }, STRIKES_START_MS + k * STRIKE_MS)
+    );
+    timers.push(setTimeout(() => setCur(strikes.length), STRIKES_START_MS + strikes.length * STRIKE_MS));
+    return () => timers.forEach(clearTimeout);
+  }, [strikes]);
+  // Hali "tortilmagan" metrlar: zarba navbati kelguncha qurbon to'rsiz joyida turadi
+  const pendingHit = (id: string) => strikes.reduce((sum, st, k) => (st.to === id && !st.blocked && k > cur ? sum + st.m : sum), 0);
+  const pct = (v: number) => Math.min(100, (v / Math.max(1, goal)) * 100);
+  const posOf = (p: LivePlayerRow) => {
+    const after = p.progress + pendingHit(p.id);
+    const before = Math.max(0, p.progress - Math.max(0, p.effect?.delta ?? 0));
+    return arrived ? pct(after) : pct(Math.min(before, after));
+  };
+  const strike = cur >= 0 && cur < strikes.length ? strikes[cur] : null;
+
   return (
     <div
-      className="relative flex-1 overflow-hidden rounded-3xl ring-1 ring-cyan-400/20"
-      style={{ background: "linear-gradient(180deg, #0b1e3a 0%, #12304f 22%, #1b3b2a 23%, #14532d 100%)", minHeight: Math.max(300, Math.round((lanes.length * 54) / 0.77) + 16) }}
+      className="relative shrink-0 overflow-hidden rounded-3xl ring-1 ring-cyan-400/20"
+      style={{ background: "linear-gradient(180deg, #0b1e3a 0%, #12304f 18%, #1b3b2a 19%, #14532d 100%)", height: total }}
     >
       {/* Uzoqdagi shahar (sekin suriladi) */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[22%] overflow-hidden opacity-70">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[18%] overflow-hidden opacity-70">
         <div className={cn("flex h-full w-[200%] items-end", moving && "adv-scroll-x-fast")}>
           {Array.from({ length: 2 }, (_, k) => (
             <div key={k} className="flex h-full w-1/2 items-end gap-1 px-2">
@@ -117,31 +176,36 @@ function RaceBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[];
         </div>
       </div>
       {/* Marra (yo'lakchalar ustida) */}
-      <div className="pointer-events-none absolute bottom-0 right-[6%] top-[22%] z-[5] w-4 bg-[repeating-conic-gradient(#fff_0_25%,#111_0_50%)] bg-[length:16px_16px] opacity-90" />
-      <div className="pointer-events-none absolute right-[3%] top-[12%] flex items-start">
-        <div className="h-16 w-1 rounded bg-slate-300" />
+      <div className="pointer-events-none absolute bottom-0 right-[6%] top-[18%] z-[5] w-4 bg-[repeating-conic-gradient(#fff_0_25%,#111_0_50%)] bg-[length:16px_16px] opacity-90" />
+      <div className="pointer-events-none absolute right-[3%] top-[6%] flex items-start">
+        <div className="h-12 w-1 rounded bg-slate-300" />
         <div className="adv-flag h-8 w-12 bg-[repeating-conic-gradient(#fff_0_25%,#111_0_50%)] bg-[length:12px_12px]" />
       </div>
-      <div className="absolute inset-x-0 bottom-0 top-[23%] flex flex-col justify-around gap-1 px-2 py-2">
+
+      {/* To'r zarbasi e'loni: kim → kimga */}
+      {strike && <StrikeBanner key={cur} strike={strike} from={byId.get(strike.from)} to={byId.get(strike.to)} />}
+
+      <div className="absolute inset-x-0 bottom-0 top-[19%] flex flex-col justify-around px-2 py-1.5">
         {lanes.map((p, i) => {
           const color = slotColor(slotOf(p.id));
-          const before = Math.max(0, p.progress - Math.max(0, p.effect?.delta ?? 0));
-          const pct = (v: number) => Math.min(100, (v / Math.max(1, goal)) * 100);
-          const at = arrived ? pct(p.progress) : pct(before);
           const stepping = moving && (p.effect?.delta ?? 0) > 0;
           const turbo = p.effect?.items.includes("🔥");
-          const stunned = Boolean(p.effect?.text.includes("⚡")) && (p.effect?.delta ?? 0) <= 0;
+          const hitNow = strike?.to === p.id && !strike.blocked;
+          const shieldNow = strike?.to === p.id && strike.blocked;
+          const attacking = strike?.from === p.id;
+          const zappedEarlier = strikes.some((st, k) => st.to === p.id && !st.blocked && k < cur);
+          const mood: CharMood = hitNow || zappedEarlier ? "sad" : attacking ? "cheer" : stepping ? "run" : moving ? "idle" : afterMood(p);
           return (
-            <div key={p.id} className="relative flex min-h-[44px] flex-1 items-center overflow-visible rounded-xl">
+            <div key={p.id} className="relative flex flex-1 items-center overflow-visible rounded-xl" style={{ minHeight: laneH - 6 }}>
               {/* Yo'lakcha: asfalt va harakatlanuvchi chiziq */}
-              <div className="absolute inset-0 rounded-xl bg-[#1f2937] shadow-inner" />
+              <div className={cn("absolute inset-0 rounded-xl bg-[#1f2937] shadow-inner transition-colors duration-300", hitNow && "bg-[#3b2a07]")} />
               <div className={cn("absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,0.35)_0_48px,transparent_48px_96px)]", stepping && "adv-road")} />
               <span className="absolute left-2 z-10 font-mono text-xs font-black text-white/50">{i + 1}</span>
               <div
-                className="absolute bottom-0 z-10 flex items-end gap-1 transition-[left] duration-[1500ms] ease-out"
-                style={{ left: `calc(4% + ${at * 0.86}% - 22px)` }}
+                className="absolute bottom-0 z-10 flex items-end gap-1 ease-out"
+                style={{ left: `calc(4% + ${posOf(p) * 0.86}% - ${charSize / 2}px)`, transition: hitNow ? "left 800ms cubic-bezier(0.6,-0.4,0.4,1.3) 600ms" : "left 1500ms ease-out" }}
               >
-                <div className="relative">
+                <div className={cn("relative", hitNow && "live-freeze")}>
                   {stepping && (
                     <span className="pointer-events-none absolute -left-4 bottom-1 flex gap-1">
                       <span className="adv-dust h-3 w-3 rounded-full bg-white/50" />
@@ -149,22 +213,107 @@ function RaceBoard({ players, goal, slotOf, index }: { players: LivePlayerRow[];
                     </span>
                   )}
                   {turbo && stepping && <span className="adv-flame absolute -left-7 bottom-3 text-2xl">🔥</span>}
-                  {stunned && <span className="live-pop absolute -top-3 left-3 z-20 text-2xl">⚡</span>}
-                  {p.effect?.items.includes("🛡️") && <span className="live-pop absolute -top-2 right-0 z-20 text-xl">🛡️</span>}
-                  <CharacterSvg look={p.look} size={46} mood={stepping ? "run" : stunned ? "sad" : moving ? "idle" : afterMood(p)} pedestal={false} />
+                  {hitNow && (
+                    <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                      <span className="live-pop text-4xl drop-shadow-[0_0_12px_rgba(250,204,21,0.9)]">⚡</span>
+                      <NetOverlay size={charSize} />
+                    </span>
+                  )}
+                  {shieldNow && <span className="live-pop absolute -top-3 left-1/2 z-20 -translate-x-1/2 text-3xl drop-shadow-[0_0_12px_rgba(56,189,248,0.9)]">🛡️</span>}
+                  {!strike && p.effect?.items.includes("🛡️") && <span className="absolute -top-2 right-0 z-20 text-xl">🛡️</span>}
+                  <CharacterSvg look={p.look} size={charSize} mood={mood} pedestal={false} />
                 </div>
-                <div className="mb-2 flex flex-col items-start gap-0.5">
+                <div className="mb-1 flex flex-col items-start gap-0.5">
                   <NameTag name={p.name} color={color} />
-                  <DeltaBadge p={p} />
+                  {laneH >= 44 && cur >= strikes.length && <DeltaBadge p={p} delay={0.2} />}
+                  {laneH >= 44 && strikes.length === 0 && <DeltaBadge p={p} />}
                 </div>
               </div>
-              <span className="absolute right-[9%] z-10 font-mono text-xs font-bold text-white/60">{formatNumberUz(p.progress)} m</span>
+              <span className="absolute right-[9%] z-10 font-mono text-xs font-bold text-white/60">{formatNumberUz(p.progress + pendingHit(p.id))} m</span>
             </div>
           );
         })}
+        {/* Uchayotgan to'r: tashlagan yo'lakchadan qurbonga */}
+        {strike && laneOf(strike.from) >= 0 && laneOf(strike.to) >= 0 && (
+          <NetShot
+            key={`shot${cur}`}
+            from={{ x: posOf(byId.get(strike.from)!), lane: laneOf(strike.from) }}
+            to={{ x: pct(byId.get(strike.to)!.progress + pendingHit(strike.to) + (strike.blocked ? 0 : strike.m)), lane: laneOf(strike.to) }}
+            lanes={lanes.length}
+            blocked={strike.blocked}
+          />
+        )}
       </div>
       {players.length > lanes.length && <p className="absolute bottom-1 left-3 text-xs text-white/60">+{players.length - lanes.length} ta poygachi</p>}
     </div>
+  );
+}
+
+/** Tepadagi katta e'lon: "Ali ⚡ elektr to'r → Zarina −50 m" yoki qalqon qaytardi */
+function StrikeBanner({ strike, from, to }: { strike: Strike; from?: LivePlayerRow; to?: LivePlayerRow }) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center px-3">
+      <div
+        className={cn(
+          "live-banner flex items-center gap-3 rounded-3xl px-5 py-2.5 shadow-2xl ring-2 sm:gap-5 sm:px-8",
+          strike.blocked ? "bg-gradient-to-r from-sky-600 to-cyan-500 ring-sky-200/60" : "bg-gradient-to-r from-amber-500 via-yellow-400 to-orange-500 text-slate-950 ring-yellow-100/70"
+        )}
+        style={{ animationDelay: "0s" }}
+      >
+        <span className="flex items-center gap-2">
+          <CharacterSvg look={from?.look} size={52} headOnly mood="cheer" />
+          <span className="max-w-[9rem] truncate text-xl font-black sm:text-3xl">{from?.name.split(" ")[0] ?? "?"}</span>
+        </span>
+        <span className="flex flex-col items-center leading-none">
+          <span className="text-3xl sm:text-4xl">⚡</span>
+          <span className="text-[11px] font-black uppercase tracking-wider">elektr to&apos;r</span>
+        </span>
+        <span className="text-2xl font-black sm:text-4xl">→</span>
+        <span className="flex items-center gap-2">
+          <CharacterSvg look={to?.look} size={52} headOnly mood={strike.blocked ? "cheer" : "sad"} />
+          <span className="max-w-[9rem] truncate text-xl font-black sm:text-3xl">{to?.name.split(" ")[0] ?? "?"}</span>
+        </span>
+        <span className={cn("rounded-2xl px-3 py-1 font-mono text-xl font-black sm:text-3xl", strike.blocked ? "bg-white/20" : "bg-rose-600 text-white")}>
+          {strike.blocked ? "🛡️ qaytardi!" : `−${strike.m} m`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Uchayotgan elektr to'r: boshlanish yo'lakchasidan qurbon yo'lakchasiga yoy bo'ylab */
+function NetShot({ from, to, lanes, blocked }: { from: { x: number; lane: number }; to: { x: number; lane: number }; lanes: number; blocked: boolean }) {
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setGo(true)));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const y = (lane: number) => ((lane + 0.5) / Math.max(1, lanes)) * 100;
+  const p = go ? to : from;
+  return (
+    <div
+      className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2"
+      style={{ left: `calc(4% + ${p.x * 0.86}%)`, top: `${y(p.lane)}%`, transition: "left 650ms cubic-bezier(0.3,0.6,0.4,1), top 650ms cubic-bezier(0.3,-0.6,0.4,1)" }}
+    >
+      <div className={cn("relative flex items-center justify-center", go && "adv-spin-fast")}>
+        <svg viewBox="0 0 40 40" className="h-12 w-12 drop-shadow-[0_0_14px_rgba(250,204,21,0.95)] sm:h-16 sm:w-16">
+          <circle cx="20" cy="20" r="16" fill="none" stroke="#fde047" strokeWidth="2.5" />
+          <path d="M4 20 H36 M20 4 V36 M8.7 8.7 L31.3 31.3 M31.3 8.7 L8.7 31.3" stroke="#facc15" strokeWidth="1.8" />
+          <circle cx="20" cy="20" r="8" fill="none" stroke="#fef08a" strokeWidth="1.5" />
+        </svg>
+        {go && <span className={cn("live-pop absolute text-4xl", blocked && "opacity-0")} style={{ animationDelay: "0.6s" }}>💥</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Qurbon ustidagi to'r (yo'lakchada titrab turadi) */
+function NetOverlay({ size }: { size: number }) {
+  return (
+    <svg viewBox="0 0 40 40" className="adv-net absolute" style={{ width: size * 1.1, height: size * 1.1 }}>
+      <circle cx="20" cy="20" r="17" fill="rgba(250,204,21,0.12)" stroke="#fde047" strokeWidth="2" />
+      <path d="M3 20 H37 M20 3 V37 M8 8 L32 32 M32 8 L8 32" stroke="#facc15" strokeWidth="1.4" />
+    </svg>
   );
 }
 
@@ -181,7 +330,7 @@ function Rocket({ p, color, fell, flying }: { p: LivePlayerRow; color: string; f
       </svg>
       {/* Illyuminatorda — personaj boshi */}
       <span className="pointer-events-none absolute left-1/2 top-[30%] -translate-x-1/2 overflow-hidden rounded-full sm:top-[31%]" style={{ width: 24, height: 24 }}>
-        <CharacterSvg look={p.look} size={24} headOnly still mood={fell ? "sad" : "cheer"} />
+        <CharacterSvg look={p.look} size={24} headOnly still mood={fell ? "sad" : "happy"} />
       </span>
       {!fell && (
         <span className="absolute top-[76%] flex flex-col items-center">
@@ -351,7 +500,7 @@ function BridgeBoard({
               style={{ left: `calc(${left}% + ${((j % 4) - 1.5) * 46}px)`, bottom: `${60 + Math.floor(j / 4) * 9}%`, zIndex: 10 - Math.floor(j / 4) }}
               title={p.name}
             >
-              <CharacterSvg look={p.look} size={50} mood={hopping && stepped ? "jump" : splash ? "sad" : p.finished ? "cheer" : "idle"} pedestal={false} />
+              <CharacterSvg look={p.look} size={50} mood={hopping && stepped ? "jump" : splash ? "sad" : p.finished ? "happy" : "idle"} pedestal={false} />
               <NameTag name={p.name} color={slotColor(slotOf(p.id))} className="-mt-1" />
               {splash && (
                 <span className="pointer-events-none absolute top-24 flex gap-1">
@@ -410,7 +559,7 @@ function GoldBoard({ players, slotOf, index }: { players: LivePlayerRow[]; slotO
             <div key={p.id} className="flex items-center gap-3 rounded-2xl bg-black/35 px-3 py-1.5 ring-1 ring-amber-200/10">
               <span className="w-6 text-center font-mono font-black text-amber-200/70">{i === 0 ? "👑" : i + 1}</span>
               <span className="relative shrink-0">
-                <CharacterSvg look={p.look} size={44} mood={digging && gained ? "work" : gained ? "cheer" : "idle"} holding="pickaxe" pedestal={false} />
+                <CharacterSvg look={p.look} size={44} mood={digging && gained ? "work" : gained ? "happy" : "idle"} holding="pickaxe" pedestal={false} />
                 {digging && gained && (
                   <span className="adv-coin pointer-events-none absolute -top-1 left-1/2 text-lg" style={{ animationDelay: `${i * 0.1}s` }}>
                     🪙
@@ -487,7 +636,7 @@ function TerritoryBoard({ players, cells, slots, index }: { players: LivePlayerR
               className="live-drop pointer-events-none absolute flex -translate-x-1/2 -translate-y-[70%] flex-col items-center"
               style={{ left: `${((m.x / m.n + 0.5) / GRID_W) * 100}%`, top: `${((m.y / m.n + 0.5) / GRID_H) * 100}%` }}
             >
-              <CharacterSvg look={byId.get(slots[slot])?.look} size={m.n >= 10 ? 48 : 36} mood={m.n >= 10 ? "cheer" : "idle"} pedestal={false} />
+              <CharacterSvg look={byId.get(slots[slot])?.look} size={m.n >= 10 ? 48 : 36} mood={m.n >= 10 ? "happy" : "idle"} pedestal={false} />
               <span className="-mt-1 rounded bg-black/50 px-1 text-[10px] font-black">🚩{m.n}</span>
             </span>
           ) : null

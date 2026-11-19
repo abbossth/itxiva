@@ -56,13 +56,13 @@ export async function applyMissedHomeworkPenalties(now: Date = new Date()): Prom
       });
       if (!created) continue;
 
-      const { applied, balanceAfter } = await deductClamped(student._id, penalty.wanted);
-      if (applied > 0) {
-        await Penalty.updateOne({ _id: penalty._id }, { $set: { applied } });
+      const { applied, xpApplied, balanceAfter } = await deductClamped(student._id, penalty.wanted);
+      if (applied > 0 || xpApplied > 0) {
+        if (applied > 0) await Penalty.updateOne({ _id: penalty._id }, { $set: { applied } });
         await CoinLedger.create({
           studentId: student._id,
           amount: -applied,
-          xp: 0,
+          xp: -xpApplied,
           type: "penalty",
           referenceId: lesson._id,
           description: penalty.reason,

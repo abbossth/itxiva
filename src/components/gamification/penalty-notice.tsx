@@ -164,7 +164,7 @@ export function PenaltyOverlay({ notice, onClose }: { notice: Notice; onClose: (
             </div>
 
             <p id="penalty-title" className="mt-5 text-xs font-black uppercase tracking-[0.3em] text-red-300">
-              Balansdan coin olindi
+              Balansdan coin va XP olindi
             </p>
 
             <div className="reward-number mt-1 flex items-baseline gap-2">
@@ -173,6 +173,9 @@ export function PenaltyOverlay({ notice, onClose }: { notice: Notice; onClose: (
               </span>
               <span className="text-lg font-black text-red-200">coin</span>
             </div>
+            <p className="reward-item mt-1 inline-flex items-center gap-1.5 rounded-full bg-violet-500/15 px-3 py-1 text-sm font-black text-violet-200 ring-1 ring-violet-400/30" style={{ animationDelay: "0.8s" }}>
+              ⚡ Tajriba ham kamaydi: −{formatNumberUz(wantedTotal)} XP
+            </p>
 
             <ul className="mt-4 w-full space-y-2 text-left">
               {notice.items.slice(0, 5).map((item, i) => {

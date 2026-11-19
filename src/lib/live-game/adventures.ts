@@ -136,6 +136,8 @@ export interface AdvEffect {
   delta: number;
   /** Ko'rsatish uchun belgilar (masalan, kovlangan narsalar) */
   items: string[];
+  /** Poyga: shu o'yinchi tashlagan elektr to'rlar (kimga, necha metr, qalqon qaytardimi) — proyektorda animatsiya */
+  zaps?: { to: string; m: number; blocked: boolean }[];
 }
 
 export interface AdvOut {
@@ -341,7 +343,7 @@ export function revealAdventure(mode: AdventureMode, players: AdvPlayer[], ctx: 
       const t = byId.get(chosen.id)!;
       if (chosen.correct && tacticOf(chosen) === "shield") {
         events.push(`🛡️ ${chosen.name}ning qalqoni ${p.name}ning to'rini qaytardi`);
-        me.effect = { ...me.effect, text: `${me.effect.text} · ${chosen.name} qalqonda!` };
+        me.effect = { ...me.effect, text: `${me.effect.text} · ${chosen.name} qalqonda!`, zaps: [...(me.effect.zaps ?? []), { to: chosen.id, m: 0, blocked: true }] };
         continue;
       }
       const already = lost.get(chosen.id) ?? 0;
@@ -352,7 +354,7 @@ export function revealAdventure(mode: AdventureMode, players: AdvPlayer[], ctx: 
       t.progress -= hit;
       t.score -= scoreHit;
       t.effect = { ...t.effect, text: `${t.effect.text} · ⚡ ${p.name} -${hit} m`, delta: t.effect.delta - scoreHit, items: [...t.effect.items, "⚡"] };
-      me.effect = { ...me.effect, text: `${me.effect.text} · ⚡ ${chosen.name} -${hit} m`, items: [...me.effect.items, "⚡"] };
+      me.effect = { ...me.effect, text: `${me.effect.text} · ⚡ ${chosen.name} -${hit} m`, items: [...me.effect.items, "⚡"], zaps: [...(me.effect.zaps ?? []), { to: chosen.id, m: hit, blocked: false }] };
       events.push(`⚡ ${p.name} ${chosen.name}ning robotini ${hit} m orqaga surdi!`);
     }
   }

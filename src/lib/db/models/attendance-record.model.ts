@@ -15,6 +15,8 @@ export interface IAttendanceRecordData {
   coinsAwarded: number;
   /** Do'kon balansiga (spendableBalance) haqiqiy ta'siri. Eski yozuvlarda yo'q — coinsAwarded ga teng deb olinadi */
   balanceDelta?: number | null;
+  /** XP ga haqiqiy ta'siri (jarima XP ni ham kamaytiradi). Eski yozuvlarda yo'q — max(coinsAwarded, 0) deb olinadi */
+  xpDelta?: number | null;
   notes?: string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -65,6 +67,10 @@ const AttendanceRecordSchema = new Schema<IAttendanceRecord>(
       default: 0,
     },
     balanceDelta: {
+      type: Number,
+      default: null,
+    },
+    xpDelta: {
       type: Number,
       default: null,
     },

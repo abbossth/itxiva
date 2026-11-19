@@ -175,8 +175,8 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
       return (
         <div className="flex items-end gap-4">
           <CharacterSvg look={{ ...look, hair: "spiky", head: "cap", color: 1, level: 1 }} size={90} mood="idle" className="opacity-80" />
-          <CharacterSvg look={look} size={150} mood="cheer" />
-          <CharacterSvg look={{ ...look, hair: "long", outfit: "hoodie", color: 4, eyes: "happy", level: 1 }} size={90} mood="jump" className="opacity-80" />
+          <CharacterSvg look={look} size={150} mood="happy" />
+          <CharacterSvg look={{ ...look, hair: "long", outfit: "hoodie", color: 4, eyes: "happy", level: 1 }} size={90} mood="idle" className="opacity-80" />
         </div>
       );
     case "character-levels":
@@ -184,7 +184,7 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
         <div className="flex items-end gap-1 sm:gap-3">
           {[1, 4, 7, 10].map((lvl, k) => (
             <div key={lvl} className="flex flex-col items-center">
-              <CharacterSvg look={{ ...look, level: lvl, power: Math.min(5, k * 2) }} size={58 + k * 14} mood={k === 3 ? "cheer" : "idle"} />
+              <CharacterSvg look={{ ...look, level: lvl, power: Math.min(5, k * 2) }} size={58 + k * 14} mood={k === 3 ? "happy" : "idle"} />
               <span className="mt-1 rounded-full bg-white/15 px-2 text-[11px] font-black text-white">{lvl}-daraja</span>
             </div>
           ))}
@@ -200,7 +200,7 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
               </span>
             ))}
           </div>
-          <CharacterSvg look={{ ...look, level: Math.max(look.level, 6), back: "cape", hand: "sword", head: "crown", pet: "cat", power: 4 }} size={150} mood="cheer" />
+          <CharacterSvg look={{ ...look, level: Math.max(look.level, 6), back: "cape", hand: "sword", head: "crown", pet: "cat", power: 4 }} size={150} mood="happy" />
           <span className="mb-10 rounded-full bg-amber-400 px-3 py-1 text-sm font-black text-slate-950">🪙 → ⚡</span>
         </div>
       );
@@ -222,8 +222,26 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
       return (
         <div className="flex items-end gap-4">
           <span className="live-chest mb-6 text-7xl">🎁</span>
-          <CharacterSvg look={{ ...look, back: "wings", power: Math.max(look.power, 3) }} size={140} mood="cheer" />
+          <CharacterSvg look={{ ...look, back: "wings", power: Math.max(look.power, 3) }} size={140} mood="happy" />
           <span className="mb-8 text-5xl">🎡</span>
+        </div>
+      );
+    case "emotes":
+      return (
+        <div className="flex items-end gap-2">
+          <CharacterSvg look={{ ...look, level: 1 }} size={90} emote="wave" pedestal={false} />
+          <CharacterSvg look={look} size={140} emote="kiss" />
+          <CharacterSvg look={{ ...look, level: 1 }} size={90} emote="jump" pedestal={false} />
+        </div>
+      );
+    case "xp-penalty":
+      return (
+        <div className="flex items-end gap-4">
+          <CharacterSvg look={look} size={130} mood="sad" />
+          <div className="mb-8 flex flex-col gap-2">
+            <span className="rounded-2xl bg-rose-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 🪙</span>
+            <span className="rounded-2xl bg-violet-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 XP</span>
+          </div>
         </div>
       );
     default:

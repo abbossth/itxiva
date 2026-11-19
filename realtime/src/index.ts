@@ -17,6 +17,9 @@ export interface Env {
 
 const ROOM_PATH = /^\/room\/([a-f0-9]{24})\/(\d{1,3})$/;
 const ZONE_PATH = /^\/zone\/([a-f0-9]{24})\/(\d{1,3})$/;
+/** HTTP zaxira yo'li: WebSocket ochilmasa, o'yinchi joyini shu yerga yuboradi va kadrni oladi */
+const ZONE_RELAY_PATH = /^\/zone\/([a-f0-9]{24})\/(\d{1,3})\/relay$/;
+const CORS = { "access-control-allow-origin": "*", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type", "cache-control": "no-store" };
 const FRAME_MS = 66;
 
 export default {
@@ -25,6 +28,12 @@ export default {
     if (url.pathname === "/") return new Response("itxiva arena: ok");
     // Sayt "Yashil zona" xonasi bor-yo'qligini shu yerdan tekshiradi (yo'q bo'lsa — HTTP yo'li)
     if (url.pathname === "/health/zone") return new Response("ok", { headers: { "access-control-allow-origin": "*" } });
+    const rm = url.pathname.match(ZONE_RELAY_PATH);
+    if (rm) {
+      if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+      if (req.method !== "POST") return new Response("POST kerak", { status: 405, headers: CORS });
+      return env.ZONE_ROOM.get(env.ZONE_ROOM.idFromName(`${rm[1]}:${rm[2]}`)).fetch(req);
+    }
     const zm = url.pathname.match(ZONE_PATH);
     if (zm) {
       if (req.headers.get("Upgrade") !== "websocket") return new Response("WebSocket kerak", { status: 426 });
@@ -151,7 +160,7 @@ export class ArenaRoom implements DurableObject {
 
 // ---- "Yashil zona" ----
 
-const ZONE_FRAME_MS = 66;
+const ZONE_FRAME_MS = 50;
 
 export class ZoneRoomDO implements DurableObject {
   private room: ZoneRoom | null = null;
@@ -167,12 +176,27 @@ export class ZoneRoomDO implements DurableObject {
 
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const m = url.pathname.match(ZONE_PATH);
+    const relay = url.pathname.match(ZONE_RELAY_PATH);
+    const m = relay ?? url.pathname.match(ZONE_PATH);
     const t = await verifyToken<ZoneTicket>(this.env.ARENA_SECRET, url.searchParams.get("t") ?? "");
-    if (!m || !t || t.k !== "zone" || t.g !== m[1] || t.r !== Number(m[2])) return new Response("Bilet yaroqsiz", { status: 403 });
+    if (!m || !t || t.k !== "zone" || t.g !== m[1] || t.r !== Number(m[2])) return new Response("Bilet yaroqsiz", { status: 403, headers: relay ? CORS : undefined });
     if (!this.room || this.room.startedAt !== t.st) {
       this.room = new ZoneRoom(t.g, t.r, t.seed, t.fin, t.st, t.en, t.res);
       this.finalSent = false;
+    }
+    // HTTP zaxira: joy qabul qilinadi va darhol ro'yxat + kadr qaytariladi (xona taymeri ham ishga tushadi)
+    if (relay) {
+      if (t.role === "player") {
+        this.room.join(t);
+        try {
+          const body = (await req.json()) as { x?: unknown; y?: unknown; s?: unknown };
+          this.room.input(t.p, body ?? {}, Date.now());
+        } catch {
+          // bo'sh so'rov — faqat kadr
+        }
+      }
+      if (!this.timer) this.timer = setInterval(() => this.tick(), ZONE_FRAME_MS);
+      return new Response(this.room.relayMessage(Date.now()), { headers: { ...CORS, "content-type": "application/json" } });
     }
 
     const pair = new WebSocketPair();

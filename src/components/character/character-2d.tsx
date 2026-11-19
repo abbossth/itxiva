@@ -8,7 +8,7 @@ import { CharacterSvg, type CharMood } from "./character-svg";
 // Profildagi jonli 2D personaj: ko'zlari va boshi sichqoncha (barmoq) tomonga qaraydi,
 // bosilganda xursand bo'lib sakraydi, ustiga olib borilsa — qo'l silkitadi.
 
-export function Character2D({ look, size = 220, sound = true }: { look: Partial<GameLook>; size?: number; sound?: boolean }) {
+export function Character2D({ look, size = 220, sound = true, emote = null }: { look: Partial<GameLook>; size?: number; sound?: boolean; emote?: string | null }) {
   const box = useRef<HTMLDivElement>(null);
   const [gaze, setGaze] = useState<{ x: number; y: number } | null>(null);
   const [mood, setMood] = useState<CharMood>("idle");
@@ -56,7 +56,7 @@ export function Character2D({ look, size = 220, sound = true }: { look: Partial<
       }}
       title="Bosing — personaj sakraydi!"
     >
-      <CharacterSvg look={look} size={size} mood={mood} gaze={gaze} />
+      <CharacterSvg look={look} size={size} mood={mood} gaze={gaze} emote={emote} />
     </div>
   );
 }

@@ -15,7 +15,8 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
   const canvas = useRef<HTMLCanvasElement>(null);
   const waves = zoneWaveCount(z.final);
   const [info, setInfo] = useState({ wave: 0, waves, secs: 0, countdown: 1, lock: false, alive: 0, total: 0, done: false, caps: "", offline: false });
-  const init = useRef({ startsInMs: z.startsInMs, remainingMs: z.remainingMs, ws: z.ws ?? null });
+  // Vaqt: server soatidagi boshlanish/tugash (xona soatiga moslab hisoblanadi)
+  const init = useRef({ startAt: z.startAt, endAt: z.endAt, ws: z.ws ?? null });
   const soundRef = useRef(sound);
   useEffect(() => {
     soundRef.current = sound;
@@ -28,9 +29,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
     if (!ctx) return;
     const fx = new ZoneFx();
     const t0 = performance.now();
-    const startAt = t0 + init.current.startsInMs;
-    const endAt = t0 + init.current.remainingMs;
-    const startMs = Date.now() + init.current.startsInMs;
+    const { startAt: startMs, endAt } = init.current;
     const sfx = (f: () => void) => {
       if (soundRef.current) f();
     };
@@ -56,7 +55,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
     let shownWave = -2;
     let wasLock = false;
     let resolved = 0;
-    let started = init.current.startsInMs <= 0;
+    let started = Date.now() >= startMs;
     const layouts = new Map<string, ZoneWave>();
     const prevShown = new Map<string, { x: number; y: number }>();
 
@@ -85,7 +84,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const wallNow = startMs + (now - startAt);
+      const wallNow = net.now();
       const phase = zonePhase(startMs, wallNow, waves);
       const wave = phase.wave >= 0 ? layoutFor(phase.wave) : null;
       net.pump(now);
@@ -108,7 +107,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
 
       const list: DrawRobot[] = [];
       for (const p of net.peers.values()) {
-        const sh = net.shown(p.id, now) ?? { x: p.x, y: p.y, moving: false };
+        const sh = net.shown(p.id) ?? { x: p.x, y: p.y, moving: false };
         const prev = prevShown.get(p.id);
         const ddx = prev ? sh.x - prev.x : 0;
         const ddy = prev ? sh.y - prev.y : 0;
@@ -130,7 +129,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       if (now - lastInfo > 150) {
         lastInfo = now;
         const secs = Math.max(0, Math.ceil((phase.waveEndsAt - wallNow) / 1000));
-        const countdown = Math.max(0, startAt - now);
+        const countdown = Math.max(0, startMs - wallNow);
         const tickSec = countdown > 0 ? Math.ceil(countdown / 1000) : phase.lock ? 99 : secs;
         if (tickSec > 0 && tickSec <= 3 && tickSec < lastTick) sfx(countdown > 0 ? playTickSound : playHeartbeat);
         if (countdown <= 0 && !started) {

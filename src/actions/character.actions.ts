@@ -8,6 +8,7 @@ import { awardCoins } from "@/lib/gamification/award";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { CHAR_SLOTS, MAX_POWER, POWER_STEPS, SLOT_LABELS, charItem, cleanLook, itemKey, type CharLook, type CharSlot } from "@/lib/character/catalog";
 import { ensureCharacter } from "@/lib/character/grant";
+import { emoteKey, emoteOf } from "@/lib/character/emotes";
 import type { ActionResult } from "./auth.actions";
 
 // O'quvchi personaji: ko'rish, saqlash, coin bilan qism sotib olish va "kuch" upgrade.
@@ -116,6 +117,35 @@ export async function upgradeCharacterPowerAction(): Promise<ActionResult<MyChar
     { _id: session.userId, $or: [{ "character.power": { $lt: power } }, { "character.power": { $exists: false } }] },
     { $set: { "character.power": power, "character.look": { ...cur.look, power }, "character.updatedAt": new Date() } }
   );
+  const next = await loadMe(session.userId);
+  revalidatePath("/profile");
+  return { success: true, data: next ? view(next) : cur };
+}
+
+/** Harakatni (emot) coin evaziga sotib olish */
+export async function buyEmoteAction(id: string): Promise<ActionResult<MyCharacter>> {
+  const session = await requireStudent();
+  const e = emoteOf(String(id));
+  if (!e) return { success: false, message: "Bunday harakat yo'q" };
+  const rate = checkRateLimit(`char_${session.userId}`, 20, 60_000);
+  if (!rate.allowed) return { success: false, message: `Juda ko'p urinish. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring` };
+  await connectToDatabase();
+  const u = await loadMe(session.userId);
+  if (!u) return { success: false, message: "Foydalanuvchi topilmadi" };
+  const cur = view(u);
+  const key = emoteKey(e.id);
+  if (e.price === 0 || cur.owned.includes(key)) return { success: true, data: cur };
+  const paid = await awardCoins({
+    studentId: session.userId,
+    coin: -e.price,
+    xp: 0,
+    type: "purchase",
+    description: `Personaj harakati: ${e.name}`,
+    idempotencyKey: `char:${session.userId}:${key}`,
+  });
+  if (!paid.ok) return { success: false, message: paid.reason === "insufficient" ? "Balansingizda yetarli coin yo'q" : "Foydalanuvchi topilmadi" };
+  await ensureCharacter(session.userId);
+  await User.updateOne({ _id: session.userId }, { $addToSet: { "character.owned": key } });
   const next = await loadMe(session.userId);
   revalidatePath("/profile");
   return { success: true, data: next ? view(next) : cur };

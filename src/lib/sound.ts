@@ -214,33 +214,80 @@ function running(): AudioContext | null {
   return audio;
 }
 
-/** Test o'yini: to'g'ri javob — ko'tariluvchi uch nota */
+/** Test o'yini: to'g'ri javob — yorqin qo'ng'iroqli major arpedjio, uchqun va yumshoq zarb */
 export function playCorrectSound(): void {
   const audio = running();
   if (!audio) return;
   const t = audio.currentTime;
-  tone(audio, "triangle", 659.25, t, 0.14, 0.25);
-  tone(audio, "triangle", 830.6, t + 0.09, 0.14, 0.25);
-  tone(audio, "triangle", 987.8, t + 0.18, 0.32, 0.3);
+  bellTone(audio, 1046.5, t, 0.7, 0.12);
+  bellTone(audio, 1318.5, t + 0.08, 0.7, 0.1);
+  bellTone(audio, 1568, t + 0.16, 0.9, 0.11);
+  tone(audio, "triangle", 523.25, t, 0.25, 0.12);
+  tone(audio, "triangle", 783.99, t + 0.16, 0.4, 0.1);
+  sparkle(audio, t + 0.22, 0.05);
+  softThump(audio, t, 0.35);
 }
 
-/** Test o'yini: xato javob yoki vaqt tugadi — pasayuvchi past ovoz */
+/** Test o'yini: xato javob yoki vaqt tugadi — past "bvomp" (pasayuvchi detune qilingan tovush) va zarb */
 export function playWrongSound(): void {
   const audio = running();
   if (!audio) return;
   const t = audio.currentTime;
-  tone(audio, "sawtooth", 220, t, 0.18, 0.12);
-  tone(audio, "sawtooth", 164.8, t + 0.16, 0.34, 0.12);
+  const f = audio.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(1400, t);
+  f.frequency.exponentialRampToValueAtTime(260, t + 0.5);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  f.connect(g);
+  out(audio, g, 0.15);
+  for (const det of [-14, 14]) {
+    const o = audio.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(311, t);
+    o.frequency.exponentialRampToValueAtTime(155, t + 0.5);
+    o.detune.value = det;
+    o.connect(f);
+    o.start(t);
+    o.stop(t + 0.65);
+  }
+  softThump(audio, t, 0.5, 70);
 }
 
-/** Test o'yini: oxirgi soniyalarda taymer "tiq" etadi */
+/** Test o'yini: oxirgi soniyalarda taymer — yog'och "tiq" (woodblock) */
 export function playTickSound(): void {
   const audio = running();
   if (!audio) return;
-  tone(audio, "square", 1200, audio.currentTime, 0.05, 0.06);
+  const t = audio.currentTime;
+  const o = audio.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(1900, t);
+  o.frequency.exponentialRampToValueAtTime(1300, t + 0.05);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.22, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  o.connect(g);
+  out(audio, g, 0.12);
+  o.start(t);
+  o.stop(t + 0.09);
+  const n = audio.createBufferSource();
+  n.buffer = getNoise(audio);
+  const bp = audio.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 3500;
+  const ng = audio.createGain();
+  ng.gain.setValueAtTime(0.08, t);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
+  n.connect(bp).connect(ng);
+  out(audio, ng, 0);
+  n.start(t);
+  n.stop(t + 0.02);
 }
 
-/** Reyting: qatorlar surilganda "whoosh" (filtrlangan shovqin) */
+/** Reyting: qatorlar surilganda "whoosh" — filtrlangan shovqin chapdan o'ngga o'tadi */
 export function playWhoosh(volume = 0.5): void {
   const audio = running();
   if (!audio) return;
@@ -249,25 +296,31 @@ export function playWhoosh(volume = 0.5): void {
   src.buffer = getNoise(audio);
   const filter = audio.createBiquadFilter();
   filter.type = "bandpass";
-  filter.Q.value = 1.2;
-  filter.frequency.setValueAtTime(400, t);
-  filter.frequency.exponentialRampToValueAtTime(3200, t + 0.35);
+  filter.Q.value = 1.4;
+  filter.frequency.setValueAtTime(350, t);
+  filter.frequency.exponentialRampToValueAtTime(3600, t + 0.32);
+  filter.frequency.exponentialRampToValueAtTime(1200, t + 0.5);
+  const pan = audio.createStereoPanner();
+  pan.pan.setValueAtTime(-0.8, t);
+  pan.pan.linearRampToValueAtTime(0.8, t + 0.5);
   const gain = audio.createGain();
   gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.4 * volume, t + 0.12);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-  src.connect(filter).connect(gain).connect(audio.destination);
+  gain.gain.exponentialRampToValueAtTime(0.42 * volume, t + 0.16);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+  src.connect(filter).connect(pan).connect(gain);
+  out(audio, gain, 0.25);
   src.start(t);
-  src.stop(t + 0.5);
+  src.stop(t + 0.6);
 }
 
-/** Reyting: kimdir o'rin ko'targanda — qisqa ko'tariluvchi "ding" */
+/** Reyting: kimdir o'rin ko'targanda — ko'tariluvchi qo'ng'iroq va uchqun */
 export function playRankUp(): void {
   const audio = running();
   if (!audio) return;
   const t = audio.currentTime;
-  tone(audio, "triangle", 880, t, 0.12, 0.18);
-  tone(audio, "triangle", 1318.5, t + 0.07, 0.22, 0.18);
+  bellTone(audio, 880, t, 0.5, 0.09);
+  bellTone(audio, 1318.5, t + 0.07, 0.6, 0.09);
+  sparkle(audio, t + 0.12, 0.035);
 }
 
 /** G'oliblar e'loni oldidan baraban sadosi (`seconds` davomida kuchayib boradi) */
@@ -306,29 +359,29 @@ export function playDrumroll(seconds = 1.6): void {
   osc.stop(end + 0.5);
 }
 
-/** Yetakchi almashdi yoki 1-o'rin e'loni — tantanali fanfara (`grand` — kattaroq, final uchun) */
+/** Yetakchi almashdi yoki 1-o'rin e'loni — mis cholg'u fanfarasi, timpani va tarelka (`grand` — kattaroq, final uchun) */
 export function playFanfare(grand = false): void {
   const audio = running();
   if (!audio) return;
-  const t = audio.currentTime;
-  const notes = grand
+  const t = audio.currentTime + 0.02;
+  const notes: [number, number, number][] = grand
     ? [
-        [523.25, 0, 0.18],
-        [659.25, 0.16, 0.18],
-        [783.99, 0.32, 0.18],
-        [1046.5, 0.5, 0.7],
-        [783.99, 0.5, 0.7],
-        [659.25, 0.5, 0.7],
+        [523.25, 0, 0.16],
+        [659.25, 0.16, 0.16],
+        [783.99, 0.32, 0.16],
+        [1046.5, 0.5, 0.9],
       ]
     : [
         [587.33, 0, 0.12],
-        [739.99, 0.1, 0.12],
-        [880, 0.2, 0.4],
+        [739.99, 0.12, 0.12],
+        [880, 0.24, 0.5],
       ];
-  for (const [f, at, dur] of notes) {
-    tone(audio, "sawtooth", f, t + at, dur, grand ? 0.09 : 0.07);
-    tone(audio, "triangle", f * 2, t + at, dur, 0.05);
-  }
+  for (const [f, at, dur] of notes) brass(audio, f, t + at, dur, grand ? 0.1 : 0.08);
+  const chordAt = grand ? 0.5 : 0.24;
+  for (const f of grand ? [261.63, 329.63, 392] : [293.66, 369.99, 440]) brass(audio, f, t + chordAt, grand ? 1 : 0.55, 0.05);
+  timpani(audio, t + chordAt, grand ? 65.4 : 73.4, grand ? 0.8 : 0.55);
+  cymbal(audio, t + chordAt, grand ? 0.22 : 0.12, grand ? 2 : 1.2);
+  sparkle(audio, t + chordAt + 0.1, 0.05);
 }
 
 /** Arena: lazer otishi (qisqa, baland) */
@@ -376,7 +429,7 @@ export function playHurt(): void {
   tone(audio, "sawtooth", 120, t + 0.05, 0.2, 0.1);
 }
 
-/** Rejim introsi: har rejimga o'z tonalligi va tembridagi qisqa jingl (ko'tariluvchi arpedjio + akkord) */
+/** Rejim introsi: har rejimga o'z tonalligi va tembridagi qisqa jingl (arpedjio + mis akkord + timpani) */
 export function playModeJingle(transpose = 0, wave: OscillatorType = "square", minor = false): void {
   const audio = running();
   if (!audio) return;
@@ -384,56 +437,40 @@ export function playModeJingle(transpose = 0, wave: OscillatorType = "square", m
   const root = 261.63 * Math.pow(2, transpose / 12);
   const third = minor ? 3 : 4;
   const steps = [0, third, 7, 12, third + 12];
-  steps.forEach((st, i) => tone(audio, wave, root * Math.pow(2, st / 12), t + i * 0.11, 0.16, 0.06));
-  for (const st of [0, third, 7, 12]) tone(audio, "triangle", root * Math.pow(2, st / 12), t + 0.62, 0.9, 0.05);
-  // Baraban zarbasi
-  const osc = audio.createOscillator();
-  const g = audio.createGain();
-  osc.frequency.setValueAtTime(140, t + 0.62);
-  osc.frequency.exponentialRampToValueAtTime(45, t + 0.8);
-  g.gain.setValueAtTime(0.6, t + 0.62);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-  osc.connect(g).connect(audio.destination);
-  osc.start(t + 0.62);
-  osc.stop(t + 0.95);
+  steps.forEach((st, i) => tone(audio, wave, root * Math.pow(2, st / 12), t + i * 0.1, 0.18, 0.05, 0.35));
+  steps.forEach((st, i) => bellTone(audio, root * 2 * Math.pow(2, st / 12), t + i * 0.1, 0.4, 0.035));
+  for (const st of [0, third, 7, 12]) brass(audio, root * Math.pow(2, st / 12), t + 0.55, 0.9, 0.045);
+  timpani(audio, t + 0.55, root / 4, 0.7);
+  cymbal(audio, t + 0.55, 0.14, 1.4);
 }
 
-/** "Boshlash" bosilganda: ko'tariluvchi shovqin (riser) va kuchli zarba */
+/** "Boshlash" bosilganda: ko'tariluvchi shovqin (riser), keyin kuchli zarba — timpani, tarelka va mis akkord */
 export function playGameStart(): void {
   const audio = running();
   if (!audio) return;
   const t = audio.currentTime;
-  // Riser: shovqin filtri yuqoriga ko'tariladi
-  const len = Math.floor(audio.sampleRate * 0.9);
-  const buf = audio.createBuffer(1, len, audio.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   const src = audio.createBufferSource();
-  src.buffer = buf;
+  src.buffer = getNoise(audio);
+  src.loop = true;
   const f = audio.createBiquadFilter();
   f.type = "bandpass";
   f.Q.value = 3;
   f.frequency.setValueAtTime(300, t);
-  f.frequency.exponentialRampToValueAtTime(6000, t + 0.8);
+  f.frequency.exponentialRampToValueAtTime(7000, t + 0.85);
   const g = audio.createGain();
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.35, t + 0.75);
+  g.gain.exponentialRampToValueAtTime(0.3, t + 0.8);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-  src.connect(f).connect(g).connect(audio.destination);
+  src.connect(f).connect(g);
+  out(audio, g, 0.3);
   src.start(t);
-  src.stop(t + 0.92);
-  // Zarba: past baraban + akkord
-  const hit = t + 0.82;
-  const osc = audio.createOscillator();
-  const og = audio.createGain();
-  osc.frequency.setValueAtTime(160, hit);
-  osc.frequency.exponentialRampToValueAtTime(40, hit + 0.35);
-  og.gain.setValueAtTime(0.9, hit);
-  og.gain.exponentialRampToValueAtTime(0.0001, hit + 0.5);
-  osc.connect(og).connect(audio.destination);
-  osc.start(hit);
-  osc.stop(hit + 0.55);
-  for (const fr of [261.63, 329.63, 392, 523.25]) tone(audio, "sawtooth", fr, hit, 0.6, 0.05);
+  src.stop(t + 0.95);
+  const hit = t + 0.86;
+  timpani(audio, hit, 55, 1);
+  softThump(audio, hit, 0.9, 50);
+  cymbal(audio, hit, 0.3, 2.4);
+  for (const fr of [261.63, 329.63, 392, 523.25]) brass(audio, fr, hit, 1.1, 0.06);
+  sparkle(audio, hit + 0.15, 0.06);
 }
 
 // ---- "Yashil zona" ovozlari ----
@@ -768,4 +805,44 @@ export function playPodiumIntro(): void {
   for (const f of [130.81, 155.56, 196]) brass(audio, f, t, 1.4, 0.04);
   timpani(audio, t, 65.4, 0.5);
   sparkle(audio, t + 0.6, 0.04);
+}
+
+
+// ---- Yordamchi tovushlar (yuqoridagi effektlar uchun) ----
+
+/** Qo'ng'iroq (FM): toza, yaltiroq nota */
+function bellTone(audio: AudioContext, freq: number, at: number, dur: number, level: number) {
+  const car = audio.createOscillator();
+  car.frequency.value = freq;
+  const mod = audio.createOscillator();
+  mod.frequency.value = freq * 2.01;
+  const mg = audio.createGain();
+  mg.gain.setValueAtTime(freq * 1.2, at);
+  mg.gain.exponentialRampToValueAtTime(1, at + dur);
+  mod.connect(mg).connect(car.frequency);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(level, at + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  car.connect(g);
+  out(audio, g, 0.35);
+  for (const o of [car, mod]) {
+    o.start(at);
+    o.stop(at + dur + 0.05);
+  }
+}
+
+/** Yumshoq past zarb (tovushga "og'irlik" beradi) */
+function softThump(audio: AudioContext, at: number, level = 0.4, freq = 90) {
+  const o = audio.createOscillator();
+  o.frequency.setValueAtTime(freq * 1.8, at);
+  o.frequency.exponentialRampToValueAtTime(freq, at + 0.08);
+  const g = audio.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(level, at + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+  o.connect(g);
+  out(audio, g, 0.1);
+  o.start(at);
+  o.stop(at + 0.32);
 }

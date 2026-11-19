@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Box, Check, Coins, Lock, Sparkles, Square, Zap } from "lucide-react";
-import { buyCharacterItemAction, saveCharacterAction, upgradeCharacterPowerAction, type MyCharacter } from "@/actions/character.actions";
+import { buyCharacterItemAction, buyEmoteAction, saveCharacterAction, upgradeCharacterPowerAction, type MyCharacter } from "@/actions/character.actions";
+import { EMOTES, EMOTE_MS, hasEmote, type Emote } from "@/lib/character/emotes";
 import {
   CHAR_ITEMS,
   CHAR_SLOTS,
@@ -32,15 +33,24 @@ import { Character3D } from "./character-3d";
 
 type Look = CharLook & { color: number };
 
-const SLOT_ICONS: Record<CharSlot, string> = { skin: "🎨", hair: "💇", eyes: "👀", mouth: "👄", head: "🎩", outfit: "👕", back: "🦸", hand: "✋", pet: "🐾" };
+const SLOT_ICONS: Record<CharSlot, string> = { skin: "🎨", hair: "💇", eyes: "👀", mouth: "👄", head: "🎩", outfit: "👕", back: "🎒", hand: "✋", pet: "🐾", costume: "🦸" };
 
 export function CharacterEditor({ initial }: { initial: MyCharacter }) {
   const { toast } = useToast();
   const [me, setMe] = useState(initial);
   const [look, setLook] = useState<Look>(initial.look);
   const [view, setView] = useState<"2d" | "3d">("2d");
-  const [slot, setSlot] = useState<CharSlot>("outfit");
+  const [slot, setSlot] = useState<CharSlot | "emotes">("outfit");
   const [buying, setBuying] = useState<CharItem | null>(null);
+  const [buyingEmote, setBuyingEmote] = useState<Emote | null>(null);
+  // Ko'rinishda ijro etilayotgan harakat (bosilganda 2,6 s)
+  const [preview, setPreview] = useState<{ id: string; key: number } | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showEmote = (id: string, key: number) => {
+    setPreview({ id, key });
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => setPreview(null), EMOTE_MS);
+  };
   const [powerAsk, setPowerAsk] = useState(false);
   const [saved, setSaved] = useState<"idle" | "saving" | "saved">("idle");
   const [pending, start] = useTransition();
@@ -101,6 +111,21 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
       setLook((l) => ({ ...l, [it.slot]: it.id }));
     });
 
+  const buyEmote = (e: Emote) =>
+    start(async () => {
+      const r = await buyEmoteAction(e.id);
+      setBuyingEmote(null);
+      if (!r.success || !r.data) {
+        toast.error(r.message ?? "Sotib olib bo'lmadi");
+        return;
+      }
+      setMe(r.data);
+      announceBalance(r.data.balance);
+      playRewardSound();
+      void fireConfetti({ particleCount: 60, spread: 70, origin: { y: 0.4 }, zIndex: 80 });
+      toast.success(`"${e.name}" harakati sizniki! Jonli o'yin kutish zalida bosing`);
+    });
+
   const upgrade = () =>
     start(async () => {
       const r = await upgradeCharacterPowerAction();
@@ -117,7 +142,7 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
       setLook((l) => ({ ...l, power: r.data!.power }));
     });
 
-  const items = CHAR_ITEMS.filter((it) => it.slot === slot);
+  const items = slot === "emotes" ? [] : CHAR_ITEMS.filter((it) => it.slot === slot);
   const nextPower = me.power < MAX_POWER ? POWER_STEPS[me.power] : null;
   const colorable = look.outfit === "tee" || look.outfit === "hoodie" || look.outfit === "hero";
 
@@ -142,7 +167,11 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
           </span>
         </div>
         <div className="relative mt-2">
-          {view === "2d" ? <Character2D look={gameLook} size={210} /> : <Character3D look={gameLook} height={330} onFail={() => setView("2d")} />}
+          {view === "2d" || preview ? (
+            <Character2D key={preview?.key ?? "base"} look={gameLook} size={210} emote={preview?.id ?? null} />
+          ) : (
+            <Character3D look={gameLook} height={330} onFail={() => setView("2d")} />
+          )}
         </div>
         <p className="relative mt-1 text-center text-xs text-slate-300">
           {view === "3d" ? "Sudrab aylantiring · bosing — sakraydi va qo'l silkitadi" : "Personajni bosing — sakraydi! Ko'zlari sichqonchaga qaraydi"}
@@ -211,7 +240,64 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
                 {SLOT_LABELS[s]}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setSlot("emotes")}
+              className={cn(
+                "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition",
+                slot === "emotes" ? "bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/20" : "bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-500/10 dark:text-fuchsia-300"
+              )}
+            >
+              <span>🕺</span>
+              Harakatlar
+            </button>
           </div>
+
+          {slot === "emotes" && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Jonli o&apos;yinning kutish zalida telefonda bosasiz — personajingiz katta ekranda shu harakatni qiladi. Bosib ko&apos;ring!
+              </p>
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+                {EMOTES.map((e) => {
+                  const mine = hasEmote(e, me.owned);
+                  return (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          unlockSound();
+                          showEmote(e.id, ev.timeStamp);
+                          if (!mine) setBuyingEmote(e);
+                        }}
+                        className={cn(
+                          "relative flex w-full cursor-pointer flex-col items-center gap-1 rounded-2xl border p-2 text-center transition hover:-translate-y-0.5 hover:shadow-md",
+                          preview?.id === e.id ? "border-fuchsia-500 bg-fuchsia-50 ring-2 ring-fuchsia-500/30 dark:bg-fuchsia-500/10" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
+                        )}
+                      >
+                        <span className="text-3xl leading-none">{e.icon}</span>
+                        <span className="line-clamp-1 text-[11px] font-bold text-slate-800 dark:text-slate-100">{e.name}</span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black",
+                            e.price === 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : mine ? "bg-teal-600 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+                          )}
+                        >
+                          {e.price === 0 ? "Bepul" : mine ? (
+                            <>
+                              <Check className="h-3 w-3" /> Sizniki
+                            </>
+                          ) : (
+                            <>🪙 {e.price}</>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {slot === "outfit" && colorable && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -298,6 +384,17 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
         title={buying ? `"${buying.name}" sotib olinsinmi?` : ""}
         description={buying ? `${buying.price} coin yechiladi (balansingiz: ${formatNumberUz(me.balance)}). Bir marta sotib olinadi — keyin xohlagan paytda kiyasiz.` : ""}
         confirmText={buying ? `${buying.price} coin — sotib olish` : "Sotib olish"}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(buyingEmote)}
+        onClose={() => setBuyingEmote(null)}
+        onConfirm={() => {
+          if (buyingEmote) buyEmote(buyingEmote);
+        }}
+        isLoading={pending}
+        title={buyingEmote ? `"${buyingEmote.name}" harakati sotib olinsinmi?` : ""}
+        description={buyingEmote ? `${buyingEmote.price} coin yechiladi (balansingiz: ${formatNumberUz(me.balance)}). Keyin jonli o'yinlarda xohlagancha ishlatasiz.` : ""}
+        confirmText={buyingEmote ? `${buyingEmote.price} coin — sotib olish` : "Sotib olish"}
       />
       <ConfirmDialog
         isOpen={powerAsk}

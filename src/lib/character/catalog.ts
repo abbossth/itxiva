@@ -3,7 +3,7 @@
 // (tagidagi supa materiali, nur, aura) va yangi qismlar ochiladi; ba'zilari coin evaziga sotib olinadi.
 // Bu fayl brauzer va server uchun umumiy (sof funksiyalar).
 
-export const CHAR_SLOTS = ["skin", "hair", "eyes", "mouth", "head", "outfit", "back", "hand", "pet"] as const;
+export const CHAR_SLOTS = ["skin", "hair", "eyes", "mouth", "head", "outfit", "back", "hand", "pet", "costume"] as const;
 export type CharSlot = (typeof CHAR_SLOTS)[number];
 
 export interface CharItem {
@@ -26,6 +26,7 @@ export const SLOT_LABELS: Record<CharSlot, string> = {
   back: "Orqada",
   hand: "Qo'lda",
   pet: "Hamroh",
+  costume: "Kostyum",
 };
 
 const I = (slot: CharSlot, id: string, name: string, level: number, price: number): CharItem => ({ slot, id, name, level, price });
@@ -106,6 +107,18 @@ export const CHAR_ITEMS: CharItem[] = [
   I("pet", "cat", "Mushuk", 5, 120),
   I("pet", "drone", "Dron", 6, 160),
   I("pet", "dragon", "Kichik ajdar", 10, 450),
+  // Qahramon kostyumlari (original): kiyim, bosh kiyim va orqadagi narsa o'rniga butun obraz
+  I("costume", "none", "Yo'q", 1, 0),
+  I("costume", "cat", "Kosmik mushuk", 2, 250),
+  I("costume", "penguin", "Pingvin", 2, 250),
+  I("costume", "dino", "Dinozavr", 3, 300),
+  I("costume", "dragon", "Ajdar xudi", 3, 300),
+  I("costume", "wind", "Shamol yuguruvchi", 4, 300),
+  I("costume", "pirate", "Qaroqchi kapitan", 4, 350),
+  I("costume", "forest", "O'rmon devi", 5, 350),
+  I("costume", "night", "Tungi qo'riqchi", 5, 400),
+  I("costume", "ice", "Muz shahzodasi", 6, 450),
+  I("costume", "cyber", "Kiber zirh", 7, 500),
 ];
 
 const BY_KEY = new Map(CHAR_ITEMS.map((it) => [`${it.slot}:${it.id}`, it]));
@@ -129,6 +142,7 @@ export const DEFAULT_LOOK: CharLook = {
   back: "none",
   hand: "none",
   pet: "none",
+  costume: "none",
   power: 0,
 };
 

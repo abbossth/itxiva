@@ -51,26 +51,23 @@ function clampDelta(delta: number, balance: number): number {
 }
 
 /**
- * XP — yozuv bergan coinning faqat musbat qismi: kelgani uchun mukofot XP beradi, jarima XP ni kamaytirmaydi,
- * mukofot bekor qilinsa (masalan "kelgan" xato belgilangan bo'lsa) — berilgan XP qaytariladi.
+ * XP — yozuv ta'siriga teng: kelgani uchun mukofot XP beradi, sababsiz qoldirish jarimasi XP ni ham kamaytiradi
+ * (0 dan pastga emas). Holat o'zgarsa yoki bekor qilinsa — yozuvdagi `xpDelta` bo'yicha aynan qaytariladi.
  */
-function xpDeltaFor(prevAwarded: number, nextAwarded: number): number {
-  return Math.max(nextAwarded, 0) - Math.max(prevAwarded, 0);
-}
 
 async function moveCoins(
   studentId: string | mongoose.Types.ObjectId,
   wantTotal: number,
   wantBalance: number,
-  /** Yozuvning shu o'zgarishdan oldingi `coinsAwarded` qiymati (XP hisobi uchun) */
-  prevAwarded = 0
+  /** XP o'zgarishi (jarimada manfiy; 0 dan pastga tushmaydi) */
+  wantXp = 0
 ): Promise<{ dTotal: number; dBalance: number; dXp: number; totalAfter?: number; balanceAfter?: number }> {
-  if (wantTotal === 0 && wantBalance === 0) return { dTotal: 0, dBalance: 0, dXp: 0 };
+  if (wantTotal === 0 && wantBalance === 0 && wantXp === 0) return { dTotal: 0, dBalance: 0, dXp: 0 };
   const user = await User.findById(studentId).select("totalCoins spendableBalance xp").lean();
   if (!user) return { dTotal: 0, dBalance: 0, dXp: 0 };
   const dTotal = clampDelta(wantTotal, user.totalCoins ?? 0);
   const dBalance = clampDelta(wantBalance, user.spendableBalance ?? 0);
-  const dXp = clampDelta(xpDeltaFor(prevAwarded, prevAwarded + dTotal), user.xp ?? 0);
+  const dXp = clampDelta(wantXp, user.xp ?? 0);
   if (dTotal === 0 && dBalance === 0 && dXp === 0) return { dTotal: 0, dBalance: 0, dXp: 0 };
   const updated = await User.findByIdAndUpdate(
     studentId,
@@ -106,10 +103,13 @@ export async function settleRecordCoins(
     : rules[record.status];
   const prevTotal = record.coinsAwarded ?? 0;
   const prevBalance = record.balanceDelta ?? prevTotal;
+  // XP ham coin kabi: mukofot qo'shadi, jarima ayiradi (eski yozuvlarda jarima XP ga tegmagan — 0 dan pastga emas)
+  const prevXp = record.xpDelta ?? Math.max(prevTotal, 0);
 
-  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance, prevTotal);
+  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance, target - prevXp);
   record.coinsAwarded = prevTotal + moved.dTotal;
   record.balanceDelta = prevBalance + moved.dBalance;
+  record.xpDelta = prevXp + moved.dXp;
   await record.save();
 
   const amount = moved.dTotal || moved.dBalance;
@@ -124,7 +124,7 @@ export async function settleRecordCoins(
     await Penalty.deleteOne({ kind: "absence", refId: session._id, studentId: record.studentId });
   }
 
-  if (amount !== 0) {
+  if (amount !== 0 || moved.dXp !== 0) {
     await CoinLedger.create({
       studentId: record.studentId,
       amount,
@@ -354,9 +354,10 @@ export async function deleteSessionWithCoins(sessionId: string | mongoose.Types.
   for (const record of records) {
     const total = record.coinsAwarded ?? 0;
     const balance = record.balanceDelta ?? total;
-    const moved = await moveCoins(record.studentId, -total, -balance, total);
+    const xp = record.xpDelta ?? Math.max(total, 0);
+    const moved = await moveCoins(record.studentId, -total, -balance, -xp);
     const amount = moved.dTotal || moved.dBalance;
-    if (amount !== 0) {
+    if (amount !== 0 || moved.dXp !== 0) {
       reverted++;
       await CoinLedger.create({
         studentId: record.studentId,
@@ -388,10 +389,12 @@ export async function reapplySessionCoins(
   for (const record of records) {
     const total = record.coinsAwarded ?? 0;
     const balance = record.balanceDelta ?? total;
-    const moved = await moveCoins(record.studentId, total, balance, 0);
-    if (moved.dTotal !== total || moved.dBalance !== balance) {
+    const xp = record.xpDelta ?? Math.max(total, 0);
+    const moved = await moveCoins(record.studentId, total, balance, xp);
+    if (moved.dTotal !== total || moved.dBalance !== balance || moved.dXp !== xp) {
       record.coinsAwarded = moved.dTotal;
       record.balanceDelta = moved.dBalance;
+      record.xpDelta = moved.dXp;
       await record.save();
     }
     const amount = moved.dTotal || moved.dBalance;

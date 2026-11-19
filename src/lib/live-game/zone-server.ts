@@ -134,6 +134,8 @@ export interface ZoneTickResult {
   /** Server qabul qilgan joy (cheklangan bo'lsa — tuzatish uchun) */
   x: number;
   y: number;
+  /** Server vaqti (telefon soatini moslash uchun) */
+  now: number;
 }
 
 const num = (v: unknown, min: number, max: number, fallback: number) => {
@@ -206,16 +208,18 @@ export async function zoneTick(game: CachedGame, studentId: string, input: ZoneT
     total: runners.length,
     x,
     y,
+    now,
   };
 }
 
 /** Proyektor (HTTP yo'li): hamma robotlar (natijani ham hisoblaydi) */
-export async function watchZone(gameId: Id): Promise<{ peers: ZonePeer[]; resolved: number; round: number } | null> {
+export async function watchZone(gameId: Id): Promise<{ peers: ZonePeer[]; resolved: number; round: number; now: number } | null> {
   const game = await loadZoneGame(gameId);
   const z = game?.zone;
   if (!game || !z || game.status !== "zone") return null;
   const resolved = await resolveZoneWaves(game);
-  return { peers: peersOf(z, await loadRunners(game._id, z.round), Date.now()), resolved, round: z.round };
+  const now = Date.now();
+  return { peers: peersOf(z, await loadRunners(game._id, z.round), now), resolved, round: z.round, now };
 }
 
 // ---- Real vaqt xonasi (Cloudflare) bilan bog'lanish ----

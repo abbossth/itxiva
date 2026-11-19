@@ -9,7 +9,7 @@ import { fireConfetti } from "@/lib/confetti";
 import { playDrumroll, playFireworksSound, playPodiumIntro, playPodiumReveal } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
 import { CharacterSvg } from "@/components/character/character-svg";
-import { TEAM_STYLES } from "./live-ui";
+import { TEAM_STYLES, useViewportHeight } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 // Final: g'oliblar sahnasi. Sahna chiroqlari aylanib turadi, ustunlar ustida — sirli siluetlar.
@@ -29,9 +29,9 @@ interface Place {
 
 const COLUMN = [
   // Balandlik ekranga nisbatan — past ekranda ham shohsupa to'liq sig'adi
-  { place: 2 as const, pillar: "min-h-[19vh]", face: "from-slate-200 via-slate-300 to-slate-500", top: "bg-slate-100", text: "text-slate-800", medal: "🥈", glow: "rgba(226,232,240,0.55)" },
-  { place: 1 as const, pillar: "min-h-[25vh]", face: "from-amber-200 via-amber-400 to-amber-600", top: "bg-amber-100", text: "text-amber-950", medal: "🥇", glow: "rgba(251,191,36,0.7)" },
-  { place: 3 as const, pillar: "min-h-[15vh] pb-2", face: "from-orange-200 via-orange-400 to-orange-700", top: "bg-orange-100", text: "text-orange-950", medal: "🥉", glow: "rgba(251,146,60,0.55)" },
+  { place: 2 as const, face: "from-slate-200 via-slate-300 to-slate-500", top: "bg-slate-100", text: "text-slate-800", medal: "🥈", glow: "rgba(226,232,240,0.55)" },
+  { place: 1 as const, face: "from-amber-200 via-amber-400 to-amber-600", top: "bg-amber-100", text: "text-amber-950", medal: "🥇", glow: "rgba(251,191,36,0.7)" },
+  { place: 3 as const, face: "from-orange-200 via-orange-400 to-orange-700", top: "bg-orange-100", text: "text-orange-950", medal: "🥉", glow: "rgba(251,146,60,0.55)" },
 ];
 
 /** Aylanib turuvchi sahna chiroqlari */
@@ -125,13 +125,27 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
   }, []);
 
   const isShown = (place: number) => shown === -1 || place >= shown;
+  // O'lchamlar ekran balandligidan: hammasi (ro'yxat va tugma bilan) skrollsiz sig'adi
+  const vh = useViewportHeight();
+  const charBig = Math.round(Math.min(170, Math.max(80, vh * 0.17)));
+  const charSmall = Math.round(charBig * 0.74);
+  // Ustunda medal, ism va ochko sig'ishi kerak — balandlik undan past bo'lmaydi
+  const pillarH = { 1: Math.max(96, Math.round(vh * 0.19)), 2: Math.max(84, Math.round(vh * 0.15)), 3: Math.max(76, Math.round(vh * 0.12)) } as const;
+  const rest = shown === -1 && state.mode !== "team" ? scored.slice(3, vh > 820 ? 12 : 9) : [];
 
   return (
-    <div className="relative flex flex-col items-center gap-5 overflow-hidden py-4 text-center">
+    <div className="relative flex min-h-0 flex-1 flex-col items-center justify-between gap-3 overflow-hidden pb-1 text-center">
       <Spotlights focus={rolling !== null || shown === -1} />
-      <p className="relative text-sm font-black uppercase tracking-[0.4em] text-amber-200 drop-shadow">{state.mode === "team" ? "G'olib jamoalar" : "G'oliblar"}</p>
+      <div className="relative flex w-full items-center justify-center">
+        <p className="text-sm font-black uppercase tracking-[0.4em] text-amber-200 drop-shadow">{state.mode === "team" ? "G'olib jamoalar" : "G'oliblar"}</p>
+        {shown === -1 && (
+          <Link href="/mentor/live" className="live-pop absolute right-0 inline-flex min-h-[40px] items-center rounded-2xl bg-white/15 px-4 text-sm font-bold ring-1 ring-white/20 backdrop-blur hover:bg-white/25">
+            Yangi o&apos;yin
+          </Link>
+        )}
+      </div>
 
-      <div className="relative flex w-full max-w-5xl items-end justify-center gap-2 pt-6 sm:gap-5">
+      <div className="relative flex min-h-0 w-full max-w-5xl flex-1 items-end justify-center gap-2 sm:gap-5">
         {/* 1-o'rin ortidagi aylanuvchi nur */}
         {isShown(1) && places[0] && (
           <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-[18%]">
@@ -145,7 +159,7 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
             />
           </div>
         )}
-        {COLUMN.map(({ place, pillar, face, top, text, medal, glow }) => {
+        {COLUMN.map(({ place, face, top, text, medal, glow }) => {
           const p = places[place - 1];
           if (!p) return <div key={place} className="flex-1" />;
           const open = isShown(place);
@@ -160,11 +174,11 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
                   <div className="live-drop relative">
                     <span aria-hidden className="podium-burst absolute -inset-[20%] -z-10 rounded-full" style={{ background: `radial-gradient(circle, ${glow} 0%, transparent 65%)` }} />
                     {p.team === undefined ? (
-                      <CharacterSvg look={p.look} size={big ? 170 : 125} mood={shown === -1 || big ? "cheer" : "jump"} pedestal={false} className="drop-shadow-[0_14px_22px_rgba(0,0,0,0.5)]" />
+                      <CharacterSvg look={p.look} size={big ? charBig : charSmall} mood={shown === place ? "cheer" : "happy"} pedestal={false} className="drop-shadow-[0_14px_22px_rgba(0,0,0,0.5)]" />
                     ) : (
                       <div className="flex items-end -space-x-4">
                         {(p.members ?? []).slice(0, 5).map((m, k) => (
-                          <CharacterSvg key={k} look={m.look} size={big ? 90 : 70} mood="cheer" pedestal={false} />
+                          <CharacterSvg key={k} look={m.look} size={Math.round((big ? charBig : charSmall) * 0.55)} mood={shown === place ? "cheer" : "happy"} pedestal={false} />
                         ))}
                       </div>
                     )}
@@ -172,7 +186,7 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
                 ) : (
                   <div className={cn("relative opacity-80", isRolling ? "podium-shake" : "podium-mystery")}>
                     <div style={{ filter: "brightness(0) drop-shadow(0 0 12px rgba(167,139,250,0.8))" }}>
-                      <CharacterSvg look={p.team === undefined ? p.look : null} size={big ? 170 : 125} pedestal={false} still />
+                      <CharacterSvg look={p.team === undefined ? p.look : null} size={big ? charBig : charSmall} pedestal={false} still />
                     </div>
                     <span className="absolute inset-0 flex items-center justify-center text-6xl font-black text-violet-200/80">?</span>
                   </div>
@@ -183,18 +197,17 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
                 <div className={cn("mx-auto h-5 w-full rounded-[50%] opacity-95", top)} />
                 <div
                   className={cn(
-                    "relative -mt-2.5 flex w-full flex-col items-center justify-start gap-0.5 overflow-hidden rounded-b-xl bg-gradient-to-b px-2 pt-3 shadow-2xl",
-                    pillar,
+                    "relative -mt-2.5 flex w-full flex-col items-center justify-start gap-0.5 overflow-hidden rounded-b-xl bg-gradient-to-b px-2 pb-2 pt-2 shadow-2xl",
                     p.team !== undefined ? TEAM_STYLES[p.team]?.bar : face,
                     text
                   )}
-                  style={open ? { boxShadow: `0 0 60px ${glow}` } : undefined}
+                  style={{ minHeight: pillarH[place], ...(open ? { boxShadow: `0 0 60px ${glow}` } : {}) }}
                 >
                   <span className="reward-shine pointer-events-none absolute inset-0" />
-                  <span className={cn("font-mono font-black leading-none", big ? "text-5xl sm:text-6xl" : "text-4xl sm:text-5xl")}>{open ? medal : place}</span>
+                  <span className={cn("font-mono font-black leading-none", vh < 760 ? "text-3xl" : big ? "text-5xl sm:text-6xl" : "text-4xl sm:text-5xl")}>{open ? medal : place}</span>
                   {open ? (
                     <div className="live-intro-up flex w-full flex-col items-center">
-                      <span className={cn("max-w-full truncate font-black", big ? "text-xl sm:text-3xl" : "text-base sm:text-2xl")}>{p.name}</span>
+                      <span className={cn("max-w-full truncate font-black", vh < 760 ? "text-base sm:text-xl" : big ? "text-xl sm:text-3xl" : "text-base sm:text-2xl")}>{p.name}</span>
                       <span className="font-mono text-xs font-bold opacity-80 sm:text-base">{formatNumberUz(p.score)} ochko</span>
                       {p.coins > 0 && <span className="mt-0.5 rounded-full bg-black/15 px-2.5 py-0.5 text-xs font-black sm:text-sm">+{p.coins} coin</span>}
                       {p.members && p.members.length > 0 && (
@@ -215,23 +228,17 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
 
       {shown === -1 && places.length === 0 && <p className="relative text-lg font-bold text-slate-300">Bu o&apos;yinda hech kim ochko to&apos;plamadi.</p>}
 
-      {shown === -1 && state.mode !== "team" && scored.length > 3 && (
-        <ol className="live-pop relative grid w-full max-w-3xl gap-1.5 sm:grid-cols-2">
-          {scored.slice(3, 10).map((p, i) => (
-            <li key={p.id} className="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-left backdrop-blur">
-              <span className="w-6 font-mono font-black text-slate-400">{i + 4}</span>
-              <CharacterSvg look={p.look} size={34} headOnly mood="idle" />
+      {rest.length > 0 && (
+        <ol className="live-pop relative grid w-full max-w-5xl shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {rest.map((p, i) => (
+            <li key={p.id} className="flex h-9 items-center gap-2 rounded-xl bg-white/10 px-2.5 text-left text-sm backdrop-blur">
+              <span className="w-5 font-mono font-black text-slate-400">{i + 4}</span>
+              <CharacterSvg look={p.look} size={26} headOnly still />
               <span className="min-w-0 flex-1 truncate font-bold">{p.name}</span>
               <span className="font-mono font-black">{formatNumberUz(p.score)}</span>
             </li>
           ))}
         </ol>
-      )}
-
-      {shown === -1 && (
-        <Link href="/mentor/live" className="relative inline-flex min-h-[48px] items-center rounded-2xl bg-white/10 px-6 font-bold hover:bg-white/20">
-          Yangi o&apos;yin
-        </Link>
       )}
     </div>
   );

@@ -24,6 +24,7 @@ import { GalaxyPlayer } from "./galaxy/galaxy-race";
 import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
+import { EmotePad } from "./emote-pad";
 import { ModeIntro } from "./live-intro";
 import { TacticView } from "./live-tactics";
 import { isAdventure } from "@/lib/live-game/adventures";
@@ -250,7 +251,11 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         {!state.joined && state.status !== "finished" ? (
           <JoinView state={state} busy={busy} onJoin={join} />
         ) : state.status === "lobby" ? (
-          <Waiting title="Siz o'yindasiz!" text="Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi." look={me?.look} />
+          <div className="quiz-pop flex flex-col items-center gap-2 py-4 text-center">
+            <p className="text-2xl font-black lg:text-4xl">Siz o&apos;yindasiz!</p>
+            <p className="max-w-xs text-sm text-slate-300">Mentor o&apos;yinni boshlashini kuting. Savollar shu yerda chiqadi.</p>
+            <EmotePad gameId={state.id} look={me?.look ?? null} />
+          </div>
         ) : state.status === "question" ? (
           me?.eliminated ? (
             <Waiting title="Siz o'yindan chiqdingiz" text="Jonlar tugadi — oxirigacha tomosha qiling." tone="out" look={me?.look} />
@@ -308,7 +313,7 @@ function Waiting({ title, text, tone = "wait", look }: { title: string; text: st
     <div className="quiz-pop flex flex-col items-center gap-4 py-10 text-center">
       {look !== undefined && (
         <Link href="/profile?tab=character" className="group relative" title="Personajni o'zgartirish">
-          <CharacterSvg look={look} size={130} mood={tone === "out" ? "sad" : tone === "ok" ? "jump" : "idle"} />
+          <CharacterSvg look={look} size={130} mood={tone === "out" ? "sad" : tone === "ok" ? "happy" : "idle"} />
         </Link>
       )}
       <span
@@ -520,7 +525,7 @@ function FinishedView({ state }: { state: LivePlayerState }) {
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
       <Crown className="h-14 w-14 text-amber-300" />
-      {me && <CharacterSvg look={me.look} size={140} mood={me.rank > 0 && me.rank <= 3 ? "cheer" : "idle"} />}
+      {me && <CharacterSvg look={me.look} size={140} mood={me.rank > 0 && me.rank <= 3 ? "happy" : "idle"} />}
       <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">O&apos;yin tugadi</p>
       {me ? (
         <>

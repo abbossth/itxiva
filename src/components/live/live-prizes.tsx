@@ -24,7 +24,7 @@ function GiftReveal({ gift, look, already }: { gift: GiftView; look: GameLook | 
   const preview = { ...(look ?? {}), ...(gift.kind === "item" && gift.slot ? { [gift.slot]: gift.key.split(":")[1] } : { power: gift.power }) };
   return (
     <div className="live-pop relative flex flex-col items-center rounded-3xl bg-slate-950/80 px-5 py-3 ring-2 ring-cyan-300/70 shadow-[0_0_40px_rgba(34,211,238,0.45)]">
-      <CharacterSvg look={preview} size={110} mood="cheer" />
+      <CharacterSvg look={preview} size={110} mood="happy" />
       <span className="text-xs font-black uppercase tracking-widest text-cyan-200">Personaj sovg&apos;asi</span>
       <span className="text-xl font-black text-white">
         {gift.kind === "power" ? "⚡ " : ""}

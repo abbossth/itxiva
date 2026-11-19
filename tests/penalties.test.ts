@@ -141,6 +141,44 @@ describe("sababsiz dars qoldirish", () => {
   });
 });
 
+describe("jarima XP ni ham kamaytiradi", () => {
+  const xpOf = async (id: unknown) => (await User.findById(id).lean())?.xp ?? 0;
+
+  it("sababsiz qoldirish: coin bilan birga XP ham olinadi, 'sababli' qilinsa XP qaytadi; 0 dan pastga tushmaydi", async () => {
+    const { gid, guli, ali } = await setup();
+    await User.updateOne({ _id: guli._id }, { $set: { xp: 100 } });
+    await User.updateOne({ _id: ali._id }, { $set: { xp: 4 } });
+    const first = await lessonDay(gid, "2026-10-05");
+    expect(await xpOf(guli._id)).toBe(90);
+    expect(await xpOf(ali._id)).toBe(0);
+    await lessonDay(gid, "2026-10-07");
+    expect(await xpOf(guli._id)).toBe(60);
+    await attendance.manualUpdateAttendanceAction({ sessionId: first, studentId: guli._id.toString(), status: "excused" });
+    expect(await xpOf(guli._id)).toBe(70);
+    // Kelgan deb tuzatilsa: jarima XP qaytadi va mukofot XP beriladi
+    await attendance.manualUpdateAttendanceAction({ sessionId: first, studentId: guli._id.toString(), status: "present" });
+    expect(await xpOf(guli._id)).toBe(80);
+    const ledger = await CoinLedger.find({ studentId: guli._id, type: "penalty" }).lean();
+    expect(ledger.every((l) => (l.xp ?? 0) < 0)).toBe(true);
+  });
+
+  it("uyga vazifa jarimasi XP ni ham kamaytiradi", async () => {
+    const { group, guli } = await setup();
+    await User.updateOne({ _id: guli._id }, { $set: { xp: 25 } });
+    await Lesson.create({
+      groupId: group._id,
+      quarter: 2,
+      order: 1,
+      title: "CSS",
+      isPublished: true,
+      homework: { isEnabled: true, instructions: "x", attachments: [], dueAt: at("2026-11-11", "16:30"), coinsReward: 20 },
+    });
+    await applyMissedHomeworkPenalties(at("2026-11-11", "16:35"));
+    expect(await xpOf(guli._id)).toBe(15);
+    expect((await CoinLedger.findOne({ studentId: guli._id, type: "penalty" }).lean())?.xp).toBe(-10);
+  });
+});
+
 describe("topshirilmagan uyga vazifa", () => {
   async function homeworkLesson(groupId: import("mongoose").Types.ObjectId, dueAt: Date, title = "HTML") {
     return Lesson.create({

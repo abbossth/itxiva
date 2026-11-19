@@ -1,6 +1,7 @@
 "use client";
 
 import { CharacterSvg } from "@/components/character/character-svg";
+import { emoteOf } from "@/lib/character/emotes";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
@@ -35,7 +36,7 @@ import { ArenaHost } from "./arena/arena-screens";
 import { GalaxyHost } from "./galaxy/galaxy-host";
 import { ZoneHost } from "./zone/zone-host";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
-import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown } from "./live-ui";
+import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown, useViewportHeight } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
 
 const POLL_MS = 1000;
@@ -645,9 +646,56 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   );
 }
 
-function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy: boolean; onStart: () => void; onCancel: () => void }) {
+/** Kutish zalidagi personajlar. Jamoaviyda — har jamoa o'z rangli qatorida (qatorga sig'ganicha ko'p) */
+function LobbyCrowd({ state }: { state: LiveHostState }) {
+  const n = state.players.length;
+  // Kutish zali skrollsiz sig'sin: personaj o'lchami ekran balandligidan
+  const vh = useViewportHeight();
+  const one = (p: LiveHostState["players"][number], i: number, size: number) => (
+    <div key={p.id} className="live-drop relative flex flex-col items-center" style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+      {p.emote && (
+        <span key={`b${p.emote.at}`} className="live-pop absolute -top-3 z-10 rounded-full bg-white px-2 py-0.5 text-lg shadow-lg">
+          {emoteOf(p.emote.id)?.icon}
+        </span>
+      )}
+      <CharacterSvg key={`c${p.emote?.at ?? "idle"}`} look={p.look} size={size} mood="idle" still={n > 40 && !p.emote} emote={p.emote?.id} />
+      <span className="-mt-1 max-w-full truncate rounded-xl bg-white px-2 py-0.5 text-xs font-black text-slate-900 shadow-lg sm:text-sm">{p.name.split(" ")[0]}</span>
+    </div>
+  );
+  if (state.mode !== "team") {
+    const size = Math.round(Math.min(n > 24 ? 62 : 80, Math.max(44, (vh - 430) / (n > 16 ? 2.6 : 1.6))));
+    return <>{state.players.map((p, i) => one(p, i, size))}</>;
+  }
+  const teams = [...new Set([...state.standings.map((t) => t.team), ...state.players.map((p) => p.team)])].sort((a, b) => a - b);
+  const biggest = Math.max(1, ...teams.map((t) => state.players.filter((p) => p.team === t).length));
+  const rowH = Math.max(64, (vh - 400) / Math.max(1, teams.length));
+  const size = Math.round(Math.min(biggest > 14 ? 50 : biggest > 8 ? 62 : 76, rowH * 0.62));
   return (
-    <div className="flex flex-col items-center gap-6 py-6 text-center">
+    <div className="flex w-full flex-col gap-2">
+      {teams.map((t) => {
+        const members = state.players.filter((p) => p.team === t);
+        const name = state.standings.find((x) => x.team === t)?.name ?? `${t + 1}-jamoa`;
+        return (
+          <div key={t} className={cn("flex items-center gap-3 rounded-3xl px-3 py-1.5 ring-1", TEAM_STYLES[t]?.soft)}>
+            <div className="flex w-28 shrink-0 flex-col items-start text-left sm:w-36">
+              <span className={cn("mb-1 h-2 w-10 rounded-full", TEAM_STYLES[t]?.bar)} />
+              <span className="text-base font-black text-white sm:text-xl">{name}</span>
+              <span className="text-xs font-bold text-white/60">{members.length} ta o&apos;yinchi</span>
+            </div>
+            <div className="flex min-h-[48px] flex-1 flex-wrap items-end gap-x-1 gap-y-1">
+              {members.length === 0 ? <span className="self-center text-sm text-white/50">Hali hech kim…</span> : members.map((p, i) => one(p, i, size))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy: boolean; onStart: () => void; onCancel: () => void }) {
+  const vh = useViewportHeight();
+  return (
+    <div className={cn("flex flex-col items-center text-center", vh < 820 ? "gap-3 py-2" : "gap-6 py-6")}>
       <div>
         <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-300">Kutish zali</p>
         <h2 className="mt-2 text-3xl font-black sm:text-5xl">Qo&apos;shiling!</h2>
@@ -662,24 +710,11 @@ function Lobby({ state, busy, onStart, onCancel }: { state: LiveHostState; busy:
           </li>
         ))}
       </ul>
-      <div className="flex min-h-[120px] w-full flex-wrap content-start justify-center gap-2">
+      <div className="flex min-h-[120px] w-full shrink-0 flex-wrap content-start justify-center gap-2">
         {state.players.length === 0 ? (
           <p className="self-center text-sm text-slate-400">Hali hech kim qo&apos;shilmadi…</p>
         ) : (
-          state.players.map((p, i) => (
-            <div key={p.id} className="live-drop flex w-[5.5rem] flex-col items-center sm:w-28" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-              <CharacterSvg look={p.look} size={state.players.length > 24 ? 62 : 80} mood={i % 3 === 0 ? "jump" : "idle"} still={state.players.length > 40} />
-              <span
-                className={cn(
-                  "-mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-xl px-2 py-0.5 text-xs font-black shadow-lg sm:text-sm",
-                  state.mode === "team" ? `ring-1 ${TEAM_STYLES[p.team]?.soft}` : "bg-white text-slate-900"
-                )}
-              >
-                {state.mode === "team" && <span className={cn("h-2 w-2 shrink-0 rounded-full", TEAM_STYLES[p.team]?.dot)} />}
-                <span className="truncate">{p.name.split(" ")[0]}</span>
-              </span>
-            </div>
-          ))
+          <LobbyCrowd state={state} />
         )}
       </div>
       {state.waiting.length > 0 && (
@@ -756,14 +791,40 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
           <SkipForward className="h-4 w-4" /> Natijani ko&apos;rsatish
         </Button>
       </div>
-      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} />
+      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} teams={state.mode === "team" ? state.standings : undefined} />
     </div>
   );
 }
 
 /** Savol paytida: hamma o'quvchilarning personajlari — javob berganlar sakraydi (✓), qolganlar o'ylaydi */
-function AnswerCrowd({ players }: { players: LiveHostState["players"] }) {
+function AnswerCrowd({ players, teams }: { players: LiveHostState["players"]; teams?: LiveHostState["standings"] }) {
   if (players.length === 0) return null;
+  if (teams && teams.length > 0) {
+    const size = players.length > 24 ? 32 : 40;
+    return (
+      <div className="mt-auto flex shrink-0 flex-col gap-1">
+        {teams.map((t) => {
+          const members = players.filter((p) => p.team === t.team).sort((a, b) => Number(b.answered) - Number(a.answered));
+          return (
+            <div key={t.team} className={cn("flex items-center gap-2 rounded-2xl px-2 py-1 ring-1", TEAM_STYLES[t.team]?.soft)}>
+              <span className="w-24 shrink-0 truncate text-left text-sm font-black text-white">{t.name}</span>
+              <span className="w-12 shrink-0 font-mono text-xs font-bold text-white/70">
+                {members.filter((p) => p.answered).length}/{members.length}
+              </span>
+              <div className="flex flex-1 flex-wrap items-end gap-x-0.5">
+                {members.map((p) => (
+                  <span key={p.id} className="relative" title={p.name}>
+                    {p.answered && <span className="live-pop absolute -top-1 right-0 z-10 rounded-full bg-emerald-500 px-1 text-[9px] font-black">✓</span>}
+                    <CharacterSvg look={p.look} size={size} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
   const size = players.length > 28 ? 34 : players.length > 16 ? 42 : 50;
   const ordered = [...players].sort((a, b) => Number(b.answered) - Number(a.answered));
   return (
@@ -778,7 +839,7 @@ function AnswerCrowd({ players }: { players: LiveHostState["players"] }) {
           >
             {p.answered ? "✓" : "…"}
           </span>
-          <CharacterSvg look={p.look} size={size} mood={p.answered ? "jump" : "idle"} pedestal={false} still={players.length > 36} />
+          <CharacterSvg look={p.look} size={size} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36} />
           <span className="max-w-[4.5rem] truncate text-[10px] font-bold text-white/70">{p.name.split(" ")[0]}</span>
         </div>
       ))}
@@ -843,7 +904,7 @@ function RevealView({
           {state.mode === "team" ? (
             <ModePanel state={state} />
           ) : isAdventure(state.mode) ? (
-            <AdventureBoard key={state.index} state={state} />
+            <AdventureBoard key={state.index} state={state} sound={sound} />
           ) : (
             <LiveLeaderboard key={state.index} players={state.players} mode={state.mode} sound={sound} index={state.index} />
           )}
@@ -951,7 +1012,8 @@ function TeamRace({ state }: { state: LiveHostState }) {
   return (
     <div className="space-y-3 rounded-3xl bg-[#0f172a]/70 p-3 ring-1 ring-white/10">
       {state.standings.map((s, i) => {
-        const members = state.players.filter((p) => p.team === s.team).slice(0, 6);
+        const all = state.players.filter((p) => p.team === s.team);
+        const members = all.slice(0, 14);
         const pct = Math.max(6, (s.average / top) * 88);
         return (
           <div key={s.team} className="relative h-20 overflow-hidden rounded-2xl bg-[#1f2937]">
@@ -962,12 +1024,13 @@ function TeamRace({ state }: { state: LiveHostState }) {
               {i === 0 && "👑 "}
               {s.name} <span className="font-mono text-white/70">· {formatNumberUz(s.average)}</span>
             </span>
-            <div className="absolute bottom-0 flex items-end transition-[left] duration-[1600ms] ease-out" style={{ left: `calc(${pct}% - ${members.length * 22 + 20}px)` }}>
+            <div className="absolute bottom-0 flex items-end transition-[left] duration-[1600ms] ease-out" style={{ left: `max(8px, calc(${pct}% - ${members.length * (members.length > 7 ? 16 : 24) + 24}px))` }}>
               {members.map((p, k) => (
-                <span key={p.id} className="-ml-3 first:ml-0" style={{ zIndex: 10 - k }}>
-                  <CharacterSvg look={p.look} size={40} mood={go ? "run" : i === 0 ? "cheer" : "idle"} pedestal={false} />
+                <span key={p.id} className="first:ml-0" style={{ zIndex: 20 - k, marginLeft: k === 0 ? 0 : members.length > 7 ? -22 : -14 }}>
+                  <CharacterSvg look={p.look} size={40} mood={go ? "run" : i === 0 ? "happy" : "idle"} pedestal={false} still={state.players.length > 30} />
                 </span>
               ))}
+              {all.length > members.length && <span className="mb-2 ml-1 rounded-full bg-black/50 px-2 text-xs font-black">+{all.length - members.length}</span>}
             </div>
             <span className="absolute bottom-1 right-6 text-[11px] text-white/50">{s.members} ta</span>
           </div>

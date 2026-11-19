@@ -48,7 +48,7 @@ export interface ILiveGamePlayerData {
   /** Marraga / narigi qirg'oqqa yetgan (poyga, ko'prik) */
   finished: boolean;
   /** Oxirgi natija ta'siri (o'quvchi ekranida va proyektorda ko'rsatiladi) */
-  effect?: { index: number; kind: string; text: string; delta: number; items: string[] } | null;
+  effect?: { index: number; kind: string; text: string; delta: number; items: string[]; zaps?: { to: string; m: number; blocked: boolean }[] } | null;
   /** "Kiber jang" (hamma hammaga qarshi) holati */
   arena?: ILiveArenaPlayer | null;
   /** Jang oldidan xarita uchun ovozi (qaysi jang uchun) */
@@ -59,6 +59,8 @@ export interface ILiveGamePlayerData {
   zone?: ILiveZonePlayer | null;
   /** O'quvchi personaji (qo'shilgan paytdagi ko'rinishi va darajasi) */
   look?: Record<string, unknown> | null;
+  /** Kutish zalidagi oxirgi harakati (emot) */
+  emote?: { id: string; at: number } | null;
   createdAt?: Date | string;
 }
 
@@ -176,6 +178,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     studentId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     name: { type: String, required: true },
     look: { type: Schema.Types.Mixed, default: null },
+    emote: { type: new Schema({ id: String, at: Number }, { _id: false }), default: null },
     team: { type: Number, default: 0 },
     score: { type: Number, default: 0 },
     streak: { type: Number, default: 0 },
@@ -196,7 +199,17 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     progress: { type: Number, default: 0 },
     finished: { type: Boolean, default: false },
     effect: {
-      type: new Schema({ index: Number, kind: String, text: String, delta: Number, items: { type: [String], default: [] } }, { _id: false }),
+      type: new Schema(
+        {
+          index: Number,
+          kind: String,
+          text: String,
+          delta: Number,
+          items: { type: [String], default: [] },
+          zaps: { type: [new Schema({ to: String, m: Number, blocked: Boolean }, { _id: false })], default: [] },
+        },
+        { _id: false }
+      ),
       default: null,
     },
     minigames: {

@@ -1,9 +1,12 @@
 // 3D personaj (three.js): 2D chizmadagi qismlar oddiy shakllardan (shar, kapsula, konus) yig'iladi.
+// Multfilm uslubi: "toon" yoritish (3 pog'onali soya), har qism atrofida to'q kontur (teskari qobiq usuli),
+// yerga tushgan yumshoq soya va ACES rang moslash.
 // Sichqoncha: sudrash — aylantirish (inersiya bilan), bosish — sakrab qo'l silkitadi, kursor tomonga bosh buriladi.
 // Ko'rinmay qolsa (sahifadan chiqib ketsa) — chizish to'xtaydi. Faqat profil sahifasida, kerak bo'lganda yuklanadi.
 
 import type * as T from "three";
 import { DEFAULT_LOOK, OUTFIT_COLORS, tierOf, type GameLook } from "@/lib/character/catalog";
+import { COSTUMES } from "./character-svg";
 
 type Three = typeof import("three");
 
@@ -55,6 +58,9 @@ export class Character3DScene {
   private io: IntersectionObserver;
   private ro: ResizeObserver;
   private disposables: { dispose: () => void }[] = [];
+  private toonRamp: T.DataTexture;
+  private outlineMat: T.MeshBasicMaterial;
+  private shadowTex: T.CanvasTexture;
 
   constructor(
     private THREE: Three,
@@ -66,6 +72,24 @@ export class Character3DScene {
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
+    // Toon soyasi: 3 pog'ona (to'q / o'rta / yorug')
+    this.toonRamp = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat);
+    this.toonRamp.minFilter = THREE.NearestFilter;
+    this.toonRamp.magFilter = THREE.NearestFilter;
+    this.toonRamp.needsUpdate = true;
+    this.outlineMat = new THREE.MeshBasicMaterial({ color: 0x1b1530, side: THREE.BackSide });
+    // Yumshoq soya (radial gradient)
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const cx = c.getContext("2d")!;
+    const grd = cx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, "rgba(0,0,0,0.55)");
+    grd.addColorStop(1, "rgba(0,0,0,0)");
+    cx.fillStyle = grd;
+    cx.fillRect(0, 0, 128, 128);
+    this.shadowTex = new THREE.CanvasTexture(c);
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.touchAction = "none";
     this.renderer.domElement.style.cursor = "grab";
@@ -140,11 +164,51 @@ export class Character3DScene {
     }
   };
 
-  private mat(color: number, opts: Partial<T.MeshStandardMaterialParameters> = {}) {
-    const m = new this.THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, ...opts });
-    if ((opts.metalness ?? 0) > 0.3) m.emissive.setHex(color).multiplyScalar(0.12);
+  /** Material: oddiy qismlar — toon (multfilm), metall va shaffoflar — standart (yaltiraydi) */
+  private mat(color: number, opts: Partial<T.MeshStandardMaterialParameters> = {}): T.Material {
+    const metal = (opts.metalness ?? 0) > 0.3;
+    if (metal || opts.transparent) {
+      const m = new this.THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.05, ...opts });
+      if (metal) m.emissive.setHex(color).multiplyScalar(0.12);
+      this.disposables.push(m);
+      return m;
+    }
+    const m = new this.THREE.MeshToonMaterial({
+      color,
+      gradientMap: this.toonRamp,
+      side: opts.side,
+      emissive: opts.emissive !== undefined ? new this.THREE.Color(opts.emissive as number) : undefined,
+      emissiveIntensity: opts.emissiveIntensity,
+    });
     this.disposables.push(m);
     return m;
+  }
+
+  /** Kontur: har qism orqasida biroz kattaroq, teskari tomoni chizilgan to'q nusxa (kichik va yassi qismlarga emas) */
+  private outline(root: T.Object3D) {
+    const THREE = this.THREE;
+    const list: T.Mesh[] = [];
+    root.traverse((o) => {
+      const m = o as T.Mesh;
+      if (!m.isMesh || m.userData.outline || m.userData.noOutline) return;
+      const mat = m.material as T.Material & { transparent?: boolean; emissiveIntensity?: number; emissive?: T.Color };
+      // Shaffof va nurli (olov, uchqun, toj) qismlarga kontur kerak emas
+      const e = mat.emissive;
+      const glowing = e ? Math.max(e.r, e.g, e.b) * (mat.emissiveIntensity ?? 1) > 0.3 : false;
+      if (mat.transparent || glowing) return;
+      if (m.geometry.type === "ShapeGeometry" || m.geometry.type === "PlaneGeometry") return;
+      m.geometry.computeBoundingSphere();
+      const r = m.geometry.boundingSphere?.radius ?? 0;
+      if (r < 0.07) return;
+      list.push(m);
+    });
+    for (const m of list) {
+      const r = m.geometry.boundingSphere!.radius;
+      const hull = new THREE.Mesh(m.geometry, this.outlineMat);
+      hull.userData.outline = true;
+      hull.scale.setScalar(Math.min(1.14, Math.max(1.03, 1 + 0.032 / r)));
+      m.add(hull);
+    }
   }
 
   private mesh(geo: T.BufferGeometry, mat: T.Material, x = 0, y = 0, z = 0, parent?: T.Object3D) {
@@ -169,10 +233,12 @@ export class Character3DScene {
     this.rig = rig;
     this.root.add(rig);
     const { SphereGeometry, CapsuleGeometry, CylinderGeometry, ConeGeometry, TorusGeometry, BoxGeometry, Group } = THREE;
-    const skin = this.mat(SKIN[look.skin] ?? SKIN.peach, look.skin === "gold" ? { metalness: 0.6, roughness: 0.3 } : look.skin === "galaxy" ? { emissive: 0x4c1d95, emissiveIntensity: 0.4 } : {});
+    const cos = look.costume && look.costume !== "none" ? COSTUMES[look.costume] : undefined;
+    const skin = this.mat(cos?.skin ? hex(cos.skin) : SKIN[look.skin] ?? SKIN.peach, look.skin === "gold" ? { metalness: 0.6, roughness: 0.3 } : look.skin === "galaxy" ? { emissive: 0x4c1d95, emissiveIntensity: 0.4 } : {});
     const main = hex(OUTFIT_COLORS[look.color % OUTFIT_COLORS.length] ?? OUTFIT_COLORS[0]);
     const tier = tierOf(look.level);
     const o = (() => {
+      if (cos) return { body: hex(cos.body), trim: hex(cos.trim), legs: hex(cos.legs), metal: cos.helmet ? 0.35 : 0 };
       switch (look.outfit) {
         case "school":
           return { body: 0x1e3a8a, trim: 0xf8fafc, legs: 0x1e293b, metal: 0 };
@@ -197,6 +263,15 @@ export class Character3DScene {
     const legM = this.mat(o.legs);
     const dark = this.mat(0x0f172a);
 
+    // Yerga va supaga tushgan yumshoq soya
+    const shadowMat = new THREE.MeshBasicMaterial({ map: this.shadowTex, transparent: true, depthWrite: false });
+    this.disposables.push(shadowMat);
+    const floor = this.mesh(new THREE.PlaneGeometry(3.4, 3.4), shadowMat, 0, -0.17, 0);
+    floor.rotation.x = -Math.PI / 2;
+    floor.userData.noOutline = true;
+    const contact = this.mesh(new THREE.PlaneGeometry(1.3, 1.3), shadowMat, 0, 0.012, 0);
+    contact.rotation.x = -Math.PI / 2;
+    contact.userData.noOutline = true;
     // Supa (darajaga qarab material)
     const ped = this.mesh(new CylinderGeometry(0.95, 1.05, 0.18, 48), this.mat(hex(tier.light), { metalness: 0.7, roughness: 0.3 }), 0, -0.09, 0);
     ped.renderOrder = -1;
@@ -252,14 +327,25 @@ export class Character3DScene {
     this.parts.armR = mkArm(0.56);
     this.handItem(look.hand, this.parts.armR);
 
-    // Orqadagi narsalar
-    if (look.back === "cape") {
-      const cape = this.mesh(new CylinderGeometry(0.45, 0.75, 1.1, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), this.mat(0xdc2626, { side: THREE.DoubleSide }), 0, 0.95, -0.05);
-      cape.rotation.y = Math.PI;
+    // Kostyum: ko'krak (qorin) belgisi, dum va plash
+    if (cos?.emblem === "belly") this.mesh(new SphereGeometry(0.34, 20, 16), trimM, 0, 1.0, 0.16).scale.set(1, 1.1, 0.6);
+    if (cos?.tail) {
+      const tail = this.mesh(new CapsuleGeometry(0.09, 0.55, 6, 10), this.mat(hex(cos.tail)), 0.25, 0.7, -0.45);
+      tail.rotation.x = -0.9;
+      tail.rotation.z = -0.5;
+    }
+    const backKind = cos ? (cos.cape ? "costume-cape" : "none") : look.back;
+    if (backKind === "costume-cape" && cos?.cape) {
+      const cape = this.mesh(new CylinderGeometry(0.45, 0.8, 1.15, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), this.mat(hex(cos.cape), { side: THREE.DoubleSide }), 0, 0.95, -0.05);
       this.parts.cape = cape;
     }
-    if (look.back === "backpack") this.mesh(new BoxGeometry(0.62, 0.62, 0.3), this.mat(0x92400e), 0, 1.08, -0.42);
-    if (look.back === "jetpack") {
+    // Orqadagi narsalar
+    if (backKind === "cape") {
+      const cape = this.mesh(new CylinderGeometry(0.45, 0.75, 1.1, 20, 1, true, Math.PI * 0.6, Math.PI * 0.8), this.mat(0xdc2626, { side: THREE.DoubleSide }), 0, 0.95, -0.05);
+      this.parts.cape = cape;
+    }
+    if (backKind === "backpack") this.mesh(new BoxGeometry(0.62, 0.62, 0.3), this.mat(0x92400e), 0, 1.08, -0.42);
+    if (backKind === "jetpack") {
       for (const x of [-0.22, 0.22]) {
         this.mesh(new CylinderGeometry(0.13, 0.13, 0.6, 16), this.mat(0x64748b, { metalness: 0.7, roughness: 0.3 }), x, 1.08, -0.45);
         const f = this.mesh(new ConeGeometry(0.11, 0.35, 12), this.mat(0xf97316, { emissive: 0xf97316, emissiveIntensity: 1.5 }), x, 0.62, -0.45);
@@ -267,13 +353,13 @@ export class Character3DScene {
         this.parts.flames.push(f);
       }
     }
-    if (look.back === "wings" || look.back === "dragon") {
+    if (backKind === "wings" || backKind === "dragon") {
       const shape = new THREE.Shape();
       shape.moveTo(0, 0);
       shape.bezierCurveTo(0.4, 0.5, 1.1, 0.6, 1.2, 0.1);
       shape.bezierCurveTo(0.9, 0.1, 0.9, -0.3, 0.6, -0.4);
       shape.bezierCurveTo(0.4, -0.3, 0.2, -0.2, 0, 0);
-      const wm = look.back === "wings" ? this.mat(0xf8fafc, { side: THREE.DoubleSide }) : this.mat(0x7c3aed, { side: THREE.DoubleSide, metalness: 0.2 });
+      const wm = backKind === "wings" ? this.mat(0xf8fafc, { side: THREE.DoubleSide }) : this.mat(0x7c3aed, { side: THREE.DoubleSide, metalness: 0.2 });
       for (const s of [-1, 1]) {
         const pivot = new Group();
         pivot.position.set(s * 0.15, 1.25, -0.38);
@@ -293,7 +379,7 @@ export class Character3DScene {
     this.parts.head = head;
     this.mesh(new SphereGeometry(0.58, 32, 24), skin, 0, 0, 0, head);
     for (const x of [-0.58, 0.58]) this.mesh(new SphereGeometry(0.13, 12, 10), skin, x, -0.02, 0, head);
-    this.hair(look, head);
+    if (!cos?.noHair) this.hair(look, head);
     // Yuz
     const eyeM = look.eyes === "fire" ? this.mat(0xf97316, { emissive: 0xf97316, emissiveIntensity: 1 }) : look.eyes === "star" ? this.mat(0xfacc15, { emissive: 0xfacc15, emissiveIntensity: 0.6 }) : dark;
     if (look.eyes === "shades" || look.eyes === "visor") {
@@ -311,6 +397,15 @@ export class Character3DScene {
       const c = this.mesh(new SphereGeometry(0.08, 12, 8), this.mat(0xfb7185, { transparent: true, opacity: 0.45 }), x, -0.14, 0.47, head);
       c.scale.set(1, 0.6, 0.3);
     }
+    // Qoshlar
+    if (look.eyes !== "visor") {
+      const browM = this.mat(look.skin === "galaxy" ? 0x2e1065 : 0x3b2314);
+      for (const s of [-1, 1]) {
+        const b = this.mesh(new CapsuleGeometry(0.025, 0.13, 4, 8), browM, s * 0.2, 0.2, 0.53, head);
+        b.rotation.z = Math.PI / 2 + s * 0.12;
+        b.userData.noOutline = true;
+      }
+    }
     if (look.mouth === "mask") {
       this.mesh(new SphereGeometry(0.59, 24, 16, 0, Math.PI * 2, Math.PI * 0.55, Math.PI * 0.3), this.mat(0x1f2937), 0, 0, 0, head);
     } else {
@@ -318,7 +413,8 @@ export class Character3DScene {
       m.rotation.z = Math.PI;
       if (look.mouth === "open") m.scale.set(0.6, 1.4, 1);
     }
-    this.headItem(look, head, main);
+    if (cos) this.costumeHead(cos, head);
+    else this.headItem(look, head, main);
 
     // Hamroh
     if (look.pet !== "none") this.pet(look.pet);
@@ -332,6 +428,7 @@ export class Character3DScene {
       s.userData.h = 0.6 + (i % 4) * 0.45;
       this.parts.sparks.push(s);
     }
+    this.outline(rig);
     if (look.level >= 10) {
       for (let i = 0; i < 3; i++) {
         const s = this.mesh(new SphereGeometry(0.07, 10, 8), this.mat(0xfef08a, { emissive: 0xfef08a, emissiveIntensity: 1.5 }), 0, 0, 0);
@@ -360,6 +457,38 @@ export class Character3DScene {
       }
     if (look.hair === "curly") for (let i = 0; i < 9; i++) this.mesh(new SphereGeometry(0.15, 10, 8), m, Math.cos((i / 9) * Math.PI) * 0.5, 0.42 + Math.sin((i / 9) * Math.PI) * 0.14, 0.05, head);
     if (look.hair === "mohawk") this.mesh(new BoxGeometry(0.12, 0.35, 0.8), this.mat(0xec4899), 0, 0.62, 0, head);
+  }
+
+  /** Kostyum qalpog'i: quloqlar/shoxlar/tikanlar, shlem, shlyapa, niqob */
+  private costumeHead(c: (typeof COSTUMES)[string], head: T.Object3D) {
+    const { SphereGeometry, ConeGeometry, CylinderGeometry, BoxGeometry, TorusGeometry } = this.THREE;
+    if (c.hood) {
+      const m = this.mat(hex(c.hood));
+      const hood = this.mesh(new SphereGeometry(0.65, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.62), m, 0, 0.02, -0.03, head);
+      // Old tomoni yuqoriroq (yuz ochiq), orqasi pastroq
+      hood.rotation.x = -0.8;
+      if (c.ears === "cat") for (const s of [-1, 1]) this.mesh(new ConeGeometry(0.16, 0.34, 4), m, s * 0.36, 0.62, -0.02, head).rotation.z = -s * 0.35;
+      if (c.ears === "horns") for (const s of [-1, 1]) this.mesh(new ConeGeometry(0.07, 0.32, 10), this.mat(0xfef3c7), s * 0.28, 0.7, -0.05, head).rotation.z = -s * 0.4;
+      if (c.ears === "spikes") for (let i = 0; i < 4; i++) this.mesh(new ConeGeometry(0.08, 0.22, 6), this.mat(hex(c.trim)), 0, 0.66 - i * 0.12, -0.12 - i * 0.16, head).rotation.x = -0.4 - i * 0.35;
+    }
+    if (c.helmet) {
+      this.mesh(new SphereGeometry(0.7, 32, 24), this.mat(hex(c.body), { metalness: 0.4, roughness: 0.25 }), 0, 0, 0, head);
+      this.mesh(new BoxGeometry(0.86, 0.2, 0.12), this.mat(0x22d3ee, { emissive: 0x0891b2, emissiveIntensity: 0.9 }), 0, 0.05, 0.62, head);
+    }
+    if (c.mask) this.mesh(new TorusGeometry(0.585, 0.08, 8, 40), this.mat(hex(c.mask)), 0, 0.04, 0, head).rotation.x = Math.PI / 2;
+    if (c.hat === "pirate") {
+      this.mesh(new CylinderGeometry(0.8, 0.8, 0.06, 3), this.mat(0x111827), 0, 0.42, 0, head);
+      this.mesh(new SphereGeometry(0.45, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(0x111827), 0, 0.42, 0, head);
+    }
+    if (c.hat === "ice") for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      this.mesh(new ConeGeometry(0.06, 0.3, 6), this.mat(0xe0f2fe, { transparent: true, opacity: 0.9 }), Math.sin(a) * 0.4, 0.72, Math.cos(a) * 0.4, head);
+    }
+    if (c.hat === "leaf") for (let i = 0; i < 5; i++) {
+      const leaf = this.mesh(new SphereGeometry(0.12, 10, 8), this.mat(i % 2 ? 0x84cc16 : 0x65a30d), -0.36 + i * 0.18, 0.66, 0, head);
+      leaf.scale.set(0.6, 1.6, 0.4);
+    }
+    if (c.eyepatch) this.mesh(new SphereGeometry(0.11, 12, 10), this.mat(0x111827), 0.2, 0.04, 0.55, head).scale.set(1, 1, 0.4);
   }
 
   private headItem(look: GameLook, head: T.Object3D, main: number) {
@@ -537,6 +666,9 @@ export class Character3DScene {
     window.removeEventListener("pointermove", this.onMove);
     window.removeEventListener("pointerup", this.onUp);
     for (const d of this.disposables) d.dispose();
+    this.toonRamp.dispose();
+    this.outlineMat.dispose();
+    this.shadowTex.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
