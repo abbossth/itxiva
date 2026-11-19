@@ -11,6 +11,7 @@ import { requireMentor } from "@/lib/auth/guards";
 import { awardCoins, syncLevel } from "@/lib/gamification/award";
 import { notify } from "@/lib/notifications/notify";
 import { dayKey } from "@/lib/gamification/periods";
+import { compareUz } from "@/lib/sort-uz";
 
 // Mentor: o'quvchilarga qo'lda coin/XP berish va xato yozilgan coin/XP ni tuzatish.
 // Yozuv hech qachon o'chirilmaydi — summasi o'zgartiriladi (bekor qilish = 0). Aks holda mukofot kaliti bo'shab,
@@ -259,7 +260,7 @@ export async function getGroupCoinBatchesAction(groupId: string, sign: "minus" |
         const freq = new Map<number, number>();
         for (const e of b.entries) freq.set(e.amount, (freq.get(e.amount) ?? 0) + 1);
         const amount = [...freq.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? 0;
-        return { ...b, amount, entries: b.entries.sort((x, y) => x.name.localeCompare(y.name)) };
+        return { ...b, amount, entries: b.entries.sort((x, y) => compareUz(x.name, y.name)) };
       })
       // Avval ko'p o'quvchiga tegishli, keyin yangilari
       .sort((a, b) => b.entries.length - a.entries.length || b.day.localeCompare(a.day))

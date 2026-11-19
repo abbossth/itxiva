@@ -37,6 +37,7 @@ import {
   recomputeSummary,
   settleRecordCoins,
 } from "@/lib/attendance/core";
+import { compareUz } from "@/lib/sort-uz";
 
 /** Darsda qatnashgan deb hisoblanadigan holatlar */
 const ATTENDED: AttendanceStatus[] = ["present", "late"];
@@ -205,6 +206,22 @@ export async function rotateAttendanceSessionAction(
 /**
  * Projector view data for mentor screen
  */
+// QR rasmi kod almashguncha bir xil — har 3 soniyalik so'rovda qayta chizilmaydi
+const qrCache = new Map<string, string>();
+async function projectorQr(link: string): Promise<string> {
+  const hit = qrCache.get(link);
+  if (hit) return hit;
+  try {
+    const url = await QRCode.toDataURL(link, { width: 420, margin: 2, color: { dark: "#0F172A", light: "#FFFFFF" } });
+    if (qrCache.size > 200) qrCache.clear();
+    qrCache.set(link, url);
+    return url;
+  } catch (err) {
+    console.error("QR Code generation error:", err);
+    return "";
+  }
+}
+
 export async function getAttendanceSessionForProjector(sessionId: string) {
   await requireMentor();
   await connectToDatabase();
@@ -212,7 +229,12 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
   const attSession = await AttendanceSession.findById(sessionId).lean();
   if (!attSession) return null;
 
-  const group = await Group.findById(attSession.groupId).lean();
+  // Proyektor har 3 s da so'raydi: guruh, yozuvlar va o'quvchilar bir vaqtda (ketma-ket emas)
+  const [group, allRecords, students] = await Promise.all([
+    Group.findById(attSession.groupId).select("name shortName grade schedule").lean(),
+    AttendanceRecord.find({ sessionId }).sort({ markedAt: -1 }).populate("studentId", "fullName login").lean(),
+    User.find({ groupId: attSession.groupId, role: "student" }).select("fullName login").lean(),
+  ]);
 
   // Calculate elapsed time
   const elapsedSeconds = Math.floor(
@@ -220,18 +242,11 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
   );
 
   // Fetch attendees
-  const allRecords = await AttendanceRecord.find({ sessionId })
-    .sort({ markedAt: -1 })
-    .populate("studentId", "fullName login")
-    .lean();
   // Davomat paytida o'chirilgan o'quvchining yozuvi bazada qoladi, lekin o'quvchisi yo'q (populate null qaytaradi).
   // Ekran har bir yozuvda ism kutadi — bunday yozuvlar ro'yxatga kiritilmaydi.
   const records = allRecords.filter((r) => r.studentId);
 
   // Guruhning barcha o'quvchilari: jami soni va hali belgilanmaganlar (kelmaganlar) ro'yxati uchun
-  const students = await User.find({ groupId: attSession.groupId, role: "student" })
-    .select("fullName login")
-    .lean();
   const totalStudents = students.length;
   const markedIds = new Set(
     records.map((r) => (r.studentId as unknown as { _id: mongoose.Types.ObjectId } | null)?._id.toString())
@@ -239,24 +254,12 @@ export async function getAttendanceSessionForProjector(sessionId: string) {
   const absentStudents = students
     .filter((st) => !markedIds.has(st._id.toString()))
     .map((st) => ({ _id: st._id.toString(), fullName: st.fullName, login: st.login }))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    .sort((a, b) => compareUz(a.fullName, b.fullName));
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://itxiva.uz";
   const deepLink = `${appUrl}/a/${attSession.currentToken}`;
 
-  let qrDataUrl = "";
-  try {
-    qrDataUrl = await QRCode.toDataURL(deepLink, {
-      width: 420,
-      margin: 2,
-      color: {
-        dark: "#0F172A",
-        light: "#FFFFFF",
-      },
-    });
-  } catch (err) {
-    console.error("QR Code generation error:", err);
-  }
+  const qrDataUrl = await projectorQr(deepLink);
 
   const secondsRemaining = Math.max(
     0,
@@ -780,7 +783,7 @@ export async function getAttendanceSessionDetail(sessionId: string): Promise<Ses
         !isSessionFinalized(attSession) && !attSession.isManual ? lessonEndOf(attSession, group?.schedule).toISOString() : null,
     },
     group: group ? { _id: group._id.toString(), name: group.name, grade: group.grade } : null,
-    roster: [...rows.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    roster: [...rows.values()].sort((a, b) => compareUz(a.fullName, b.fullName)),
   };
 }
 

@@ -24,6 +24,7 @@ import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import { notifyGroup } from "@/lib/notifications/notify";
 import { formatDateTimeUz } from "@/lib/utils";
 import { trackMaterialView } from "@/lib/gamification/quests";
+import { compareUz } from "@/lib/sort-uz";
 
 export async function getLessonsByGroupAndQuarter({
   groupId,
@@ -586,7 +587,7 @@ export async function getLinkedLessons(lessonId: string): Promise<LinkedLessonIn
         quizOpen: quizOf.has(s._id.toString()) ? Boolean(quizOf.get(s._id.toString())) : null,
       };
     })
-    .sort((a, b) => a.groupName.localeCompare(b.groupName));
+    .sort((a, b) => compareUz(a.groupName, b.groupName));
 }
 
 /** Darsni boshqa guruhlarga ham qo'shadi: har biriga bog'langan nusxa (testi bilan) yaratiladi */

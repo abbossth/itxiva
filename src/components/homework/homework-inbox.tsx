@@ -12,6 +12,7 @@ import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 import type { HomeworkInboxItem } from "@/actions/homework.actions";
 import { IntegrityChips } from "@/components/homework/integrity-report";
+import { compareUz } from "@/lib/sort-uz";
 
 type Tab = "pending" | "recent";
 
@@ -42,7 +43,7 @@ export function HomeworkInbox({
       g.count++;
       map.set(item.groupId, g);
     }
-    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    return [...map.values()].sort((a, b) => compareUz(a.label, b.label));
   }, [pending]);
   const [groupId, setGroupId] = useState(groups.some((g) => g.id === initialGroupId) ? initialGroupId! : "");
 

@@ -31,6 +31,7 @@ import { User } from "@/lib/db/models/user.model";
 import { after } from "next/server";
 import { notifyFinishedExams } from "@/lib/notifications/scheduled";
 import { MAX_EXAM_VIOLATIONS, shiftedStartForUnlock } from "@/lib/exam-proctoring";
+import { compareUz } from "@/lib/sort-uz";
 
 export type ActionState<T = unknown> = {
   success: boolean;
@@ -905,15 +906,18 @@ export async function getExamsForMentor(): Promise<
     await requireMentor();
     await connectDB();
 
-    const exams = await Exam.find().sort({ createdAt: -1 }).populate("groupIds", "name").lean();
-    const examIds = exams.map((e) => e._id);
-
-    const submissionsCounts = await ExamSubmission.aggregate([
-      { $match: { examId: { $in: examIds }, status: { $in: ["submitted", "graded"] } } },
-      // Bir o'quvchining bir necha urinishi bitta topshirgan o'quvchi sifatida sanaladi
-      { $group: { _id: { examId: "$examId", studentId: "$studentId" } } },
-      { $group: { _id: "$_id.examId", count: { $sum: 1 } } },
+    // Ro'yxatga savollarning faqat soni kerak: savollar va to'g'ri javoblar sahifaga yuborilmaydi
+    const [exams, questionCounts, submissionsCounts] = await Promise.all([
+      Exam.find().select("-questions").sort({ createdAt: -1 }).populate("groupIds", "name").lean(),
+      Exam.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([{ $project: { n: { $size: { $ifNull: ["$questions", []] } } } }]),
+      ExamSubmission.aggregate([
+        { $match: { status: { $in: ["submitted", "graded"] } } },
+        // Bir o'quvchining bir necha urinishi bitta topshirgan o'quvchi sifatida sanaladi
+        { $group: { _id: { examId: "$examId", studentId: "$studentId" } } },
+        { $group: { _id: "$_id.examId", count: { $sum: 1 } } },
+      ]),
     ]);
+    const questionCount = new Map(questionCounts.map((q) => [q._id.toString(), q.n]));
 
     const countMap = new Map<string, number>();
     submissionsCounts.forEach((c) => countMap.set(c._id.toString(), c.count));
@@ -936,14 +940,8 @@ export async function getExamsForMentor(): Promise<
         passingScore: exam.passingScore,
         isPublished: exam.isPublished,
         isResultsPublished: exam.isResultsPublished,
-        questions: exam.questions.map((q) => ({
-          _id: q._id?.toString(),
-          type: q.type,
-          prompt: q.prompt,
-          options: q.options || [],
-          correctAnswers: q.correctAnswers || [],
-          points: q.points,
-        })),
+        questions: [],
+        questionCount: questionCount.get(eId) ?? 0,
         createdAt: exam.createdAt?.toString(),
         updatedAt: exam.updatedAt?.toString(),
       };
@@ -1253,7 +1251,7 @@ export async function getExamSubmissionsForMentor(examId: string): Promise<
     // Bir o'quvchining urinishlari yonma-yon, yangisi tepada
     rows.sort(
       (a, b) =>
-        (a.studentId?.fullName || "").localeCompare(b.studentId?.fullName || "") ||
+        compareUz(a.studentId?.fullName || "", b.studentId?.fullName || "") ||
         String(a.studentId?._id ?? "").localeCompare(String(b.studentId?._id ?? "")) ||
         b.attemptNumber - a.attemptNumber
     );

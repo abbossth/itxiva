@@ -181,6 +181,7 @@ const ExamSubmissionSchema = new Schema<IExamSubmission>(
 );
 
 ExamSubmissionSchema.index({ examId: 1, studentId: 1, attemptNumber: 1 }, { unique: true });
+ExamSubmissionSchema.index({ submittedAt: -1 });
 
 export const ExamSubmission: Model<IExamSubmission> =
   mongoose.models.ExamSubmission ||

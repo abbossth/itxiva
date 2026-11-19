@@ -247,7 +247,7 @@ export function ExamsManager({ initialExams, activeQuarter }: ExamsManagerProps)
                   </div>
                   <div className="flex items-center gap-1.5">
                     <FileCheck className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                    <span>{exam.questions.length} ta savol</span>
+                    <span>{exam.questionCount ?? exam.questions.length} ta savol</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />

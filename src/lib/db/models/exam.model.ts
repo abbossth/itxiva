@@ -36,6 +36,8 @@ export interface IExamData {
   /** Mentorga "imtihon yakunlandi" xabari yuborilgan vaqt (ikki marta yuborilmasligi uchun) */
   finishedNotifiedAt?: Date | string | null;
   questions: IExamQuestion[];
+  /** Ro'yxat uchun: savollar yuborilmaganda ularning soni */
+  questionCount?: number;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }

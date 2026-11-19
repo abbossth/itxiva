@@ -51,6 +51,7 @@ const OrderSchema = new Schema<IOrder>(
 
 OrderSchema.index({ studentId: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, createdAt: -1 });
+OrderSchema.index({ createdAt: -1 });
 // Do'kon kartalaridagi "nechta o'quvchi sotib oldi" soni
 OrderSchema.index({ productId: 1, status: 1 });
 

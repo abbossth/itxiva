@@ -231,9 +231,13 @@ async function audienceStudents(a: Pick<IAnnouncement, "audience" | "groupIds" |
   });
 }
 
-async function audienceLabel(a: Pick<IAnnouncement, "audience" | "groupIds" | "grades">): Promise<string> {
+function audienceLabelSync(a: Pick<IAnnouncement, "audience" | "grades">): string {
   if (a.audience === "all") return "Barcha o'quvchilar";
-  if (a.audience === "grades") return `${[...(a.grades ?? [])].sort((x, y) => x - y).join(", ")}-sinflar`;
+  return `${[...(a.grades ?? [])].sort((x, y) => x - y).join(", ")}-sinflar`;
+}
+
+async function audienceLabel(a: Pick<IAnnouncement, "audience" | "groupIds" | "grades">): Promise<string> {
+  if (a.audience !== "groups") return audienceLabelSync(a);
   const groups = await Group.find({ _id: { $in: a.groupIds } }).select("name shortName").lean();
   return groups.map((g) => groupShortName(g)).join(", ") || "Guruhlar";
 }
@@ -243,7 +247,10 @@ export async function getAnnouncementsForMentor(): Promise<AnnouncementListItem[
   await connectToDatabase();
   const list = await Announcement.find({}).sort({ createdAt: -1 }).limit(200);
   const ids = list.map((a) => a._id);
-  const viewRows = await AnnouncementView.aggregate<{ _id: mongoose.Types.ObjectId; seen: number; dismissed: number; clicked: number }>([
+  // Guruh nomlari bir marta (har e'lon uchun alohida so'rov emas)
+  const namedIds = [...new Set(list.filter((a) => a.audience === "groups").flatMap((a) => a.groupIds.map(String)))];
+  const [viewRows, groups, named] = await Promise.all([
+    AnnouncementView.aggregate<{ _id: mongoose.Types.ObjectId; seen: number; dismissed: number; clicked: number }>([
     { $match: { announcementId: { $in: ids } } },
     {
       $group: {
@@ -253,10 +260,13 @@ export async function getAnnouncementsForMentor(): Promise<AnnouncementListItem[
         clicked: { $sum: { $cond: [{ $gt: ["$clicks", 0] }, 1, 0] } },
       },
     },
+    ]),
+    Group.find({ isActive: true }).select("_id grade").lean(),
+    namedIds.length > 0 ? Group.find({ _id: { $in: namedIds } }).select("name shortName").lean() : [],
   ]);
   const byId = new Map(viewRows.map((r) => [String(r._id), r]));
+  const groupLabel = new Map(named.map((g) => [String(g._id), groupShortName(g)]));
   // Auditoriya soni: guruhlar va har guruhdagi o'quvchilar soni bir marta olinadi
-  const groups = await Group.find({ isActive: true }).select("_id grade").lean();
   const perGroup = new Map(
     (
       await User.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
@@ -271,6 +281,8 @@ export async function getAnnouncementsForMentor(): Promise<AnnouncementListItem[
         a.audience === "all" ? true : a.audience === "groups" ? a.groupIds.some((id) => String(id) === String(g._id)) : a.grades.includes(g.grade)
       )
       .reduce((s, g) => s + (perGroup.get(String(g._id)) ?? 0), 0);
+  const labelOf = (a: IAnnouncement) =>
+    a.audience === "groups" ? a.groupIds.map((id) => groupLabel.get(String(id))).filter(Boolean).join(", ") || "Guruhlar" : audienceLabelSync(a);
   return Promise.all(
     list.map(async (a) => {
       const r = byId.get(a._id.toString());
@@ -278,7 +290,7 @@ export async function getAnnouncementsForMentor(): Promise<AnnouncementListItem[
       return {
         ...toMentorView(a),
         active: announcementActive(a),
-        audienceLabel: await audienceLabel(a),
+        audienceLabel: labelOf(a),
         stats: { audience, seen: r?.seen ?? 0, dismissed: r?.dismissed ?? 0, clicked: r?.clicked ?? 0 },
       };
     })

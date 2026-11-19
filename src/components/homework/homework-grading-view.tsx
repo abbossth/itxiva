@@ -34,6 +34,7 @@ import {
   describeDue,
 } from "@/lib/homework-status";
 import { cn, formatDateTimeUz } from "@/lib/utils";
+import { compareUz } from "@/lib/sort-uz";
 
 type TabId = "submitted" | "graded" | "returned" | "missing" | "all";
 
@@ -74,7 +75,7 @@ export function HomeworkGradingView({
   );
 
   const rows = useMemo(
-    () => [...roster.rows].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || a.fullName.localeCompare(b.fullName)),
+    () => [...roster.rows].sort((a, b) => STATE_ORDER[a.state] - STATE_ORDER[b.state] || compareUz(a.fullName, b.fullName)),
     [roster.rows]
   );
   const counts = useMemo(() => {

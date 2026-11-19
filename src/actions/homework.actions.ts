@@ -30,6 +30,7 @@ import { notify, notifyMentors, sendNotifications } from "@/lib/notifications/no
 import { formatDateTimeUz } from "@/lib/utils";
 import { groupShortName } from "@/lib/group-name";
 import { ActionResult } from "./auth.actions";
+import { compareUz } from "@/lib/sort-uz";
 
 const isObjectId = (id: unknown): id is string => typeof id === "string" && mongoose.isValidObjectId(id);
 
@@ -455,10 +456,30 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
   await requireMentor();
   await connectToDatabase();
 
-  type Row = SubmissionLean & { lessonId: mongoose.Types.ObjectId; studentId: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId };
+  type Row = Pick<SubmissionLean, "_id" | "status" | "submittedAt" | "isLate" | "attempt" | "score" | "integrity"> & {
+    lessonId: mongoose.Types.ObjectId;
+    studentId: mongoose.Types.ObjectId;
+    hasText: boolean;
+    nLinks: number;
+    nFiles: number;
+  };
+  // Ro'yxat uchun javob matni, havolalar va fayllar yuklanmaydi — baza faqat bor-yo'qligi va sonini qaytaradi
+  const fields = {
+    lessonId: 1,
+    studentId: 1,
+    status: 1,
+    submittedAt: 1,
+    isLate: 1,
+    attempt: 1,
+    score: 1,
+    integrity: 1,
+    hasText: { $gt: [{ $strLenCP: { $trim: { input: { $ifNull: ["$text", ""] } } } }, 0] },
+    nLinks: { $size: { $ifNull: ["$links", []] } },
+    nFiles: { $size: { $ifNull: ["$files", []] } },
+  };
   const [pendingDocs, recentDocs] = await Promise.all([
-    HomeworkSubmission.find({ status: "submitted" }).sort({ submittedAt: 1 }).limit(500).lean<Row[]>(),
-    HomeworkSubmission.find({ status: { $in: ["graded", "returned"] } }).sort({ gradedAt: -1, submittedAt: -1 }).limit(50).lean<Row[]>(),
+    HomeworkSubmission.find({ status: "submitted" }).select(fields).sort({ submittedAt: 1 }).limit(500).lean<Row[]>(),
+    HomeworkSubmission.find({ status: { $in: ["graded", "returned"] } }).select(fields).sort({ gradedAt: -1, submittedAt: -1 }).limit(50).lean<Row[]>(),
   ]);
   const all = [...pendingDocs, ...recentDocs];
   if (all.length === 0) return { pending: [], recent: [] };
@@ -495,9 +516,9 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
         isLate: Boolean(s.isLate),
         attempt: s.attempt ?? 1,
         score: s.score ?? null,
-        hasText: Boolean(s.text?.trim()),
-        links: s.links?.length ?? 0,
-        files: s.files?.length ?? 0,
+        hasText: Boolean(s.hasText),
+        links: s.nLinks ?? 0,
+        files: s.nFiles ?? 0,
         integrity: toIntegrityView(s.integrity, true),
       },
     ];
@@ -731,7 +752,7 @@ export async function getHomeworkRoster(lessonId: string): Promise<HomeworkRoste
     },
     group: group ? { _id: group._id.toString(), name: group.name, grade: group.grade } : null,
     task: toTask(lesson.homework),
-    rows: [...rows.values()].sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    rows: [...rows.values()].sort((a, b) => compareUz(a.fullName, b.fullName)),
   };
 }
 

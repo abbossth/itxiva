@@ -92,15 +92,15 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
   await requireMentor();
   if (typeof studentId !== "string" || !mongoose.isValidObjectId(studentId)) return null;
 
-  const report = await getStudentReport(studentId);
-  if (!report) return null;
   await connectToDatabase();
-
-  const [user, profile, logs] = await Promise.all([
+  // Hisobot va shaxsiy ma'lumotlar bir vaqtda yuklanadi
+  const [report, user, profile, logs] = await Promise.all([
+    getStudentReport(studentId),
     User.findById(studentId).select("groupId createdAt mustChangePassword telegram.chatId").lean(),
     StudentProfile.findOne({ studentId }).lean(),
     AuditLog.find({ targetUserId: studentId }).sort({ createdAt: -1 }).limit(30).lean(),
   ]);
+  if (!report) return null;
 
   return {
     report,

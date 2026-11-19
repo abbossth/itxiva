@@ -37,6 +37,7 @@ import { formatTimeUz } from "@/lib/utils";
 import { ATTENDANCE_COINS, coinRuleLabel } from "@/lib/attendance-status";
 import { ExcuseStudentsDialog, type ExcuseCandidate } from "./excuse-students-dialog";
 import { playCheckInSound, unlockSound } from "@/lib/sound";
+import { compareUz } from "@/lib/sort-uz";
 
 interface AttendeeRecord {
   _id: string;
@@ -278,7 +279,7 @@ export function ProjectorScreen({ initialData }: ProjectorScreenProps) {
     ...data.records
       .filter((r) => r.status === "absent")
       .map((r) => ({ id: r.studentId._id, fullName: r.studentId.fullName, login: r.studentId.login })),
-  ].sort((a, b) => a.fullName.localeCompare(b.fullName));
+  ].sort((a, b) => compareUz(a.fullName, b.fullName));
   const lessonEndLabel = formatTimeUz(data.lessonEndsAt);
 
   const undoExcuse = async (studentId: string) => {

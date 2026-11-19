@@ -136,6 +136,8 @@ CoinLedgerSchema.index(
   { unique: true, partialFilterExpression: { idempotencyKey: { $type: "string" } } }
 );
 CoinLedgerSchema.index({ type: 1, createdAt: -1 });
+// Hisobotlar: davr bo'yicha (guruh tanlanmaganda)
+CoinLedgerSchema.index({ createdAt: -1 });
 
 export const CoinLedger: Model<ICoinLedger> =
   mongoose.models.CoinLedger ||

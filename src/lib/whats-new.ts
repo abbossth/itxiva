@@ -29,6 +29,34 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-reports-2026-11",
+    date: "2026-11-19",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Hisobotlar va ro'yxatlar yangilandi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📊",
+        title: "Hisobotlar tezroq ochiladi",
+        text: "«Hisobotlar» sahifasi (ayniqsa «O'quv yili» davri) endi ancha tez yuklanadi: coinlar baza ichida hisoblanadi, bo'limlar bir vaqtda yuklanadi. Uyga vazifalar qutisi, imtihonlar va e'lonlar ro'yxati ham yengillashdi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔤",
+        title: "Ismlar o'zbek alifbosi tartibida",
+        text: "Jadvallarda ismlar endi hamma joyda bir xil — o'zbek alifbosi bo'yicha saralanadi: Oʻ, Gʻ, Sh, Ch harflari Z dan keyin keladi. Avval hisobot jadvali ochilganda tartib bir lahzada o'zgarib ketardi — bu tuzatildi.",
+      },
+      {
+        art: "emoji",
+        emoji: "👥",
+        title: "Guruhdagi o'quvchilar soni doim to'g'ri",
+        text: "Guruh kartochkasi va guruh sahifasidagi o'quvchilar soni endi har safar bazadan sanaladi — o'quvchini arxivlash yoki tiklashdan keyin ham to'g'ri ko'rinadi. Davomat proyektori ham serverga kamroq yuk beradi.",
+      },
+    ],
+    cta: { label: "Hisobotlarni ochish", href: "/mentor/reports" },
+  },
+  {
     id: "mentor-live-2026-11",
     date: "2026-11-19",
     audience: "mentor",

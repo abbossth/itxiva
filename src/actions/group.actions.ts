@@ -15,8 +15,16 @@ export async function getGroups() {
   const session = await requireAuth();
 
   if (session.role === "mentor") {
-    const groups = await Group.find({ isActive: true }).sort({ grade: 1, name: 1 }).lean();
-    return JSON.parse(JSON.stringify(groups)) as IGroup[];
+    // O'quvchilar soni bazadan jonli sanaladi: saqlangan son arxivlash/tiklashdan keyin eskirib qolishi mumkin edi
+    const [groups, counts] = await Promise.all([
+      Group.find({ isActive: true }).sort({ grade: 1, name: 1 }).lean(),
+      User.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
+        { $match: { role: "student", groupId: { $ne: null } } },
+        { $group: { _id: "$groupId", n: { $sum: 1 } } },
+      ]),
+    ]);
+    const countOf = new Map(counts.map((c) => [String(c._id), c.n]));
+    return JSON.parse(JSON.stringify(groups.map((g) => ({ ...g, studentCount: countOf.get(String(g._id)) ?? 0 })))) as IGroup[];
   } else {
     if (!session.groupId) return [];
     const group = await Group.findById(session.groupId).lean();
@@ -29,9 +37,9 @@ export async function getGroupById(id: string) {
   await connectToDatabase();
   await requireGroupAccess(id);
 
-  const group = await Group.findById(id).lean();
+  const [group, studentCount] = await Promise.all([Group.findById(id).lean(), User.countDocuments({ groupId: id, role: "student" })]);
   if (!group) return null;
-  return JSON.parse(JSON.stringify(group)) as IGroup;
+  return JSON.parse(JSON.stringify({ ...group, studentCount })) as IGroup;
 }
 
 export async function createGroupAction(input: GroupInput) {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Filter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { compareUz } from "@/lib/sort-uz";
 
 // Jadval ustunlarini saralash va filtrlash: ustun sarlavhasi bosilganda kichik menyu ochiladi.
 // Har jadval o'z ko'rinishini saqlaydi — faqat sarlavhadagi tugma va qatorlar ro'yxati shu hookdan olinadi.
@@ -90,7 +91,7 @@ export function useTableControls<R>(rows: R[], columns: ColumnDef<R>[], initialS
           const bn = b.v === null || b.v === undefined || b.v === "";
           // Qiymati yo'qlar har doim oxirida
           if (an || bn) return an && bn ? a.i - b.i : an ? 1 : -1;
-          const cmp = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v), "uz", { numeric: true });
+          const cmp = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : compareUz(String(a.v), String(b.v));
           return dir * cmp || a.i - b.i;
         })
         .map((x) => x.r);
@@ -113,7 +114,7 @@ export function useTableControls<R>(rows: R[], columns: ColumnDef<R>[], initialS
     return [...counts.entries()]
       .map(([k, x]) => ({ key: k, ...x }))
       .sort((a, b) =>
-        typeof a.raw === "number" && typeof b.raw === "number" ? a.raw - b.raw : a.label.localeCompare(b.label, "uz", { numeric: true })
+        typeof a.raw === "number" && typeof b.raw === "number" ? a.raw - b.raw : compareUz(a.label, b.label)
       );
   };
 

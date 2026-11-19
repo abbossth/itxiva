@@ -16,6 +16,7 @@ import { Order, OrderStatus } from "@/lib/db/models/order.model";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
 import { latestAttempts } from "@/lib/exam-attempts";
 import { dateFromKey, addDaysToKey, toDateKey } from "@/lib/schedule";
+import { compareUz } from "@/lib/sort-uz";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : null);
@@ -103,14 +104,46 @@ export async function getReportData(params: {
   const studentIds = students.map((s) => s._id);
   const nameOfGroup = (id?: unknown) => (id ? groupName.get(String(id)) ?? "—" : "Guruhsiz");
 
+  // Bo'limlar bir-biriga bog'liq emas — bazaga birdaniga (ketma-ket 10 ta so'rov emas)
+  const byStudentFilter = groupId ? { studentId: { $in: studentIds } } : {};
+  const [{ sessions, records }, ledgerRows, [quizSubs, examSubs], { homeworkLessons, homeworkSubs }, orders, pendingOrders] = await Promise.all([
+    (async () => {
+      const sessions = await AttendanceSession.find({ status: "closed", date: { $gte: start, $lt: end }, ...groupFilter })
+        .select("groupId date")
+        .sort({ date: 1 })
+        .lean();
+      const records = await AttendanceRecord.find({ sessionId: { $in: sessions.map((s) => s._id) } })
+        .select("sessionId studentId groupId status")
+        .lean();
+      return { sessions, records };
+    })(),
+    // Coinlar: hamma yozuv serverga yuklanmaydi — baza o'zi o'quvchi va tur bo'yicha jamlaydi
+    CoinLedger.aggregate<{ _id: { s: mongoose.Types.ObjectId; t: CoinTransactionType; pos: boolean }; sum: number }>([
+      { $match: { createdAt: { $gte: start, $lt: end }, type: { $ne: "xp_align" }, ...byStudentFilter } },
+      { $group: { _id: { s: "$studentId", t: "$type", pos: { $gt: ["$amount", 0] } }, sum: { $sum: "$amount" } } },
+    ]),
+    Promise.all([
+      QuizSubmission.find({ submittedAt: { $gte: start, $lt: end }, status: { $in: ["submitted", "graded"] }, ...byStudentFilter })
+        .select("studentId totalScore maxScore")
+        .lean(),
+      ExamSubmission.find({ submittedAt: { $gte: start, $lt: end }, status: { $in: ["submitted", "graded"] }, ...groupFilter })
+        .select("examId studentId attemptNumber totalScore maxScore isPassed status")
+        .lean(),
+    ]),
+    (async () => {
+      const homeworkLessons = await Lesson.find({ "homework.isEnabled": true, isPublished: true, date: { $gte: start, $lt: end }, ...groupFilter })
+        .select("groupId")
+        .lean();
+      const homeworkSubs = await HomeworkSubmission.find({ lessonId: { $in: homeworkLessons.map((l) => l._id) } })
+        .select("groupId studentId status score")
+        .lean();
+      return { homeworkLessons, homeworkSubs };
+    })(),
+    Order.find({ createdAt: { $gte: start, $lt: end }, ...byStudentFilter }).select("status productTitle price").lean(),
+    Order.countDocuments({ status: "pending", ...byStudentFilter }),
+  ]);
+
   // ---------- Davomat ----------
-  const sessions = await AttendanceSession.find({ status: "closed", date: { $gte: start, $lt: end }, ...groupFilter })
-    .select("groupId date")
-    .sort({ date: 1 })
-    .lean();
-  const records = await AttendanceRecord.find({ sessionId: { $in: sessions.map((s) => s._id) } })
-    .select("sessionId studentId groupId status")
-    .lean();
 
   const bySession = new Map<string, { attended: number; total: number }>();
   const byGroup = new Map<string, { lessons: number; present: number; late: number; excused: number; absent: number }>();
@@ -147,45 +180,22 @@ export async function getReportData(params: {
   }
 
   // ---------- Coinlar ----------
-  const ledger = await CoinLedger.find({
-    createdAt: { $gte: start, $lt: end },
-    type: { $ne: "xp_align" },
-    ...(groupId ? { studentId: { $in: studentIds } } : {}),
-  })
-    .select("studentId amount type")
-    .lean();
   const coinsByType = new Map<CoinTransactionType, number>();
   const earnedByStudent = new Map<string, number>();
   let coinsEarned = 0;
   let coinsSpent = 0;
-  for (const l of ledger) {
-    coinsByType.set(l.type, (coinsByType.get(l.type) ?? 0) + l.amount);
-    if (l.type === "purchase") coinsSpent += -l.amount;
-    // Xarid va uning qaytarilishi "topilgan coin" hisoblanmaydi
-    else if (l.type !== "adjustment" || l.amount < 0) {
-      coinsEarned += l.amount;
-      const sid = l.studentId.toString();
-      earnedByStudent.set(sid, (earnedByStudent.get(sid) ?? 0) + l.amount);
+  for (const { _id: k, sum } of ledgerRows) {
+    coinsByType.set(k.t, (coinsByType.get(k.t) ?? 0) + sum);
+    if (k.t === "purchase") coinsSpent += -sum;
+    // Xarid va uning qaytarilishi (musbat tuzatish) "topilgan coin" hisoblanmaydi
+    else if (k.t !== "adjustment" || !k.pos) {
+      coinsEarned += sum;
+      const sid = k.s.toString();
+      earnedByStudent.set(sid, (earnedByStudent.get(sid) ?? 0) + sum);
     }
   }
 
   // ---------- Testlar va imtihonlar ----------
-  const [quizSubs, examSubs] = await Promise.all([
-    QuizSubmission.find({
-      submittedAt: { $gte: start, $lt: end },
-      status: { $in: ["submitted", "graded"] },
-      ...(groupId ? { studentId: { $in: studentIds } } : {}),
-    })
-      .select("studentId totalScore maxScore")
-      .lean(),
-    ExamSubmission.find({
-      submittedAt: { $gte: start, $lt: end },
-      status: { $in: ["submitted", "graded"] },
-      ...groupFilter,
-    })
-      .select("examId studentId attemptNumber totalScore maxScore isPassed status")
-      .lean(),
-  ]);
 
   const quizByGroup = new Map<string, { n: number; sum: number }>();
   const quizByStudent = new Map<string, { n: number; sum: number }>();
@@ -204,17 +214,6 @@ export async function getReportData(params: {
   }
 
   // ---------- Uyga vazifalar ----------
-  const homeworkLessons = await Lesson.find({
-    "homework.isEnabled": true,
-    isPublished: true,
-    date: { $gte: start, $lt: end },
-    ...groupFilter,
-  })
-    .select("groupId")
-    .lean();
-  const homeworkSubs = await HomeworkSubmission.find({ lessonId: { $in: homeworkLessons.map((l) => l._id) } })
-    .select("groupId studentId status score")
-    .lean();
   const studentsPerGroup = new Map<string, number>();
   for (const s of students) {
     if (s.groupId) studentsPerGroup.set(s.groupId.toString(), (studentsPerGroup.get(s.groupId.toString()) ?? 0) + 1);
@@ -258,12 +257,6 @@ export async function getReportData(params: {
   const examTitle = new Map(examDocs.map((e) => [e._id.toString(), e.title]));
 
   // ---------- Do'kon ----------
-  const orders = await Order.find({
-    createdAt: { $gte: start, $lt: end },
-    ...(groupId ? { studentId: { $in: studentIds } } : {}),
-  })
-    .select("status productTitle price")
-    .lean();
   const ordersByStatus = new Map<OrderStatus, number>();
   const products = new Map<string, { count: number; coins: number }>();
   for (const o of orders) {
@@ -274,10 +267,6 @@ export async function getReportData(params: {
     p.count++;
     p.coins += o.price;
   }
-  const pendingOrders = await Order.countDocuments({
-    status: "pending",
-    ...(groupId ? { studentId: { $in: studentIds } } : {}),
-  });
 
   const studentRow = (sid: string) => {
     const st = studentById.get(sid);
@@ -400,7 +389,7 @@ export async function getReportData(params: {
           coinsEarned: earnedByStudent.get(sid) ?? 0,
         };
       })
-      .sort((a, b) => a.fullName.localeCompare(b.fullName)),
+      .sort((a, b) => compareUz(a.fullName, b.fullName)),
     ordersByStatus: [...ordersByStatus.entries()].map(([status, count]) => ({ status, count })),
     topProducts: [...products.entries()]
       .map(([title, v]) => ({ title, ...v }))

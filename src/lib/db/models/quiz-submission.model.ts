@@ -135,6 +135,8 @@ const QuizSubmissionSchema = new Schema<IQuizSubmission>(
 
 // Har bir o'quvchi uchun bitta quiz topshirig'i (yoki oxirgi topshiriq)
 QuizSubmissionSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
+// Hisobotlar: davr bo'yicha topshirilganlar
+QuizSubmissionSchema.index({ submittedAt: -1 });
 
 export const QuizSubmission: Model<IQuizSubmission> =
   mongoose.models.QuizSubmission ||
