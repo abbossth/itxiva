@@ -1106,6 +1106,7 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, play
         place: p.arena!.place,
         team: p.arena!.team ?? -1,
       }))
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- outAt faqat saralash uchun, javobga kirmaydi
   ).map(({ outAt: _o, ...r }) => r);
   const teamed = rows.some((r) => r.team >= 0);
   const round = a.round ?? game.questions.length - 1;

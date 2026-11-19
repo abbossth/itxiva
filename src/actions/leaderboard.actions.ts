@@ -48,6 +48,55 @@ export interface LeaderboardData {
   canSwitch: boolean;
 }
 
+type BoardBase = {
+  groupMap: Map<string, { name: string; grade: number }>;
+  students: { _id: mongoose.Types.ObjectId; fullName: string; groupId?: unknown; spendableBalance?: number; totalCoins: number; xp: number }[];
+  weekMap: Map<string, number>;
+};
+const BOARD_TTL_MS = process.env.VITEST ? 0 : 5000;
+const boardCache = new Map<string, { at: number; p: Promise<BoardBase> }>();
+function boardBase(key: string, load: () => Promise<BoardBase>): Promise<BoardBase> {
+  const now = Date.now();
+  const c = boardCache.get(key);
+  if (c && now - c.at < BOARD_TTL_MS) return c.p;
+  const p = load();
+  if (boardCache.size > 200) boardCache.clear();
+  boardCache.set(key, { at: now, p });
+  p.catch(() => boardCache.delete(key));
+  return p;
+}
+
+async function loadBoardBase(groupFilter: Record<string, unknown>, field: "xp" | "spendableBalance" | "totalCoins", xpMode: boolean, balanceMode: boolean): Promise<BoardBase> {
+  const matchingGroups = await Group.find(groupFilter).lean();
+  const groupMap = new Map(matchingGroups.map((g) => [g._id.toString(), { name: groupShortName(g), grade: g.grade }]));
+  const userQuery: Record<string, unknown> = { role: "student", isHiddenFromLeaderboard: false, groupId: { $in: matchingGroups.map((g) => g._id) } };
+  const students = (
+    (await User.find(userQuery)
+      .select("fullName groupId totalCoins xp spendableBalance")
+      .sort({ [field]: -1, createdAt: 1 })
+      .lean()) as unknown as IUser[]
+  ).map((st) => ({ ...st, totalCoins: st[field] ?? 0, xp: st.xp ?? 0 }));
+
+  // Oxirgi 7 kundagi o'sish: do'kon xaridlari faqat balansni kamaytiradi, shuning uchun boshqa o'lchovlarda hisobga olinmaydi
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
+    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $nin: balanceMode ? ["xp_align"] : ["purchase", "xp_align"] } } },
+    {
+      $group: {
+        _id: "$studentId",
+        sum: {
+          $sum: xpMode
+            ? // Gamifikatsiyadan oldingi yozuvlarda xp yo'q — daromad turlarida coin bilan teng
+              { $ifNull: ["$xp", { $cond: [{ $in: ["$type", LEGACY_EARNING_TYPES] }, "$amount", 0] }] }
+            : "$amount",
+        },
+      },
+    },
+  ]);
+  const weekMap = new Map(weekRows.map((r) => [String(r._id), r.sum]));
+  return { groupMap, students, weekMap };
+}
+
 export async function getLeaderboardAction({
   type = "all",
   groupId,
@@ -73,17 +122,6 @@ export async function getLeaderboardAction({
     groupFilter.grade = Number(grade);
   }
 
-  const matchingGroups = await Group.find(groupFilter).lean();
-  const matchingGroupIds = matchingGroups.map((g) => g._id);
-  const groupMap = new Map(matchingGroups.map((g) => [g._id.toString(), { name: groupShortName(g), grade: g.grade }]));
-
-  // Query users
-  const userQuery: Record<string, unknown> = {
-    role: "student",
-    isHiddenFromLeaderboard: false,
-    groupId: { $in: matchingGroupIds },
-  };
-
   // Gamifikatsiya yoqilgan bo'lsa reyting XP bo'yicha (do'kon xaridi va jarima ta'sir qilmaydi)
   const { gamification } = await getAppSettings();
   const gamificationOn = gamification.enabled;
@@ -93,30 +131,12 @@ export async function getLeaderboardAction({
   // Gamifikatsiya o'chiq bo'lsa coin yagona reyting: u do'kon xaridi bilan tushmasligi kerak
   const balanceMode = gamificationOn && metric === "coin";
   const field = xpMode ? "xp" : balanceMode ? "spendableBalance" : "totalCoins";
-  const students = (
-    (await User.find(userQuery)
-      .select("fullName groupId totalCoins xp spendableBalance")
-      .sort({ [field]: -1, createdAt: 1 })
-      .lean()) as unknown as IUser[]
-  ).map((st) => ({ ...st, totalCoins: st[field] ?? 0, xp: st.xp ?? 0 }));
 
-  // Oxirgi 7 kundagi o'sish: do'kon xaridlari faqat balansni kamaytiradi, shuning uchun boshqa o'lchovlarda hisobga olinmaydi
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const weekRows = await CoinLedger.aggregate<{ _id: unknown; sum: number }>([
-    { $match: { studentId: { $in: students.map((st) => st._id) }, createdAt: { $gte: weekAgo }, type: { $nin: balanceMode ? ["xp_align"] : ["purchase", "xp_align"] } } },
-    {
-      $group: {
-        _id: "$studentId",
-        sum: {
-          $sum: xpMode
-            ? // Gamifikatsiyadan oldingi yozuvlarda xp yo'q — daromad turlarida coin bilan teng
-              { $ifNull: ["$xp", { $cond: [{ $in: ["$type", LEGACY_EARNING_TYPES] }, "$amount", 0] }] }
-            : "$amount",
-        },
-      },
-    },
-  ]);
-  const weekMap = new Map(weekRows.map((r) => [String(r._id), r.sum]));
+  // Umumiy qism (hamma uchun bir xil) — 5 soniya keshlanadi: jonli o'yindan keyin 100 o'quvchi bir vaqtda
+  // ochganda hisob 100 marta takrorlanmaydi. Ism qisqartirish va "siz" belgisi har so'rovda alohida.
+  const { groupMap, students, weekMap } = await boardBase(JSON.stringify([groupFilter, field, xpMode, balanceMode]), () =>
+    loadBoardBase(groupFilter, field, xpMode, balanceMode)
+  );
 
   // Compute ranks with tie handling
   let currentRank = 1;

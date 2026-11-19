@@ -5,7 +5,7 @@
 import mongoose from "mongoose";
 import { LiveGame, type ILiveArena, type ILiveArenaFeed, type ILiveArenaPickup } from "@/lib/db/models/live-game.model";
 import { LiveGamePlayer, type ILiveArenaPlayer } from "@/lib/db/models/live-game-player.model";
-import type { PvpFeedView, PvpMe, PvpPeer, PvpTickInput, PvpTickResult, PvpWorld } from "./pvp-types";
+import type { PvpMe, PvpPeer, PvpTickInput, PvpTickResult, PvpWorld } from "./pvp-types";
 import { hmacVerify, signTicket, type ArenaTicket } from "./arena-token";
 import type { RoomResults } from "./pvp-room";
 import {

@@ -113,14 +113,19 @@ export function ExamTaker({
   }, [hideQuestions, exam.questions]);
 
   // Auto-save logic
+  // Oxirgi saqlangan javoblar: o'zgarmagan bo'lsa har 30 soniyada serverga qayta yuborilmaydi
+  const lastSaved = useRef<string | null>(null);
   const performSaveDraft = useCallback(async () => {
+    const answersList = Object.values(answersRef.current);
+    const snapshot = JSON.stringify(answersList);
+    if (snapshot === lastSaved.current) return;
     try {
       setSavingDraft(true);
-      const answersList = Object.values(answersRef.current);
       await saveExamDraftAction({
         examId: exam._id,
         answers: answersList,
       });
+      lastSaved.current = snapshot;
       setLastSavedTime(
         `Saqlandi: ${new Date().toLocaleTimeString("uz-UZ", {
           hour: "2-digit",
