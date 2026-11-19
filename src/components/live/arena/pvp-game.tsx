@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Scoreboard, byScore, type BoardRow } from "./arena-scoreboard";
 import { getGameLooksAction } from "@/actions/live-game.actions";
 import type { GameLook } from "@/lib/character/catalog";
 import { Crosshair, Eye, Skull, Users } from "lucide-react";
@@ -95,7 +96,11 @@ interface Hud {
   spectating: string | null;
   /** Jamoaviy arena: har jamoaning tirik a'zolari */
   teams: { team: number; alive: number }[];
+  /** Statistika jadvali (Tab bosib turilganda / 📊 tugmasi) — yopiq bo'lsa null */
+  board: BoardRow[] | null;
 }
+
+
 
 export function PvpGame({
   gameId,
@@ -130,6 +135,7 @@ export function PvpGame({
     killedBy: null,
     spectating: null,
     teams: [],
+    board: null,
   });
   const myTeam = typeof init.team === "number" ? init.team : -1;
   const [phase, setPhase] = useState<"intro" | "play" | "done">(startsInMs > 0 ? "intro" : "play");
@@ -139,7 +145,9 @@ export function PvpGame({
 
   const timing = useRef<{ start: number; end: number } | null>(null);
   // Ekrandagi tugmalar (sakrash, emoji) o'yin siklidagi funksiyalarni chaqiradi
-  const controls = useRef<{ dash: () => void; emote: (i: number) => void } | null>(null);
+  const controls = useRef<{ dash: () => void; emote: (i: number) => void; board: (open: boolean) => void } | null>(null);
+  // Statistika jadvali: kompyuterda Tab bosib turilganda, telefonda 📊 tugmasi bilan
+  const [boardOpen, setBoardOpen] = useState(false);
   useEffect(() => {
     const now = performance.now();
     timing.current = { start: now + startsInMs, end: now + startsInMs + remainingMs };
@@ -232,6 +240,12 @@ export function PvpGame({
 
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
+      if (k === "tab") {
+        // Brauzer fokusni boshqa elementga o'tkazmasin
+        e.preventDefault();
+        if (!e.repeat) showBoard(down);
+        return;
+      }
       if (down && (k === "shift" || k === "e")) {
         e.preventDefault();
         dashReq = true;
@@ -255,11 +269,21 @@ export function PvpGame({
       myEmote = { e: i, at: performance.now() };
       haptic([10]);
     }
+    let boardShown = false;
+    function showBoard(open: boolean) {
+      boardShown = open;
+      setBoardOpen(open);
+      lastHud = 0; // jadval darhol yangilansin
+    }
+    // Oyna fokusni yo'qotsa (Alt+Tab) — Tab qo'yib yuborilganini bilmaymiz: jadval yopiladi
+    const onBlur = () => boardShown && showBoard(false);
+    window.addEventListener("blur", onBlur);
     controls.current = {
       dash: () => {
         dashReq = true;
       },
       emote,
+      board: showBoard,
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
     const ku = (e: KeyboardEvent) => onKey(e, false);
@@ -813,6 +837,29 @@ export function PvpGame({
                   .sort((a, b) => a - b)
                   .map((team) => ({ team, alive: (world?.peers ?? []).filter((p) => p.team === team && !p.out).length }))
               : [],
+          board: boardShown
+            ? (world?.peers ?? [])
+                .map((p): BoardRow => {
+                  // O'zi — eng yangi holat o'z hisobidan
+                  const mine = p.isMe && me;
+                  const lives = mine ? me!.lives : p.lives;
+                  const maxLives = mine ? me!.maxLives : p.maxLives;
+                  const out = mine ? me!.out : p.out;
+                  return {
+                    id: p.id,
+                    name: p.isMe ? myName : p.name,
+                    kills: mine ? me!.kills : p.kills,
+                    deaths: out ? maxLives : Math.max(0, maxLives - lives),
+                    lives: out ? 0 : lives,
+                    maxLives,
+                    out,
+                    team: p.team,
+                    isMe: p.isMe,
+                    look: lookOf(p.id),
+                  };
+                })
+                .sort(byScore)
+            : null,
         });
       }
       if (!ended && (world?.ended || now >= tm.end + 1500)) {
@@ -835,6 +882,7 @@ export function PvpGame({
       if (bannerTimer) clearTimeout(bannerTimer);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);
+      window.removeEventListener("blur", onBlur);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
@@ -926,6 +974,25 @@ export function PvpGame({
           </button>
         </>
       )}
+      {phase !== "intro" && (
+        <button
+          type="button"
+          onPointerDown={(ev) => {
+            ev.stopPropagation();
+            controls.current?.board(!boardOpen);
+          }}
+          aria-label="Statistika"
+          aria-pressed={boardOpen}
+          title={touch ? undefined : "Tab — bosib turing"}
+          className={cn(
+            "absolute right-2 top-14 z-20 flex h-10 cursor-pointer items-center gap-1 rounded-xl px-2.5 text-sm font-black text-white backdrop-blur transition active:scale-90 sm:right-3",
+            boardOpen ? "bg-amber-400 text-slate-950" : "bg-black/55"
+          )}
+        >
+          📊 {!touch && <kbd className="rounded bg-white/15 px-1 font-mono text-[10px]">Tab</kbd>}
+        </button>
+      )}
+      {hud.board && <Scoreboard rows={hud.board} myTeam={myTeam} left={hud.left} />}
       {/* Kim kimni yiqitdi */}
       <div className="pointer-events-none absolute left-2 top-24 flex max-w-[60%] flex-col gap-1 sm:left-3">
         {hud.feed.map((f) => (
@@ -962,7 +1029,7 @@ export function PvpGame({
           <p className="max-w-md text-sm text-slate-200">
             {touch
               ? "Chap tomon — yurish, o'ng tomonni bosib turing — otish (o'zi nishonga oladi), 💨 — sakrash"
-              : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya"}
+              : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya, Tab — statistika"}
           </p>
           <p className="max-w-md text-xs text-slate-300">
             3 marta o&apos;q yegan o&apos;yindan chiqadi. Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
@@ -1002,4 +1069,5 @@ export function PvpGame({
     </div>
   );
 }
+
 

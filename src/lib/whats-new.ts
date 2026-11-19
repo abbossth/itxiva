@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "arena-board-2026-11",
+    date: "2026-11-19",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Kiber arenada statistika",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📊",
+        title: "Tab — kim nechta kill qildi?",
+        text: "Kiber arenada kompyuterda Tab tugmasini bosib turing (telefonda — yuqoridagi 📊 tugmasi): har bir o'yinchining kill soni, necha marta yiqilgani, qolgan joni va kim chiqib ketgani ko'rinadi. Eng ko'p kill qilgan 👑 bilan belgilanadi, jamoaviy jangda — jamoalar bo'yicha.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-board-2026-11",
+    date: "2026-11-19",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Kiber arenada o'quvchilar uchun statistika",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📊",
+        title: "Tab bosilganda jang statistikasi",
+        text: "Kiber arena paytida o'quvchilar o'z qurilmasida Tab tugmasini bosib turib (telefonda 📊 tugmasi) jadvalni ko'radi: kill, o'lim, qolgan jon va kim chiqib ketgani; jamoaviy jangda jamoalar bo'yicha jami kill. Jang davom etaveradi — jadval o'yinni to'xtatmaydi.",
+      },
+    ],
+  },
+  {
     id: "mentor-reports-2026-11",
     date: "2026-11-19",
     audience: "mentor",
