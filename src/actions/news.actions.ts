@@ -10,11 +10,11 @@ import { cleanLook, gameLook, type GameLook } from "@/lib/character/catalog";
 
 export async function getPendingNewsAction(): Promise<{ item: NewsItem; look: GameLook } | null> {
   const me = await getCurrentUser();
-  if (!me || me.role !== "student") return null;
+  if (!me || (me.role !== "student" && me.role !== "mentor")) return null;
   await connectToDatabase();
   const u = await User.findById(me.userId).select("seenNews character level").lean();
   if (!u) return null;
-  const item = pendingNews(u.seenNews ?? []);
+  const item = pendingNews(u.seenNews ?? [], me.role);
   if (!item) return null;
   const lvl = Math.max(1, u.level ?? 1);
   const raw = (u.character?.look ?? null) as Record<string, unknown> | null;
@@ -23,7 +23,7 @@ export async function getPendingNewsAction(): Promise<{ item: NewsItem; look: Ga
 
 export async function markNewsSeenAction(id: string): Promise<void> {
   const me = await getCurrentUser();
-  if (!me || me.role !== "student" || !NEWS.some((n) => n.id === id)) return;
+  if (!me || !NEWS.some((n) => n.id === id && n.audience === me.role)) return;
   await connectToDatabase();
   await User.updateOne({ _id: me.userId }, { $addToSet: { seenNews: id } });
 }

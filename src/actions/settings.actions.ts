@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { AppSettings } from "@/lib/db/models/app-settings.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { requireMentor } from "@/lib/auth/guards";
-import { isAcademicYear } from "@/lib/settings";
+import { forgetAppSettings, isAcademicYear } from "@/lib/settings";
 import { isAccentId } from "@/lib/theme-accents";
 import { gamificationSettingsSchema } from "@/lib/validations/gamification.schema";
 import { ensureSystemQuests } from "@/lib/gamification/quests";
@@ -26,6 +26,7 @@ export async function updateAppSettingsAction(input: unknown): Promise<ActionRes
 
   await connectToDatabase();
   await AppSettings.updateOne({ key: "global" }, { $set: { academicYear, quarter, accent, studentProfileEdit } }, { upsert: true });
+  forgetAppSettings();
   await AuditLog.create({
     actorId: mentor.userId,
     action: "UPDATE_SETTINGS",
@@ -45,6 +46,7 @@ export async function updateGamificationSettingsAction(input: unknown): Promise<
 
   await connectToDatabase();
   await AppSettings.updateOne({ key: "global" }, { $set: { gamification: parsed.data } }, { upsert: true });
+  forgetAppSettings();
   await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_GAMIFICATION", details: parsed.data });
   // Yoqilganda kunlik odatlar (test, material, kirish) topshiriq sifatida paydo bo'ladi
   if (parsed.data.enabled) await ensureSystemQuests(parsed.data);
@@ -68,6 +70,7 @@ export async function updateAmbienceSettingsAction(input: unknown): Promise<Acti
 
   await connectToDatabase();
   await AppSettings.updateOne({ key: "global" }, { $set: { ambience } }, { upsert: true });
+  forgetAppSettings();
   await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_SETTINGS", details: { ambience } });
   revalidatePath("/", "layout");
   return { success: true, message: "Bezak sozlamalari saqlandi" };

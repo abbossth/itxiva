@@ -44,8 +44,29 @@ export function parseQuarter(value: unknown, fallback: number): number {
   return Number.isInteger(q) && q >= 1 && q <= 4 ? q : fallback;
 }
 
-/** Platforma sozlamalari (bitta so'rov davomida bazadan bir marta o'qiladi) */
+// Sozlamalar juda kam o'zgaradi, lekin deyarli har sahifa va amal ularni o'qiydi: server nusxasida 10 soniya
+// saqlanadi (bazaga har so'rovda murojaat bo'lmasin). Shu nusxada saqlanganda darhol yangilanadi
+// (forgetAppSettings), ikkinchi nusxada — ko'pi bilan 10 soniyada.
+const SETTINGS_TTL_MS = process.env.VITEST ? 0 : 10_000;
+let settingsCache: { at: number; p: Promise<AppSettingsData> } | null = null;
+
+export function forgetAppSettings() {
+  settingsCache = null;
+}
+
+/** Platforma sozlamalari (bitta so'rov davomida bazadan bir marta, server nusxasida — 10 soniyada bir marta o'qiladi) */
 export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
+  const now = Date.now();
+  if (settingsCache && now - settingsCache.at < SETTINGS_TTL_MS) return settingsCache.p;
+  const p = loadAppSettings();
+  settingsCache = { at: now, p };
+  p.catch(() => {
+    if (settingsCache?.p === p) settingsCache = null;
+  });
+  return p;
+});
+
+async function loadAppSettings(): Promise<AppSettingsData> {
   await connectToDatabase();
   const doc = await AppSettings.findOne({ key: "global" }).lean();
   return {
@@ -56,4 +77,4 @@ export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
     gamification: parseGamification(doc?.gamification),
     ambience: parseAmbience(doc?.ambience),
   };
-});
+}

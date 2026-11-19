@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowRight, Check } from "lucide-react";
@@ -58,6 +59,17 @@ export function AnnouncementModal({ waitForLevelUp, effects }: { waitForLevelUp:
       window.removeEventListener(OVERLAY_FREE_EVENT, onFree);
     };
   }, [load]);
+  // Boshqa sahifaga o'tilganda qayta urinish (masalan, jonli o'yindan chiqqach — o'yin davomida oyna chiqmaydi)
+  const pathname = usePathname();
+  const firstPath = useRef(true);
+  useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    const t = setTimeout(() => void load(), 800);
+    return () => clearTimeout(t);
+  }, [pathname, load]);
 
   // Ochilganda: tugmaga fokus, Escape — yopish; bayram e'lonida konfetti
   useEffect(() => {

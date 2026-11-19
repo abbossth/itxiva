@@ -39,7 +39,7 @@ import {
   openBox,
   BOX_GIFT_CHANCE,
   GIFT_FALLBACK_COINS,
-  pickMinigame,
+  pickRound,
   prizeOf,
   spinSuperWheel,
   SUPER_WHEEL,
@@ -129,6 +129,22 @@ function remainingOf(game: Pick<ILiveGame, "status" | "questionStartedAt" | "que
 
 const activeFilter = () => ({ status: { $ne: "finished" as LiveGameStatus }, createdAt: { $gt: new Date(Date.now() - LIVE_GAME_MAX_MS) } });
 
+// Guruhning faol o'yini: har bir o'quvchi tabi 20 s da bir so'raydi — guruh bo'yicha 3 s keshlanadi
+// (200 ta ochiq tab bazaga sekundiga 10 ta emas, guruhga 3 s da bitta so'rov). O'yin ochilganda/yakunlanganda tozalanadi.
+type ActiveGame = { _id: mongoose.Types.ObjectId; mode: LiveGameMode; status: LiveGameStatus } | null;
+const ACTIVE_TTL_MS = process.env.VITEST ? 0 : 3000;
+const activeByGroup = new Map<string, { at: number; p: Promise<ActiveGame> }>();
+function activeGameOfGroup(groupId: string): Promise<ActiveGame> {
+  const now = Date.now();
+  const c = activeByGroup.get(groupId);
+  if (c && now - c.at < ACTIVE_TTL_MS) return c.p;
+  const p = LiveGame.findOne({ ...activeFilter(), groupId }).select("mode status").sort({ createdAt: -1 }).lean<ActiveGame>().exec();
+  if (activeByGroup.size > 2000) activeByGroup.clear();
+  activeByGroup.set(groupId, { at: now, p });
+  p.catch(() => activeByGroup.delete(groupId));
+  return p;
+}
+
 // ---------------- Mentor ----------------
 
 export interface LiveGroupOption {
@@ -204,6 +220,7 @@ export async function createLiveGameAction(input: {
     if (questions.length === 0) {
       return fail(input.source === "today" ? "Bugungi darsda test savollari yo'q" : "Guruh darslarida test savollari yo'q");
     }
+    activeByGroup.clear();
     const game = await LiveGame.create({
       mentorId: mentor.userId,
       groupId: group._id,
@@ -260,22 +277,15 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds arena arenaRounds galaxy galaxyRounds zone zoneRounds").lean();
+    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds minigameKinds arena arenaRounds galaxy galaxyRounds zone zoneRounds").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
     // Har 3 savoldan keyin — qisqa o'yin (bir marta)
     if (game.status === "reveal" && game.options?.minigames !== false && minigameDue(game.index, game.questions.length, game.minigameRounds ?? [])) {
-      // Birinchi qisqa o'yin har doim omad g'ildiragi (Super priz va Super baraban shu yerdan yutiladi)
-      const first = (game.minigameRounds ?? []).length === 0;
-      // Ba'zan qisqa o'yin o'rniga "Yashil zona" raundi (ketma-ket ikki marta emas)
-      const mRounds = game.minigameRounds ?? [];
-      const zRounds = game.zoneRounds ?? [];
-      const lastWasZone = mRounds.length > 0 && zRounds.includes(mRounds[mRounds.length - 1]);
-      if (game.options?.zone && !first && !lastWasZone && Math.random() < ZONE_MINIGAME_CHANCE) {
-        await startZone(game._id, game.index, false, true);
-        return { success: true, data: { finished: false } };
-      }
-      await startMinigame(game._id, game.index, (game.minigame?.kind as MinigameKind | undefined) ?? null, first ? "wheel" : undefined);
+      // Tasodifiy tartib: shu o'yinda hamma tur (va yoqilgan bo'lsa "Yashil zona") bir martadan chiqmaguncha takrorlanmaydi
+      const kind = pickRound(game.minigameKinds ?? [], Boolean(game.options?.zone));
+      if (kind === "zone") await startZone(game._id, game.index, false, true);
+      else await startMinigame(game._id, game.index, kind);
       return { success: true, data: { finished: false } };
     }
     // "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang
@@ -345,19 +355,30 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
     );
     if (!game) return { success: true, data: { revealed: false } };
 
-    const missing = await LiveGamePlayer.find({ gameId: game._id, eliminated: false, "answers.index": { $ne: game.index } });
-    const outs: string[] = [];
-    for (const p of missing) {
-      const o = missedAnswer(game.mode, p);
-      const res = await LiveGamePlayer.updateOne(
-        { _id: p._id, "answers.index": { $ne: game.index } },
-        {
-          $push: { answers: { index: game.index, value: "", isCorrect: false, ms: 0, points: 0 } },
-          $set: { streak: o.streak, lives: o.lives, eliminated: o.eliminated, guard: o.guard, ...(o.eliminated ? { eliminatedAt: game.index } : {}) },
-        }
-      );
-      if (res.modifiedCount > 0 && o.eliminated) outs.push(p.name);
-    }
+    // Javob bermaganlar — bitta so'rovda (100 o'quvchida 100 ta ketma-ket so'rov emas)
+    const missing = await LiveGamePlayer.find({ gameId: game._id, eliminated: false, "answers.index": { $ne: game.index } })
+      .select("name score streak lives eliminated double guard")
+      .lean();
+    const outIds: mongoose.Types.ObjectId[] = [];
+    const ops = missing.map((p) => {
+      const o = missedAnswer(game.mode, { ...p, double: Boolean(p.double), guard: Boolean(p.guard) });
+      if (o.eliminated) outIds.push(p._id);
+      return {
+        updateOne: {
+          filter: { _id: p._id, "answers.index": { $ne: game.index } },
+          update: {
+            $push: { answers: { index: game.index, value: "", isCorrect: false, ms: 0, points: 0 } },
+            $set: { streak: o.streak, lives: o.lives, eliminated: o.eliminated, guard: o.guard, ...(o.eliminated ? { eliminatedAt: game.index } : {}) },
+          },
+        },
+      };
+    });
+    if (ops.length > 0) await LiveGamePlayer.bulkWrite(ops, { ordered: false });
+    // Chiqib ketganlar: shu savolda haqiqatan yozilganlari (oxirgi lahzada javob bergan bo'lsa — yozilmagan)
+    const outs =
+      outIds.length > 0
+        ? (await LiveGamePlayer.find({ _id: { $in: outIds }, eliminated: true, eliminatedAt: game.index, answers: { $elemMatch: { index: game.index, value: "", ms: 0 } } }).select("name").lean()).map((p) => p.name)
+        : [];
     if (outs.length > 0) await pushEvents(game._id, outs.map((n) => ({ text: `${n} o'yindan chiqdi`, kind: "out" as const })));
     if (isAdventure(game.mode)) await applyAdventure(game);
     await saveRanks(game._id, game.mode);
@@ -421,8 +442,7 @@ async function applyAdventure(game: ILiveGame) {
   if (events.length > 0) await pushEvents(game._id, events.slice(0, 6).map((text) => ({ text, kind: "info" as const })));
 }
 
-async function startMinigame(gameId: mongoose.Types.ObjectId, round: number, previous: MinigameKind | null, forced?: MinigameKind) {
-  const kind = forced ?? pickMinigame(previous);
+async function startMinigame(gameId: mongoose.Types.ObjectId, round: number, kind: MinigameKind) {
   const startedAt = new Date(Date.now() + MINIGAME_INTRO_S * 1000);
   const endsAt = new Date(startedAt.getTime() + MINIGAMES[kind].seconds * 1000);
   await LiveGame.updateOne(
@@ -434,7 +454,7 @@ async function startMinigame(gameId: mongoose.Types.ObjectId, round: number, pre
         questionStartedAt: null,
         ...(kind === "bonus" ? { bonusIndex: round + 1 } : {}),
       },
-      $push: { minigameRounds: round },
+      $push: { minigameRounds: round, minigameKinds: kind },
     }
   );
   // Omad g'ildiragi: har bir o'quvchi o'z g'ildiragini aylantiradi — natija (segment) shu yerda tanlanadi
@@ -710,8 +730,6 @@ function galaxyView(game: Pick<ILiveGame, "galaxy" | "status">, players: ILiveGa
   };
 }
 
-/** Qisqa o'yin navbatida "Yashil zona" chiqish ehtimoli (boshqa rejimlarda) */
-const ZONE_MINIGAME_CHANCE = 0.25;
 
 /**
  * "Yashil zona" raundi boshlanadi: robotlar maydon o'rtasida, tezlik — shu bosqichdagi to'g'ri javoblarga qarab.
@@ -729,7 +747,7 @@ async function startZone(gameId: mongoose.Types.ObjectId, round: number, final: 
         zone: { round, final, mini, seed: seedOf(`${gameId}:zone:${round}`), startedAt, endsAt, resolved: 0, rt, endedAt: null },
         questionStartedAt: null,
       },
-      $push: mini ? { zoneRounds: round, minigameRounds: round } : { zoneRounds: round },
+      $push: mini ? { zoneRounds: round, minigameRounds: round, minigameKinds: "zone" } : { zoneRounds: round },
     }
   );
   if (res.modifiedCount === 0) return;
@@ -938,6 +956,7 @@ export async function cancelLiveGameAction(gameId: string): Promise<Result<{ can
       { _id: gameId, status: { $ne: "finished" } },
       { $set: { status: "finished", finishedAt: new Date(), rewardedAt: new Date(), questionStartedAt: null } }
     );
+    activeByGroup.clear();
     return { success: true, data: { cancelled: res.modifiedCount > 0 } };
   } catch (err) {
     return errorOf(err, "Bekor qilib bo'lmadi");
@@ -1364,7 +1383,7 @@ export async function getMyActiveLiveGameAction(): Promise<{ id: string; mode: L
   const user = await getCurrentUser();
   if (user?.role !== "student" || !user.groupId) return null;
   await connectDB();
-  const game = await LiveGame.findOne({ ...activeFilter(), groupId: user.groupId }).select("mode status").sort({ createdAt: -1 }).lean();
+  const game = await activeGameOfGroup(user.groupId);
   if (!game) return null;
   const joined = Boolean(await LiveGamePlayer.exists({ gameId: game._id, studentId: user.userId }));
   return { id: game._id.toString(), mode: game.mode, status: game.status, joined };

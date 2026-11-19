@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
 import { getPendingNewsAction, markNewsSeenAction } from "@/actions/news.actions";
 import type { NewsArt, NewsItem } from "@/lib/whats-new";
@@ -59,6 +59,17 @@ export function WhatsNewModal({ waitForLevelUp }: { waitForLevelUp: boolean }) {
       window.removeEventListener(OVERLAY_FREE_EVENT, onFree);
     };
   }, [load]);
+  // Boshqa sahifaga o'tilganda qayta urinish (masalan, jonli o'yindan chiqqach — o'yin davomida oyna chiqmaydi)
+  const pathname = usePathname();
+  const firstPath = useRef(true);
+  useEffect(() => {
+    if (firstPath.current) {
+      firstPath.current = false;
+      return;
+    }
+    const t = setTimeout(() => void load(), 800);
+    return () => clearTimeout(t);
+  }, [pathname, load]);
 
   const close = useCallback(
     (go?: string) => {

@@ -41,15 +41,21 @@ export default async function DashboardLayout({
   }
   await connectToDatabase();
 
-  const [orders, homework, quests, cookieStore, settings, levelState, me] = await Promise.all([
+  const [orders, homework, quests, cookieStore, settings, levelState] = await Promise.all([
     getOrdersBadgeCount(),
     getHomeworkBadgeCount(),
     getQuestsBadgeCount(),
     cookies(),
     getAppSettings(),
     getStudentLevelState(),
-    session.role === "student" ? User.findById(session.userId).select("spendableBalance celebrationsEnabled").lean() : null,
   ]);
+  // Balans va bezak sozlamasi daraja holati bilan birga o'qiladi; gamifikatsiya o'chiq bo'lsagina alohida so'rov
+  const me =
+    session.role !== "student"
+      ? null
+      : levelState
+        ? { spendableBalance: levelState.summary.balance, celebrationsEnabled: levelState.celebrationsEnabled }
+        : await User.findById(session.userId).select("spendableBalance celebrationsEnabled").lean();
   const balance = session.role === "student" ? me?.spendableBalance ?? 0 : null;
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
@@ -109,7 +115,8 @@ export default async function DashboardLayout({
       {session.role === "student" && <AnnouncementModal waitForLevelUp={Boolean(levelState?.levelUp)} effects={effectsOn} />}
 
       {/* Platforma yangiliklari: yangi imkoniyat chiqqanda bir marta slaydlar bilan tushuntiriladi (lib/whats-new.ts) */}
-      {session.role === "student" && <WhatsNewModal waitForLevelUp={Boolean(levelState?.levelUp)} />}
+      {/* O'quvchiga — o'quvchilarga tegishli, mentorga — mentorga tegishli o'zgarishlar */}
+      <WhatsNewModal waitForLevelUp={Boolean(levelState?.levelUp)} />
 
       {/* Ctrl+K: sahifalar va amallarni qidirish (kontenti birinchi ochilganda yuklanadi) */}
       <CommandPaletteTrigger role={session.role} gamification={gamification} />

@@ -373,14 +373,17 @@ describe("o'yin ichida", () => {
     const id = res.data.gameId;
     as(ali);
     await live.joinLiveGameAction(id);
-    // Birinchi qisqa o'yin — doim omad g'ildiragi
+    // Birinchi raund: 0.01 → "Mo'ljalga otish"
     await play(mentor, ali, id, 3);
     as(mentor);
+    const first = vi.spyOn(Math, "random").mockReturnValueOnce(0.01);
     await live.startLiveQuestionAction(id);
-    expect((await LiveGame.findById(id).lean())?.status).toBe("minigame");
+    first.mockRestore();
+    expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("target");
     tick(60_000);
     await play(mentor, ali, id, 3);
-    const rnd = vi.spyOn(Math, "random").mockReturnValue(0.01);
+    // Sumkada qolganlar: memory, math, colors, reaction, wheel, bonus, zone — 0.95 → Yashil zona
+    const rnd = vi.spyOn(Math, "random").mockReturnValueOnce(0.95);
     as(mentor);
     await live.startLiveQuestionAction(id);
     rnd.mockRestore();

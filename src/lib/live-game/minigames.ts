@@ -43,6 +43,36 @@ export function pickMinigame(previous: MinigameKind | null, rng: number = Math.r
   return pool[pool.length - 1];
 }
 
+/** Savollar orasidagi raund turi: qisqa o'yin yoki "Yashil zona" */
+export type RoundKind = MinigameKind | "zone";
+/** Raund vazni: hammasi teng atrofida (g'ildirak sal ko'proq), shunda har o'yinda tartib har xil */
+const ROUND_WEIGHT: Record<RoundKind, number> = { tap: 0, target: 2, memory: 2, math: 2, colors: 2, reaction: 2, wheel: 3, bonus: 1, zone: 2 };
+
+/**
+ * Keyingi raund — "sumka" usuli: o'yinda hamma tur bir martadan chiqmaguncha takrorlanmaydi, tartibi esa
+ * har o'yinda tasodifiy. Sumka bo'shagach yangisi boshlanadi (oxirgisi ketma-ket ikki marta chiqmaydi).
+ * `history` — shu o'yinda chiqqan turlar (eskidan yangiga).
+ */
+export function pickRound(history: readonly string[], allowZone: boolean, rng: number = Math.random()): RoundKind {
+  const all: RoundKind[] = [...MINIGAME_KINDS, ...(allowZone ? (["zone"] as const) : [])];
+  let used = new Set<string>();
+  for (const k of history) {
+    if (!all.includes(k as RoundKind)) continue;
+    used.add(k);
+    if (used.size >= all.length) used = new Set();
+  }
+  const last = history[history.length - 1];
+  let pool = all.filter((k) => !used.has(k));
+  if (pool.length > 1) pool = pool.filter((k) => k !== last);
+  const total = pool.reduce((sum, k) => sum + ROUND_WEIGHT[k], 0);
+  let x = Math.min(Math.max(rng, 0), 0.999999) * total;
+  for (const k of pool) {
+    x -= ROUND_WEIGHT[k];
+    if (x < 0) return k;
+  }
+  return pool[pool.length - 1];
+}
+
 /** Natija yuboriladigan o'yinlar (o'quvchi qurilmasida o'ynaladi) */
 export type ScoredMinigame = "tap" | "target" | "memory" | "math" | "colors" | "reaction";
 export function isScoredMinigame(kind: MinigameKind): kind is ScoredMinigame {

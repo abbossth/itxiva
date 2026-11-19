@@ -20,8 +20,15 @@ export function announceBalance(balance: number): void {
 // Katta oynalar (mukofot, e'lon) bir-birining ustiga chiqmasin: bittasi ochiq bo'lsa, ikkinchisi u yopilishini kutadi
 export const OVERLAY_FREE_EVENT = "itxiva:overlay-free";
 
+/** Jonli o'yin sahifasi (o'quvchi telefoni yoki proyektor): savol/jang ustiga hech qanday oyna chiqmaydi */
+export function onLiveGamePage(): boolean {
+  return typeof location !== "undefined" && /^\/(mentor\/)?live\/[^/]+/.test(location.pathname);
+}
+
 export function overlayBusy(except?: string): boolean {
   if (typeof document === "undefined") return false;
+  // O'yin davomida mukofot, jarima, e'lon va yangilik oynalari kutadi — o'yindan chiqqach ko'rsatiladi
+  if (except !== "live" && onLiveGamePage()) return true;
   const current = document.body.dataset.overlay;
   return Boolean(current) && current !== except;
 }

@@ -6,6 +6,7 @@ import { getCurrentUser, requireStudent } from "@/lib/auth/guards";
 import { getAppSettings } from "@/lib/settings";
 import { buildLevels, levelProgress } from "@/lib/gamification/levels";
 import { dailyCheckIn } from "@/lib/gamification/quests";
+import { dayKey } from "@/lib/gamification/periods";
 
 export interface LevelSummary {
   level: number;
@@ -30,21 +31,26 @@ export interface LevelUpInfo {
 }
 
 /** Yon menyu va sarlavha uchun: o'quvchining darajasi va tabrik oynasi (gamifikatsiya yoqilgan bo'lsa) */
-export async function getStudentLevelState(): Promise<{ summary: LevelSummary; levelUp: LevelUpInfo | null } | null> {
+export async function getStudentLevelState(): Promise<{ summary: LevelSummary; levelUp: LevelUpInfo | null; celebrationsEnabled: boolean } | null> {
   const session = await getCurrentUser();
   if (session?.role !== "student") return null;
   const { gamification } = await getAppSettings();
   if (!gamification.enabled) return null;
 
   await connectToDatabase();
-  // Kuniga birinchi ochilishda: seriya va "Platformaga kiring" topshirig'i (keyingi chaqiruvlarda bitta so'rov)
-  try {
-    await dailyCheckIn(session.userId);
-  } catch (error) {
-    console.error("Daily check-in error:", error);
-  }
-  const user = await User.findById(session.userId).select("xp spendableBalance pendingLevelUp").lean();
+  // Har sahifada bitta o'qish. Kuniga birinchi ochilishda: seriya va "Platformaga kiring" topshirig'i
+  // (shundan keyin XP/balans o'zgargan bo'lishi mumkin — qayta o'qiladi)
+  const SEL = "xp spendableBalance pendingLevelUp celebrationsEnabled streak.lastDayKey";
+  let user = await User.findById(session.userId).select(SEL).lean();
   if (!user) return null;
+  if (user.streak?.lastDayKey !== dayKey()) {
+    try {
+      await dailyCheckIn(session.userId);
+      user = (await User.findById(session.userId).select(SEL).lean()) ?? user;
+    } catch (error) {
+      console.error("Daily check-in error:", error);
+    }
+  }
 
   const levels = buildLevels(gamification.levelThresholds);
   const p = levelProgress(user.xp ?? 0, levels);
@@ -73,7 +79,7 @@ export async function getStudentLevelState(): Promise<{ summary: LevelSummary; l
         nextXp: after?.minXp ?? null,
       }
     : null;
-  return { summary, levelUp };
+  return { summary, levelUp, celebrationsEnabled: user.celebrationsEnabled !== false };
 }
 
 /** Tabrik oynasi yopildi — qayta ko'rsatilmaydi */

@@ -1,5 +1,7 @@
-// "Yangilik" e'lonlari: platformaga yangi imkoniyat qo'shilganda o'quvchilarga kirishda bir marta modal oynada
-// slaydlar bilan tushuntiriladi. Yangi imkoniyat chiqqanda shu ro'yxatning BOSHIGA yozuv qo'shiladi (id — o'zgarmas).
+// "Yangilik" e'lonlari: platformaga o'zgarish kelganda tegishli foydalanuvchilarga kirishda bir marta modal oynada
+// slaydlar bilan tushuntiriladi. QOIDA: o'quvchilarga tegishli har bir o'zgarish — audience "student" yozuvi,
+// mentorga tegishlisi — audience "mentor" yozuvi; ikkalasiga tegishli bo'lsa — ikkita yozuv (har biri o'z tilida).
+// Yangi yozuv ro'yxatning BOSHIGA qo'shiladi (id — o'zgarmas).
 // Ko'rilganlari `User.seenNews` da saqlanadi. Slayd rasmi `art` bo'yicha komponentda chiziladi.
 // Bu fayl brauzer va server uchun umumiy.
 
@@ -17,8 +19,8 @@ export interface NewsItem {
   id: string;
   /** Chiqqan sana (YYYY-MM-DD): undan keyin ro'yxatdan o'tganlarga ham ko'rsatiladi */
   date: string;
-  /** Kimga: hozircha faqat o'quvchilar */
-  audience: "student";
+  /** Kimga: o'quvchilar yoki mentorlar */
+  audience: "student" | "mentor";
   badge: string;
   title: string;
   slides: NewsSlide[];
@@ -26,6 +28,59 @@ export interface NewsItem {
 }
 
 export const NEWS: NewsItem[] = [
+  {
+    id: "mentor-live-2026-11",
+    date: "2026-11-19",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Jonli o'yinlarda nimalar o'zgardi",
+    slides: [
+      {
+        art: "games",
+        title: "O'quvchilar personaji barcha o'yinlarda",
+        text: "Yashil zona va Kiber arenada robotlar o'rniga o'quvchilarning o'z personajlari yuradi, Galaktika poygasida kema kabinasida uchuvchining boshi ko'rinadi. Javob berib bo'lgan o'quvchilar kutish paytida harakat (emot) yuboradi — proyektordagi personajlar qatorida ko'rinadi.",
+      },
+      {
+        art: "boosters",
+        title: "O'quvchilar uchun kuchaytirgichlar",
+        text: "O'quvchilar coin evaziga sotib olib, savol paytida ishlatadi: ✂️ 50/50 (15 coin), ⚡ ×2 ochko (20 coin, faqat oddiy savol rejimlarida), 🛡️ Qalqon (20 coin — bitta xato kechiriladi). Har savolda har turdan bittadan, bir o'yinda har turdan ko'pi bilan 3 ta. Sarflangan coin «Coin iqtisodi»da «purchase» sifatida ko'rinadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🎲",
+        title: "Mini o'yinlar tartibi endi tasodifiy",
+        text: "Har 3 savoldan keyingi mini o'yin endi har doim omad g'ildiragi bo'lmaydi: tartib har o'yinda boshqacha va hamma tur bir martadan chiqmaguncha takrorlanmaydi. «Qisqa o'yinlarda Yashil zona ham chiqsin» yoqilgan bo'lsa, Yashil zona ham shu navbatga qo'shiladi.",
+      },
+      {
+        art: "emoji",
+        emoji: "⚡",
+        title: "Tezroq va yengilroq",
+        text: "Natijani ochish katta guruhlarda ham bir lahzada bajariladi, sahifalar serverga kamroq yuk beradi. Jonli o'yin paytida o'quvchilar ekraniga e'lon, mukofot yoki yangilik oynalari chiqmaydi — ular o'yindan keyin ko'rsatiladi.",
+      },
+    ],
+    cta: { label: "Jonli o'yinlar", href: "/mentor/live" },
+  },
+  {
+    id: "live-random-2026-11",
+    date: "2026-11-19",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Jonli o'yinlar yanada qiziqarli",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎲",
+        title: "Mini o'yinlar har safar boshqacha",
+        text: "Har 3 savoldan keyin chiqadigan mini o'yin endi tasodifiy: mo'ljalga otish, xotira, tez hisob, rang tuzog'i, reaksiya, omad g'ildiragi, bonus raund yoki Yashil zona. Hamma o'yin bir martadan chiqmaguncha takrorlanmaydi!",
+      },
+      {
+        art: "emoji",
+        emoji: "🎯",
+        title: "O'yin paytida hech narsa xalaqit bermaydi",
+        text: "Savolga javob berayotganingizda ekranga e'lon, mukofot yoki yangilik oynasi chiqmaydi — ular o'yin tugagach ko'rsatiladi.",
+      },
+    ],
+  },
   {
     id: "boosters-2026-11",
     date: "2026-11-19",

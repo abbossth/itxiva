@@ -90,6 +90,21 @@ describe("qoidalar", () => {
     for (let r = 0; r < 1; r += 0.05) expect(mg.pickMinigame(null, r)).not.toBe("tap");
   });
 
+  it("raundlar tartibi tasodifiy: hamma tur bir martadan chiqmaguncha takrorlanmaydi, birinchisi doim g'ildirak emas", () => {
+    const firsts = new Set<string>();
+    for (let r = 0; r < 1; r += 0.07) firsts.add(mg.pickRound([], false, r));
+    expect(firsts.size).toBeGreaterThan(4);
+    // Bir aylanish: 7 tur (zona bilan 8) — hammasi har xil
+    for (const zone of [false, true]) {
+      const history: string[] = [];
+      for (let i = 0; i < (zone ? 8 : 7); i++) history.push(mg.pickRound(history, zone, Math.random()));
+      expect(new Set(history).size).toBe(history.length);
+      expect(history.includes("zone")).toBe(zone);
+      // Yangi aylanish: oxirgisi ketma-ket takrorlanmaydi
+      for (let r = 0; r < 1; r += 0.1) expect(mg.pickRound(history, zone, r)).not.toBe(history[history.length - 1]);
+    }
+  });
+
   it("ochko: bosish ×5 (120 gacha) va eng tezga +200, nishon ×40; katta son chegaralanadi", () => {
     const p = mg.minigamePoints("tap", [{ id: "a", value: 50 }, { id: "b", value: 200 }]);
     expect(p.get("a")).toBe(250);
@@ -208,8 +223,8 @@ describe("o'yin ichida", () => {
   it("omad g'ildiragi: har kim o'z g'ildiragini aylantiradi — natija har xil, tugaganda har kimga o'ziniki qo'llanadi", async () => {
     const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
-    // Birinchi qisqa o'yin har doim g'ildirak; o'yinchilar uchun: 0.01 → +500, 0.5 → +100
-    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
+    // Tur: 0.8 → g'ildirak; o'yinchilar uchun: 0.01 → +500, 0.5 → +100
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.8).mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
     await live.startLiveQuestionAction(id);
     spy.mockRestore();
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("wheel");
@@ -279,7 +294,7 @@ describe("o'yin ichida", () => {
     };
     const players = await LiveGamePlayer.find({ gameId: id }).sort({ _id: 1 }).lean();
     const order = players.map((p) => p.studentId.toString());
-    const spy = vi.spyOn(Math, "random");
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.8); // tur: g'ildirak
     for (const sid of order) spy.mockReturnValueOnce(sid === ali._id.toString() ? superAt("super") : superAt("superWheel"));
     await live.startLiveQuestionAction(id);
     spy.mockRestore();

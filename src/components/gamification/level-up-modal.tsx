@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Coins, Sparkles } from "lucide-react";
 import { LevelBadge, XpBar } from "@/components/gamification/level-badge";
 import { LevelStage, celebrateLevel } from "@/components/gamification/level-reveal";
@@ -19,6 +19,7 @@ import { LEVEL_MATERIALS } from "@/lib/gamification/levels";
 export function LevelUpModal({ info }: { info: LevelUpInfo }) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
+  const pathname = usePathname();
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Oyna sahifa yuklanishi bilan ochiq: portal serverda chizilmaydi, shuning uchun faqat brauzerda ko'rsatiladi
   const mounted = useSyncExternalStore(
@@ -40,7 +41,7 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
   );
 
   useEffect(() => {
-    if (!mounted || !open) return;
+    if (!mounted || !open || /^\/(mentor\/)?live\/[^/]+/.test(pathname ?? "")) return;
     buttonRef.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
@@ -50,9 +51,10 @@ export function LevelUpModal({ info }: { info: LevelUpInfo }) {
       clearTimeout(t);
       window.removeEventListener("keydown", onKey);
     };
-  }, [mounted, open, close]);
+  }, [mounted, open, close, pathname]);
 
-  if (!mounted || !open) return null;
+  // Jonli o'yin ekranini to'smaydi: o'yindan chiqqach ko'rsatiladi
+  if (!mounted || !open || /^\/(mentor\/)?live\/[^/]+/.test(pathname ?? "")) return null;
 
   const nextPercent = info.nextXp !== null ? Math.min(100, Math.round((info.xp / info.nextXp) * 100)) : 100;
 

@@ -83,6 +83,8 @@ export interface ILiveGameData {
   minigame?: ILiveMinigame | null;
   /** O'tkazilgan qisqa o'yinlar (savol raqamlari) */
   minigameRounds: number[];
+  /** Shu o'yinda chiqqan raund turlari (qisqa o'yinlar va "zone") — tartib tasodifiy, takrorlanmasin */
+  minigameKinds?: string[];
   /** Jang o'tkazilgan savollar (savol raqami; oxirgisi — final jang) */
   arenaRounds: number[];
   /** "Hudud bosib olish": har katakning egasi (o'yinchining qo'shilish tartibi), -1 — bo'sh */
@@ -203,6 +205,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
       default: null,
     },
     minigameRounds: { type: [Number], default: [] },
+    minigameKinds: { type: [String], default: [] },
     arenaRounds: { type: [Number], default: [] },
     galaxy: {
       type: new Schema(
