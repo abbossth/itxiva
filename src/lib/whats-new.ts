@@ -3,7 +3,7 @@
 // Ko'rilganlari `User.seenNews` da saqlanadi. Slayd rasmi `art` bo'yicha komponentda chiziladi.
 // Bu fayl brauzer va server uchun umumiy.
 
-export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emotes" | "xp-penalty" | "emoji";
+export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emotes" | "xp-penalty" | "boosters" | "games" | "emoji";
 
 export interface NewsSlide {
   title: string;
@@ -26,6 +26,26 @@ export interface NewsItem {
 }
 
 export const NEWS: NewsItem[] = [
+  {
+    id: "boosters-2026-11",
+    date: "2026-11-19",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Personajingiz endi barcha o'yinlarda",
+    slides: [
+      {
+        art: "games",
+        title: "Hamma o'yinda — o'z personajingiz",
+        text: "Yashil zonada robot o'rniga personajingiz yuguradi, Kiber arenada qurol bilan jang qiladi, Galaktika poygasida kemangiz kabinasida o'tiradi. Savolga javob berib kutayotganda ham harakat tugmalarini bosing — katta ekranda ko'rinadi.",
+      },
+      {
+        art: "boosters",
+        title: "O'yin uchun kuchaytirgichlar",
+        text: "Coinga sotib oling va savol paytida bosing: ✂️ 50/50 — ikkita noto'g'ri variant o'chadi; ⚡ ×2 — keyingi to'g'ri javob ikki baravar ochko; 🛡️ Qalqon — bitta xato kechiriladi (jon ketmaydi, seriya uzilmaydi). Kutish zalida yoki «Personajim» → «O'yin uchun» bo'limida.",
+      },
+    ],
+    cta: { label: "Kuchaytirgich olish", href: "/profile?tab=character" },
+  },
   {
     id: "emotes-2026-11",
     date: "2026-11-19",

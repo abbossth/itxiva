@@ -27,6 +27,7 @@ import { cn, formatNumberUz } from "@/lib/utils";
 import { CharacterSvg } from "./character-svg";
 import { Character2D } from "./character-2d";
 import { Character3D } from "./character-3d";
+import { BoosterShop } from "@/components/live/boosters";
 
 // Profil → "Personajim": personajni 2D yoki 3D ko'rinishda ko'rish (sichqoncha bilan o'ynash), qismlarini tanlash,
 // coin evaziga yangi qism sotib olish va "kuch" upgrade. Har o'zgarish o'zi saqlanadi.
@@ -40,7 +41,7 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
   const [me, setMe] = useState(initial);
   const [look, setLook] = useState<Look>(initial.look);
   const [view, setView] = useState<"2d" | "3d">("2d");
-  const [slot, setSlot] = useState<CharSlot | "emotes">("outfit");
+  const [slot, setSlot] = useState<CharSlot | "emotes" | "boosters">("outfit");
   const [buying, setBuying] = useState<CharItem | null>(null);
   const [buyingEmote, setBuyingEmote] = useState<Emote | null>(null);
   // Ko'rinishda ijro etilayotgan harakat (bosilganda 2,6 s)
@@ -251,7 +252,20 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
               <span>🕺</span>
               Harakatlar
             </button>
+            <button
+              type="button"
+              onClick={() => setSlot("boosters")}
+              className={cn(
+                "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition",
+                slot === "boosters" ? "bg-amber-500 text-white shadow-md shadow-amber-500/20" : "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300"
+              )}
+            >
+              <span>🎒</span>
+              O&apos;yin uchun
+            </button>
           </div>
+
+          {slot === "boosters" && <BoosterShop />}
 
           {slot === "emotes" && (
             <div className="space-y-2">

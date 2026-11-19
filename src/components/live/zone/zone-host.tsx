@@ -8,6 +8,8 @@ import { playFanfare, playHeartbeat, playShutdown, playSurvive, playTickSound, p
 import { cn, formatNumberUz } from "@/lib/utils";
 import { ZoneFx, drawZoneField, type DrawRobot } from "./zone-draw";
 import { ZoneNet } from "./zone-net";
+import { getGameLooksAction } from "@/actions/live-game.actions";
+import type { GameLook } from "@/lib/character/catalog";
 
 // "Yashil zona": proyektor. Hamma robotlar real vaqt xonasidan (tomoshabin) yoki HTTP orqali o'qiladi va silliq chiziladi.
 
@@ -48,6 +50,15 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       },
     });
     net.start();
+    // Personajlar: o'yindagi hammaning ko'rinishi bir marta yuklanadi (robot o'rniga shular chiziladi)
+    const looks = new Map<string, GameLook>();
+    let looksReady = false;
+    void getGameLooksAction(gameId)
+      .then((r) => {
+        if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
+        looksReady = r.success;
+      })
+      .catch(() => {});
     let raf = 0;
     let last = t0;
     let lastInfo = 0;
@@ -113,7 +124,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
         const ddy = prev ? sh.y - prev.y : 0;
         prevShown.set(p.id, { x: sh.x, y: sh.y });
         const mv = Math.hypot(ddx, ddy) > 0.02;
-        list.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv });
+        list.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv, look: looksReady ? looks.get(p.id) ?? null : undefined });
       }
       drawZoneField(ctx, el.width, el.height, {
         wave,

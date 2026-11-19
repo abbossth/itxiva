@@ -53,6 +53,7 @@ import { awardCoins } from "@/lib/gamification/award";
 import { MAX_POWER, cleanLook, gameLook, pickGiftItem, type GameLook } from "@/lib/character/catalog";
 import { giftView, grantCharacterGift, type GiftView } from "@/lib/character/grant";
 import { EMOTE_GAP_MS, EMOTE_MS, emoteOf, hasEmote } from "@/lib/character/emotes";
+import { BOOSTER_MAX_PER_GAME, boosterOf, boosterWorks } from "@/lib/live-game/boosters";
 import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaveCount } from "@/lib/live-game/zone";
 import { resolveZoneWaves, zoneRealtimeEnabled, zoneSocketUrl } from "@/lib/live-game/zone-server";
 import {
@@ -352,7 +353,7 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
         { _id: p._id, "answers.index": { $ne: game.index } },
         {
           $push: { answers: { index: game.index, value: "", isCorrect: false, ms: 0, points: 0 } },
-          $set: { streak: 0, lives: o.lives, eliminated: o.eliminated, ...(o.eliminated ? { eliminatedAt: game.index } : {}) },
+          $set: { streak: o.streak, lives: o.lives, eliminated: o.eliminated, guard: o.guard, ...(o.eliminated ? { eliminatedAt: game.index } : {}) },
         }
       );
       if (res.modifiedCount > 0 && o.eliminated) outs.push(p.name);
@@ -1456,7 +1457,7 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
       {
         $push: { answers: { index, value: clean, isCorrect, ms: Math.min(elapsed, q.timeLimit * 1000), points: o.points } },
         $inc: { score: o.points, chests: o.chests },
-        $set: { streak: o.streak, lives: o.lives, eliminated: o.eliminated, double: o.double, ...(o.eliminated ? { eliminatedAt: index } : {}) },
+        $set: { streak: o.streak, lives: o.lives, eliminated: o.eliminated, double: o.double, guard: o.guard, ...(o.eliminated ? { eliminatedAt: index } : {}) },
       }
     );
     if (res.modifiedCount === 0) return fail("Bu savolga javob berdingiz");
@@ -1592,6 +1593,9 @@ export interface LivePlayerState {
     chests: number;
     shield: boolean;
     double: boolean;
+    /** Qalqon faol va shu savolda ishlatilgan kuchaytirgichlar */
+    guard: boolean;
+    boostersNow: string[];
     streak: number;
     coins: number;
     /** Joriy savolga javob */
@@ -1794,6 +1798,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               chests: hiddenAns?.isCorrect && game.mode === "chest" ? Math.max(0, mine.chests - 1) : mine.chests,
               shield: mine.shield,
               double: mine.double,
+              guard: Boolean(mine.guard),
+              boostersNow: (mine.boostersUsed ?? []).filter((u) => u.index === game.index).map((u) => u.id),
               streak: hiddenAns ? streakBefore(mine) : mine.streak,
               coins: mine.coins ?? 0,
               answered: Boolean(ans),
@@ -2097,7 +2103,8 @@ export async function playEmoteAction(gameId: string, emoteId: string): Promise<
     if (!e) return fail("Bunday harakat yo'q");
     await connectDB();
     const game = await loadGameForStudent(gameId, user.groupId);
-    if (!game || game.status !== "lobby") return { success: true, data: { played: false } };
+    // Kutish zalida, javob berib boshqalarni kutayotganda va natija paytida
+    if (!game || !["lobby", "question", "reveal"].includes(game.status)) return { success: true, data: { played: false } };
     if (e.price > 0) {
       const me = await User.findById(user.userId).select("character").lean();
       if (!hasEmote(e, me?.character?.owned ?? [])) return fail("Bu harakat hali sizda yo'q — «Personajim» bo'limida oching");
@@ -2111,5 +2118,69 @@ export async function playEmoteAction(gameId: string, emoteId: string): Promise<
     return { success: true, data: { played: res.modifiedCount > 0 } };
   } catch (err) {
     return errorOf(err, "Harakatni ko'rsatib bo'lmadi");
+  }
+}
+
+/**
+ * Savol paytida kuchaytirgichni ishlatish: zaxiradan bittasi yechiladi (atomik), so'ng ta'siri qo'llanadi.
+ * 50/50 — ikkita noto'g'ri variant qaytariladi (telefonda yashiriladi); ×2 — keyingi to'g'ri javob ikki baravar;
+ * qalqon — bitta xato kechiriladi. Har savolga har turdan bittadan, bir o'yinda har turdan ko'pi bilan 3 ta.
+ */
+export async function applyLiveBoosterAction(gameId: string, index: number, id: string): Promise<Result<{ id: string; hide: string[] }>> {
+  try {
+    const user = await requireStudent();
+    const b = boosterOf(id);
+    if (!b || !Number.isInteger(index) || index < 0) return fail("Bunday kuchaytirgich yo'q");
+    await connectDB();
+    const game = await loadGameForStudent(gameId, user.groupId);
+    if (!game || game.status !== "question" || game.index !== index) return fail("Kuchaytirgich savol paytida ishlatiladi");
+    const q = game.questions[index];
+    if (!q || !boosterWorks(b.id, game.mode, q)) return fail(b.id === "fifty" ? "Bu savolda 50/50 ishlamaydi" : "Bu o'yinda bu kuchaytirgich ishlamaydi");
+    const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId }).select("answers boostersUsed eliminated").lean();
+    if (!player || player.eliminated) return fail("Avval o'yinga qo'shiling");
+    if (player.answers.some((a) => a.index === index)) return fail("Javob berib bo'lgansiz");
+    const used = player.boostersUsed ?? [];
+    if (used.some((u) => u.id === b.id && u.index === index)) return fail("Bu savolda ishlatilgan");
+    if (used.filter((u) => u.id === b.id).length >= BOOSTER_MAX_PER_GAME) return fail(`Bir o'yinda ko'pi bilan ${BOOSTER_MAX_PER_GAME} ta`);
+    // Shartli: shu savol uchun ikki marta yozilmaydi
+    const mark = await LiveGamePlayer.updateOne(
+      { _id: player._id, boostersUsed: { $not: { $elemMatch: { id: b.id, index } } } },
+      { $push: { boostersUsed: { id: b.id, index } } }
+    );
+    if (mark.modifiedCount === 0) return fail("Bu savolda ishlatilgan");
+    const spent = await User.updateOne({ _id: user.userId, [`boosters.${b.id}`]: { $gte: 1 } }, { $inc: { [`boosters.${b.id}`]: -1 } });
+    if (spent.modifiedCount === 0) {
+      await LiveGamePlayer.updateOne({ _id: player._id }, { $pull: { boostersUsed: { id: b.id, index } } });
+      return fail("Bu kuchaytirgich tugagan — «Personajim» bo'limida sotib oling");
+    }
+    let hide: string[] = [];
+    if (b.id === "fifty") {
+      const wrong = q.options.filter((o) => !q.correctAnswers.includes(o));
+      // Kamida bitta noto'g'ri variant qoladi: 4 variantda — 2 ta, 3 variantda — 1 ta yashiriladi
+      hide = [...wrong].sort(() => Math.random() - 0.5).slice(0, Math.max(0, Math.min(2, wrong.length - 1)));
+    } else if (b.id === "double") await LiveGamePlayer.updateOne({ _id: player._id }, { $set: { double: true } });
+    else await LiveGamePlayer.updateOne({ _id: player._id }, { $set: { guard: true } });
+    invalidateLiveSnapshot(game._id.toString());
+    return { success: true, data: { id: b.id, hide } };
+  } catch (err) {
+    return errorOf(err, "Kuchaytirgichni ishlatib bo'lmadi");
+  }
+}
+
+/** Kanvas o'yinlar uchun: o'yindagi hamma o'yinchilarning personaji (o'yinchi id → ko'rinish) */
+export async function getGameLooksAction(gameId: string): Promise<Result<Record<string, GameLook>>> {
+  try {
+    const me = await getCurrentUser();
+    if (!me || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    const game = await LiveGame.findById(gameId).select("groupId mentorId").lean();
+    if (!game) return fail("O'yin topilmadi");
+    if (me.role === "student" && String(game.groupId) !== String(me.groupId ?? "")) return fail("O'yin topilmadi");
+    const players = await LiveGamePlayer.find({ gameId: game._id }).select("look").lean();
+    const out: Record<string, GameLook> = {};
+    for (const p of players) if (p.look) out[p._id.toString()] = p.look as unknown as GameLook;
+    return { success: true, data: out };
+  } catch (err) {
+    return errorOf(err, "Personajlarni olib bo'lmadi");
   }
 }

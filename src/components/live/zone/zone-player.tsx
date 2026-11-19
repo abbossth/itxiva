@@ -37,6 +37,8 @@ import {
 import { cn, formatNumberUz } from "@/lib/utils";
 import { ZoneFx, drawZoneField, toField, type DrawRobot } from "./zone-draw";
 import { ZoneNet } from "./zone-net";
+import { getGameLooksAction } from "@/actions/live-game.actions";
+import type { GameLook } from "@/lib/character/catalog";
 
 // "Yashil zona": o'quvchi ekrani. Robot ekranga bosilgan (yoki sudralgan) joyga yuradi, klaviaturada ←↑→↓ / WASD.
 // O'z roboti darhol (kechikishsiz) yuradi; joy real vaqt xonasiga ~20 marta/s yuboriladi (yo'q bo'lsa — HTTP).
@@ -144,6 +146,15 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       },
     });
     net.start();
+    // Personajlar: o'yindagi hammaning ko'rinishi bir marta yuklanadi (robot o'rniga shular chiziladi)
+    const looks = new Map<string, GameLook>();
+    let looksReady = false;
+    void getGameLooksAction(gameId)
+      .then((r) => {
+        if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
+        looksReady = r.success;
+      })
+      .catch(() => {});
 
     let raf = 0;
     let last = t0;
@@ -322,9 +333,9 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         const ddy = prev ? sh.y - prev.y : 0;
         prevShown.set(p.id, { x: sh.x, y: sh.y });
         const mv = Math.hypot(ddx, ddy) > 0.02;
-        robots.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv });
+        robots.push({ id: p.id, name: p.name, x: sh.x, y: sh.y, color: p.color, out: p.o > 0, dx: mv ? ddx : 0, dy: mv ? ddy : 0, seat: p.seat, moving: mv, look: looksReady ? looks.get(p.id) ?? null : undefined });
       }
-      robots.push({ id: "me", name: "Siz", x: s.x, y: s.y, color: z.color, out, me: true, dx: s.dx, dy: s.dy, seat: mySeat, stunned: now < stunUntil, moving: walking });
+      robots.push({ id: "me", name: "Siz", x: s.x, y: s.y, color: z.color, out, me: true, dx: s.dx, dy: s.dy, seat: mySeat, stunned: now < stunUntil, moving: walking, look: looksReady ? looks.get(playerId) ?? null : undefined });
 
       // Yo'l ko'rsatkich: joyim bo'lmasa — eng yaqin bo'sh zonaga
       let guide: { x: number; y: number } | null = null;

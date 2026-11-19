@@ -35,6 +35,8 @@ export interface GalaxyOptions {
   /** Har ~250 ms: serverga holat; javobda boshqa kemalar */
   onSend: (state: { d: number; x: number; orbs: number }) => void;
   onEvent?: (kind: "orb" | "hit" | "ring" | "turbo") => void;
+  /** Uchuvchi personajining boshi (rasm tayyor bo'lsa): o'ziniki va boshqalarniki (id bo'yicha) */
+  pilot?: (id: string | null) => HTMLImageElement | null;
 }
 
 interface PeerState {
@@ -49,6 +51,8 @@ interface PeerState {
   shownD: number;
   shownX: number;
   group: Three.Group | null;
+  /** Kabinada personaj boshi qo'yilganmi */
+  pilot?: boolean;
 }
 
 const VIEW_AHEAD = 170;
@@ -74,6 +78,8 @@ export class GalaxyEngine {
   private geo: Record<string, Three.BufferGeometry> = {};
   private mat: Record<string, Three.Material> = {};
   private peers = new Map<string, PeerState>();
+  private ownPilot = false;
+  private pilotTex: { dispose: () => void }[] = [];
   private raf = 0;
   private last = 0;
   private lastSend = 0;
@@ -175,12 +181,27 @@ export class GalaxyEngine {
     this.ship = own.group;
     this.flame = own.flame;
     this.scene.add(this.ship);
+    this.ownPilot = false;
 
     this.resize = new ResizeObserver(() => this.fit());
     this.resize.observe(container);
     this.fit();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  /** Kabina ustiga uchuvchi personajining boshi (sprite) */
+  private addPilot(group: Three.Group, img: HTMLImageElement, ghost: boolean) {
+    const { THREE } = this;
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: ghost ? 0.85 : 1, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.95, 0.95, 1);
+    sprite.position.set(0, 0.78, -0.1);
+    group.add(sprite);
+    this.pilotTex.push(tex, mat);
   }
 
   // ---------------- Boshqaruv ----------------
@@ -229,6 +250,7 @@ export class GalaxyEngine {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    for (const d of this.pilotTex) d.dispose();
     this.resize.disconnect();
     this.scene.traverse((o) => {
       const m = o as Three.Mesh;
@@ -530,6 +552,14 @@ export class GalaxyEngine {
       this.meshes.delete(id);
     }
 
+    // O'z kemasi: personaj boshi (rasm tayyor bo'lganda bir marta)
+    if (!this.ownPilot && this.opts.pilot) {
+      const img = this.opts.pilot(null);
+      if (img) {
+        this.addPilot(this.ship, img, false);
+        this.ownPilot = true;
+      }
+    }
     // Boshqa kemalar: oxirgi ma'lum masofa + taxminiy tezlik bilan silliq
     for (const p of this.peers.values()) {
       const ahead = Math.min(1, (now - p.at) / 1000);
@@ -547,6 +577,13 @@ export class GalaxyEngine {
         s.group.add(this.makeLabel(p.name, color));
         p.group = s.group;
         this.scene.add(p.group);
+      }
+      if (!p.pilot && this.opts.pilot) {
+        const img = this.opts.pilot(p.id);
+        if (img) {
+          this.addPilot(p.group, img, true);
+          p.pilot = true;
+        }
       }
       p.group.visible = true;
       p.group.position.set(p.shownX * HALF_WIDTH, Math.sin(t * 3 + p.ship) * 0.08, -dz);

@@ -3,6 +3,8 @@
 // Fon bir marta alohida canvas'ga chiziladi (har kadrda emas) — kuchsiz telefonda ham silliq.
 
 import { FIELD, ROBOT_COLORS, ROBOT_R, STAR_R, ZAP_PERIOD_MS, zapActive, type ZoneWave } from "@/lib/live-game/zone";
+import type { GameLook } from "@/lib/character/catalog";
+import { characterSprite, drawCharacterSprite } from "@/components/character/character-sprite";
 
 export interface DrawRobot {
   id: string;
@@ -19,6 +21,8 @@ export interface DrawRobot {
   seat: number;
   stunned?: boolean;
   moving?: boolean;
+  /** O'quvchi personaji — bo'lsa robot o'rniga shu chiziladi */
+  look?: GameLook | null;
 }
 
 export interface DrawState {
@@ -452,6 +456,7 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
     const rad = ROBOT_R * k;
     const color = r.out ? "#475569" : ROBOT_COLORS[r.color % ROBOT_COLORS.length];
     const bob = r.out ? 0 : Math.sin(s.t * (r.moving ? 14 : 3) + r.color) * rad * (r.moving ? 0.12 : 0.06);
+    const sprite = r.look !== undefined ? characterSprite(r.look) : null;
     ctx.save();
     ctx.globalAlpha = r.out ? 0.45 : 1;
     // Soya
@@ -479,6 +484,41 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       ctx.beginPath();
       ctx.arc(x, y, rad + k * 1.1 + Math.sin(s.t * 6) * k * 0.2, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (sprite) {
+      // Personaj: oyoqlari robot o'rnida, yo'nalishiga qarab ko'zgu aksi
+      drawCharacterSprite(ctx, sprite, x, y + rad * 1.05, rad * 3.6, { t: s.t, moving: r.moving, faceLeft: (r.dx ?? 0) < -0.05, out: r.out, seed: r.color });
+      if (r.stunned && !r.out) {
+        ctx.strokeStyle = "#fde047";
+        ctx.lineWidth = Math.max(1, k * 0.2);
+        for (let b = 0; b < 3; b++) {
+          const a = s.t * 12 + b * 2.1;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(a) * rad * 1.3, y - rad + Math.sin(a) * rad * 1.3);
+          ctx.lineTo(x + Math.cos(a + 0.4) * rad * 1.9, y - rad + Math.sin(a + 0.4) * rad * 1.9);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+      if (labelled(r)) {
+        ctx.font = `800 ${Math.max(10, k * (r.me ? 2 : 1.7))}px system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillStyle = r.out ? "rgba(148,163,184,0.7)" : "#fff";
+        ctx.strokeStyle = "rgba(2,6,23,0.7)";
+        ctx.lineWidth = Math.max(2, k * 0.35);
+        const name = r.me ? "Siz" : r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name;
+        ctx.strokeText(name, x, y - rad * 2.7);
+        ctx.fillText(name, x, y - rad * 2.7);
+      }
+      if (!r.out && r.seat < 0) {
+        ctx.font = `900 ${Math.max(10, k * 1.8)}px system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "#fca5a5";
+        ctx.fillText("joy yo'q!", x, y + rad * 1.3);
+      }
+      continue;
     }
     ctx.translate(0, -bob);
     // Antenna

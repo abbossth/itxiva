@@ -31,6 +31,8 @@ export interface IUserData {
   character?: { look?: Record<string, unknown> | null; owned?: string[]; power?: number; updatedAt?: Date | null } | null;
   /** Ko'rilgan "Yangilik" e'lonlari (id) */
   seenNews?: string[];
+  /** O'yin kuchaytirgichlari zaxirasi: tur → soni */
+  boosters?: { fifty?: number; double?: number; guard?: number } | null;
   /** Kirish seriyasi (Asia/Tashkent kunlari bo'yicha) */
   streak?: { current: number; best: number; lastDayKey: string | null } | null;
   /** Seriya himoyasi: o'tkazib yuborilgan bir kunni avtomatik yopadi */
@@ -139,6 +141,10 @@ const UserSchema = new Schema<IUser>(
       default: null,
     },
     seenNews: { type: [String], default: [] },
+    boosters: {
+      type: new Schema({ fifty: { type: Number, default: 0, min: 0 }, double: { type: Number, default: 0, min: 0 }, guard: { type: Number, default: 0, min: 0 } }, { _id: false }),
+      default: null,
+    },
     streak: {
       current: { type: Number, default: 0 },
       best: { type: Number, default: 0 },

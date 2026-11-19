@@ -234,6 +234,39 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
           <CharacterSvg look={{ ...look, level: 1 }} size={90} emote="jump" pedestal={false} />
         </div>
       );
+    case "games":
+      return (
+        <div className="flex items-end gap-3">
+          <div className="mb-4 flex flex-col items-center rounded-2xl bg-emerald-500/20 p-2 ring-1 ring-emerald-300/40">
+            <CharacterSvg look={{ ...look, level: 1 }} size={70} mood="run" pedestal={false} />
+            <span className="text-[10px] font-black text-emerald-200">Yashil zona</span>
+          </div>
+          <CharacterSvg look={look} size={130} emote="karate" />
+          <div className="mb-4 flex flex-col items-center rounded-2xl bg-violet-500/20 p-2 ring-1 ring-violet-300/40">
+            <span className="text-4xl">🚀</span>
+            <CharacterSvg look={look} size={34} headOnly />
+            <span className="text-[10px] font-black text-violet-200">Galaktika</span>
+          </div>
+        </div>
+      );
+    case "boosters":
+      return (
+        <div className="flex items-end gap-4">
+          <CharacterSvg look={look} size={120} mood="happy" />
+          <div className="mb-6 grid gap-2">
+            {[
+              ["✂️", "50/50"],
+              ["⚡", "×2 ochko"],
+              ["🛡️", "Qalqon"],
+            ].map(([i, n]) => (
+              <span key={n} className="live-pop inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-sm font-black text-white shadow-lg">
+                <span className="text-xl">{i}</span>
+                {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      );
     case "xp-penalty":
       return (
         <div className="flex items-end gap-4">

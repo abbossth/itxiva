@@ -24,7 +24,8 @@ import { GalaxyPlayer } from "./galaxy/galaxy-race";
 import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
-import { EmotePad } from "./emote-pad";
+import { EmotePad, EmoteStrip } from "./emote-pad";
+import { BoosterBar, BoosterShop } from "./boosters";
 import { ModeIntro } from "./live-intro";
 import { TacticView } from "./live-tactics";
 import { isAdventure } from "@/lib/live-game/adventures";
@@ -255,6 +256,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
             <p className="text-2xl font-black lg:text-4xl">Siz o&apos;yindasiz!</p>
             <p className="max-w-xs text-sm text-slate-300">Mentor o&apos;yinni boshlashini kuting. Savollar shu yerda chiqadi.</p>
             <EmotePad gameId={state.id} look={me?.look ?? null} />
+            <BoosterShop compact />
           </div>
         ) : state.status === "question" ? (
           me?.eliminated ? (
@@ -262,7 +264,10 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           ) : me?.answered && isAdventure(state.mode) && state.tactics ? (
             <TacticView state={state} onPick={pickTactic} saving={tacticSaving} />
           ) : me?.answered ? (
-            <Waiting title="Javob qabul qilindi" text="Boshqalar javob berishini kuting…" tone="ok" look={me?.look} />
+            <div>
+              <Waiting title="Javob qabul qilindi" text="Boshqalar javob berishini kuting… Shu orada personajingiz bilan salomlashing:" tone="ok" look={me?.look} />
+              <EmoteStrip gameId={state.id} />
+            </div>
           ) : (
             <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
           )
@@ -271,7 +276,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         ) : state.status === "zone" && state.zone ? (
           <ZonePlayer gameId={state.id} z={state.zone} />
         ) : state.status === "galaxy" && state.galaxy ? (
-          <GalaxyPlayer gameId={state.id} g={state.galaxy} />
+          <GalaxyPlayer gameId={state.id} g={state.galaxy} look={me?.look ?? null} />
         ) : state.status === "minigame" && state.minigame ? (
           <MinigamePlayer key={state.minigame.round} gameId={state.id} m={state.minigame} />
         ) : state.status === "reveal" ? (
@@ -335,6 +340,8 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
   const remaining = useCountdown(state.remainingMs, true);
   const [picked, setPicked] = useState<string[]>([]);
   const [text, setText] = useState("");
+  // 50/50: yashirilgan noto'g'ri variantlar
+  const [gone, setGone] = useState<string[]>([]);
   const timeUp = remaining <= 0;
 
   // Kompyuterda klaviatura: 1–6 yoki A–F — variant, Enter — tasdiqlash (bir nechta javobda)
@@ -375,16 +382,20 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
         </span>
       </div>
       {timeUp && <p className="text-center text-sm font-bold text-rose-300">Vaqt tugadi</p>}
+      {!timeUp && state.me && (
+        <BoosterBar gameId={state.id} index={state.index} mode={state.mode} question={q} active={state.me.boostersNow ?? []} onHide={(o) => setGone((g) => [...g, ...o])} />
+      )}
 
       {q.type !== "short_answer" ? (
         <div className="grid gap-2.5 sm:grid-cols-2 lg:gap-4">
           {q.options.map((opt, i) => {
             const on = picked.includes(opt);
+            const hidden = gone.includes(opt);
             return (
               <button
                 key={opt}
                 type="button"
-                disabled={busy || timeUp}
+                disabled={busy || timeUp || hidden}
                 onClick={() => {
                   if (q.type === "single_choice") onAnswer(opt);
                   else setPicked((p) => (p.includes(opt) ? p.filter((x) => x !== opt) : [...p, opt]));
@@ -392,7 +403,8 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
                 className={cn(
                   "quiz-tile flex min-h-[68px] cursor-pointer items-center gap-3 rounded-2xl border-b-4 px-4 text-left text-lg font-black shadow-md transition-transform hover:scale-[1.02] active:translate-y-0.5 disabled:opacity-50 sm:min-h-[96px] sm:text-xl lg:min-h-[130px] lg:gap-4 lg:px-6 lg:text-3xl",
                   TILE_COLORS[i % TILE_COLORS.length],
-                  on && "ring-4 ring-white"
+                  on && "ring-4 ring-white",
+                  hidden && "option-gone"
                 )}
                 style={{ animationDelay: `${i * 50}ms` }}
               >

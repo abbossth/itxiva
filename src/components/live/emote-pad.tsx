@@ -221,3 +221,43 @@ function EmoteBurst({ icon, from, to, onDone }: { icon: string; from: { x: numbe
     </>
   );
 }
+
+/** Ixcham qator: javob berib kutayotganda — egalikdagi harakatlar (katta ekrandagi personaj qatorida ko'rinadi) */
+export function EmoteStrip({ gameId }: { gameId: string }) {
+  const [owned, setOwned] = useState<string[] | null>(null);
+  const [on, setOn] = useState<string | null>(null);
+  const last = useRef(-1e9);
+  useEffect(() => {
+    void getMyCharacter()
+      .then((c) => setOwned(c?.owned ?? []))
+      .catch(() => setOwned([]));
+  }, []);
+  if (!owned) return null;
+  const mine = EMOTES.filter((e) => hasEmote(e, owned)).slice(0, 8);
+  return (
+    <div className="flex flex-wrap justify-center gap-1.5">
+      {mine.map((e) => (
+        <button
+          key={e.id}
+          type="button"
+          onClick={(ev) => {
+            if (ev.timeStamp - last.current < EMOTE_GAP_MS) return;
+            last.current = ev.timeStamp;
+            unlockSound();
+            playRankUp();
+            haptic([12]);
+            setOn(e.id);
+            setTimeout(() => setOn((x) => (x === e.id ? null : x)), 900);
+            void playEmoteAction(gameId, e.id).catch(() => {});
+          }}
+          className={cn("flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-xl shadow ring-2 transition active:scale-90", on === e.id ? "scale-110 ring-white" : "ring-white/20")}
+          style={{ background: `radial-gradient(circle at 35% 30%, hsl(${hue(e.id)} 90% 72%), hsl(${hue(e.id)} 80% 45%) 70%)` }}
+          aria-label={e.name}
+          title={e.name}
+        >
+          <span className={cn(on === e.id && "emote-wiggle")}>{e.icon}</span>
+        </button>
+      ))}
+    </div>
+  );
+}

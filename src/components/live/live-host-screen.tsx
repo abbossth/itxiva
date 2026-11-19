@@ -815,7 +815,7 @@ function AnswerCrowd({ players, teams }: { players: LiveHostState["players"]; te
                 {members.map((p) => (
                   <span key={p.id} className="relative" title={p.name}>
                     {p.answered && <span className="live-pop absolute -top-1 right-0 z-10 rounded-full bg-emerald-500 px-1 text-[9px] font-black">✓</span>}
-                    <CharacterSvg look={p.look} size={size} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36} />
+                    <CharacterSvg look={p.look} size={size} key={`c${p.emote?.at ?? "i"}`} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36 && !p.emote} emote={p.emote?.id} />
                   </span>
                 ))}
               </div>
@@ -839,7 +839,7 @@ function AnswerCrowd({ players, teams }: { players: LiveHostState["players"]; te
           >
             {p.answered ? "✓" : "…"}
           </span>
-          <CharacterSvg look={p.look} size={size} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36} />
+          <CharacterSvg look={p.look} size={size} key={`c${p.emote?.at ?? "i"}`} mood={p.answered ? "happy" : "idle"} pedestal={false} still={players.length > 36 && !p.emote} emote={p.emote?.id} />
           <span className="max-w-[4.5rem] truncate text-[10px] font-bold text-white/70">{p.name.split(" ")[0]}</span>
         </div>
       ))}

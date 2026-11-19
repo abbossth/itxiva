@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getGameLooksAction } from "@/actions/live-game.actions";
+import type { GameLook } from "@/lib/character/catalog";
 import { Crosshair, Eye, Skull, Users } from "lucide-react";
 import type { PvpFeedView, PvpMe, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-types";
 import { decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
@@ -420,6 +422,16 @@ export function PvpGame({
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const room = newClientState();
     const meBase = { weapon: init.weapon, cooldown: init.cooldown, name: myName, skin: init.skin };
+    // Personajlar: robot o'rniga o'quvchilarning o'z personaji chiziladi
+    const looks = new Map<string, GameLook>();
+    let looksReady = false;
+    void getGameLooksAction(gameId)
+      .then((r) => {
+        if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
+        looksReady = r.success;
+      })
+      .catch(() => {});
+    const lookOf = (id: string) => (looksReady ? looks.get(id) ?? null : undefined);
     const connect = () => {
       if (!wsUrl || closed) return;
       let opened = false;
@@ -555,7 +567,7 @@ export function PvpGame({
         if (!p.out && !vis.has(p.id)) continue;
         drawRobot(
           ctx,
-          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y, map), ring: teamColor(p.team), fired: now - (peerFired.get(p.id) ?? -1e9) < 110 },
+          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y, map), ring: teamColor(p.team), fired: now - (peerFired.get(p.id) ?? -1e9) < 110, look: lookOf(p.id) },
           t
         );
       }
@@ -565,7 +577,7 @@ export function PvpGame({
         const moving = keys.size > 0 || Boolean(stick);
         drawRobot(
           ctx,
-          { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y, map), ring: teamColor(myTeam), fired: now - lastFire < 90, dash: now < dashUntil },
+          { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y, map), ring: teamColor(myTeam), fired: now - lastFire < 90, dash: now < dashUntil, look: lookOf(init.playerId) },
           t
         );
       }

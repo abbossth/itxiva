@@ -1,5 +1,8 @@
 "use client";
 
+import { getGameLooksAction } from "@/actions/live-game.actions";
+import type { GameLook } from "@/lib/character/catalog";
+import { characterSprite } from "@/components/character/character-sprite";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Gem, Rocket, Zap } from "lucide-react";
 import type { LivePlayerState } from "@/actions/live-game.actions";
@@ -14,7 +17,7 @@ import type { GalaxyEngine, GalaxyHud } from "./galaxy-engine";
 
 type PlayerGalaxy = NonNullable<LivePlayerState["galaxy"]>;
 
-export function GalaxyPlayer({ gameId, g }: { gameId: string; g: PlayerGalaxy }) {
+export function GalaxyPlayer({ gameId, g, look }: { gameId: string; g: PlayerGalaxy; look?: GameLook | null }) {
   if (!g.joined) {
     return (
       <div className="flex flex-col items-center gap-3 py-14 text-center">
@@ -25,7 +28,7 @@ export function GalaxyPlayer({ gameId, g }: { gameId: string; g: PlayerGalaxy })
     );
   }
   if (g.ended) return <GalaxyResult g={g} />;
-  return <GalaxyRace key={g.round} gameId={gameId} g={g} />;
+  return <GalaxyRace key={g.round} gameId={gameId} g={g} look={look ?? null} />;
 }
 
 function GalaxyResult({ g }: { g: PlayerGalaxy }) {
@@ -62,7 +65,21 @@ const EMPTY_HUD: GalaxyHud = {
   flash: null,
 };
 
-function GalaxyRace({ gameId, g }: { gameId: string; g: PlayerGalaxy }) {
+function GalaxyRace({ gameId, g, look }: { gameId: string; g: PlayerGalaxy; look: GameLook | null }) {
+  // Uchuvchilar: o'zining va boshqalarning personaj boshi (kabinada)
+  const looks = useRef<Map<string, GameLook> | null>(null);
+  const myLook = useRef(look);
+  useEffect(() => {
+    let alive = true;
+    void getGameLooksAction(gameId)
+      .then((r) => {
+        if (alive && r.success) looks.current = new Map(Object.entries(r.data));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [gameId]);
   const box = useRef<HTMLDivElement>(null);
   const engine = useRef<GalaxyEngine | null>(null);
   const [hud, setHud] = useState<GalaxyHud>({ ...EMPTY_HUD, turbo: g.turbo });
@@ -120,6 +137,7 @@ function GalaxyRace({ gameId, g }: { gameId: string; g: PlayerGalaxy }) {
             startAt,
             endAt,
             onHud: setHud,
+            pilot: (id) => (id === null ? characterSprite(myLook.current, true) : looks.current ? characterSprite(looks.current.get(id) ?? null, true) : null),
             onSend: send,
             onEvent: (kind) => {
               if (kind === "hit") {

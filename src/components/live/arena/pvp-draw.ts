@@ -1,6 +1,8 @@
 // "Kiber jang" chizmalari (canvas): xarita, qahramonlar, o'qlar, sovg'alar. O'quvchi va proyektor bir xil ko'radi.
 
 import { DEFAULT_MAP, EMOTES, PLAYER_R, POWERS, TELEPORT_R, skinOf, type ArenaMap, type PowerKind, type Shot } from "@/lib/live-game/pvp";
+import type { GameLook } from "@/lib/character/catalog";
+import { characterSprite, drawCharacterSprite } from "@/components/character/character-sprite";
 
 export const PEER_COLORS = ["#f472b6", "#a78bfa", "#fb923c", "#4ade80", "#facc15", "#60a5fa", "#f87171", "#2dd4bf", "#e879f9", "#a3e635"];
 
@@ -277,6 +279,8 @@ export interface RobotLook {
   fired?: boolean;
   /** Sakrash (dash) davomida — orqasida iz */
   dash?: boolean;
+  /** O'quvchi personaji — bo'lsa robot o'rniga shu (tik turgan holda, qurol nishonga buriladi) */
+  look?: GameLook | null;
 }
 
 export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number) {
@@ -325,6 +329,56 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
   ctx.beginPath();
   ctx.ellipse(4, R * 0.9, R * 0.9, R * 0.35, 0, 0, Math.PI * 2);
   ctx.fill();
+  const sprite = r.look !== undefined ? characterSprite(r.look) : null;
+  if (sprite) {
+    const H = R * 3.2;
+    const gun = () => {
+      ctx.save();
+      ctx.translate(0, -R * 0.55);
+      ctx.rotate(r.a);
+      const triple = r.powers?.includes("triple");
+      ctx.fillStyle = r.powers?.includes("rapid") ? "#fb923c" : "#334155";
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 2;
+      for (const da of triple ? [-0.3, 0, 0.3] : [0]) {
+        ctx.save();
+        ctx.rotate(da);
+        ctx.beginPath();
+        ctx.roundRect(R * 0.2, -5, 26, 10, 3);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (r.fired && !r.out) {
+        ctx.fillStyle = "rgba(253,224,71,0.95)";
+        ctx.beginPath();
+        ctx.arc(R * 0.2 + 30, 0, 9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+    // Yuqoriga nishonlansa — qurol personaj orqasida, aks holda oldida
+    if (Math.sin(r.a) < 0) gun();
+    drawCharacterSprite(ctx, sprite, 0, R * 0.95, H, { t, moving: r.moving, faceLeft: Math.cos(r.a) < 0, out: r.out, seed });
+    if (Math.sin(r.a) >= 0) gun();
+    if (r.flash) {
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath();
+      ctx.ellipse(0, -R * 0.6, R * 1.1, R * 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (r.shield && !r.out) {
+      ctx.strokeStyle = `rgba(56,189,248,${0.6 + Math.sin(t * 8) * 0.25})`;
+      ctx.fillStyle = "rgba(56,189,248,0.12)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, -R * 0.5, R + 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   ctx.translate(0, bob);
   ctx.scale(breathe, breathe);
   ctx.rotate(r.a);

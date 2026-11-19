@@ -80,6 +80,8 @@ export interface PlayerLike {
   lives: number;
   eliminated: boolean;
   double: boolean;
+  /** Qalqon (kuchaytirgich): bitta xato kechiriladi */
+  guard?: boolean;
 }
 
 export interface AnswerOutcome {
@@ -89,6 +91,8 @@ export interface AnswerOutcome {
   eliminated: boolean;
   chests: number;
   double: boolean;
+  /** Qalqon qoldimi (xatoda ishlatilsa — false) */
+  guard: boolean;
 }
 
 /** Javobning ta'siri tanlangan o'yin turiga qarab */
@@ -97,8 +101,11 @@ export function scoreAnswer(
   player: PlayerLike,
   a: { isCorrect: boolean; elapsedMs: number; limitSec: number; /** Bonus raund: ochko ×2 */ bonus?: boolean }
 ): AnswerOutcome {
-  const streak = a.isCorrect ? player.streak + 1 : 0;
-  const base = { points: 0, streak, lives: player.lives, eliminated: player.eliminated, chests: 0, double: player.double };
+  // Qalqon: xato javobda seriya uzilmaydi va (omon qolishda) jon ketmaydi — bir marta
+  const guarded = !a.isCorrect && Boolean(player.guard);
+  const streak = a.isCorrect ? player.streak + 1 : guarded ? player.streak : 0;
+  const guard = Boolean(player.guard) && !guarded;
+  const base = { points: 0, streak, lives: player.lives, eliminated: player.eliminated, chests: 0, double: player.double, guard };
   // ×2 (sandiq yoki omad g'ildiragidan) keyingi to'g'ri javobda ishlatiladi; bonus raund bilan qo'shiladi
   const mult = (a.isCorrect && player.double ? 2 : 1) * (a.bonus ? 2 : 1);
   // Sarguzasht rejimlarida ochko natija ochilganda (hammaga birdan) hisoblanadi
@@ -108,7 +115,7 @@ export function scoreAnswer(
     return { ...base, points: CHEST_CORRECT_POINTS * mult, chests: 1, double: false };
   }
   const pts = answerPoints({ isCorrect: a.isCorrect, elapsedMs: a.elapsedMs, limitSec: a.limitSec, streak }).total * mult;
-  if (mode === "survival" && !a.isCorrect) {
+  if (mode === "survival" && !a.isCorrect && !guarded) {
     const lives = Math.max(player.lives - 1, 0);
     return { ...base, lives, eliminated: lives === 0 };
   }

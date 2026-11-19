@@ -5,7 +5,8 @@ import { Crown, Skull, Swords, Trophy, Users } from "lucide-react";
 import type { LiveArenaView, LivePlayerState } from "@/actions/live-game.actions";
 import type { PvpFeedView, PvpWorld } from "@/lib/live-game/pvp-server";
 import { BULLET_RANGE, BULLET_SPEED, PLAYER_R, POWERS, inBush, mapOf, sameTeam, skinOf, stepShots, teamColor, type MapId, type Shot } from "@/lib/live-game/pvp";
-import { resolveArenaVoteAction, voteArenaMapAction } from "@/actions/live-game.actions";
+import { getGameLooksAction, resolveArenaVoteAction, voteArenaMapAction } from "@/actions/live-game.actions";
+import type { GameLook } from "@/lib/character/catalog";
 import { MapVote } from "./map-vote";
 import { playBoom } from "@/lib/sound";
 import { useCountdown } from "../live-ui";
@@ -267,7 +268,7 @@ function ArenaFight({
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-2 lg:flex-row">
         <div className="relative min-h-[300px] flex-1 overflow-hidden rounded-2xl ring-1 ring-fuchsia-400/30">
-          <ArenaSpectator worldRef={worldRef} realtime={Boolean(wsUrl)} mapId={arena.map} />
+          <ArenaSpectator gameId={gameId} worldRef={worldRef} realtime={Boolean(wsUrl)} mapId={arena.map} />
           {shout && (
             <div key={shout.key} className="pointer-events-none absolute inset-x-0 top-6 flex justify-center">
               <span className="live-banner rounded-2xl bg-amber-500 px-6 py-3 text-3xl font-black text-white shadow-2xl sm:text-4xl">
@@ -367,7 +368,7 @@ function ArenaFight({
 }
 
 /** Butun maydon: hamma o'yinchilar, o'qlar va sovg'alar (so'rovlar orasida silliq harakat) */
-function ArenaSpectator({ worldRef, realtime, mapId }: { worldRef: React.RefObject<PvpWorld | null>; realtime: boolean; mapId: MapId }) {
+function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string; worldRef: React.RefObject<PvpWorld | null>; realtime: boolean; mapId: MapId }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -386,6 +387,15 @@ function ArenaSpectator({ worldRef, realtime, mapId }: { worldRef: React.RefObje
     const sparks: Spark[] = [];
     const outSeen = new Set<string>();
     let lastWorld: PvpWorld | null = null;
+    // Personajlar: robot o'rniga o'quvchilarning o'z personaji chiziladi
+    const looks = new Map<string, GameLook>();
+    let looksReady = false;
+    void getGameLooksAction(gameId)
+      .then((r) => {
+        if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
+        looksReady = r.success;
+      })
+      .catch(() => {});
     let raf = 0;
     let last = performance.now();
     const loop = (now: number) => {
@@ -462,7 +472,7 @@ function ArenaSpectator({ worldRef, realtime, mapId }: { worldRef: React.RefObje
         shown.set(p.id, s);
         drawRobot(
           ctx,
-          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y, map), size: big, ring: teamColor(p.team), fired: now - (fired.get(p.id) ?? -1e9) < 110 },
+          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y, map), size: big, ring: teamColor(p.team), fired: now - (fired.get(p.id) ?? -1e9) < 110, look: looksReady ? looks.get(p.id) ?? null : undefined },
           t
         );
       }
@@ -485,7 +495,7 @@ function ArenaSpectator({ worldRef, realtime, mapId }: { worldRef: React.RefObje
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [worldRef, realtime, mapId]);
+  }, [gameId, worldRef, realtime, mapId]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />;
 }
