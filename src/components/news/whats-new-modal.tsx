@@ -12,6 +12,7 @@ import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 import { playRankUp, playWhoosh, unlockSound } from "@/lib/sound";
 import { CharacterSvg } from "@/components/character/character-svg";
 import { cn } from "@/lib/utils";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 /**
  * "Yangilik" e'loni: platformaga yangi imkoniyat qo'shilganda o'quvchiga kirishda bir marta slaydlar bilan
@@ -212,7 +213,7 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
             ))}
           </div>
           <CharacterSvg look={{ ...look, level: Math.max(look.level, 6), back: "cape", hand: "sword", head: "crown", pet: "cat", power: 4 }} size={150} mood="happy" />
-          <span className="mb-10 rounded-full bg-amber-400 px-3 py-1 text-sm font-black text-slate-950">🪙 → ⚡</span>
+          <span className="mb-10 rounded-full bg-amber-400 px-3 py-1 text-sm font-black text-slate-950"><GoldCoin /> → ⚡</span>
         </div>
       );
     case "character-games":
@@ -283,7 +284,7 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
         <div className="flex items-end gap-4">
           <CharacterSvg look={look} size={130} mood="sad" />
           <div className="mb-8 flex flex-col gap-2">
-            <span className="rounded-2xl bg-rose-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 🪙</span>
+            <span className="rounded-2xl bg-rose-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 <GoldCoin /></span>
             <span className="rounded-2xl bg-violet-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 XP</span>
           </div>
         </div>

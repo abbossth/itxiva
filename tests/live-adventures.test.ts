@@ -72,7 +72,7 @@ describe("sarguzasht qoidalari", () => {
     expect(adv.rollDig(() => 0)).toBe("gold");
     expect(adv.rollDig(() => 0.999)).toBe("rock");
     const fast = adv.revealAdventure("gold", [P({ id: "a", ms: 0 })], { ...ctx(), rng: () => 0 });
-    expect(fast.out[0].effect.items).toEqual(["🪙", "🪙"]);
+    expect(fast.out[0].effect.items).toEqual(["💰", "💰"]);
     expect(fast.out[0].score).toBe(300);
     // Bomba (vazn oralig'i: oltin 38 + xalta 22 + olmos 8 = 68 → 68..84 bomba)
     const bomb = adv.revealAdventure("gold", [P({ id: "a", ms: 9000, score: 100 })], { ...ctx(), rng: () => 0.7 });

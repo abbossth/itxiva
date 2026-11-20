@@ -106,6 +106,24 @@ export interface ILiveGameData {
   zone?: ILiveZone | null;
   zoneRounds?: number[];
   finishedAt?: Date | string | null;
+  /** O'quvchi yaratgan o'yin: server o'zi boshqaradi, g'oliblarga coin/XP/sovg'a berilmaydi */
+  studentGame?: boolean;
+  /** O'yinni yaratgan o'quvchi (studentGame) */
+  creatorId?: string | mongoose.Types.ObjectId | null;
+  creatorName?: string;
+  /** Butun sinf uchun o'yin (masalan, 8): shu sinfdagi barcha guruhlar qo'shila oladi; null — faqat guruh */
+  grade?: number | null;
+  /** O'yin narxi (coin) — qatnashchilar birgalikda yig'adi; paid — hozircha yig'ilgani */
+  price?: number;
+  paid?: number;
+  /** Kim qancha qo'shdi (har qo'shish alohida yozuv) */
+  contributions?: { key: string; studentId: string | mongoose.Types.ObjectId; name: string; amount: number; at: Date | string }[];
+  /** Narx to'lgan vaqt — FUNDED_START_S dan keyin o'yin o'zi boshlanadi */
+  fundedAt?: Date | string | null;
+  /** Boshlanmay bekor qilinib, coinlar qaytarilgan vaqt */
+  refundedAt?: Date | string | null;
+  /** Natija ochilgan vaqt — server o'zi keyingi savolga o'tishi uchun */
+  revealedAt?: Date | string | null;
   /** Coin berilgan vaqt (bir marta) */
   rewardedAt?: Date | string | null;
   createdAt?: Date | string;
@@ -238,6 +256,19 @@ const LiveGameSchema = new Schema<ILiveGame>(
     known: { type: [Number], default: [] },
     introAt: { type: Date, default: null },
     bonusIndex: { type: Number, default: null },
+    studentGame: { type: Boolean, default: false },
+    creatorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    creatorName: { type: String, default: "" },
+    grade: { type: Number, default: null },
+    price: { type: Number, default: 0 },
+    paid: { type: Number, default: 0 },
+    contributions: {
+      type: [new Schema({ key: String, studentId: { type: Schema.Types.ObjectId, ref: "User" }, name: String, amount: Number, at: Date }, { _id: false })],
+      default: [],
+    },
+    fundedAt: { type: Date, default: null },
+    refundedAt: { type: Date, default: null },
+    revealedAt: { type: Date, default: null },
     arena: {
       type: new Schema(
         {
@@ -272,5 +303,8 @@ const LiveGameSchema = new Schema<ILiveGame>(
 
 LiveGameSchema.index({ groupId: 1, status: 1 });
 LiveGameSchema.index({ mentorId: 1, createdAt: -1 });
+// O'quvchi o'yinlari: sinf bo'yicha faol o'yinlar va mentor kuzatuvi
+LiveGameSchema.index({ grade: 1, status: 1 }, { partialFilterExpression: { studentGame: true } });
+LiveGameSchema.index({ studentGame: 1, createdAt: -1 });
 
 export const LiveGame: Model<ILiveGame> = mongoose.models.LiveGame || mongoose.model<ILiveGame>("LiveGame", LiveGameSchema);

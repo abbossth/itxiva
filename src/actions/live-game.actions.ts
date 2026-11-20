@@ -10,7 +10,21 @@ import { User } from "@/lib/db/models/user.model";
 import { getCurrentUser, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { autoGradeQuiz } from "@/lib/grading";
 import { countLiveQuestions, pickQuestions } from "@/lib/live-game/questions";
-import { isValidSchedule, pickNearestLessonGroup } from "@/lib/schedule";
+import { dateFromKey, isLessonNow, isValidSchedule, pickNearestLessonGroup, toDateKey } from "@/lib/schedule";
+import { AttendanceSession } from "@/lib/db/models/attendance-session.model";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { getAppSettings } from "@/lib/settings";
+import {
+  AUTO_MINIGAME_S,
+  AUTO_REVEAL_CHEST_S,
+  AUTO_REVEAL_S,
+  FUNDED_START_S,
+  STUDENT_GAME_COUNTS,
+  STUDENT_LOBBY_MAX_MS,
+  studentGamePrice,
+  type StudentGameAudience,
+} from "@/lib/live-game/student-games-config";
+import { absenceBanMessage, absenceBanUntil, gradeOfGroup, refundStudentGame } from "@/lib/live-game/student-games";
 import { notifyGroup } from "@/lib/notifications/notify";
 import {
   LIVE_MODES,
@@ -107,6 +121,7 @@ function arenaRoundDue(mode: LiveGameMode, index: number, total: number, done: n
   return (index + 1) % ARENA_EVERY === 0;
 }
 import { arenaSocketUrl, finishPvp, loadPvpGame, pvpTick, setupPvp, watchPvp, type PvpTickInput, type PvpTickResult, type PvpWorld } from "@/lib/live-game/pvp-server";
+import { mayPlay } from "@/lib/live-game/student-games";
 
 // Jonli o'yin: mentor proyektorda boshqaradi, o'quvchilar telefondan qo'shiladi. Holat qisqa so'rovlar bilan olinadi.
 
@@ -134,11 +149,16 @@ const activeFilter = () => ({ status: { $ne: "finished" as LiveGameStatus }, cre
 type ActiveGame = { _id: mongoose.Types.ObjectId; mode: LiveGameMode; status: LiveGameStatus } | null;
 const ACTIVE_TTL_MS = process.env.VITEST ? 0 : 3000;
 const activeByGroup = new Map<string, { at: number; p: Promise<ActiveGame> }>();
-function activeGameOfGroup(groupId: string): Promise<ActiveGame> {
+function activeGameOfGroup(groupId: string, grade: number | null = null): Promise<ActiveGame> {
   const now = Date.now();
   const c = activeByGroup.get(groupId);
   if (c && now - c.at < ACTIVE_TTL_MS) return c.p;
-  const p = LiveGame.findOne({ ...activeFilter(), groupId }).select("mode status").sort({ createdAt: -1 }).lean<ActiveGame>().exec();
+  // Guruh o'yini yoki butun sinf uchun ochilgan o'quvchi o'yini; mentor o'yini birinchi
+  const p = LiveGame.findOne({ ...activeFilter(), $or: [{ groupId }, ...(grade !== null ? [{ studentGame: true, grade }] : [])] })
+    .select("mode status")
+    .sort({ studentGame: 1, createdAt: -1 })
+    .lean<ActiveGame>()
+    .exec();
   if (activeByGroup.size > 2000) activeByGroup.clear();
   activeByGroup.set(groupId, { at: now, p });
   p.catch(() => activeByGroup.delete(groupId));
@@ -165,7 +185,7 @@ export async function getLiveGameSetupAction(): Promise<Result<{ groups: LiveGro
     const groups = await Group.find({ isActive: { $ne: false } }).select("name schedule").sort({ name: 1 }).lean();
     const scheduled = groups.filter((g) => isValidSchedule(g.schedule));
     const suggestedId = scheduled.length > 0 ? pickNearestLessonGroup(scheduled)?._id.toString() : undefined;
-    const active = await LiveGame.find({ ...activeFilter(), groupId: { $in: groups.map((g) => g._id) } }).select("groupId").lean();
+    const active = await LiveGame.find({ ...activeFilter(), groupId: { $in: groups.map((g) => g._id) }, studentGame: { $ne: true } }).select("groupId").lean();
     const activeOf = new Map(active.map((g) => [g.groupId.toString(), g._id.toString()]));
     const data = await Promise.all(
       groups.map(async (g) => ({
@@ -213,8 +233,14 @@ export async function createLiveGameAction(input: {
     const group = await Group.findById(input.groupId).select("_id").lean();
     if (!group) return fail("Guruh topilmadi");
 
-    const existing = await LiveGame.findOne({ ...activeFilter(), groupId: group._id }).select("_id").lean();
+    const existing = await LiveGame.findOne({ ...activeFilter(), groupId: group._id, studentGame: { $ne: true } }).select("_id").lean();
     if (existing) return { success: true, data: { gameId: existing._id.toString(), existing: true } };
+    // Mentor o'yini ustun: shu guruhdagi o'quvchi o'yinlari to'xtatiladi (boshlanmagan bo'lsa — coin qaytariladi)
+    const grade = await gradeOfGroup(group._id.toString());
+    const studentGames = await LiveGame.find({ ...activeFilter(), studentGame: true, $or: [{ groupId: group._id }, ...(grade !== null ? [{ grade }] : [])] })
+      .select("status introAt")
+      .lean();
+    for (const sg of studentGames) await cancelStudentGame(sg._id, "mentor jonli o'yin boshladi", sg.status === "lobby" && !sg.introAt);
 
     const questions = await pickQuestions(group._id, input.source, count);
     if (questions.length === 0) {
@@ -277,6 +303,18 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
+    return await advanceGame(gameId);
+  } catch (err) {
+    return errorOf(err, "Savolni boshlab bo'lmadi");
+  }
+}
+
+/**
+ * Keyingi bosqich (mentor tugmasi yoki o'quvchi o'yinida server o'zi). Barcha yozuvlar shartli —
+ * ikki tomon bir vaqtda chaqirsa ham savol o'tkazib yuborilmaydi.
+ */
+async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Result<{ finished: boolean }>> {
+  {
     const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds minigameKinds arena arenaRounds galaxy galaxyRounds zone zoneRounds").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
@@ -334,11 +372,9 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
     }
     await LiveGame.updateOne(
       { _id: game._id, index: game.index, status: game.status },
-      { $set: { status: "question", index: next, questionStartedAt: new Date() } }
+      { $set: { status: "question", index: next, questionStartedAt: new Date(), revealedAt: null } }
     );
     return { success: true, data: { finished: false } };
-  } catch (err) {
-    return errorOf(err, "Savolni boshlab bo'lmadi");
   }
 }
 
@@ -348,12 +384,21 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
+    return { success: true, data: { revealed: await revealGame(gameId) } };
+  } catch (err) {
+    return errorOf(err, "Natijani ochib bo'lmadi");
+  }
+}
+
+/** Natijani ochish (mentor yoki o'quvchi o'yinida server o'zi); bir marta — shartli */
+async function revealGame(gameId: string | mongoose.Types.ObjectId): Promise<boolean> {
+  {
     const game = await LiveGame.findOneAndUpdate(
       { _id: gameId, status: "question" },
-      { $set: { status: "reveal", questionStartedAt: null } },
+      { $set: { status: "reveal", questionStartedAt: null, revealedAt: new Date() } },
       { returnDocument: "after" }
     );
-    if (!game) return { success: true, data: { revealed: false } };
+    if (!game) return false;
 
     // Javob bermaganlar — bitta so'rovda (100 o'quvchida 100 ta ketma-ket so'rov emas)
     const missing = await LiveGamePlayer.find({ gameId: game._id, eliminated: false, "answers.index": { $ne: game.index } })
@@ -382,9 +427,7 @@ export async function revealLiveQuestionAction(gameId: string): Promise<Result<{
     if (outs.length > 0) await pushEvents(game._id, outs.map((n) => ({ text: `${n} o'yindan chiqdi`, kind: "out" as const })));
     if (isAdventure(game.mode)) await applyAdventure(game);
     await saveRanks(game._id, game.mode);
-    return { success: true, data: { revealed: true } };
-  } catch (err) {
-    return errorOf(err, "Natijani ochib bo'lmadi");
+    return true;
   }
 }
 
@@ -494,8 +537,11 @@ async function endMinigame(gameId: mongoose.Types.ObjectId | string): Promise<bo
     await Promise.all(
       players.map(async (p) => {
         const seg = WHEEL[p.minigames.find((m) => m.round === round)?.value ?? WHEEL.length - 1] ?? WHEEL[WHEEL.length - 1];
-        const pts = wheelPoints(seg.effect);
-        const prize = prizeOf(seg.effect);
+        // O'quvchi o'yinida coin/sovg'a qutisi yo'q: Super priz va Super baraban o'rniga +300 ochko
+        const studentPrize = Boolean(game.studentGame) && Boolean(prizeOf(seg.effect));
+        const pts = wheelPoints(seg.effect) + (studentPrize ? 300 : 0);
+        const prize = game.studentGame ? null : prizeOf(seg.effect);
+        if (studentPrize) big.push(`✨ ${p.name} g'ildirakdan +300 ochko yutdi!`);
         if (seg.effect === "p500") big.push(`${p.name} g'ildirakdan +500 yutdi!`);
         if (prize === "box") big.push(`🎁 ${p.name} SUPER PRIZ yutdi!`);
         if (prize === "superWheel") big.push(`🎡 ${p.name} SUPER BARABAN yutdi!`);
@@ -592,9 +638,9 @@ export async function voteArenaMapAction(gameId: string, round: number, map: str
     const user = await requireStudent();
     if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId) || !Number.isInteger(round) || !isMapId(map)) return fail("Ovoz berib bo'lmaydi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("groupId status arena.round arena.voteEndsAt arena.map").lean();
+    const game = await LiveGame.findById(gameId).select("groupId grade status arena.round arena.voteEndsAt arena.map").lean();
     const a = game?.arena;
-    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (!game || !(await mayPlay(game, user.groupId))) return fail("O'yin topilmadi");
     if (game.status !== "arena" || !a?.voteEndsAt || a.map || a.round !== round) return fail("Ovoz berish tugadi");
     if (Date.now() > new Date(a.voteEndsAt).getTime() + 1500) return fail("Ovoz berish tugadi");
     const res = await LiveGamePlayer.updateOne({ gameId: game._id, studentId: user.userId }, { $set: { arenaVote: { round, map } } });
@@ -1236,6 +1282,11 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
       game = (await LiveGame.findById(gameId).lean()) ?? game;
       players = await LiveGamePlayer.find({ gameId: game._id }).lean<(ILiveGamePlayer & { _id: mongoose.Types.ObjectId })[]>();
     }
+    // Mentor o'quvchi o'yinini kuzatayotganda ham o'yin o'zi yuraveradi
+    if (game.studentGame && (await autopilot({ game, players }))) {
+      game = (await LiveGame.findById(gameId).lean()) ?? game;
+      players = await LiveGamePlayer.find({ gameId: game._id }).lean<(ILiveGamePlayer & { _id: mongoose.Types.ObjectId })[]>();
+    }
     const q = game.index >= 0 ? game.questions[game.index] : null;
     const revealed = game.status === "reveal" || game.status === "finished";
     const answersNow = players.map((p) => p.answers.find((a) => a.index === game.index)).filter(Boolean);
@@ -1341,7 +1392,7 @@ export async function getLiveGamesForMentorAction(): Promise<Result<LiveGameList
   try {
     await requireMentor();
     await connectDB();
-    const games = await LiveGame.find({}).select("groupId mode status questions createdAt").sort({ createdAt: -1 }).limit(15).lean();
+    const games = await LiveGame.find({ studentGame: { $ne: true } }).select("groupId mode status questions createdAt").sort({ createdAt: -1 }).limit(15).lean();
     const [groups, counts, winners] = await Promise.all([
       Group.find({ _id: { $in: games.map((g) => g.groupId) } }).select("name").lean(),
       LiveGamePlayer.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
@@ -1375,7 +1426,7 @@ export async function getLiveGamesForMentorAction(): Promise<Result<LiveGameList
 async function loadGameForStudent(gameId: unknown, groupId: string | null | undefined) {
   if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return null;
   const game = await LiveGame.findById(gameId).lean();
-  if (!game || game.groupId.toString() !== String(groupId ?? "")) return null;
+  if (!game || !(await mayPlay(game, groupId))) return null;
   return game;
 }
 
@@ -1384,7 +1435,7 @@ export async function getMyActiveLiveGameAction(): Promise<{ id: string; mode: L
   const user = await getCurrentUser();
   if (user?.role !== "student" || !user.groupId) return null;
   await connectDB();
-  const game = await activeGameOfGroup(user.groupId);
+  const game = await activeGameOfGroup(user.groupId, await gradeOfGroup(user.groupId));
   if (!game) return null;
   const joined = Boolean(await LiveGamePlayer.exists({ gameId: game._id, studentId: user.userId }));
   return { id: game._id.toString(), mode: game.mode, status: game.status, joined };
@@ -1398,6 +1449,12 @@ export async function joinLiveGameAction(gameId: string): Promise<Result<{ joine
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     const exists = await LiveGamePlayer.exists({ gameId: game._id, studentId: user.userId });
     if (exists) return { success: true, data: { joined: true } };
+    // Darsni sababsiz qoldirgan — bir necha kun jonli o'yinga kira olmaydi (mentor sozlaydi)
+    const rules = (await getAppSettings()).studentGames;
+    if (game.studentGame || rules.absenceBanAllGames) {
+      const until = await absenceBanUntil(user.userId, rules.absenceBanDays);
+      if (until) return fail(absenceBanMessage(until));
+    }
 
     const me = await User.findById(user.userId).select("fullName character level").lean();
     // Personaj: o'yin davomida shu ko'rinishda (keyin profilda o'zgartirsa — keyingi o'yinda)
@@ -1449,11 +1506,11 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
     // 100 o'quvchi bir vaqtda javob beradi: butun o'yin emas, faqat tekshiruv uchun kerakli maydonlar va shu savol
     const [game, player] = await Promise.all([
       LiveGame.findById(gameId)
-        .select({ groupId: 1, status: 1, index: 1, questionStartedAt: 1, mode: 1, bonusIndex: 1, questions: { $slice: [index, 1] } })
-        .lean<Pick<ILiveGame, "groupId" | "status" | "index" | "questionStartedAt" | "mode" | "bonusIndex" | "questions"> & { _id: mongoose.Types.ObjectId }>(),
+        .select({ groupId: 1, grade: 1, status: 1, index: 1, questionStartedAt: 1, mode: 1, bonusIndex: 1, questions: { $slice: [index, 1] } })
+        .lean<Pick<ILiveGame, "groupId" | "grade" | "status" | "index" | "questionStartedAt" | "mode" | "bonusIndex" | "questions"> & { _id: mongoose.Types.ObjectId }>(),
       LiveGamePlayer.findOne({ gameId, studentId: user.userId }).select("-minigames -arena").lean<ILiveGamePlayer & { _id: mongoose.Types.ObjectId }>(),
     ]);
-    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("Bu savolga hozir javob berib bo'lmaydi");
+    if (!game || !(await mayPlay(game, user.groupId))) return fail("Bu savolga hozir javob berib bo'lmaydi");
     if (game.status !== "question" || game.index !== index || !game.questionStartedAt || !game.questions[0]) return fail("Bu savolga hozir javob berib bo'lmaydi");
     const q = game.questions[0];
     const elapsed = Date.now() - new Date(game.questionStartedAt).getTime();
@@ -1497,9 +1554,9 @@ export async function chooseLiveTacticAction(gameId: string, index: number, tact
     }
     await connectDB();
     const game = await LiveGame.findById(gameId)
-      .select({ groupId: 1, status: 1, index: 1, mode: 1, questionStartedAt: 1, questions: { $slice: [index, 1] } })
-      .lean<Pick<ILiveGame, "groupId" | "status" | "index" | "mode" | "questionStartedAt" | "questions"> & { _id: mongoose.Types.ObjectId }>();
-    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+      .select({ groupId: 1, grade: 1, status: 1, index: 1, mode: 1, questionStartedAt: 1, questions: { $slice: [index, 1] } })
+      .lean<Pick<ILiveGame, "groupId" | "grade" | "status" | "index" | "mode" | "questionStartedAt" | "questions"> & { _id: mongoose.Types.ObjectId }>();
+    if (!game || !(await mayPlay(game, user.groupId))) return fail("O'yin topilmadi");
     if (!isAdventure(game.mode) || !isTactic(game.mode, tactic)) return fail("Bu taktika yo'q");
     if (game.status !== "question" || game.index !== index || !game.questionStartedAt) return fail("Savol yopildi");
     const limit = (game.questions[0]?.timeLimit ?? 20) * 1000;
@@ -1587,6 +1644,22 @@ export interface LivePrizeView {
 export interface LivePlayerState {
   id: string;
   mode: LiveGameMode;
+  /** O'quvchi yaratgan o'yin: egasi, auditoriya; creator — shu o'quvchi egasimi */
+  studentGame: {
+    creator: boolean;
+    creatorName: string;
+    audience: string;
+    started: boolean;
+    price: number;
+    paid: number;
+    /** Narx to'lgan — shuncha ms dan keyin boshlanadi (0 — hali to'lmagan yoki boshlangan) */
+    startsInMs: number;
+    funded: boolean;
+    /** Boshlanmay bekor qilingan (coinlar qaytarilgan) */
+    cancelled: boolean;
+    contributors: { name: string; amount: number }[];
+    mine: number;
+  } | null;
   status: LiveGameStatus;
   index: number;
   total: number;
@@ -1739,13 +1812,15 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
     // Umumiy holat — qisqa keshdan (hamma o'quvchi uchun bitta yuklash, ≤400 ms eski). Yuborilgan javobni
     // ekran o'zi eslab qoladi; o'z yozuvi faqat keshda hali bo'lmasa (hozirgina qo'shilgan) alohida o'qiladi
     let snap = await liveSnapshot(gameId);
-    if (!snap || snap.game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (!snap || !(await mayPlay(snap.game, user.groupId))) return fail("O'yin topilmadi");
     // Xarita uchun ovoz vaqti tugagan (yoki hamma ovoz bergan) — jang shu so'rovda boshlanadi
     if (voteDue(snap.game, snap.players)) {
       await resolveArenaVote(gameId);
       invalidateLiveSnapshot(gameId);
       snap = (await liveSnapshot(gameId)) ?? snap;
     }
+    // O'quvchi o'yini: proyektor yo'q — o'yinchilar so'rovi o'yinni oldinga suradi
+    if (snap.game.studentGame && (await autopilot(snap))) snap = (await liveSnapshot(gameId)) ?? snap;
     const game = snap.game;
     const group = { name: snap.groupName };
     const players: ILiveGamePlayer[] = [...snap.players];
@@ -1794,6 +1869,24 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
       data: {
         id: game._id.toString(),
         mode: game.mode,
+        studentGame: game.studentGame
+          ? {
+              creator: String(game.creatorId ?? "") === user.userId,
+              creatorName: game.creatorName || "O'quvchi",
+              audience: typeof game.grade === "number" ? `${game.grade}-sinflar` : group.name,
+              started: game.status !== "lobby" || Boolean(game.introAt),
+              price: game.price ?? 0,
+              paid: game.paid ?? 0,
+              funded: Boolean(game.fundedAt),
+              cancelled: game.status === "finished" && !game.introAt,
+              startsInMs:
+                game.status === "lobby" && game.fundedAt && !game.introAt
+                  ? Math.max(0, new Date(game.fundedAt).getTime() + FUNDED_START_S * 1000 - Date.now())
+                  : 0,
+              contributors: contributorsOf(game.contributions),
+              mine: (game.contributions ?? []).filter((c) => String(c.studentId) === user.userId).reduce((n, c) => n + c.amount, 0),
+            }
+          : null,
         status: game.status === "finished" || new Date(game.createdAt ?? 0).getTime() < Date.now() - LIVE_GAME_MAX_MS ? "finished" : game.status,
         index: game.index,
         total: game.questions.length,
@@ -2019,7 +2112,7 @@ export async function pvpTickAction(gameId: string, input: PvpTickInput): Promis
     if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
     const game = await loadPvpGame(gameId);
-    if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return fail("O'yin topilmadi");
+    if (!game || !(await mayPlay(game, user.groupId))) return fail("O'yin topilmadi");
     if (game.status !== "arena" || !game.arena) return fail("Arena tugagan");
     const res = await pvpTick(game, user.userId, input);
     if (!res) return fail("Avval o'yinga qo'shiling");
@@ -2055,6 +2148,7 @@ export async function openLivePrizeAction(
     const game = await loadGameForStudent(gameId, user.groupId);
     if (!game) return fail("O'yin topilmadi");
     if (game.status !== "finished") return fail("Sovg'a o'yin tugagach ochiladi");
+    if (game.studentGame) return fail("O'quvchilar o'yinida sovg'a berilmaydi");
     const player = await LiveGamePlayer.findOne({ gameId: game._id, studentId: user.userId }).select("prizes").lean();
     const prize = player?.prizes?.find((p) => p.round === round);
     if (!player || !prize) return fail("Sovg'a topilmadi");
@@ -2193,14 +2287,528 @@ export async function getGameLooksAction(gameId: string): Promise<Result<Record<
     const me = await getCurrentUser();
     if (!me || !mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const game = await LiveGame.findById(gameId).select("groupId mentorId").lean();
+    const game = await LiveGame.findById(gameId).select("groupId grade mentorId").lean();
     if (!game) return fail("O'yin topilmadi");
-    if (me.role === "student" && String(game.groupId) !== String(me.groupId ?? "")) return fail("O'yin topilmadi");
+    if (me.role === "student" && !(await mayPlay(game, me.groupId))) return fail("O'yin topilmadi");
     const players = await LiveGamePlayer.find({ gameId: game._id }).select("look").lean();
     const out: Record<string, GameLook> = {};
     for (const p of players) if (p.look) out[p._id.toString()] = p.look as unknown as GameLook;
     return { success: true, data: out };
   } catch (err) {
     return errorOf(err, "Personajlarni olib bo'lmadi");
+  }
+}
+
+
+// =====================================================================================================
+// O'quvchilar yaratadigan o'yinlar: coin evaziga, guruh yoki butun sinf uchun. Server o'zi boshqaradi,
+// g'oliblarga coin/XP/sovg'a berilmaydi. Mentor sozlaydi, kuzatadi va to'xtata oladi.
+// =====================================================================================================
+
+type AutoStep = "intro" | "advance" | "reveal" | "endMinigame" | "endGalaxy" | "endZone" | "endArena" | "expire";
+
+/** Avto-boshqaruv: hozir qanday qadam kerak (sof hisob; snapshotdan, bazaga murojaatsiz) */
+function autopilotDue(
+  g: Pick<ILiveGame, "status" | "introAt" | "fundedAt" | "questionStartedAt" | "questions" | "index" | "mode" | "revealedAt" | "minigame" | "galaxy" | "zone" | "arena"> & { createdAt?: Date | string },
+  players: Pick<ILiveGamePlayer, "eliminated" | "answers" | "arena" | "team">[],
+  now: number
+): AutoStep | null {
+  const t = (d: Date | string | null | undefined) => (d ? new Date(d).getTime() : NaN);
+  switch (g.status) {
+    case "lobby":
+      if (g.introAt) return now >= t(g.introAt) + INTRO_MS ? "advance" : null;
+      // Narx to'ldi — qisqa sanoqdan keyin o'yin o'zi boshlanadi
+      if (g.fundedAt) return now >= t(g.fundedAt) + FUNDED_START_S * 1000 ? "intro" : null;
+      return now - t(g.createdAt) > STUDENT_LOBBY_MAX_MS ? "expire" : null;
+    case "question": {
+      if (!g.questionStartedAt) return null;
+      const limit = (g.questions[g.index]?.timeLimit ?? 20) * 1000;
+      if (now - t(g.questionStartedAt) >= limit) return "reveal";
+      const active = players.filter((p) => !p.eliminated);
+      if (active.length === 0) return null;
+      const mine = (p: (typeof active)[number]) => p.answers.find((a) => a.index === g.index);
+      const allDone = active.every((p) => mine(p));
+      // Sarguzasht rejimlarida — hamma taktika tanlaguncha (vaqt tugasa baribir ochiladi)
+      if (allDone && (!isAdventure(g.mode) || active.every((p) => mine(p)?.tactic))) return "reveal";
+      return null;
+    }
+    case "reveal":
+      return g.revealedAt && now - t(g.revealedAt) >= (g.mode === "chest" ? AUTO_REVEAL_CHEST_S : AUTO_REVEAL_S) * 1000 ? "advance" : null;
+    case "minigame": {
+      const m = g.minigame;
+      if (!m) return "advance";
+      if (!m.endedAt) return now >= t(m.endsAt) + 1500 ? "endMinigame" : null;
+      return now - t(m.endedAt) >= AUTO_MINIGAME_S * 1000 ? "advance" : null;
+    }
+    case "galaxy": {
+      const x = g.galaxy;
+      if (!x) return "advance";
+      if (!x.endedAt) return now >= t(x.endsAt) + 1800 ? "endGalaxy" : null;
+      return now - t(x.endedAt) >= AUTO_REVEAL_S * 1000 ? "advance" : null;
+    }
+    case "zone": {
+      const z = g.zone;
+      if (!z) return "advance";
+      if (!z.endedAt) return now >= t(z.endsAt) + 1500 ? "endZone" : null;
+      return now - t(z.endedAt) >= AUTO_REVEAL_S * 1000 ? "advance" : null;
+    }
+    case "arena": {
+      const a = g.arena;
+      if (!a) return "advance";
+      // Xarita uchun ovoz — o'quvchilar so'rovi o'zi hal qiladi (voteDue)
+      if (a.voteEndsAt) return null;
+      if (!a.endedAt) {
+        if (now >= t(a.endsAt) + 2000) return "endArena";
+        // Bittadan (jamoaviyda — bitta jamoadan) boshqa hamma chiqib ketsa — g'olib aniq
+        const fighters = players.filter((p) => p.arena);
+        if (now < t(a.startedAt) + 3000 || fighters.length < 2) return null;
+        const alive = fighters.filter((p) => !p.arena!.out);
+        const decided = a.teams ? new Set(alive.map((p) => p.team)).size <= 1 : alive.length <= 1;
+        return decided ? "endArena" : null;
+      }
+      return now - t(a.endedAt) >= AUTO_REVEAL_S * 1000 ? "advance" : null;
+    }
+    default:
+      return null;
+  }
+}
+
+// Bir server nusxasida bitta o'yin uchun bir vaqtda bitta qadam (100 ta so'rov bir lahzada kelsa ham)
+const autopilotBusy = new Map<string, number>();
+
+/** O'quvchi o'yinini oldinga surish (holat so'rovlari ichidan). Qadam qilingan bo'lsa — true */
+async function autopilot(snap: { game: ILiveGame & { _id: mongoose.Types.ObjectId; createdAt?: Date | string }; players: ILiveGamePlayer[] }): Promise<boolean> {
+  const g = snap.game;
+  if (!g.studentGame || g.status === "finished") return false;
+  const step = autopilotDue(g, snap.players, Date.now());
+  if (!step) return false;
+  const id = g._id.toString();
+  const busy = autopilotBusy.get(id);
+  if (busy && Date.now() - busy < 5000) return false;
+  autopilotBusy.set(id, Date.now());
+  try {
+    if (step === "intro") await LiveGame.updateOne({ _id: g._id, status: "lobby", introAt: null }, { $set: { introAt: new Date() } });
+    else if (step === "advance") await advanceGame(g._id);
+    else if (step === "reveal") await revealGame(g._id);
+    else if (step === "endMinigame") await endMinigame(g._id);
+    else if (step === "endGalaxy") await endGalaxy(g._id);
+    else if (step === "endZone") await endZone(g._id);
+    else if (step === "endArena") await endArena(g._id);
+    else await cancelStudentGame(g._id, "o'yin uchun coin yig'ilmadi");
+    invalidateLiveSnapshot(id);
+    return true;
+  } finally {
+    autopilotBusy.delete(id);
+  }
+}
+
+/** O'quvchi o'yinini to'xtatish; refund — har bir qatnashchiga o'zi qo'shgan coin qaytariladi (bir marta) */
+async function cancelStudentGame(gameId: string | mongoose.Types.ObjectId, reason: string, refund = true): Promise<boolean> {
+  const game = await LiveGame.findOneAndUpdate(
+    { _id: gameId, studentGame: true, status: { $ne: "finished" } },
+    { $set: { status: "finished", finishedAt: new Date(), rewardedAt: new Date(), questionStartedAt: null } },
+    { returnDocument: "after" }
+  ).lean();
+  if (!game) return false;
+  activeByGroup.clear();
+  invalidateLiveSnapshot(game._id.toString());
+  if (refund) await refundStudentGame(game, reason);
+  return true;
+}
+
+/** Hissa qo'shganlar: ism va jami (ko'pidan kamiga) */
+function contributorsOf(list: ILiveGame["contributions"]): { name: string; amount: number }[] {
+  const m = new Map<string, { name: string; amount: number }>();
+  for (const c of list ?? []) {
+    const k = String(c.studentId);
+    const cur = m.get(k) ?? { name: c.name, amount: 0 };
+    cur.amount += c.amount;
+    m.set(k, cur);
+  }
+  return [...m.values()].sort((a, b) => b.amount - a.amount);
+}
+
+/** Bugun (Toshkent vaqti) boshlangan payt */
+const todayStart = () => dateFromKey(toDateKey());
+
+export interface StudentGameSetup {
+  enabled: boolean;
+  /** Yaratib bo'lmasa — sababi */
+  blocked: string | null;
+  grade: number | null;
+  groupName: string;
+  allowGrade: boolean;
+  balance: number;
+  questions: number;
+  dailyLimit: number;
+  createdToday: number;
+  /** Tur → narx (guruh uchun); null — yopiq */
+  prices: Record<LiveGameMode, number | null>;
+  gradeExtra: number;
+  counts: number[];
+  /** O'zining faol o'yini */
+  myActive: string | null;
+}
+
+/** Nima uchun hozir yaratib bo'lmaydi (null — mumkin) */
+async function studentGameBlock(user: { userId: string; groupId?: string | null }, audience: StudentGameAudience): Promise<string | null> {
+  const settings = (await getAppSettings()).studentGames;
+  if (!settings.enabled) return "Mentor hozircha o'quvchilar o'yinini o'chirib qo'ygan";
+  if (!user.groupId) return "Siz hali guruhga biriktirilmagansiz";
+  const banned = await absenceBanUntil(user.userId, settings.absenceBanDays);
+  if (banned) return absenceBanMessage(banned);
+  const grade = await gradeOfGroup(user.groupId);
+  if (audience === "grade" && (!settings.allowGrade || grade === null)) return "Butun sinf uchun o'yin yopiq";
+  const targets =
+    audience === "grade" && grade !== null
+      ? await Group.find({ grade, isActive: { $ne: false } }).select("_id schedule").lean()
+      : await Group.find({ _id: user.groupId }).select("_id schedule").lean();
+  const ids = targets.map((g) => g._id);
+  if (settings.blockDuringLessons) {
+    if (targets.some((g) => isLessonNow(g.schedule))) return "Dars vaqtida o'yin yaratib bo'lmaydi — darsdan keyin urinib ko'ring";
+    if (await AttendanceSession.exists({ groupId: { $in: ids }, status: "active" })) return "Hozir dars ketyapti (davomat ochiq) — keyinroq urinib ko'ring";
+  }
+  const [mentorGame, mine, sameTarget, today] = await Promise.all([
+    LiveGame.exists({ ...activeFilter(), groupId: { $in: ids }, studentGame: { $ne: true } }),
+    LiveGame.exists({ ...activeFilter(), studentGame: true, creatorId: user.userId }),
+    audience === "grade"
+      ? LiveGame.exists({ ...activeFilter(), studentGame: true, grade })
+      : LiveGame.exists({ ...activeFilter(), studentGame: true, groupId: user.groupId, grade: null }),
+    LiveGame.countDocuments({ studentGame: true, creatorId: user.userId, createdAt: { $gte: todayStart() } }),
+  ]);
+  if (mentorGame) return "Hozir mentor o'yini ketyapti — unga qo'shiling";
+  if (mine) return "Sizning o'yiningiz hali tugamagan";
+  if (sameTarget) return audience === "grade" ? "Bu sinf uchun boshqa o'quvchi o'yini ketyapti — unga qo'shiling" : "Guruhingizda boshqa o'quvchi o'yini ketyapti — unga qo'shiling";
+  if (today >= settings.dailyLimit) return `Bugun ${settings.dailyLimit} ta o'yin yaratdingiz — ertaga yana mumkin`;
+  return null;
+}
+
+export async function getStudentGameSetupAction(): Promise<Result<StudentGameSetup>> {
+  try {
+    const user = await requireStudent();
+    await connectDB();
+    const settings = (await getAppSettings()).studentGames;
+    const [grade, group, me, questions, createdToday, myActive, blocked] = await Promise.all([
+      gradeOfGroup(user.groupId),
+      user.groupId ? Group.findById(user.groupId).select("name").lean() : null,
+      User.findById(user.userId).select("spendableBalance").lean(),
+      user.groupId ? countLiveQuestions(new mongoose.Types.ObjectId(user.groupId), "all") : 0,
+      LiveGame.countDocuments({ studentGame: true, creatorId: user.userId, createdAt: { $gte: todayStart() } }),
+      LiveGame.findOne({ ...activeFilter(), studentGame: true, creatorId: user.userId }).select("_id").lean(),
+      studentGameBlock(user, "group"),
+    ]);
+    const prices = {} as Record<LiveGameMode, number | null>;
+    for (const m of MODES) prices[m] = studentGamePrice(settings, m, "group");
+    return {
+      success: true,
+      data: {
+        enabled: settings.enabled,
+        blocked: blocked && !blocked.startsWith("Butun") ? blocked : null,
+        grade,
+        groupName: group?.name ?? "",
+        allowGrade: settings.allowGrade,
+        balance: me?.spendableBalance ?? 0,
+        questions,
+        dailyLimit: settings.dailyLimit,
+        createdToday,
+        prices,
+        gradeExtra: settings.gradeExtra,
+        counts: [...STUDENT_GAME_COUNTS],
+        myActive: myActive?._id.toString() ?? null,
+      },
+    };
+  } catch (err) {
+    return errorOf(err, "Ma'lumotlarni olib bo'lmadi");
+  }
+}
+
+/**
+ * Hissa qo'shish: avval coin yechiladi (kalit bilan — bir marta), keyin o'yin hisobiga yoziladi. Yozib bo'lmasa
+ * (narx to'lib qoldi yoki o'yin bekor bo'ldi) — coin darhol qaytariladi. Narx to'lsa — fundedAt (o'yin o'zi boshlanadi).
+ */
+async function addContribution(
+  gameId: mongoose.Types.ObjectId,
+  student: { id: string; name: string },
+  amount: number,
+  key: string,
+  title: string
+): Promise<Result<{ paid: number; price: number }>> {
+  const charge = await awardCoins({
+    studentId: student.id,
+    coin: -amount,
+    xp: 0,
+    type: "purchase",
+    description: `Jonli o'yinga hissa: ${title}`,
+    referenceId: gameId,
+    idempotencyKey: `sgame-c:${key}`,
+  });
+  if (!charge.ok) return fail(charge.reason === "insufficient" ? "Balansingizda yetarli coin yo'q" : "Coin yechib bo'lmadi");
+  if (!charge.applied) return fail("Bu hissa allaqachon qo'shilgan");
+  const res = await LiveGame.updateOne(
+    {
+      _id: gameId,
+      studentGame: true,
+      status: "lobby",
+      introAt: null,
+      fundedAt: null,
+      "contributions.key": { $ne: key },
+      $expr: { $lte: [{ $add: ["$paid", amount] }, "$price"] },
+    },
+    { $inc: { paid: amount }, $push: { contributions: { key, studentId: student.id, name: student.name, amount, at: new Date() } } }
+  );
+  if (res.modifiedCount === 0) {
+    await awardCoins({
+      studentId: student.id,
+      coin: amount,
+      xp: 0,
+      type: "adjustment",
+      description: `Jonli o'yinga hissa qaytarildi: ${title}`,
+      referenceId: gameId,
+      idempotencyKey: `sgame-c-back:${key}`,
+    });
+    return fail("Bu o'yin uchun coin yig'ilib bo'lgan yoki o'yin tugagan");
+  }
+  await LiveGame.updateOne({ _id: gameId, fundedAt: null, $expr: { $gte: ["$paid", "$price"] } }, { $set: { fundedAt: new Date() } });
+  invalidateLiveSnapshot(gameId.toString());
+  const after = await LiveGame.findById(gameId).select("paid price").lean();
+  return { success: true, data: { paid: after?.paid ?? 0, price: after?.price ?? 0 } };
+}
+
+const validNonce = (n: unknown): n is string => typeof n === "string" && /^[A-Za-z0-9_-]{6,64}$/.test(n);
+
+/** O'quvchi o'yin ochadi va birinchi hissani qo'shadi; qolganini qatnashchilar birgalikda yig'adi */
+export async function createStudentGameAction(input: {
+  mode: LiveGameMode;
+  audience: StudentGameAudience;
+  count: number;
+  /** Yaratuvchining birinchi hissasi (kamida 1 coin) */
+  first: number;
+  nonce: string;
+}): Promise<Result<{ gameId: string }>> {
+  try {
+    const user = await requireStudent();
+    if (!input || !MODES.includes(input.mode) || (input.audience !== "group" && input.audience !== "grade") || !validNonce(input.nonce)) {
+      return fail("Ma'lumotlar noto'g'ri");
+    }
+    const count = (STUDENT_GAME_COUNTS as readonly number[]).includes(Number(input.count)) ? Number(input.count) : 10;
+    const rate = checkRateLimit(`sgame_${user.userId}`, 6, 60_000);
+    if (!rate.allowed) return fail(`Juda ko'p urinish. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring`);
+    await connectDB();
+    const settings = (await getAppSettings()).studentGames;
+    const price = studentGamePrice(settings, input.mode, input.audience);
+    if (price === null) return fail("Bu o'yin turi o'quvchilar uchun yopiq");
+    const first = Math.floor(Number(input.first));
+    if (!Number.isFinite(first) || first < 1 || first > price) return fail(`Birinchi hissa 1 dan ${price} coingacha bo'lishi kerak`);
+    const blocked = await studentGameBlock(user, input.audience);
+    if (blocked) return fail(blocked);
+    const [me, grade] = await Promise.all([User.findById(user.userId).select("fullName spendableBalance").lean(), gradeOfGroup(user.groupId)]);
+    if (!me) return fail("Foydalanuvchi topilmadi");
+    if ((me.spendableBalance ?? 0) < first) return fail("Balansingizda yetarli coin yo'q");
+    const groupId = new mongoose.Types.ObjectId(user.groupId!);
+    const questions = await pickQuestions(groupId, "all", count);
+    if (questions.length === 0) return fail("Guruhingiz darslarida test savollari yo'q");
+
+    const title = `${LIVE_MODES[input.mode].title}${input.audience === "grade" ? ` (${grade}-sinflar)` : ""}`;
+    const game = await LiveGame.create({
+      mentorId: user.userId,
+      groupId,
+      mode: input.mode,
+      source: "all",
+      teams: 2,
+      prizes: [0, 0, 0],
+      questions,
+      options:
+        input.mode === "arena"
+          ? { minigames: false, arena: true, teamArena: false }
+          : input.mode === "galaxy" || input.mode === "zone"
+          ? { minigames: false, arena: false, teamArena: false }
+          : { minigames: true, arena: false, teamArena: false, zone: true },
+      cells: input.mode === "territory" ? emptyCells() : [],
+      cracks: input.mode === "bridge" ? makeCracks(bridgeLength(questions.length)) : [],
+      studentGame: true,
+      creatorId: user.userId,
+      creatorName: me.fullName,
+      grade: input.audience === "grade" ? grade : null,
+      price,
+      paid: 0,
+    });
+    const paid = await addContribution(game._id, { id: user.userId, name: me.fullName }, first, `${game._id}:${user.userId}:${input.nonce}`, title);
+    if (!paid.success) {
+      await LiveGame.deleteOne({ _id: game._id });
+      return fail(paid.error);
+    }
+    activeByGroup.clear();
+    await joinLiveGameAction(game._id.toString());
+    return { success: true, data: { gameId: game._id.toString() } };
+  } catch (err) {
+    return errorOf(err, "O'yinni yaratib bo'lmadi");
+  }
+}
+
+/** Qatnashchi o'yinga coin qo'shadi (o'zi ham qo'shiladi). Narx to'lsa o'yin bir necha soniyada boshlanadi */
+export async function contributeStudentGameAction(gameId: string, amount: number, nonce: string): Promise<Result<{ paid: number; price: number }>> {
+  try {
+    const user = await requireStudent();
+    const n = Math.floor(Number(amount));
+    if (!mongoose.isValidObjectId(gameId) || !Number.isFinite(n) || n < 1 || n > 1000 || !validNonce(nonce)) return fail("Ma'lumotlar noto'g'ri");
+    const rate = checkRateLimit(`sgame_c_${user.userId}`, 20, 60_000);
+    if (!rate.allowed) return fail(`Juda tez. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring`);
+    await connectDB();
+    const game = await loadGameForStudent(gameId, user.groupId);
+    if (!game || !game.studentGame || game.status !== "lobby" || game.introAt || game.fundedAt) return fail("Bu o'yinga hozir coin qo'shib bo'lmaydi");
+    const left = (game.price ?? 0) - (game.paid ?? 0);
+    if (n > left) return fail(left > 0 ? `Faqat ${left} coin yetmayapti` : "Coin yig'ilib bo'lgan");
+    const me = await User.findById(user.userId).select("fullName").lean();
+    if (!me) return fail("Foydalanuvchi topilmadi");
+    // Hissa qo'shgan — o'yinga ham qo'shiladi (kira olmasa — coin ham yechilmaydi)
+    const joined = await joinLiveGameAction(gameId);
+    if (!joined.success) return fail(joined.error);
+    return await addContribution(game._id, { id: user.userId, name: me.fullName }, n, `${gameId}:${user.userId}:${nonce}`, LIVE_MODES[game.mode].title);
+  } catch (err) {
+    return errorOf(err, "Coin qo'shib bo'lmadi");
+  }
+}
+
+/** O'yin egasi: coin yig'ilib bo'lmagan o'yinni bekor qilish — har kimga o'z coini qaytariladi */
+export async function cancelMyStudentGameAction(gameId: string): Promise<Result<{ cancelled: boolean }>> {
+  try {
+    const user = await requireStudent();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    const game = await LiveGame.findOne({ _id: gameId, studentGame: true, creatorId: user.userId }).select("status introAt fundedAt").lean();
+    if (!game) return fail("O'yin topilmadi");
+    if (game.status !== "lobby" || game.introAt || game.fundedAt) return fail("Coin yig'ilgan o'yinni bekor qilib bo'lmaydi");
+    return { success: true, data: { cancelled: await cancelStudentGame(gameId, "o'yin egasi bekor qildi") } };
+  } catch (err) {
+    return errorOf(err, "Bekor qilib bo'lmadi");
+  }
+}
+
+export interface PlayableGame {
+  id: string;
+  mode: LiveGameMode;
+  status: LiveGameStatus;
+  studentGame: boolean;
+  creatorName: string | null;
+  audience: string;
+  players: number;
+  joined: boolean;
+  mine: boolean;
+}
+
+/** O'quvchi: hozir qo'shilish mumkin bo'lgan o'yinlar (mentor o'yini va guruh/sinf o'quvchilari o'yinlari) */
+export async function getPlayableGamesAction(): Promise<Result<PlayableGame[]>> {
+  try {
+    const user = await requireStudent();
+    if (!user.groupId) return { success: true, data: [] };
+    await connectDB();
+    const grade = await gradeOfGroup(user.groupId);
+    const games = await LiveGame.find({ ...activeFilter(), $or: [{ groupId: user.groupId }, ...(grade !== null ? [{ studentGame: true, grade }] : [])] })
+      .select("mode status studentGame creatorId creatorName grade groupId")
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    const ids = games.map((g) => g._id);
+    const [counts, mine] = await Promise.all([
+      LiveGamePlayer.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([{ $match: { gameId: { $in: ids } } }, { $group: { _id: "$gameId", n: { $sum: 1 } } }]),
+      LiveGamePlayer.find({ gameId: { $in: ids }, studentId: user.userId }).select("gameId").lean(),
+    ]);
+    const n = new Map(counts.map((c) => [String(c._id), c.n]));
+    const joined = new Set(mine.map((m) => String(m.gameId)));
+    return {
+      success: true,
+      data: games.map((g) => ({
+        id: g._id.toString(),
+        mode: g.mode,
+        status: g.status,
+        studentGame: Boolean(g.studentGame),
+        creatorName: g.studentGame ? g.creatorName || "O'quvchi" : null,
+        audience: typeof g.grade === "number" ? `${g.grade}-sinflar` : "Guruh",
+        players: n.get(g._id.toString()) ?? 0,
+        joined: joined.has(g._id.toString()),
+        mine: String(g.creatorId ?? "") === user.userId,
+      })),
+    };
+  } catch (err) {
+    return errorOf(err, "O'yinlarni olib bo'lmadi");
+  }
+}
+
+export interface StudentGameMonitorItem {
+  id: string;
+  mode: LiveGameMode;
+  status: LiveGameStatus;
+  creatorName: string;
+  creatorId: string;
+  audience: string;
+  groupName: string;
+  index: number;
+  total: number;
+  price: number;
+  paid: number;
+  contributors: { name: string; amount: number }[];
+  refunded: boolean;
+  createdAt: string;
+  finishedAt: string | null;
+  players: { name: string; score: number; out: boolean }[];
+}
+
+/** Mentor: o'quvchilar o'yinlari — hozir ketayotganlari va oxirgilari, kimlar o'ynayapti */
+export async function getStudentGamesForMentorAction(): Promise<Result<StudentGameMonitorItem[]>> {
+  try {
+    await requireMentor();
+    await connectDB();
+    const games = await LiveGame.find({ studentGame: true })
+      .select("mode status creatorName creatorId grade groupId index questions.timeLimit price paid contributions refundedAt createdAt finishedAt")
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+    const ids = games.map((g) => g._id);
+    const [players, groups] = await Promise.all([
+      LiveGamePlayer.find({ gameId: { $in: ids } }).select("gameId name score eliminated").sort({ score: -1 }).lean(),
+      Group.find({ _id: { $in: games.map((g) => g.groupId) } }).select("name").lean(),
+    ]);
+    const groupName = new Map(groups.map((g) => [String(g._id), g.name]));
+    const byGame = new Map<string, StudentGameMonitorItem["players"]>();
+    for (const p of players) {
+      const k = String(p.gameId);
+      if (!byGame.has(k)) byGame.set(k, []);
+      byGame.get(k)!.push({ name: p.name, score: p.score, out: Boolean(p.eliminated) });
+    }
+    return {
+      success: true,
+      data: games.map((g) => ({
+        id: g._id.toString(),
+        mode: g.mode,
+        status: g.status,
+        creatorName: g.creatorName || "O'quvchi",
+        creatorId: String(g.creatorId ?? ""),
+        audience: typeof g.grade === "number" ? `Butun ${g.grade}-sinf` : "Guruh",
+        groupName: groupName.get(String(g.groupId)) ?? "—",
+        index: g.index,
+        total: g.questions.length,
+        price: g.price ?? 0,
+        paid: g.paid ?? 0,
+        contributors: contributorsOf(g.contributions),
+        refunded: Boolean(g.refundedAt),
+        createdAt: new Date(g.createdAt ?? Date.now()).toISOString(),
+        finishedAt: g.finishedAt ? new Date(g.finishedAt).toISOString() : null,
+        players: byGame.get(g._id.toString()) ?? [],
+      })),
+    };
+  } catch (err) {
+    return errorOf(err, "O'yinlarni olib bo'lmadi");
+  }
+}
+
+/** Mentor: o'quvchi o'yinini to'xtatish (xohlasa coin qaytariladi) */
+export async function stopStudentGameAction(gameId: string, refund: boolean): Promise<Result<{ stopped: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return { success: true, data: { stopped: await cancelStudentGame(gameId, "mentor to'xtatdi", refund === true) } };
+  } catch (err) {
+    return errorOf(err, "To'xtatib bo'lmadi");
   }
 }

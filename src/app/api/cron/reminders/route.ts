@@ -4,6 +4,7 @@ import { sendLessonReminders } from "@/lib/notifications/scheduled";
 import { closeExpiredSessions } from "@/lib/attendance/core";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
 import { finishStaleLiveGames } from "@/lib/live-game/finish";
+import { expireStudentLobbies } from "@/lib/live-game/student-games";
 import { connectToDatabase } from "@/lib/db/connect";
 import { applyLessonDateFixes } from "@/lib/lesson-plan-fixes";
 
@@ -31,12 +32,17 @@ export async function GET(req: NextRequest) {
       console.error("Live game cron error:", error);
       return null;
     });
+    // Hech kim boshlamagan o'quvchi o'yinlari: bekor qilinadi, coin qaytariladi
+    const studentLobbies = await expireStudentLobbies().catch((error) => {
+      console.error("Student game expiry error:", error);
+      return null;
+    });
     // Bir martalik: 1-chorak dars sanalari va vazifa muddatlarini jadval bo'yicha to'g'irlash
     const lessonDateFix = await applyLessonDateFixes().catch((error) => {
       console.error("Lesson date fix error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames, lessonDateFix });
+    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames, studentLobbies, lessonDateFix });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

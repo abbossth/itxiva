@@ -26,6 +26,7 @@ import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
 import { EmotePad, EmoteStrip } from "./emote-pad";
 import { BoosterBar, BoosterShop } from "./boosters";
+import { StudentFundPanel } from "./student-fund";
 import { ModeIntro } from "./live-intro";
 import { TacticView } from "./live-tactics";
 import { isAdventure } from "@/lib/live-game/adventures";
@@ -249,12 +250,15 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         )}
         {error && <p className="mb-3 rounded-xl bg-rose-500/20 px-3 py-2 text-center text-sm font-semibold text-rose-200">{error}</p>}
 
+        {state.studentGame && state.status === "lobby" && !state.studentGame.started && <StudentFundPanel state={state} onChange={() => void refresh()} />}
         {!state.joined && state.status !== "finished" ? (
           <JoinView state={state} busy={busy} onJoin={join} />
         ) : state.status === "lobby" ? (
           <div className="quiz-pop flex flex-col items-center gap-2 py-4 text-center">
             <p className="text-2xl font-black lg:text-4xl">Siz o&apos;yindasiz!</p>
-            <p className="max-w-xs text-sm text-slate-300">Mentor o&apos;yinni boshlashini kuting. Savollar shu yerda chiqadi.</p>
+            <p className="max-w-xs text-sm text-slate-300">
+              {state.studentGame ? "Coin yig'ilgach o'yin o'zi boshlanadi. Savollar shu yerda chiqadi." : "Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi."}
+            </p>
             <EmotePad gameId={state.id} look={me?.look ?? null} />
             <BoosterShop compact />
           </div>
@@ -282,7 +286,20 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         ) : state.status === "reveal" ? (
           <RevealView state={state} chest={chest} busy={busy} onOpenChest={openChest} />
         ) : (
-          <FinishedView state={state} />
+          state.studentGame?.cancelled ? (
+            <div className="quiz-pop flex flex-col items-center gap-3 py-10 text-center">
+              <span className="text-6xl">🙅</span>
+              <p className="text-2xl font-black lg:text-4xl">O&apos;yin bekor qilindi</p>
+              <p className="max-w-xs text-sm text-slate-300">
+                O&apos;yin boshlanmadi{state.studentGame.mine > 0 ? ` — qo'shgan ${state.studentGame.mine} coiningiz balansingizga qaytarildi` : ""}.
+              </p>
+              <Link href="/live" className="rounded-2xl bg-violet-600 px-5 py-3 font-black text-white hover:bg-violet-500">
+                Boshqa o&apos;yinlar
+              </Link>
+            </div>
+          ) : (
+            <FinishedView state={state} />
+          )
         )}
       </LiveShell>
       </div>

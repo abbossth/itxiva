@@ -119,6 +119,7 @@ export const STUDENT_LINKS: NavLink[] = [
   { href: "/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, gamification: true, primaryWithGamification: true, match: ["/achievements"] },
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy, primary: true, primaryWithGamification: false },
+  { href: "/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2, match: ["/live/"] },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
   { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User, sidebar: false },
 ];

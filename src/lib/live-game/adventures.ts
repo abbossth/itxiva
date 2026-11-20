@@ -83,7 +83,7 @@ export const CELL_POINTS = 100;
 
 export type DigKind = "gold" | "bag" | "diamond" | "bomb" | "rock";
 export const DIGS: Record<DigKind, { amount: number; weight: number; icon: string; label: string }> = {
-  gold: { amount: 150, weight: 38, icon: "🪙", label: "oltin" },
+  gold: { amount: 150, weight: 38, icon: "💰", label: "oltin" },
   bag: { amount: 300, weight: 22, icon: "💰", label: "xalta oltin" },
   diamond: { amount: 700, weight: 8, icon: "💎", label: "olmos" },
   bomb: { amount: -200, weight: 16, icon: "💣", label: "bomba" },

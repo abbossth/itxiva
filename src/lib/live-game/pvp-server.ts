@@ -41,7 +41,7 @@ export type { PvpFeedView, PvpMe, PvpPeer, PvpShotView, PvpTickInput, PvpTickRes
 
 // ---- Qisqa kesh (bir vaqtda o'nlab so'rov keladi) ----
 const TTL = process.env.VITEST ? 0 : 150;
-type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; status: string; arena?: ILiveArena | null };
+type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; grade?: number | null; status: string; arena?: ILiveArena | null };
 type CachedPlayer = { _id: mongoose.Types.ObjectId; name: string; studentId: mongoose.Types.ObjectId; arena?: ILiveArenaPlayer | null; createdAt?: Date | string };
 const gameCache = new Map<string, { at: number; v: CachedGame | null }>();
 const playersCache = new Map<string, { at: number; v: CachedPlayer[] }>();
@@ -61,7 +61,7 @@ export async function loadPvpGame(gameId: Id): Promise<CachedGame | null> {
   const k = String(gameId);
   const c = gameCache.get(k);
   if (c && Date.now() - c.at < TTL) return c.v;
-  const v = (await LiveGame.findById(gameId).select("groupId status arena").lean()) as CachedGame | null;
+  const v = (await LiveGame.findById(gameId).select("groupId grade status arena").lean()) as CachedGame | null;
   if (gameCache.size > 200) sweep();
   gameCache.set(k, { at: Date.now(), v });
   return v;

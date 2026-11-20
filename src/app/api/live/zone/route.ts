@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { liveWho } from "@/lib/live-game/route-auth";
 import { loadZoneGame, watchZone, zoneTick, type ZoneTickInput } from "@/lib/live-game/zone-server";
+import { mayPlay } from "@/lib/live-game/student-games";
 
 // "Yashil zona" uchun tezkor yo'l: o'quvchi soniyasiga ~4 marta robotining joyini yuboradi va boshqalarni oladi;
 // proyektor esa hamma robotlarni o'qiydi. To'lqin natijalari shu so'rovlar ichida hisoblanadi.
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return err("O'yin topilmadi", 404);
   await connectToDatabase();
   const game = await loadZoneGame(gameId);
-  if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return err("O'yin topilmadi", 404);
+  if (!game || !(await mayPlay(game, user.groupId))) return err("O'yin topilmadi", 404);
   if (game.status !== "zone" || !game.zone) return err("Raund tugagan", 409);
   const res = await zoneTick(game, user.userId, body);
   if (!res) return err("Bu raundda qatnashmayapsiz", 403);

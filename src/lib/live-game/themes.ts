@@ -64,7 +64,7 @@ export const MODE_THEMES: Record<LiveGameMode, ModeTheme> = {
     bg: ["#1a1203", "#3b2a06", "#422006"],
     glow: ["rgba(250,204,21,0.22)", "rgba(245,158,11,0.18)"],
     accent: "#facc15",
-    floaters: ["💎", "🪙", "🗝️"],
+    floaters: ["💎", "💰", "🗝️"],
     music: { transpose: 2, tempo: 1, wave: "triangle", minor: false },
   },
   arena: {
@@ -112,7 +112,7 @@ export const MODE_THEMES: Record<LiveGameMode, ModeTheme> = {
     bg: ["#140c03", "#2b1a07", "#3f2a0b"],
     glow: ["rgba(251,191,36,0.24)", "rgba(168,85,247,0.14)"],
     accent: "#fbbf24",
-    floaters: ["🪙", "💎", "⛏️"],
+    floaters: ["💰", "💎", "⛏️"],
     music: { transpose: -1, tempo: 1, wave: "sawtooth", minor: true },
   },
 };

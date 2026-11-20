@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
 import { liveWho as who } from "@/lib/live-game/route-auth";
 import { loadPvpGame, pvpTick, watchPvp, type PvpTickInput } from "@/lib/live-game/pvp-server";
+import { mayPlay } from "@/lib/live-game/student-games";
 
 // "Kiber jang" uchun tezkor yo'l: har o'quvchi soniyasiga ~5 marta murojaat qiladi.
 // Server action'lar brauzerda navbat bilan (bittadan) yuboriladi va deploydan keyin eski sahifada ishlamay qoladi —
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (typeof gameId !== "string" || !mongoose.isValidObjectId(gameId)) return err("O'yin topilmadi", 404);
   await connectToDatabase();
   const game = await loadPvpGame(gameId);
-  if (!game || game.groupId.toString() !== String(user.groupId ?? "")) return err("O'yin topilmadi", 404);
+  if (!game || !(await mayPlay(game, user.groupId))) return err("O'yin topilmadi", 404);
   if (game.status !== "arena" || !game.arena) return err("Arena tugagan", 409);
   const res = await pvpTick(game, user.userId, body.input ?? {});
   if (!res) return err("Avval o'yinga qo'shiling", 403);

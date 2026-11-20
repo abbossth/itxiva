@@ -13,6 +13,7 @@ import { CharacterSvg } from "@/components/character/character-svg";
 import type { GameLook } from "@/lib/character/catalog";
 import type { GiftView } from "@/lib/character/grant";
 import { cn } from "@/lib/utils";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 // O'yin oxirida: omad g'ildiragidan yutilgan sovg'alar. 🎁 Super priz — quti (5–20 coin yoki personajga buyum),
 // 🎡 Super baraban — 5–50 coin, personajga buyum yoki kuch +1. Natija serverda tanlanadi va darhol beriladi.
@@ -112,7 +113,7 @@ function PrizeBox({ gameId, prize, look }: { gameId: string; prize: LivePrizeVie
           <GiftReveal gift={result.gift} look={look} already={alreadyOpened} />
         ) : opened ? (
           <div className="live-pop relative flex flex-col items-center rounded-3xl bg-slate-950/80 px-6 py-3 ring-2 ring-amber-300/70 shadow-[0_0_40px_rgba(251,191,36,0.5)]">
-            <span className="text-5xl">🪙</span>
+            <GoldCoin className="text-5xl" />
             <span className="font-mono text-5xl font-black text-amber-300">+{result!.coins}</span>
             <span className="text-sm font-bold text-amber-100">coin</span>
           </div>
@@ -163,7 +164,7 @@ function SuperWheelPrize({ gameId, prize, look }: { gameId: string; prize: LiveP
           segment={shown}
           spinning={Boolean(spin)}
           size={260}
-          center="🪙"
+          center={<GoldCoin />}
           onDone={() => {
             if (!spin) return;
             setResult({ coins: spin.coins, segment: spin.segment, gift: spin.gift });

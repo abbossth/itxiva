@@ -8,6 +8,7 @@ import { CharacterSvg, type CharMood } from "@/components/character/character-sv
 import { cn, formatNumberUz } from "@/lib/utils";
 import { playHurt, playZap } from "@/lib/sound";
 import { useViewportHeight } from "./live-ui";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 // Sarguzasht rejimlarining proyektordagi maydonlari: poyga yo'li, osmon, ko'prik, kon va hudud xaritasi.
 // Har o'quvchi o'z personaji bilan: natijada avvalgi joyidan yangisiga yuguradi/uchadi/sakraydi,
@@ -562,7 +563,7 @@ function GoldBoard({ players, slotOf, index }: { players: LivePlayerRow[]; slotO
                 <CharacterSvg look={p.look} size={44} mood={digging && gained ? "work" : gained ? "happy" : "idle"} holding="pickaxe" pedestal={false} />
                 {digging && gained && (
                   <span className="adv-coin pointer-events-none absolute -top-1 left-1/2 text-lg" style={{ animationDelay: `${i * 0.1}s` }}>
-                    🪙
+                    <GoldCoin />
                   </span>
                 )}
               </span>
@@ -573,7 +574,7 @@ function GoldBoard({ players, slotOf, index }: { players: LivePlayerRow[]; slotO
                 <div className="relative h-full overflow-hidden rounded-xl bg-gradient-to-r from-amber-600 via-yellow-400 to-amber-300 transition-[width] duration-1000" style={{ width: `${Math.max(4, (p.score / top) * 100)}%` }}>
                   <span className="reward-shine absolute inset-0" />
                 </div>
-                <span className="absolute inset-y-0 right-3 flex items-center font-mono text-sm font-black text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">{formatNumberUz(p.score)} 🪙</span>
+                <span className="absolute inset-y-0 right-3 flex items-center font-mono text-sm font-black text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">{formatNumberUz(p.score)} <GoldCoin /></span>
               </div>
               <span className="flex w-28 shrink-0 justify-end gap-1 text-2xl sm:w-36 sm:text-3xl">
                 {items.map((it, j) => (
@@ -681,7 +682,7 @@ export function AdventureMine({
       : mode === "bridge"
       ? `Ko'prikda: ${me.progress} / ${goal}${me.finished ? " · qirg'oqda 🏝️" : ""}`
       : mode === "gold"
-      ? `Boylik: ${formatNumberUz(me.score)} 🪙 · ${me.progress} 💎`
+      ? `Boylik: ${formatNumberUz(me.score)} 💰 · ${me.progress} 💎`
       : `Hududingiz: ${me.progress} katak 🚩`;
   const mood: CharMood = good ? (mode === "gold" ? "work" : mode === "race" ? "run" : mode === "rocket" ? "fly" : "cheer") : bad ? "sad" : me.finished ? "cheer" : "idle";
   return (

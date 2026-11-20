@@ -11,6 +11,7 @@ import { haptic } from "@/lib/haptics";
 import { playRankUp, playWhoosh, unlockSound } from "@/lib/sound";
 import { CharacterSvg } from "@/components/character/character-svg";
 import { cn } from "@/lib/utils";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 // Kutish zalida: harakatlar g'ildiragi (PUBG'dagi kabi). Personaj sahna o'rtasida, atrofida 8 ta harakat tugmasi.
 // Bosilganda: belgilar tugmadan personajga uchadi va atrofga sochiladi, tepada harakat nomi chiqadi; personaj telefonda
@@ -169,7 +170,7 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
               >
                 <span className="text-2xl leading-none">{e.icon}</span>
                 <span className="line-clamp-1 text-[10px] font-bold text-white/85">{e.name}</span>
-                <span className="rounded-full bg-amber-400 px-1.5 text-[10px] font-black text-slate-900">🪙 {e.price}</span>
+                <span className="rounded-full bg-amber-400 px-1.5 text-[10px] font-black text-slate-900"><GoldCoin /> {e.price}</span>
               </Link>
             ))}
           </div>

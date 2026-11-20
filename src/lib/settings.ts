@@ -5,6 +5,7 @@ import { DEFAULT_ACCENT, isAccentId } from "@/lib/theme-accents";
 import { toDateKey } from "@/lib/schedule";
 import { parseGamification, type GamificationSettings } from "@/lib/gamification/config";
 import { parseAmbience, type AmbienceSettings } from "@/lib/ambience";
+import { parseStudentGames, type StudentGamesSettings } from "@/lib/live-game/student-games-config";
 
 export interface AppSettingsData {
   academicYear: string;
@@ -14,6 +15,7 @@ export interface AppSettingsData {
   studentProfileEdit: boolean;
   gamification: GamificationSettings;
   ambience: AmbienceSettings;
+  studentGames: StudentGamesSettings;
 }
 
 const YEAR_RE = /^(\d{4})-(\d{4})$/;
@@ -76,5 +78,6 @@ async function loadAppSettings(): Promise<AppSettingsData> {
     studentProfileEdit: doc?.studentProfileEdit === true,
     gamification: parseGamification(doc?.gamification),
     ambience: parseAmbience(doc?.ambience),
+    studentGames: parseStudentGames(doc?.studentGames),
   };
 }

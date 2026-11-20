@@ -28,6 +28,7 @@ import { CharacterSvg } from "./character-svg";
 import { Character2D } from "./character-2d";
 import { Character3D } from "./character-3d";
 import { BoosterShop } from "@/components/live/boosters";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 // Profil → "Personajim": personajni 2D yoki 3D ko'rinishda ko'rish (sichqoncha bilan o'ynash), qismlarini tanlash,
 // coin evaziga yangi qism sotib olish va "kuch" upgrade. Har o'zgarish o'zi saqlanadi.
@@ -302,7 +303,7 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
                               <Check className="h-3 w-3" /> Sizniki
                             </>
                           ) : (
-                            <>🪙 {e.price}</>
+                            <><GoldCoin /> {e.price}</>
                           )}
                         </span>
                       </button>
@@ -374,7 +375,7 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
                           <Lock className="h-3 w-3" /> {it.level}-daraja
                         </>
                       ) : (
-                        <>🪙 {it.price}</>
+                        <><GoldCoin /> {it.price}</>
                       )}
                     </span>
                   </button>

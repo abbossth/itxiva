@@ -10,7 +10,7 @@ import { MAX_ORBS, MAX_SPEED_CHECK, type GalaxyPeer } from "./galaxy";
 type Id = mongoose.Types.ObjectId | string;
 const TTL = process.env.VITEST ? 0 : 150;
 
-type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; status: string; galaxy?: ILiveGalaxy | null };
+type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; grade?: number | null; status: string; galaxy?: ILiveGalaxy | null };
 type CachedPlayer = { _id: mongoose.Types.ObjectId; name: string; studentId: mongoose.Types.ObjectId; galaxy?: ILiveGalaxyPlayer | null };
 const gameCache = new Map<string, { at: number; v: CachedGame | null }>();
 const playersCache = new Map<string, { at: number; v: CachedPlayer[] }>();
@@ -25,7 +25,7 @@ export async function loadGalaxyGame(gameId: Id): Promise<CachedGame | null> {
   const key = String(gameId);
   const c = gameCache.get(key);
   if (c && Date.now() - c.at < TTL) return c.v;
-  const v = await LiveGame.findById(gameId).select("groupId status galaxy").lean<CachedGame>();
+  const v = await LiveGame.findById(gameId).select("groupId grade status galaxy").lean<CachedGame>();
   sweep();
   gameCache.set(key, { at: Date.now(), v });
   return v;

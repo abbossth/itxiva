@@ -10,6 +10,7 @@ import { announceBalance } from "@/lib/rewards-client";
 import { haptic } from "@/lib/haptics";
 import { playRankUp, playRewardSound, playWhoosh, unlockSound } from "@/lib/sound";
 import { cn, formatNumberUz } from "@/lib/utils";
+import { GoldCoin } from "@/components/ui/gold-coin";
 
 // O'yin kuchaytirgichlari: savol paytida telefondagi panel (ishlatish) va do'kon (coin evaziga sotib olish).
 
@@ -156,7 +157,7 @@ export function BoosterShop({ compact = false }: { compact?: boolean }) {
               onClick={() => buy(b.id)}
               className="w-full cursor-pointer rounded-xl bg-amber-400 px-2 py-1.5 text-xs font-black text-slate-900 shadow hover:bg-amber-300 disabled:opacity-60"
             >
-              🪙 {b.price * qty[b.id]}
+              <GoldCoin /> {b.price * qty[b.id]}
             </button>
           </li>
         ))}

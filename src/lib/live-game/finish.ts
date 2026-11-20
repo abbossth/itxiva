@@ -20,6 +20,11 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
     { returnDocument: "after" }
   );
   if (!game) return false;
+  // O'quvchi yaratgan o'yin: g'oliblarga coin, XP va test coini berilmaydi
+  if (game.studentGame) {
+    await LiveGame.updateOne({ _id: game._id }, { $set: { rewardedAt: new Date() } });
+    return true;
+  }
 
   const players = await LiveGamePlayer.find({ gameId: game._id }).lean();
   const awards = computeAwards(

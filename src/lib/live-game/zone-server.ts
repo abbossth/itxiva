@@ -35,7 +35,7 @@ import type { ZoneRoomResults, ZoneTicket } from "./zone-room";
 type Id = mongoose.Types.ObjectId | string;
 const TTL = process.env.VITEST ? 0 : 150;
 
-type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; status: string; zone?: ILiveZone | null };
+type CachedGame = { _id: mongoose.Types.ObjectId; groupId: mongoose.Types.ObjectId; grade?: number | null; status: string; zone?: ILiveZone | null };
 type CachedPlayer = { _id: mongoose.Types.ObjectId; name: string; studentId: mongoose.Types.ObjectId; zone?: ILiveZonePlayer | null };
 const gameCache = new Map<string, { at: number; v: CachedGame | null }>();
 const playersCache = new Map<string, { at: number; v: CachedPlayer[] }>();
@@ -55,7 +55,7 @@ export async function loadZoneGame(gameId: Id): Promise<CachedGame | null> {
   const key = String(gameId);
   const c = gameCache.get(key);
   if (c && Date.now() - c.at < TTL) return c.v;
-  const v = await LiveGame.findById(gameId).select("groupId status zone").lean<CachedGame>();
+  const v = await LiveGame.findById(gameId).select("groupId grade status zone").lean<CachedGame>();
   sweep();
   gameCache.set(key, { at: Date.now(), v });
   return v;

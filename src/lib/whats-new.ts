@@ -29,6 +29,62 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-games-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Endi jonli o'yinni o'zingiz ochasiz!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎮",
+        title: "O'z o'yiningizni oching",
+        text: "Menyudagi «Jonli o'yin» bo'limida istalgan o'yin turini tanlang: guruhingiz uchun yoki butun sinfingiz (masalan, barcha 8-sinflar) uchun. O'yinni o'zingiz ham o'ynaysiz — proyektor shart emas, o'yin o'zi yuradi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🤝",
+        title: "Narxini birgalikda yig'asiz",
+        text: "Har o'yinning narxi bor (10 coindan, masalan klassik — 15). Siz birinchi hissani qo'shasiz, do'stlaringiz ham +1, +2, +5 qo'shadi. Coin to'lgach o'yin bir necha soniyada o'zi boshlanadi. Boshlanmasa — har kimga o'z coini qaytariladi.",
+      },
+      {
+        art: "emoji",
+        emoji: "⚠️",
+        title: "Qoidalar",
+        text: "Bu o'yinlarda g'oliblarga coin berilmaydi — faqat sharaf va zavq uchun. Dars vaqtida o'yin ochib bo'lmaydi. Darsni sababsiz qoldirsangiz, 2 kun jonli o'yinlarga kira olmaysiz — darslarga qatnashing!",
+      },
+    ],
+    cta: { label: "O'yin ochish", href: "/live" },
+  },
+  {
+    id: "mentor-student-games-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchilar o'z jonli o'yinlarini ochadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎮",
+        title: "O'quvchilar o'yin ochadi, birgalikda coin yig'adi",
+        text: "O'quvchi «Jonli o'yin» bo'limida guruhi yoki butun sinfi uchun o'yin ochadi; narxini qatnashchilar birgalikda coin qo'shib yig'adi (masalan, klassik 15 coin: 5+2+4+3+1). Narx to'lgach o'yin o'zi boshlanadi, server o'zi boshqaradi. G'oliblarga coin, XP va sovg'a berilmaydi. Boshlanmasa — har kimga o'z coini qaytadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🛠️",
+        title: "To'liq boshqaruv sizda",
+        text: "Jonli o'yin sahifasidagi «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»: yoqish/o'chirish, dars vaqtida taqiqlash, har tur narxi (0 — yopiq), butun sinf uchun ruxsat va qo'shimcha narx, kunlik limit. Darsni sababsiz qoldirgan o'quvchi uchun jonli o'yinlar necha kun yopilishini ham shu yerda belgilaysiz (sukutda 2 kun, mentor o'yinlariga ham).",
+      },
+      {
+        art: "emoji",
+        emoji: "👀",
+        title: "Kuzating va to'xtating",
+        text: "Shu sahifada hozir ketayotgan o'quvchi o'yinlari ko'rinadi: kim ochgan, kimlar qancha coin qo'shgan, kimlar o'ynayapti va qaysi bosqichda. «Kuzatish» — proyektor ko'rinishida ochiladi, «To'xtatish» — o'yinni yopadi (xohlasangiz coin qaytariladi). Siz guruhda o'yin ochsangiz, o'quvchilar o'yini avtomatik to'xtaydi.",
+      },
+    ],
+    cta: { label: "Sozlash", href: "/mentor/live" },
+  },
+  {
     id: "arena-board-2026-11",
     date: "2026-11-19",
     audience: "student",

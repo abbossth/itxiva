@@ -10,6 +10,7 @@ import { isAccentId } from "@/lib/theme-accents";
 import { gamificationSettingsSchema } from "@/lib/validations/gamification.schema";
 import { ensureSystemQuests } from "@/lib/gamification/quests";
 import { parseAmbience, SEASON_MODES } from "@/lib/ambience";
+import { parseStudentGames } from "@/lib/live-game/student-games-config";
 import type { ActionResult } from "./auth.actions";
 
 /** Joriy o'quv yili, chorak va asosiy rang — barcha foydalanuvchilar uchun */
@@ -74,4 +75,17 @@ export async function updateAmbienceSettingsAction(input: unknown): Promise<Acti
   await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_SETTINGS", details: { ambience } });
   revalidatePath("/", "layout");
   return { success: true, message: "Bezak sozlamalari saqlandi" };
+}
+
+/** O'quvchilar yaratadigan jonli o'yinlar: yoqish, dars vaqtida taqiq, narxlar, sinf uchun ruxsat, kunlik limit */
+export async function updateStudentGamesSettingsAction(input: unknown): Promise<ActionResult> {
+  const mentor = await requireMentor();
+  const studentGames = parseStudentGames(input);
+  await connectToDatabase();
+  await AppSettings.updateOne({ key: "global" }, { $set: { studentGames } }, { upsert: true });
+  forgetAppSettings();
+  await AuditLog.create({ actorId: mentor.userId, action: "UPDATE_SETTINGS", details: { studentGames } });
+  revalidatePath("/mentor/live");
+  revalidatePath("/live");
+  return { success: true, message: studentGames.enabled ? "Saqlandi — o'quvchilar o'yin yarata oladi" : "Saqlandi — o'quvchilar o'yini o'chirildi" };
 }
