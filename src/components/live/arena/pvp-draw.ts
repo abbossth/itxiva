@@ -367,15 +367,7 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
       ctx.ellipse(0, -R * 0.6, R * 1.1, R * 1.6, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    if (r.shield && !r.out) {
-      ctx.strokeStyle = `rgba(56,189,248,${0.6 + Math.sin(t * 8) * 0.25})`;
-      ctx.fillStyle = "rgba(56,189,248,0.12)";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(0, -R * 0.5, R + 16, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
+    if (r.shield && !r.out) drawShieldBubble(ctx, 0, -R * 0.5, R + 18, t);
     ctx.restore();
     return;
   }
@@ -483,14 +475,102 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
   ctx.fill();
   ctx.rotate(-r.a);
   // Qalqon pufagi
-  if (r.shield && !r.out) {
-    ctx.strokeStyle = `rgba(56,189,248,${0.6 + Math.sin(t * 8) * 0.25})`;
-    ctx.fillStyle = "rgba(56,189,248,0.12)";
-    ctx.lineWidth = 4;
+  if (r.shield && !r.out) drawShieldBubble(ctx, 0, 0, R + 14, t);
+  ctx.restore();
+}
+
+/**
+ * Qalqon: jamoa ranglariga (qizil, ko'k, sariq, yashil) o'xshamaydigan alohida effekt — oq-oltin nur, aylanuvchi
+ * kamalaksimon gardish, olti burchakli energiya to'ri, tepada oltin qalqon belgisi va atrofida uchqunlar.
+ */
+export function drawShieldBubble(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, t: number) {
+  const pulse = 1 + Math.sin(t * 6) * 0.04;
+  const rr = radius * pulse;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Ichki nur
+  const glow = ctx.createRadialGradient(0, 0, rr * 0.2, 0, 0, rr * 1.15);
+  glow.addColorStop(0, "rgba(255,255,255,0.05)");
+  glow.addColorStop(0.75, "rgba(255,247,214,0.18)");
+  glow.addColorStop(1, "rgba(255,247,214,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, rr * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+  // Aylanuvchi kamalaksimon gardish
+  const rim: CanvasGradient | string =
+    typeof ctx.createConicGradient === "function"
+      ? (() => {
+          const cg = ctx.createConicGradient(t * 2.2, 0, 0);
+          ["#fde68a", "#ffffff", "#f0abfc", "#fbbf24", "#ffffff", "#c4b5fd", "#fde68a"].forEach((c, i, a) => cg.addColorStop(i / (a.length - 1), c));
+          return cg;
+        })()
+      : "#fde68a";
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 5;
+  ctx.shadowColor = "rgba(253,230,138,0.95)";
+  ctx.shadowBlur = 14;
+  ctx.beginPath();
+  ctx.arc(0, 0, rr, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Olti burchakli energiya to'ri (ikki qavat, qarama-qarshi aylanadi)
+  const hex = (r: number, rot: number) => {
     ctx.beginPath();
-    ctx.arc(0, 0, R + 12, 0, Math.PI * 2);
+    for (let i = 0; i < 6; i++) {
+      const a = rot + (i / 6) * Math.PI * 2;
+      if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+      else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath();
+  };
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = `rgba(255,255,255,${0.45 + Math.sin(t * 5) * 0.2})`;
+  hex(rr * 0.86, t * 0.9);
+  ctx.stroke();
+  ctx.setLineDash([4, 5]);
+  ctx.strokeStyle = "rgba(253,230,138,0.6)";
+  hex(rr * 0.7, -t * 1.3);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Tepada oltin qalqon belgisi
+  ctx.save();
+  ctx.translate(0, -rr - 4);
+  const s = Math.max(7, rr * 0.22);
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.quadraticCurveTo(s * 0.9, -s * 0.85, s * 0.9, -s * 0.35);
+  ctx.quadraticCurveTo(s * 0.85, s * 0.55, 0, s);
+  ctx.quadraticCurveTo(-s * 0.85, s * 0.55, -s * 0.9, -s * 0.35);
+  ctx.quadraticCurveTo(-s * 0.9, -s * 0.85, 0, -s);
+  ctx.closePath();
+  const sg = ctx.createLinearGradient(0, -s, 0, s);
+  sg.addColorStop(0, "#fef9c3");
+  sg.addColorStop(0.5, "#fbbf24");
+  sg.addColorStop(1, "#b45309");
+  ctx.fillStyle = sg;
+  ctx.shadowColor = "rgba(251,191,36,0.9)";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#78350f";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.55);
+  ctx.lineTo(0, s * 0.5);
+  ctx.stroke();
+  ctx.restore();
+  // Aylanuvchi uchqunlar
+  for (let i = 0; i < 4; i++) {
+    const a = t * 2.6 + (i / 4) * Math.PI * 2;
+    const tw = 0.5 + 0.5 * Math.sin(t * 9 + i * 1.7);
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + tw * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, 1.6 + tw * 1.8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
   }
   ctx.restore();
 }

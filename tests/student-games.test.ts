@@ -135,6 +135,8 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 15, nonce: nonce() });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
+    // Mini o'yinlar (omad g'ildiragi tasodifiy ochko beradi) o'rinlarni aralashtirmasin
+    await LiveGame.updateOne({ _id: id }, { $set: { "options.minigames": false, "options.zone": false } });
     for (const u of [vali, sardor]) {
       as(u);
       await live.joinLiveGameAction(id);

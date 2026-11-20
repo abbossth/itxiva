@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "arena-shield-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Kiber arenada qalqon endi yaqqol ko'rinadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Oltin qalqon",
+        text: "Kiber arenada qalqon olgan o'yinchi atrofida endi oltin-kamalaksimon nurli gardish, olti burchakli energiya to'ri va tepasida oltin qalqon belgisi chiqadi — qizil, ko'k yoki boshqa jamoada bo'lsangiz ham darhol bilinadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-shield-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Kiber arena: qalqon effekti",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Qalqon jamoa rangidan ajralib turadi",
+        text: "Jamoaviy arenada ko'k jamoa halqasi va qalqon bir-biriga o'xshab qolardi. Endi qalqon alohida effektda: oltin nurli aylanuvchi gardish, olti burchakli to'r va tepada qalqon belgisi — proyektorda ham, o'quvchi ekranida ham.",
+      },
+    ],
+  },
+  {
     id: "characters-real-2026-11",
     date: "2026-11-20",
     audience: "student",
