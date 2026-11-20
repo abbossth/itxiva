@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-games-min5-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Qoida",
+    title: "O'quvchilar o'yini kamida 5 kishi bilan",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "👥",
+        title: "Kamida 5 o'yinchi",
+        text: "O'zingiz ochgan jonli o'yin kamida 5 kishi qo'shilganda (va coin yig'ilgach) boshlanadi. Uni o'yin egasi yoki mentor boshlaydi; 5 daqiqa yangi o'yinchi qo'shilmasa — o'zi boshlanadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-student-games-min5-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchilar o'yini: kamida 5 o'yinchi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "👥",
+        title: "Boshlashni egasi yoki siz hal qilasiz",
+        text: "O'quvchilar o'yini kamida 5 o'yinchi qo'shilmaguncha boshlanmaydi. Tayyor o'yinni o'yin egasi yoki siz (proyektordagi «Boshlash») boshlaysiz; 5 daqiqa yangi o'yinchi qo'shilmasa — o'zi boshlanadi. 20 daqiqada yig'ilmasa — bekor, coin qaytadi.",
+      },
+    ],
+  },
+  {
     id: "student-games-sale-2026-11",
     date: "2026-11-20",
     audience: "student",

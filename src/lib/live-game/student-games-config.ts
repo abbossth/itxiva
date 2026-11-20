@@ -36,6 +36,10 @@ export interface StudentGamesSettings {
   freeUntil: string | null;
   /** Bepul o'yinlarda ham g'oliblarga coin berilsinmi (sukutda yo'q — bepul o'ynab coin "ishlab topilmasin") */
   freePrizes: boolean;
+  /** O'yin boshlanishi uchun kamida shuncha o'yinchi qo'shilishi shart */
+  minPlayersToStart: number;
+  /** Tayyor o'yin (coin yig'ilgan, o'yinchilar yetarli): shuncha daqiqa yangi o'yinchi qo'shilmasa — o'zi boshlanadi */
+  autoStartMin: number;
 }
 
 /** O'yin turlari bo'yicha boshlang'ich narxlar (birgalikda yig'iladi): 10 coindan, real vaqtli janglar qimmatroq */
@@ -73,6 +77,8 @@ export const DEFAULT_STUDENT_GAMES: StudentGamesSettings = {
   freeFrom: null,
   freeUntil: null,
   freePrizes: false,
+  minPlayersToStart: 5,
+  autoStartMin: 5,
 };
 
 const int = (v: unknown, min: number, max: number, fallback: number) => {
@@ -106,6 +112,8 @@ export function parseStudentGames(raw: unknown): StudentGamesSettings {
     freeFrom: isoOrNull(r.freeFrom),
     freeUntil: isoOrNull(r.freeUntil),
     freePrizes: typeof r.freePrizes === "boolean" ? r.freePrizes : DEFAULT_STUDENT_GAMES.freePrizes,
+    minPlayersToStart: int(r.minPlayersToStart, 2, 50, DEFAULT_STUDENT_GAMES.minPlayersToStart),
+    autoStartMin: int(r.autoStartMin, 1, 30, DEFAULT_STUDENT_GAMES.autoStartMin),
   };
 }
 
@@ -161,7 +169,9 @@ export const AUTO_REVEAL_CHEST_S = 14;
 export const AUTO_MINIGAME_S = 6;
 /** Coin yig'ilmagan / boshlanmagan o'yin shuncha vaqtdan keyin bekor qilinadi (har kimga o'z coini qaytariladi) */
 export const STUDENT_LOBBY_MAX_MS = 20 * 60 * 1000;
-/** Narx to'lgach o'yin boshlanishigacha (s): kechikkanlar qo'shilib ulguradi */
-export const FUNDED_START_S = 8;
+/** O'yin tayyormi: coin yig'ilgan (yoki bepul) va o'yinchilar yetarli */
+export function studentGameReady(g: { price?: number; fundedAt?: unknown; needPlayers?: number }, players: number): boolean {
+  return ((g.price ?? 0) === 0 || Boolean(g.fundedAt)) && players >= (g.needPlayers ?? 0);
+}
 /** Bitta hissa: 1 coindan (tez tugmalar) */
 export const CONTRIBUTION_STEPS = [1, 2, 5, 10] as const;

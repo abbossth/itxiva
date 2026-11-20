@@ -110,8 +110,9 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
       as(ali);
       return (await live.getLivePlayerStateAction(id)) as { success: true; data: { status: string; index: number } };
     };
-    tick(8000);
-    await poll(); // intro boshlanadi
+    await LiveGame.updateOne({ _id: id }, { $set: { needPlayers: 2 } });
+    as(ali);
+    expect((await live.startStudentGameAction(id)).success).toBe(true); // intro boshlanadi
     tick(5000);
     expect((await poll()).data).toMatchObject({ status: "question", index: 0 });
     // Hamma javob bersa — natija darhol ochiladi
@@ -146,8 +147,9 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
       as(ali);
       return (await live.getLivePlayerStateAction(id)) as { success: true; data: { status: string; index: number } };
     };
-    tick(8000);
-    await poll();
+    await LiveGame.updateOne({ _id: id }, { $set: { needPlayers: 3 } });
+    as(ali);
+    expect((await live.startStudentGameAction(id)).success).toBe(true);
     tick(5000);
     expect((await poll()).data.status).toBe("question");
     // Ali tez, Vali sekinroq, Sardor eng oxirida — hammasi to'g'ri
@@ -183,10 +185,13 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     const g = (await LiveGame.findById(res.data.gameId).lean())!;
     expect(g).toMatchObject({ price: 0, paid: 0, prizes: [0, 0, 0] });
     as(vali);
-    expect((await live.startFreeStudentGameAction(res.data.gameId)).success).toBe(false); // faqat egasi
+    expect((await live.startStudentGameAction(res.data.gameId)).success).toBe(false); // faqat egasi
     as(ali);
-    expect((await live.startFreeStudentGameAction(res.data.gameId)).success).toBe(true);
-    expect((await LiveGame.findById(res.data.gameId).lean())?.fundedAt).toBeTruthy();
+    // Kamida 5 o'yinchi kerak — 2 kishi bilan boshlanmaydi
+    expect((await live.startStudentGameAction(res.data.gameId)).success).toBe(false);
+    await LiveGame.updateOne({ _id: res.data.gameId }, { $set: { needPlayers: 1 } });
+    expect((await live.startStudentGameAction(res.data.gameId)).success).toBe(true);
+    expect((await LiveGame.findById(res.data.gameId).lean())?.introAt).toBeTruthy();
 
     // Bepul davr tugadi, skidka 0 — to'liq narx
     await LiveGame.updateMany({}, { $set: { status: "finished" } });

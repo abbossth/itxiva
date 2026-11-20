@@ -18,7 +18,7 @@ import {
   AUTO_MINIGAME_S,
   AUTO_REVEAL_CHEST_S,
   AUTO_REVEAL_S,
-  FUNDED_START_S,
+  studentGameReady,
   STUDENT_GAME_COUNTS,
   STUDENT_LOBBY_MAX_MS,
   isFreeNow,
@@ -293,6 +293,14 @@ export async function startLiveIntroAction(gameId: string): Promise<Result<{ int
     await requireMentor();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
+    // O'quvchi o'yini: coin yig'ilgan va kamida N o'yinchi bo'lishi shart
+    const sg = await LiveGame.findById(gameId).select("studentGame").lean();
+    if (sg?.studentGame) {
+      const r = await startStudentGame(gameId, null);
+      if (!r.success) return r;
+      const after = await LiveGame.findById(gameId).select("status introAt").lean();
+      return { success: true, data: { introMs: after ? introLeft(after) : 0 } };
+    }
     const game = await LiveGame.findOneAndUpdate({ _id: gameId, status: "lobby" }, { $set: { introAt: new Date() } }, { returnDocument: "after" }).select("status introAt").lean();
     if (!game) return fail("O'yin allaqachon boshlangan");
     return { success: true, data: { introMs: introLeft(game) } };
@@ -1680,8 +1688,12 @@ export interface LivePlayerState {
     started: boolean;
     price: number;
     paid: number;
-    /** Narx to'lgan — shuncha ms dan keyin boshlanadi (0 — hali to'lmagan yoki boshlangan) */
+    /** Tayyor o'yin shuncha ms dan keyin o'zi boshlanadi (yangi o'yinchi qo'shilsa — qayta hisoblanadi); 0 — tayyor emas */
     startsInMs: number;
+    /** O'yinchilar soni, boshlash uchun kerakli soni va tayyorligi */
+    players: number;
+    needPlayers: number;
+    ready: boolean;
     funded: boolean;
     /** Boshlanmay bekor qilingan (coinlar qaytarilgan) */
     cancelled: boolean;
@@ -1917,9 +1929,17 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               free: (game.price ?? 0) === 0,
               prizes: game.prizes ?? [],
               minPlayers: game.minPlayers ?? 0,
+              players: players.length,
+              needPlayers: game.needPlayers ?? 0,
+              ready: studentGameReady(game, players.length),
               startsInMs:
-                game.status === "lobby" && game.fundedAt && !game.introAt
-                  ? Math.max(0, new Date(game.fundedAt).getTime() + FUNDED_START_S * 1000 - Date.now())
+                game.status === "lobby" && !game.introAt && studentGameReady(game, players.length)
+                  ? Math.max(
+                      0,
+                      Math.max(game.fundedAt ? new Date(game.fundedAt).getTime() : 0, ...players.map((p) => new Date(p.createdAt ?? 0).getTime())) +
+                        (game.autoStartMs || 5 * 60_000) -
+                        Date.now()
+                    )
                   : 0,
               contributors: contributorsOf(game.contributions),
               mine: (game.contributions ?? []).filter((c) => String(c.studentId) === user.userId).reduce((n, c) => n + c.amount, 0),
@@ -2347,16 +2367,20 @@ type AutoStep = "intro" | "advance" | "reveal" | "endMinigame" | "endGalaxy" | "
 
 /** Avto-boshqaruv: hozir qanday qadam kerak (sof hisob; snapshotdan, bazaga murojaatsiz) */
 function autopilotDue(
-  g: Pick<ILiveGame, "status" | "introAt" | "fundedAt" | "questionStartedAt" | "questions" | "index" | "mode" | "revealedAt" | "minigame" | "galaxy" | "zone" | "arena"> & { createdAt?: Date | string },
-  players: Pick<ILiveGamePlayer, "eliminated" | "answers" | "arena" | "team">[],
+  g: Pick<ILiveGame, "status" | "introAt" | "fundedAt" | "price" | "needPlayers" | "autoStartMs" | "questionStartedAt" | "questions" | "index" | "mode" | "revealedAt" | "minigame" | "galaxy" | "zone" | "arena"> & { createdAt?: Date | string },
+  players: (Pick<ILiveGamePlayer, "eliminated" | "answers" | "arena" | "team"> & { createdAt?: Date | string })[],
   now: number
 ): AutoStep | null {
   const t = (d: Date | string | null | undefined) => (d ? new Date(d).getTime() : NaN);
   switch (g.status) {
     case "lobby":
       if (g.introAt) return now >= t(g.introAt) + INTRO_MS ? "advance" : null;
-      // Narx to'ldi — qisqa sanoqdan keyin o'yin o'zi boshlanadi
-      if (g.fundedAt) return now >= t(g.fundedAt) + FUNDED_START_S * 1000 ? "intro" : null;
+      // Tayyor (coin yig'ilgan, kamida N o'yinchi): egasi yoki mentor boshlaydi; shuncha vaqt yangi o'yinchi
+      // qo'shilmasa — o'zi boshlanadi. Tayyor bo'lmasa va lobby uzoq kutsa — bekor (coin qaytadi)
+      if (studentGameReady(g, players.length)) {
+        const lastJoin = Math.max(t(g.fundedAt as Date | string | null | undefined) || 0, ...players.map((p) => t(p.createdAt) || 0));
+        return now - lastJoin >= (g.autoStartMs || 5 * 60_000) ? "intro" : null;
+      }
       return now - t(g.createdAt) > STUDENT_LOBBY_MAX_MS ? "expire" : null;
     case "question": {
       if (!g.questionStartedAt) return null;
@@ -2586,7 +2610,7 @@ export async function getStudentGameSetupAction(): Promise<Result<StudentGameSet
 
 /**
  * Hissa qo'shish: avval coin yechiladi (kalit bilan — bir marta), keyin o'yin hisobiga yoziladi. Yozib bo'lmasa
- * (narx to'lib qoldi yoki o'yin bekor bo'ldi) — coin darhol qaytariladi. Narx to'lsa — fundedAt (o'yin o'zi boshlanadi).
+ * (narx to'lib qoldi yoki o'yin bekor bo'ldi) — coin darhol qaytariladi. Narx to'lsa — fundedAt (endi egasi/mentor boshlaydi).
  */
 async function addContribution(
   gameId: mongoose.Types.ObjectId,
@@ -2681,6 +2705,8 @@ export async function createStudentGameAction(input: {
       teams: 2,
       // Bepul o'yinda sovrin faqat mentor ruxsat bersa
       prizes: cost.free && !settings.freePrizes ? [0, 0, 0] : studentGamePrizes(settings, input.mode),
+      needPlayers: settings.minPlayersToStart,
+      autoStartMs: settings.autoStartMin * 60_000,
       minPlayers: settings.minPlayersForPrizes,
       questions,
       options:
@@ -2737,19 +2763,40 @@ export async function contributeStudentGameAction(gameId: string, amount: number
   }
 }
 
-/** O'yin egasi: bepul o'yinni boshlash (coin yig'ilmaydi) — bir necha soniyadan keyin o'zi start oladi */
-export async function startFreeStudentGameAction(gameId: string): Promise<Result<{ started: boolean }>> {
+/** O'quvchi o'yinini boshlash (egasi yoki mentor): coin yig'ilgan (yoki bepul) va kamida N o'yinchi bo'lsa */
+async function startStudentGame(gameId: string, creatorId: string | null): Promise<Result<{ started: boolean }>> {
+  const game = await LiveGame.findOne({ _id: gameId, studentGame: true, ...(creatorId ? { creatorId } : {}) })
+    .select("status introAt price fundedAt needPlayers")
+    .lean();
+  if (!game) return fail("O'yin topilmadi");
+  if (game.status !== "lobby" || game.introAt) return fail("O'yin allaqachon boshlangan");
+  if ((game.price ?? 0) > 0 && !game.fundedAt) return fail("Avval o'yin uchun coin yig'ilishi kerak");
+  const players = await LiveGamePlayer.countDocuments({ gameId: game._id });
+  if (players < (game.needPlayers ?? 0)) return fail(`Kamida ${game.needPlayers} ta o'yinchi kerak — hozir ${players} ta`);
+  const res = await LiveGame.updateOne({ _id: game._id, status: "lobby", introAt: null }, { $set: { introAt: new Date() } });
+  invalidateLiveSnapshot(gameId);
+  return { success: true, data: { started: res.modifiedCount > 0 } };
+}
+
+/** O'yin egasi (moderator): tayyor o'yinni boshlash */
+export async function startStudentGameAction(gameId: string): Promise<Result<{ started: boolean }>> {
   try {
     const user = await requireStudent();
     if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
     await connectDB();
-    const res = await LiveGame.updateOne(
-      { _id: gameId, studentGame: true, creatorId: user.userId, status: "lobby", price: 0, fundedAt: null, introAt: null },
-      { $set: { fundedAt: new Date() } }
-    );
-    if (res.modifiedCount === 0) return fail("O'yinni boshlab bo'lmadi");
-    invalidateLiveSnapshot(gameId);
-    return { success: true, data: { started: true } };
+    return await startStudentGame(gameId, user.userId);
+  } catch (err) {
+    return errorOf(err, "O'yinni boshlab bo'lmadi");
+  }
+}
+
+/** Mentor: o'quvchi o'yinini boshlash (o'sha shartlar bilan) */
+export async function startStudentGameByMentorAction(gameId: string): Promise<Result<{ started: boolean }>> {
+  try {
+    await requireMentor();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    return await startStudentGame(gameId, null);
   } catch (err) {
     return errorOf(err, "O'yinni boshlab bo'lmadi");
   }
@@ -2763,7 +2810,7 @@ export async function cancelMyStudentGameAction(gameId: string): Promise<Result<
     await connectDB();
     const game = await LiveGame.findOne({ _id: gameId, studentGame: true, creatorId: user.userId }).select("status introAt fundedAt").lean();
     if (!game) return fail("O'yin topilmadi");
-    if (game.status !== "lobby" || game.introAt || game.fundedAt) return fail("Coin yig'ilgan o'yinni bekor qilib bo'lmaydi");
+    if (game.status !== "lobby" || game.introAt) return fail("Boshlangan o'yinni bekor qilib bo'lmaydi");
     return { success: true, data: { cancelled: await cancelStudentGame(gameId, "o'yin egasi bekor qildi") } };
   } catch (err) {
     return errorOf(err, "Bekor qilib bo'lmadi");
@@ -2832,6 +2879,9 @@ export interface StudentGameMonitorItem {
   total: number;
   price: number;
   paid: number;
+  /** Boshlash uchun kerakli o'yinchilar va tayyormi (mentor boshlay oladi) */
+  needPlayers: number;
+  ready: boolean;
   contributors: { name: string; amount: number }[];
   refunded: boolean;
   createdAt: string;
@@ -2845,7 +2895,7 @@ export async function getStudentGamesForMentorAction(): Promise<Result<StudentGa
     await requireMentor();
     await connectDB();
     const games = await LiveGame.find({ studentGame: true })
-      .select("mode status creatorName creatorId grade groupId index questions.timeLimit price paid contributions refundedAt createdAt finishedAt")
+      .select("mode status creatorName creatorId grade groupId index questions.timeLimit price paid contributions refundedAt createdAt finishedAt fundedAt introAt needPlayers")
       .sort({ createdAt: -1 })
       .limit(30)
       .lean();
@@ -2875,6 +2925,8 @@ export async function getStudentGamesForMentorAction(): Promise<Result<StudentGa
         total: g.questions.length,
         price: g.price ?? 0,
         paid: g.paid ?? 0,
+        needPlayers: g.needPlayers ?? 0,
+        ready: g.status === "lobby" && !g.introAt && studentGameReady(g, (byGame.get(g._id.toString()) ?? []).length),
         contributors: contributorsOf(g.contributions),
         refunded: Boolean(g.refundedAt),
         createdAt: new Date(g.createdAt ?? Date.now()).toISOString(),

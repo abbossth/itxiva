@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { cancelMyStudentGameAction, contributeStudentGameAction, startFreeStudentGameAction, type LivePlayerState } from "@/actions/live-game.actions";
+import { cancelMyStudentGameAction, contributeStudentGameAction, startStudentGameAction, type LivePlayerState } from "@/actions/live-game.actions";
 import { CONTRIBUTION_STEPS } from "@/lib/live-game/student-games-config";
 import { LIVE_MODES } from "@/lib/live-game/modes";
 import { haptic } from "@/lib/haptics";
@@ -24,11 +24,11 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
   // Narx to'lgan: boshlanishgacha sanoq
   const [countdown, setCountdown] = useState(Math.ceil(sg.startsInMs / 1000));
   useEffect(() => {
-    if (!sg.funded) return;
+    if (!sg.ready) return;
     const end = Date.now() + sg.startsInMs;
     const id = setInterval(() => setCountdown(Math.max(0, Math.ceil((end - Date.now()) / 1000))), 250);
     return () => clearInterval(id);
-  }, [sg.funded, sg.startsInMs]);
+  }, [sg.ready, sg.startsInMs]);
 
   const give = (amount: number) =>
     start(async () => {
@@ -41,7 +41,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
       haptic([15, 30, 15]);
       if (r.data.paid >= r.data.price) {
         playRankUp();
-        setMsg({ text: "Coin to'ldi! O'yin boshlanmoqda", ok: true });
+        setMsg({ text: "Coin to'ldi!", ok: true });
       } else {
         playCheckInSound(1);
         setMsg({ text: `+${amount} coin qo'shdingiz`, ok: true });
@@ -52,7 +52,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
   const startFree = () =>
     start(async () => {
       unlockSound();
-      const r = await startFreeStudentGameAction(state.id);
+      const r = await startStudentGameAction(state.id);
       if (!r.success) setMsg({ text: r.error, ok: false });
       else {
         playRankUp();
@@ -89,8 +89,28 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
         )}
       </div>
 
-      {/* Bepul o'yin: coin yig'ilmaydi — egasi boshlaydi */}
-      {sg.free && !sg.funded && (
+      {/* O'yinchilar: kamida N kishi bo'lmasa o'yin boshlanmaydi; tayyor bo'lsa — egasi yoki mentor boshlaydi */}
+      <p className={cn("mt-2 text-center text-sm font-black", sg.players >= sg.needPlayers ? "text-emerald-300" : "text-sky-200")}>
+        👥 {sg.players}/{sg.needPlayers} o&apos;yinchi{sg.players < sg.needPlayers ? ` — yana ${sg.needPlayers - sg.players} kishi kerak` : ""}
+      </p>
+      {sg.ready && (
+        <div className="mt-2 text-center">
+          {sg.creator && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={startFree}
+              className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3 text-lg font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-60"
+            >
+              ▶ O&apos;yinni boshlash
+            </button>
+          )}
+          <p className="mt-1 text-xs text-white/70">
+            {sg.creator ? "" : `${sg.creatorName.split(" ")[0]} yoki mentor boshlaydi. `}Yangi o&apos;yinchi qo&apos;shilmasa {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")} dan keyin o&apos;zi boshlanadi
+          </p>
+        </div>
+      )}
+      {false && (
         <div className="mt-3 text-center">
           {sg.creator ? (
             <>
@@ -119,11 +139,9 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
         <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-slate-950 mix-blend-luminosity">{pct}%</span>
       </div>
 
-      {sg.funded ? (
-        <p className="quiz-pop mt-3 text-center text-xl font-black text-emerald-300">
-          🎉 {sg.free ? "Boshlanmoqda" : "Coin yig'ildi"}! O&apos;yin {countdown > 0 ? `${countdown} soniyada` : "hozir"} boshlanadi
-        </p>
-      ) : sg.free ? null : (
+      {sg.funded || sg.free ? (
+        sg.funded && !sg.free && <p className="mt-2 text-center text-sm font-black text-emerald-300">🎉 Coin yig&apos;ildi!</p>
+      ) : (
         <>
           <p className="mt-2 text-center text-sm font-bold text-amber-100">
             O&apos;yin boshlanishi uchun yana <b className="text-amber-300">{left} coin</b> kerak — har kim qo&apos;sha oladi

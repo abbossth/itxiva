@@ -110,6 +110,9 @@ export interface ILiveGameData {
   studentGame?: boolean;
   /** Sovrin berilishi uchun kamida shuncha o'yinchi (o'quvchi o'yini) */
   minPlayers?: number;
+  /** O'quvchi o'yini boshlanishi uchun kamida shuncha o'yinchi va tayyor bo'lgach o'zi boshlanish vaqti (ms) */
+  needPlayers?: number;
+  autoStartMs?: number;
   /** O'yinni yaratgan o'quvchi (studentGame) */
   creatorId?: string | mongoose.Types.ObjectId | null;
   creatorName?: string;
@@ -260,6 +263,8 @@ const LiveGameSchema = new Schema<ILiveGame>(
     bonusIndex: { type: Number, default: null },
     studentGame: { type: Boolean, default: false },
     minPlayers: { type: Number, default: 0 },
+    needPlayers: { type: Number, default: 0 },
+    autoStartMs: { type: Number, default: 0 },
     creatorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     creatorName: { type: String, default: "" },
     grade: { type: Number, default: null },
