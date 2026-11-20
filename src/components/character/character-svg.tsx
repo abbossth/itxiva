@@ -347,27 +347,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
         </g>
       </g>
 
-      {/* ---- Harakat belgilari (emot) ---- */}
-      {em && anim && !headOnly && (
-        <g>
-          <ellipse className="chr-ripple" cx="50" cy="112" rx="24" ry="5" fill="none" stroke="#f0abfc" strokeWidth="1.6" />
-          <ellipse className="chr-ripple" cx="50" cy="112" rx="24" ry="5" fill="none" stroke="#a5f3fc" strokeWidth="1.2" style={{ animationDelay: "0.5s" }} />
-        </g>
-      )}
-      {em && anim &&
-        FX_SPOTS.map((f, k) => (
-          <text
-            key={k}
-            className="chr-fx"
-            x={f.x}
-            y={f.y}
-            fontSize={(headOnly ? 11 : 13) * f.s}
-            textAnchor="middle"
-            style={{ animationDelay: `${f.d}s`, transformBox: "fill-box", transformOrigin: "center" }}
-          >
-            {em.fx[k % Math.max(1, em.fx.length)] ?? em.icon}
-          </text>
-        ))}
+      {/* Harakat (emot) — faqat tana harakati: atrofida stiker/emoji chiqmaydi */}
 
       {/* ---- Hamroh ---- */}
       {!headOnly && look.pet !== "none" && <Pet kind={look.pet} />}
@@ -399,14 +379,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
 }
 
 /** Harakat belgilari: personaj atrofida turli joydan, turli vaqtda ko'tariladi */
-const FX_SPOTS = [
-  { x: 16, y: 30, d: 0, s: 1.2 },
-  { x: 84, y: 24, d: 0.25, s: 1 },
-  { x: 50, y: 2, d: 0.5, s: 1.3 },
-  { x: 10, y: 66, d: 0.75, s: 0.9 },
-  { x: 90, y: 60, d: 0.4, s: 1.1 },
-  { x: 30, y: 10, d: 0.9, s: 0.8 },
-];
+
 
 const SPARKS = [
   { x: 14, y: 30, r: 4 },

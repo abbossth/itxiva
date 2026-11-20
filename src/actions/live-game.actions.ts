@@ -69,6 +69,7 @@ import { MAX_POWER, cleanLook, gameLook, pickGiftItem, type GameLook } from "@/l
 import { giftView, grantCharacterGift, type GiftView } from "@/lib/character/grant";
 import { EMOTE_GAP_MS, EMOTE_MS, emoteOf, hasEmote } from "@/lib/character/emotes";
 import { BOOSTER_MAX_PER_GAME, boosterOf, boosterWorks } from "@/lib/live-game/boosters";
+import { PUSH_GAP_MS, PUSH_MS, lobbyNeighbors, type PushDir } from "@/lib/live-game/push";
 import { ZONE_EVERY, ZONE_INTRO_S, ROBOT_COLORS, zoneDurationMs, zonePoints, zoneSpawn, zoneSpeed, zoneWaveCount } from "@/lib/live-game/zone";
 import { resolveZoneWaves, zoneRealtimeEnabled, zoneSocketUrl } from "@/lib/live-game/zone-server";
 import {
@@ -1058,6 +1059,9 @@ export interface LivePlayerRow {
   look: GameLook | null;
   /** Kutish zalidagi harakat (so'nggi soniyalarda bosilgan bo'lsa) */
   emote: { id: string; at: number } | null;
+  /** Kutish zalida: shu o'yinchi kimnidir itarmoqda / uni kimdir itardi (so'nggi soniyalarda) */
+  push: { to: string; dir: PushDir; at: number } | null;
+  pushedBy: { from: string; dir: PushDir; at: number } | null;
 }
 
 export interface LiveQuestionView {
@@ -1234,7 +1238,15 @@ export interface LiveHostState {
   waiting: string[];
 }
 
-const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): LivePlayerRow[] =>
+/** So'nggi itarishlar: kim → kimni */
+function recentPushes(players: ILiveGamePlayer[]): Map<string, { from: string; dir: PushDir; at: number }> {
+  const now = Date.now();
+  const m = new Map<string, { from: string; dir: PushDir; at: number }>();
+  for (const p of players) if (p.push && now - p.push.at < PUSH_MS) m.set(p.push.to, { from: p._id.toString(), dir: p.push.dir, at: p.push.at });
+  return m;
+}
+
+const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number, pushed = recentPushes(players)): LivePlayerRow[] =>
   rankPlayers(
     mode,
     players.map((p) => ({ p, id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime() }))
@@ -1263,6 +1275,8 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number): 
       tactic: ans?.tactic ?? null,
       look: (p.look as GameLook | null | undefined) ?? null,
       emote: p.emote && Date.now() - p.emote.at < EMOTE_MS ? { id: p.emote.id, at: p.emote.at } : null,
+      push: p.push && Date.now() - p.push.at < PUSH_MS ? { to: p.push.to, dir: p.push.dir, at: p.push.at } : null,
+      pushedBy: pushed.get(p._id.toString()) ?? null,
     };
   });
 
@@ -1645,6 +1659,17 @@ export interface LivePrizeView {
 export interface LivePlayerState {
   id: string;
   mode: LiveGameMode;
+  /** O'yin tugaganidan beri o'tgan vaqt (server soati) — telefon avval monitorni ko'rsatadi, keyin o'rinni */
+  finishedAgoMs: number | null;
+  /** Kutish zali: chap/o'ng qo'shnilar (itarish uchun) va so'nggi itarishlar */
+  lobby: {
+    left: { id: string; name: string; look: GameLook | null } | null;
+    right: { id: string; name: string; look: GameLook | null } | null;
+    /** Meni kim itardi (dir — men qaysi tomonga uchdim) */
+    pushedBy: { name: string; dir: PushDir; at: number } | null;
+    /** Men kimni itardim */
+    myPush: { name: string; dir: PushDir; at: number } | null;
+  } | null;
   /** O'quvchi yaratgan o'yin: egasi, auditoriya; creator — shu o'quvchi egasimi */
   studentGame: {
     creator: boolean;
@@ -1873,6 +1898,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
       data: {
         id: game._id.toString(),
         mode: game.mode,
+        lobby: game.status === "lobby" && mine ? lobbyView(players, mine, game.mode) : null,
+        finishedAgoMs: game.status === "finished" ? Math.max(0, Date.now() - new Date(game.finishedAt ?? game.createdAt ?? 0).getTime()) : null,
         studentGame: game.studentGame
           ? {
               creator: String(game.creatorId ?? "") === user.userId,
@@ -2824,5 +2851,56 @@ export async function stopStudentGameAction(gameId: string, refund: boolean): Pr
     return { success: true, data: { stopped: await cancelStudentGame(gameId, "mentor to'xtatdi", refund === true) } };
   } catch (err) {
     return errorOf(err, "To'xtatib bo'lmadi");
+  }
+}
+
+
+/** Telefon uchun kutish zali: qo'shnilar va so'nggi itarishlar */
+function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: LiveGameMode): NonNullable<LivePlayerState["lobby"]> {
+  const order = rankPlayers(
+    mode,
+    players.map((p) => ({ p, id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime() }))
+  );
+  const myId = mine._id.toString();
+  const { left, right } = lobbyNeighbors(order, myId, mode === "team");
+  const view = (x: (typeof order)[number] | null) => (x ? { id: x.id, name: x.p.name, look: (x.p.look as GameLook | null | undefined) ?? null } : null);
+  const byId = new Map(players.map((p) => [p._id.toString(), p]));
+  const now = Date.now();
+  const incoming = recentPushes(players).get(myId);
+  const out = mine.push && now - mine.push.at < PUSH_MS ? mine.push : null;
+  return {
+    left: view(left),
+    right: view(right),
+    pushedBy: incoming ? { name: byId.get(incoming.from)?.name ?? "", dir: incoming.dir, at: incoming.at } : null,
+    myPush: out ? { name: byId.get(out.to)?.name ?? "", dir: out.dir, at: out.at } : null,
+  };
+}
+
+/** Kutish zalida chap yoki o'ng qo'shnini hazil qilib itarish (o'ziga, qo'shniga va proyektorda ko'rinadi) */
+export async function playPushAction(gameId: string, dir: PushDir): Promise<Result<{ pushed: boolean; name: string }>> {
+  try {
+    const user = await requireStudent();
+    if (!mongoose.isValidObjectId(gameId) || (dir !== "left" && dir !== "right")) return fail("Ma'lumotlar noto'g'ri");
+    await connectDB();
+    const game = await loadGameForStudent(gameId, user.groupId);
+    if (!game || game.status !== "lobby") return { success: true, data: { pushed: false, name: "" } };
+    const players = await LiveGamePlayer.find({ gameId: game._id }).select("name score eliminated eliminatedAt team createdAt studentId").lean();
+    const mine = players.find((p) => p.studentId.toString() === user.userId);
+    if (!mine) return fail("Avval o'yinga qo'shiling");
+    const order = rankPlayers(
+      game.mode,
+      players.map((p) => ({ id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime(), name: p.name }))
+    );
+    const target = lobbyNeighbors(order, mine._id.toString(), game.mode === "team")[dir];
+    if (!target) return fail(dir === "left" ? "Chap tomoningizda hech kim yo'q" : "O'ng tomoningizda hech kim yo'q");
+    const now = Date.now();
+    const res = await LiveGamePlayer.updateOne(
+      { _id: mine._id, $or: [{ push: null }, { push: { $exists: false } }, { "push.at": { $lt: now - PUSH_GAP_MS } }] },
+      { $set: { push: { to: target.id, dir, at: now } } }
+    );
+    if (res.modifiedCount > 0) invalidateLiveSnapshot(game._id.toString());
+    return { success: true, data: { pushed: res.modifiedCount > 0, name: target.name } };
+  } catch (err) {
+    return errorOf(err, "Itarib bo'lmadi");
   }
 }

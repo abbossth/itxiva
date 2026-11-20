@@ -20,12 +20,9 @@ import { GoldCoin } from "@/components/ui/gold-coin";
 const SLOTS = 8;
 const hue = (id: string) => (id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 47) % 360;
 
-type Burst = { key: number; icon: string; from: { x: number; y: number } };
-
 export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | null }) {
   const [owned, setOwned] = useState<string[] | null>(null);
   const [playing, setPlaying] = useState<{ id: string; key: number } | null>(null);
-  const [bursts, setBursts] = useState<Burst[]>([]);
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(340);
   const box = useRef<HTMLDivElement>(null);
@@ -66,7 +63,6 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
     playWhoosh(0.25);
     haptic([12, 30, 18]);
     setPlaying({ id: e.id, key: now });
-    setBursts((b) => [...b.slice(-2), { key: now, icon: e.fx[0] ?? e.icon, from: pos(slot) }]);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setPlaying(null), EMOTE_MS);
     void playEmoteAction(gameId, e.id).catch(() => {});
@@ -88,13 +84,9 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
         {/* Harakat nomi */}
         {current && (
           <div key={playing!.key} className="emote-banner pointer-events-none absolute left-1/2 top-[18%] z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-500 px-4 py-1 text-sm font-black text-white shadow-xl ring-2 ring-white/40">
-            {current.icon} {current.name}
+            {current.name}
           </div>
         )}
-        {/* Uchayotgan belgilar */}
-        {bursts.map((b) => (
-          <EmoteBurst key={b.key} icon={b.icon} from={b.from} to={{ x: size / 2, y: size / 2 }} onDone={() => setBursts((all) => all.filter((x) => x.key !== b.key))} />
-        ))}
         {/* Tugmalar */}
         {Array.from({ length: SLOTS }, (_, i) => {
           const e = shown[i];
@@ -180,48 +172,6 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
   );
 }
 
-/** Tugmadan personajga uchib, atrofga sochiladigan belgilar */
-function EmoteBurst({ icon, from, to, onDone }: { icon: string; from: { x: number; y: number }; to: { x: number; y: number }; onDone: () => void }) {
-  const [stage, setStage] = useState<0 | 1 | 2>(0);
-  useEffect(() => {
-    const a = requestAnimationFrame(() => requestAnimationFrame(() => setStage(1)));
-    const b = setTimeout(() => setStage(2), 420);
-    const c = setTimeout(onDone, 1300);
-    return () => {
-      cancelAnimationFrame(a);
-      clearTimeout(b);
-      clearTimeout(c);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const parts = Array.from({ length: 8 }, (_, k) => {
-    const ang = (k / 8) * Math.PI * 2;
-    const dist = 70 + (k % 3) * 18;
-    return { x: Math.cos(ang) * dist, y: Math.sin(ang) * dist };
-  });
-  return (
-    <>
-      {stage < 2 && (
-        <span
-          className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 text-3xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]"
-          style={{ left: stage === 0 ? from.x : to.x, top: stage === 0 ? from.y : to.y, transition: "left 400ms cubic-bezier(0.3,0.7,0.4,1), top 400ms cubic-bezier(0.3,0.7,0.4,1)" }}
-        >
-          {icon}
-        </span>
-      )}
-      {stage === 2 &&
-        parts.map((p, k) => (
-          <span
-            key={k}
-            className="emote-spark pointer-events-none absolute z-30 text-xl"
-            style={{ left: to.x, top: to.y, ["--dx" as string]: `${p.x}px`, ["--dy" as string]: `${p.y}px`, animationDelay: `${k * 15}ms` }}
-          >
-            {k % 2 ? "✨" : icon}
-          </span>
-        ))}
-    </>
-  );
-}
 
 /** Ixcham qator: javob berib kutayotganda — egalikdagi harakatlar (katta ekrandagi personaj qatorida ko'rinadi) */
 export function EmoteStrip({ gameId }: { gameId: string }) {

@@ -29,6 +29,48 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "lobby-push-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Kutish zalida hazillashing!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤜",
+        title: "Yoningizdagini itaring",
+        text: "Jonli o'yinning kutish zalida telefoningizda chap yoki o'ngdagi o'yinchi nomi bilan tugma chiqadi — bosing, personajingiz uni itarib yuboradi! Buni siz ham, u ham telefonda, hamma esa katta ekranda ko'radi.",
+      },
+      {
+        art: "emoji",
+        emoji: "📺",
+        title: "G'oliblar — avval katta ekranda",
+        text: "O'yin tugaganda telefoningiz «Monitorga qarang!» deydi: g'oliblar avval katta ekranda e'lon qilinadi, keyin o'z o'rningiz telefonda chiqadi. Harakatlarda endi stikerlar chiqmaydi — faqat personajingiz harakat qiladi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-lobby-push-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Kutish zali va g'oliblar e'loni",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤜",
+        title: "O'quvchilar yonidagini itarib hazillashadi",
+        text: "Kutish zalida o'quvchi chap yoki o'ng qo'shnisini itara oladi (proyektordagi tartib bo'yicha; jamoaviyda — o'z jamoasi qatorida). Itaruvchi tashlanadi, itarilgan uchib gandiraklaydi — proyektorda ham ko'rinadi. Harakatlarda emoji-stikerlar olib tashlandi.",
+      },
+      {
+        art: "emoji",
+        emoji: "📺",
+        title: "G'oliblar avval proyektorda",
+        text: "O'yin tugaganda o'quvchilar telefonida ~12 soniya «Monitorga qarang!» chiqadi — shohsupa proyektorda ochilib bo'lgach, har kim o'z o'rnini va coin tabrigini telefonda ko'radi.",
+      },
+    ],
+  },
+  {
     id: "characters-v3-2026-11",
     date: "2026-11-20",
     audience: "student",

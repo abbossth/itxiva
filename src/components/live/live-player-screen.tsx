@@ -27,6 +27,8 @@ import { AdventureMine } from "./adventure-boards";
 import { EmotePad, EmoteStrip } from "./emote-pad";
 import { BoosterBar, BoosterShop } from "./boosters";
 import { StudentFundPanel } from "./student-fund";
+import { PODIUM_REVEAL_MS } from "@/lib/live-game/podium";
+import { LobbyPush } from "./lobby-push";
 import { ModeIntro } from "./live-intro";
 import { TacticView } from "./live-tactics";
 import { isAdventure } from "@/lib/live-game/adventures";
@@ -101,12 +103,20 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
     else haptic([120]);
   }, [state.status, state.index, state.me]);
 
+  // Avval monitorda g'oliblar e'loni — keyin telefonda tabrik (taymer holat yangilanishida bekor bo'lmaydi)
+  const celebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (celebrateTimer.current) clearTimeout(celebrateTimer.current);
+  }, []);
   useEffect(() => {
     if (state.status !== "finished" || celebrated.current || !state.me) return;
     celebrated.current = true;
-    requestRewardCheck();
-    if (state.me.coins > 0) void fireConfetti({ particleCount: 120, spread: 90, origin: { y: 0.4 }, zIndex: 80 });
-  }, [state.status, state.me]);
+    const coins = state.me.coins;
+    celebrateTimer.current = setTimeout(() => {
+      requestRewardCheck();
+      if (coins > 0) void fireConfetti({ particleCount: 120, spread: 90, origin: { y: 0.4 }, zIndex: 80 });
+    }, podiumWait(state));
+  }, [state]);
 
   const NET_ERROR = "Internet aloqasi uzildi — qayta urinib ko'ring";
 
@@ -260,6 +270,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
               {state.studentGame ? "Coin yig'ilgach o'yin o'zi boshlanadi. Savollar shu yerda chiqadi." : "Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi."}
             </p>
             <EmotePad gameId={state.id} look={me?.look ?? null} />
+            {state.lobby && <LobbyPush gameId={state.id} lobby={state.lobby} look={me?.look ?? null} onDone={() => void refresh()} />}
             <BoosterShop compact />
           </div>
         ) : state.status === "question" ? (
@@ -549,7 +560,45 @@ function RevealView({
   );
 }
 
+/** Telefon monitordagi e'lon tugashini kutadi (o'quvchilar o'yinida monitor yo'q — kutmaydi) */
+function podiumWait(state: LivePlayerState): number {
+  if (state.studentGame || state.finishedAgoMs === null) return 0;
+  return Math.max(0, PODIUM_REVEAL_MS - state.finishedAgoMs);
+}
+
 function FinishedView({ state }: { state: LivePlayerState }) {
+  // Sir oxirigacha: avval monitorga qarash, keyin o'z o'rni
+  const [wait] = useState(() => podiumWait(state));
+  const [left, setLeft] = useState(Math.ceil(wait / 1000));
+  useEffect(() => {
+    if (wait <= 0) return;
+    const end = Date.now() + wait;
+    const id = setInterval(() => setLeft(Math.max(0, Math.ceil((end - Date.now()) / 1000))), 250);
+    return () => clearInterval(id);
+  }, [wait]);
+  if (left > 0) return <WatchMonitor left={left} look={state.me?.look ?? null} />;
+  return <FinishedResult state={state} />;
+}
+
+function WatchMonitor({ left, look }: { left: number; look: GameLook | null }) {
+  return (
+    <div className="quiz-pop flex flex-col items-center gap-3 py-8 text-center">
+      <div className="relative">
+        <span className="monitor-glow absolute inset-0 -z-10 rounded-full bg-fuchsia-500/30 blur-2xl" />
+        <div className="watch-tv flex h-24 w-36 items-center justify-center rounded-2xl border-4 border-slate-300 bg-gradient-to-b from-indigo-900 to-slate-950 shadow-[0_0_40px_rgba(232,121,249,0.5)]">
+          <Crown className="h-10 w-10 text-amber-300" />
+        </div>
+        <div className="mx-auto h-3 w-10 bg-slate-400" />
+        <div className="mx-auto h-1.5 w-20 rounded-full bg-slate-400" />
+      </div>
+      <p className="text-3xl font-black lg:text-5xl">Monitorga qarang!</p>
+      <p className="max-w-xs text-sm text-slate-300">G&apos;oliblar katta ekranda e&apos;lon qilinmoqda. O&apos;rningiz bu yerda {left} soniyadan keyin chiqadi…</p>
+      <CharacterSvg look={look} size={90} mood="idle" gaze={{ x: 0, y: -1 }} />
+    </div>
+  );
+}
+
+function FinishedResult({ state }: { state: LivePlayerState }) {
   const me = state.me;
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">

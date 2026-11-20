@@ -61,6 +61,8 @@ export interface ILiveGamePlayerData {
   look?: Record<string, unknown> | null;
   /** Kutish zalidagi oxirgi harakati (emot) */
   emote?: { id: string; at: number } | null;
+  /** Kutish zalida oxirgi itarish: kimni (o'yinchi id), qaysi tomonga va qachon */
+  push?: { to: string; dir: "left" | "right"; at: number } | null;
   /** Qalqon kuchaytirgichi faol (bitta xato kechiriladi) */
   guard?: boolean;
   /** Ishlatilgan kuchaytirgichlar: tur va savol raqami */
@@ -184,6 +186,7 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
     look: { type: Schema.Types.Mixed, default: null },
     emote: { type: new Schema({ id: String, at: Number }, { _id: false }), default: null },
     guard: { type: Boolean, default: false },
+    push: { type: new Schema({ to: String, dir: { type: String, enum: ["left", "right"] }, at: Number }, { _id: false }), default: null },
     boostersUsed: { type: [new Schema({ id: String, index: Number }, { _id: false })], default: [] },
     team: { type: Number, default: 0 },
     score: { type: Number, default: 0 },

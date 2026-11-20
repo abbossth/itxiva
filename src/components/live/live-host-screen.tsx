@@ -1,7 +1,6 @@
 "use client";
 
 import { CharacterSvg } from "@/components/character/character-svg";
-import { emoteOf } from "@/lib/character/emotes";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
 import Link from "@/components/ui/link";
@@ -653,12 +652,16 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
   const vh = useViewportHeight();
   const one = (p: LiveHostState["players"][number], i: number, size: number) => (
     <div key={p.id} className="live-drop relative flex flex-col items-center" style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-      {p.emote && (
-        <span key={`b${p.emote.at}`} className="live-pop absolute -top-3 z-10 rounded-full bg-white px-2 py-0.5 text-lg shadow-lg">
-          {emoteOf(p.emote.id)?.icon}
-        </span>
-      )}
-      <CharacterSvg key={`c${p.emote?.at ?? "idle"}`} look={p.look} size={size} mood="idle" still={n > 40 && !p.emote} emote={p.emote?.id} />
+      {/* Itarish hazili: itaruvchi tashlanadi, itarilgan uchib gandiraklaydi */}
+      <div
+        key={`p${p.push?.at ?? 0}-${p.pushedBy?.at ?? 0}`}
+        className={cn(
+          "relative z-[1]",
+          p.pushedBy ? (p.pushedBy.dir === "left" ? "pushed-l" : "pushed-r") : p.push ? (p.push.dir === "left" ? "push-l" : "push-r") : undefined
+        )}
+      >
+        <CharacterSvg key={`c${p.emote?.at ?? "idle"}`} look={p.look} size={size} mood="idle" still={n > 40 && !p.emote && !p.push && !p.pushedBy} emote={p.push || p.pushedBy ? null : p.emote?.id} />
+      </div>
       <span className="-mt-1 max-w-full truncate rounded-xl bg-white px-2 py-0.5 text-xs font-black text-slate-900 shadow-lg sm:text-sm">{p.name.split(" ")[0]}</span>
     </div>
   );
