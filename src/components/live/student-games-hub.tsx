@@ -12,6 +12,7 @@ import { haptic } from "@/lib/haptics";
 import { playRankUp, unlockSound } from "@/lib/sound";
 import { cn, formatNumberUz } from "@/lib/utils";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
+import { PrizeLine } from "./student-fund";
 import { GoldCoin } from "@/components/ui/gold-coin";
 
 // O'quvchi: jonli o'yinlar markazi — qo'shilish mumkin bo'lgan o'yinlar va o'z o'yinini ochish (narx birgalikda yig'iladi)
@@ -211,6 +212,7 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 </div>
               )}
 
+              {mode && <PrizeLine prizes={mode === "team" ? [setup.teamPrize] : setup.prizes} team={mode === "team"} minPlayers={setup.minPlayers} light />}
               {error && <p className="rounded-xl bg-rose-500/30 px-3 py-2 text-sm font-bold">{error}</p>}
               <button
                 type="button"
@@ -221,8 +223,8 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 {pending ? "Ochilmoqda…" : `O'yinni ochish · ${first} coin qo'shaman`}
               </button>
               <p className="text-center text-[11px] text-white/70">
-                Bugun: {setup.createdToday}/{setup.dailyLimit} ta o&apos;yin · G&apos;oliblarga coin berilmaydi — faqat sharaf uchun! · Dars vaqtida va darsni sababsiz
-                qoldirgandan keyin o&apos;yinlar yopiq bo&apos;lishi mumkin
+                Bugun: {setup.createdToday}/{setup.dailyLimit} ta o&apos;yin · Dars vaqtida va darsni sababsiz qoldirgandan keyin o&apos;yinlar yopiq bo&apos;lishi
+                mumkin
               </p>
             </>
           )}

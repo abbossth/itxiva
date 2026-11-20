@@ -106,8 +106,10 @@ export interface ILiveGameData {
   zone?: ILiveZone | null;
   zoneRounds?: number[];
   finishedAt?: Date | string | null;
-  /** O'quvchi yaratgan o'yin: server o'zi boshqaradi, g'oliblarga coin/XP/sovg'a berilmaydi */
+  /** O'quvchi yaratgan o'yin: server o'zi boshqaradi; g'oliblarga `prizes` (kamida `minPlayers` o'yinchi bo'lsa), sovg'a qutisi yo'q */
   studentGame?: boolean;
+  /** Sovrin berilishi uchun kamida shuncha o'yinchi (o'quvchi o'yini) */
+  minPlayers?: number;
   /** O'yinni yaratgan o'quvchi (studentGame) */
   creatorId?: string | mongoose.Types.ObjectId | null;
   creatorName?: string;
@@ -257,6 +259,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
     introAt: { type: Date, default: null },
     bonusIndex: { type: Number, default: null },
     studentGame: { type: Boolean, default: false },
+    minPlayers: { type: Number, default: 0 },
     creatorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     creatorName: { type: String, default: "" },
     grade: { type: Number, default: null },

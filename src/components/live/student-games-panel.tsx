@@ -70,7 +70,7 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             O&apos;quvchilar guruhi yoki butun sinfi uchun o&apos;yin ochadi, narxini qatnashchilar birgalikda coin qo&apos;shib yig&apos;adi — to&apos;lgach o&apos;yin o&apos;zi
-            boshlanadi. G&apos;oliblarga coin berilmaydi, o&apos;yinni server o&apos;zi boshqaradi.
+            boshlanadi. G&apos;oliblarga siz belgilagan coin beriladi, o&apos;yinni server o&apos;zi boshqaradi.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -116,6 +116,52 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
+          </div>
+          <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200 dark:bg-amber-500/5 dark:ring-amber-500/20">
+            <p className="mb-2 text-sm font-bold text-slate-800 dark:text-slate-200">🏆 G&apos;oliblar sovrini (coin)</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {(["1-o'rin", "2-o'rin", "3-o'rin"] as const).map((label, i) => (
+                <label key={label} className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {label}
+                  <input
+                    type="number"
+                    min={0}
+                    max={500}
+                    value={settings.prizes[i]}
+                    onChange={(e) =>
+                      setSettings((s) => {
+                        const prizes = [...s.prizes] as [number, number, number];
+                        prizes[i] = Math.min(500, Math.max(0, Math.round(Number(e.target.value) || 0)));
+                        return { ...s, prizes };
+                      })
+                    }
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                  />
+                </label>
+              ))}
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Jamoaviy: g&apos;olib jamoaning har biriga
+                <input
+                  type="number"
+                  min={0}
+                  max={500}
+                  value={settings.teamPrize}
+                  onChange={(e) => setSettings((s) => ({ ...s, teamPrize: Math.min(500, Math.max(0, Math.round(Number(e.target.value) || 0))) }))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Sovrin uchun kamida o&apos;yinchi
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={settings.minPlayersForPrizes}
+                  onChange={(e) => setSettings((s) => ({ ...s, minPlayersForPrizes: Math.min(50, Math.max(1, Math.round(Number(e.target.value) || 1))) }))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+            </div>
           </div>
           <div className="grid gap-3 rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200 sm:grid-cols-2 dark:bg-rose-500/5 dark:ring-rose-500/20">
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">

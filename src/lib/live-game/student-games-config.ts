@@ -1,7 +1,8 @@
 // O'quvchilar yaratadigan jonli o'yinlar: mentor sozlamalari va narxlar. Bu fayl brauzer va server uchun umumiy.
 // O'quvchi o'z guruhi yoki butun sinfi (masalan, barcha 8-sinflar) uchun o'yin ochadi. O'yin narxi qatnashchilar
 // birgalikda coin qo'shib yig'iladi (masalan, klassik 15 coin: biri 5, biri 2, biri 4...), narx to'lgach o'yin boshlanadi.
-// Bunday o'yinda g'oliblarga coin, XP va sovg'a berilmaydi; o'yinni server o'zi boshqaradi (proyektor shart emas).
+// G'oliblarga coin beriladi (sukutda 30/20/10, jamoaviyda g'olib jamoa a'zolariga 20) — kamida 3 o'yinchi bo'lsa;
+// sovg'a qutilari va test savollari uchun coin berilmaydi. O'yinni server o'zi boshqaradi (proyektor shart emas).
 
 import { LIVE_GAME_MODES, type LiveGameMode } from "./mode-list";
 
@@ -22,6 +23,12 @@ export interface StudentGamesSettings {
   absenceBanDays: number;
   /** Cheklov mentor o'yinlariga ham tegishli (aks holda faqat o'quvchilar o'yiniga) */
   absenceBanAllGames: boolean;
+  /** G'oliblarga coin: 1-, 2-, 3-o'rin */
+  prizes: [number, number, number];
+  /** Jamoaviy o'yinda g'olib jamoaning har bir a'zosiga */
+  teamPrize: number;
+  /** Sovrin shuncha o'yinchi qatnashganda beriladi (o'zi yolg'iz o'ynab coin "ishlab topmasin") */
+  minPlayersForPrizes: number;
 }
 
 /** O'yin turlari bo'yicha boshlang'ich narxlar (birgalikda yig'iladi): 10 coindan, real vaqtli janglar qimmatroq */
@@ -52,6 +59,9 @@ export const DEFAULT_STUDENT_GAMES: StudentGamesSettings = {
   prices: DEFAULT_STUDENT_GAME_PRICES,
   absenceBanDays: 2,
   absenceBanAllGames: true,
+  prizes: [30, 20, 10],
+  teamPrize: 20,
+  minPlayersForPrizes: 3,
 };
 
 const int = (v: unknown, min: number, max: number, fallback: number) => {
@@ -78,6 +88,9 @@ export function parseStudentGames(raw: unknown): StudentGamesSettings {
     prices,
     absenceBanDays: int(r.absenceBanDays, 0, 14, DEFAULT_STUDENT_GAMES.absenceBanDays),
     absenceBanAllGames: typeof r.absenceBanAllGames === "boolean" ? r.absenceBanAllGames : DEFAULT_STUDENT_GAMES.absenceBanAllGames,
+    prizes: [0, 1, 2].map((i) => int(Array.isArray(r.prizes) ? r.prizes[i] : undefined, 0, 500, DEFAULT_STUDENT_GAMES.prizes[i])) as [number, number, number],
+    teamPrize: int(r.teamPrize, 0, 500, DEFAULT_STUDENT_GAMES.teamPrize),
+    minPlayersForPrizes: int(r.minPlayersForPrizes, 1, 50, DEFAULT_STUDENT_GAMES.minPlayersForPrizes),
   };
 }
 
@@ -89,6 +102,11 @@ export function studentGamePrice(s: StudentGamesSettings, mode: LiveGameMode, au
   if (!base) return null;
   if (audience === "grade" && !s.allowGrade) return null;
   return base + (audience === "grade" ? s.gradeExtra : 0);
+}
+
+/** O'yin hujjatiga yoziladigan sovrinlar: jamoaviyda faqat birinchisi (g'olib jamoa a'zolariga) */
+export function studentGamePrizes(s: StudentGamesSettings, mode: LiveGameMode): number[] {
+  return mode === "team" ? [s.teamPrize, 0, 0] : [...s.prizes];
 }
 
 /** Savollar soni tanlovi */

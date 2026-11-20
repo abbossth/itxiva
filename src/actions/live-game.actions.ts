@@ -22,6 +22,7 @@ import {
   STUDENT_GAME_COUNTS,
   STUDENT_LOBBY_MAX_MS,
   studentGamePrice,
+  studentGamePrizes,
   type StudentGameAudience,
 } from "@/lib/live-game/student-games-config";
 import { absenceBanMessage, absenceBanUntil, gradeOfGroup, refundStudentGame } from "@/lib/live-game/student-games";
@@ -1657,6 +1658,9 @@ export interface LivePlayerState {
     funded: boolean;
     /** Boshlanmay bekor qilingan (coinlar qaytarilgan) */
     cancelled: boolean;
+    /** G'oliblar sovrini (jamoaviyda — g'olib jamoa a'zolariga birinchisi) va kerakli o'yinchilar soni */
+    prizes: number[];
+    minPlayers: number;
     contributors: { name: string; amount: number }[];
     mine: number;
   } | null;
@@ -1879,6 +1883,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               paid: game.paid ?? 0,
               funded: Boolean(game.fundedAt),
               cancelled: game.status === "finished" && !game.introAt,
+              prizes: game.prizes ?? [],
+              minPlayers: game.minPlayers ?? 0,
               startsInMs:
                 game.status === "lobby" && game.fundedAt && !game.introAt
                   ? Math.max(0, new Date(game.fundedAt).getTime() + FUNDED_START_S * 1000 - Date.now())
@@ -2302,7 +2308,7 @@ export async function getGameLooksAction(gameId: string): Promise<Result<Record<
 
 // =====================================================================================================
 // O'quvchilar yaratadigan o'yinlar: coin evaziga, guruh yoki butun sinf uchun. Server o'zi boshqaradi,
-// g'oliblarga coin/XP/sovg'a berilmaydi. Mentor sozlaydi, kuzatadi va to'xtata oladi.
+// g'oliblarga mentor belgilagan coin (kamida N o'yinchi bo'lsa), sovg'a qutisi yo'q. Mentor sozlaydi, kuzatadi va to'xtata oladi.
 // =====================================================================================================
 
 type AutoStep = "intro" | "advance" | "reveal" | "endMinigame" | "endGalaxy" | "endZone" | "endArena" | "expire";
@@ -2445,6 +2451,10 @@ export interface StudentGameSetup {
   /** Tur → narx (guruh uchun); null — yopiq */
   prices: Record<LiveGameMode, number | null>;
   gradeExtra: number;
+  /** G'oliblar sovrini (1-, 2-, 3-o'rin), jamoaviyda g'olib jamoaga, kerakli o'yinchilar */
+  prizes: number[];
+  teamPrize: number;
+  minPlayers: number;
   counts: number[];
   /** O'zining faol o'yini */
   myActive: string | null;
@@ -2513,6 +2523,9 @@ export async function getStudentGameSetupAction(): Promise<Result<StudentGameSet
         createdToday,
         prices,
         gradeExtra: settings.gradeExtra,
+        prizes: [...settings.prizes],
+        teamPrize: settings.teamPrize,
+        minPlayers: settings.minPlayersForPrizes,
         counts: [...STUDENT_GAME_COUNTS],
         myActive: myActive?._id.toString() ?? null,
       },
@@ -2615,7 +2628,8 @@ export async function createStudentGameAction(input: {
       mode: input.mode,
       source: "all",
       teams: 2,
-      prizes: [0, 0, 0],
+      prizes: studentGamePrizes(settings, input.mode),
+      minPlayers: settings.minPlayersForPrizes,
       questions,
       options:
         input.mode === "arena"

@@ -20,13 +20,12 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
     { returnDocument: "after" }
   );
   if (!game) return false;
-  // O'quvchi yaratgan o'yin: g'oliblarga coin, XP va test coini berilmaydi
-  if (game.studentGame) {
+  const players = await LiveGamePlayer.find({ gameId: game._id }).lean();
+  // O'quvchi yaratgan o'yin: o'yinchilar kam bo'lsa sovrin yo'q (yolg'iz o'ynab coin "ishlab topmasin")
+  if (game.studentGame && players.length < (game.minPlayers ?? 0)) {
     await LiveGame.updateOne({ _id: game._id }, { $set: { rewardedAt: new Date() } });
     return true;
   }
-
-  const players = await LiveGamePlayer.find({ gameId: game._id }).lean();
   const awards = computeAwards(
     game.mode,
     players.map((p) => ({
@@ -59,8 +58,9 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
     if (res.ok) await LiveGamePlayer.updateOne({ _id: p._id }, { $set: { coins: a.coins } });
   }
 
-  // To'g'ri javoblar asl test savoliga javob sifatida sanaladi (kunlik topshiriq; coin har savolga bir marta)
-  for (const p of players) {
+  // To'g'ri javoblar asl test savoliga javob sifatida sanaladi (kunlik topshiriq; coin har savolga bir marta).
+  // O'quvchi o'yinida yo'q — test coinini o'yin ochib "yig'ib olish" bo'lmasin
+  for (const p of game.studentGame ? [] : players) {
     const answered = p.answers
       .map((ans) => ({ questionId: game.questions[ans.index]?.sourceQuestionId ?? null, isCorrect: ans.isCorrect }))
       .filter((x): x is { questionId: string; isCorrect: boolean } => Boolean(x.questionId));

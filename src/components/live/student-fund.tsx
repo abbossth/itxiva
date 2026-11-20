@@ -122,7 +122,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
         </div>
       )}
       {sg.mine > 0 && <p className="mt-2 text-center text-xs text-white/60">Siz qo&apos;shgan: {sg.mine} coin. O&apos;yin boshlanmasa — qaytariladi.</p>}
-      <p className="mt-1 text-center text-[11px] text-white/45">Bu o&apos;quvchilar o&apos;yini: g&apos;oliblarga coin berilmaydi — faqat sharaf va zavq uchun!</p>
+      <PrizeLine prizes={sg.prizes} team={state.mode === "team"} minPlayers={sg.minPlayers} />
 
       {sg.creator && !sg.funded && (
         <div className="mt-3 text-center">
@@ -143,6 +143,31 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** G'oliblar sovrini: 1-o'rin 30, 2-o'rin 20, 3-o'rin 10 (jamoaviyda — g'olib jamoa a'zolariga) */
+export function PrizeLine({ prizes, team, minPlayers, light = false }: { prizes: number[]; team: boolean; minPlayers: number; light?: boolean }) {
+  const list = team ? (prizes[0] ? [prizes[0]] : []) : prizes.filter((n) => n > 0);
+  if (list.length === 0) return <p className={cn("mt-1 text-center text-[11px]", light ? "text-white/70" : "text-white/45")}>Bu o&apos;yinda sovrin yo&apos;q — faqat sharaf uchun!</p>;
+  return (
+    <div className="mt-2 text-center">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className={cn("text-xs font-bold", light ? "text-white/80" : "text-white/60")}>🏆 Sovrin:</span>
+        {team ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-black text-amber-200">
+            G&apos;olib jamoaning har biriga +{list[0]} <GoldCoin />
+          </span>
+        ) : (
+          list.map((n, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-black text-amber-200">
+              {["🥇", "🥈", "🥉"][i]} +{n} <GoldCoin />
+            </span>
+          ))
+        )}
+      </div>
+      {minPlayers > 1 && <p className={cn("mt-1 text-[11px]", light ? "text-white/70" : "text-white/45")}>Sovrin kamida {minPlayers} kishi o&apos;ynasa beriladi</p>}
     </div>
   );
 }

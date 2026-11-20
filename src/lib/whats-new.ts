@@ -29,6 +29,38 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-games-prizes-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "O'quvchilar o'yinida endi sovrin bor!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏆",
+        title: "G'oliblarga coin",
+        text: "O'zingiz ochgan jonli o'yinlarda ham g'oliblar coin yutadi: 🥇 1-o'rin — 30, 🥈 2-o'rin — 20, 🥉 3-o'rin — 10 coin. Jamoaviy o'yinda g'olib jamoaning har bir a'zosiga 20 coin. Sovrin o'yinda kamida 3 kishi qatnashsa beriladi — do'stlaringizni chaqiring!",
+      },
+    ],
+    cta: { label: "O'yin ochish", href: "/live" },
+  },
+  {
+    id: "mentor-student-games-prizes-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchilar o'yinida g'oliblarga coin",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏆",
+        title: "Sovrinlar va himoya",
+        text: "O'quvchilar ochgan o'yinlarda endi g'oliblarga coin beriladi: 1-o'rin 30, 2-o'rin 20, 3-o'rin 10, jamoaviyda g'olib jamoa a'zolariga 20. Sovrin faqat kamida 3 o'yinchi qatnashganda beriladi (o'quvchi yolg'iz o'ynab coin yig'masin); sovg'a qutisi va test savollari coini yo'q. Miqdorlar va o'yinchilar sonini «Jonli o'yin» → «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»da o'zgartirasiz.",
+      },
+    ],
+    cta: { label: "Sozlash", href: "/mentor/live" },
+  },
+  {
     id: "student-games-2026-11",
     date: "2026-11-20",
     audience: "student",
@@ -51,7 +83,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "⚠️",
         title: "Qoidalar",
-        text: "Bu o'yinlarda g'oliblarga coin berilmaydi — faqat sharaf va zavq uchun. Dars vaqtida o'yin ochib bo'lmaydi. Darsni sababsiz qoldirsangiz, 2 kun jonli o'yinlarga kira olmaysiz — darslarga qatnashing!",
+        text: "G'oliblarga coin beriladi: 🥇 30, 🥈 20, 🥉 10, jamoaviy o'yinda g'olib jamoaning har biriga 20 (kamida 3 kishi o'ynasa). Dars vaqtida o'yin ochib bo'lmaydi. Darsni sababsiz qoldirsangiz, 2 kun jonli o'yinlarga kira olmaysiz — darslarga qatnashing!",
       },
     ],
     cta: { label: "O'yin ochish", href: "/live" },
@@ -67,7 +99,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "🎮",
         title: "O'quvchilar o'yin ochadi, birgalikda coin yig'adi",
-        text: "O'quvchi «Jonli o'yin» bo'limida guruhi yoki butun sinfi uchun o'yin ochadi; narxini qatnashchilar birgalikda coin qo'shib yig'adi (masalan, klassik 15 coin: 5+2+4+3+1). Narx to'lgach o'yin o'zi boshlanadi, server o'zi boshqaradi. G'oliblarga coin, XP va sovg'a berilmaydi. Boshlanmasa — har kimga o'z coini qaytadi.",
+        text: "O'quvchi «Jonli o'yin» bo'limida guruhi yoki butun sinfi uchun o'yin ochadi; narxini qatnashchilar birgalikda coin qo'shib yig'adi (masalan, klassik 15 coin: 5+2+4+3+1). Narx to'lgach o'yin o'zi boshlanadi, server o'zi boshqaradi. G'oliblarga coin: 30/20/10, jamoaviyda g'olib jamoa a'zolariga 20 (kamida 3 o'yinchi bo'lsa; sozlamalardan o'zgartirasiz). Sovg'a qutisi va test coini yo'q. Boshlanmasa — har kimga o'z coini qaytadi.",
       },
       {
         art: "emoji",

@@ -97,7 +97,7 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     expect(st.success && st.data.studentGame).toMatchObject({ creator: true, funded: true, paid: 25, price: 25, mine: 16 });
   });
 
-  it("server o'zi boshqaradi: boshlanadi, natija ochiladi, keyingi savol, yakunda coin berilmaydi", async () => {
+  it("server o'zi boshqaradi: boshlanadi, natija ochiladi, keyingi savol; 2 o'yinchida sovrin yo'q", async () => {
     const { ali, vali } = await seed();
     as(ali);
     const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 15, nonce: nonce() });
@@ -127,6 +127,40 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     const bonus = await CoinLedger.countDocuments({ type: { $in: ["bonus", "quiz"] } });
     expect(bonus).toBe(0);
     expect(await balance(vali)).toBe(50);
+  });
+
+  it("kamida 3 o'yinchi: g'oliblarga 30 / 20 / 10 coin, test savoli coini yo'q", async () => {
+    const { ali, vali, sardor } = await seed();
+    as(ali);
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 15, nonce: nonce() });
+    if (!res.success) throw new Error(res.error);
+    const id = res.data.gameId;
+    for (const u of [vali, sardor]) {
+      as(u);
+      await live.joinLiveGameAction(id);
+    }
+    const poll = async () => {
+      as(ali);
+      return (await live.getLivePlayerStateAction(id)) as { success: true; data: { status: string; index: number } };
+    };
+    tick(8000);
+    await poll();
+    tick(5000);
+    expect((await poll()).data.status).toBe("question");
+    // Ali tez, Vali sekinroq, Sardor eng oxirida — hammasi to'g'ri
+    as(ali);
+    await live.answerLiveQuestionAction(id, 0, "ha");
+    tick(2000);
+    as(vali);
+    await live.answerLiveQuestionAction(id, 0, "ha");
+    tick(2000);
+    as(sardor);
+    await live.answerLiveQuestionAction(id, 0, "ha");
+    for (let i = 0; i < 40 && (await poll()).data.status !== "finished"; i++) tick(30_000);
+    const won = async (u: { _id: import("mongoose").Types.ObjectId }) => (await CoinLedger.findOne({ studentId: u._id, type: "bonus" }).lean())?.amount ?? 0;
+    expect([await won(ali), await won(vali), await won(sardor)]).toEqual([30, 20, 10]);
+    expect(await CoinLedger.countDocuments({ type: "quiz" })).toBe(0);
+    expect(await balance(ali)).toBe(50 - 15 + 30);
   });
 
   it("bekor qilinsa yoki coin yig'ilmasa — har kimga o'z coini qaytariladi", async () => {
