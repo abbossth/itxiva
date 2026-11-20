@@ -861,7 +861,7 @@ h1,
 .chr-e-guitar .chr-body { animation: chr-run-bob 0.5s ease-in-out infinite !important; }
 .chr-fx { animation: chre-fx 1.3s ease-out infinite; }
 
-@keyframes chre-wave { from { transform: rotate(-125deg); } to { transform: rotate(-165deg); } }
+@keyframes chre-wave { from { transform: rotate(-140deg); } to { transform: rotate(-152deg); } }
 @keyframes chre-kiss { 0%, 100% { transform: rotate(-20deg); } 35%, 50% { transform: rotate(-150deg); } 75% { transform: rotate(-80deg); } }
 @keyframes chre-dance { from { transform: translateX(-3px) rotate(-9deg); } to { transform: translateX(3px) rotate(9deg); } }
 @keyframes chre-arm-up-l { from { transform: rotate(20deg); } to { transform: rotate(150deg); } }
@@ -1037,3 +1037,38 @@ h1,
 .push-cool { animation: push-cool linear both; }
 @keyframes push-shake { 0%, 74%, 100% { transform: none; } 77% { transform: translateY(3px); } 80% { transform: translate(-3px, -2px); } 84% { transform: translate(2px, 1px); } }
 .push-shake { animation: push-shake 2.6s linear both; }
+
+/* ---- Tirsak bo'g'imi: bilak tirsak atrofida bukiladi (tabiiyroq harakat) ---- */
+.chr .chr-fore-l { transform-box: view-box; transform-origin: 28.1px 75.6px; }
+.chr .chr-fore-r { transform-box: view-box; transform-origin: 71.9px 75.6px; }
+@keyframes fore-rest-l { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(-7deg); } }
+@keyframes fore-rest-r { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(7deg); } }
+@keyframes fore-run-l { 0%, 100% { transform: rotate(-40deg); } 50% { transform: rotate(-18deg); } }
+@keyframes fore-run-r { 0%, 100% { transform: rotate(40deg); } 50% { transform: rotate(18deg); } }
+@keyframes fore-wave { from { transform: rotate(-30deg); } to { transform: rotate(28deg); } }
+@keyframes fore-flex-l { from { transform: rotate(85deg); } to { transform: rotate(120deg); } }
+@keyframes fore-flex-r { from { transform: rotate(-85deg); } to { transform: rotate(-120deg); } }
+@keyframes fore-punch-l { from { transform: rotate(75deg); } to { transform: rotate(0deg); } }
+@keyframes fore-punch-r { from { transform: rotate(-75deg); } to { transform: rotate(0deg); } }
+@keyframes fore-clap-l { from { transform: rotate(-25deg); } to { transform: rotate(-55deg); } }
+@keyframes fore-clap-r { from { transform: rotate(25deg); } to { transform: rotate(55deg); } }
+@keyframes fore-flail { 0%, 100% { transform: rotate(-35deg); } 50% { transform: rotate(35deg); } }
+@keyframes fore-cheer-l { 0%, 100% { transform: rotate(12deg); } 50% { transform: rotate(-12deg); } }
+@keyframes fore-cheer-r { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+.chr-calm .chr-fore-l { animation: fore-rest-l 3.6s ease-in-out infinite; animation-delay: var(--chr-d, 0s); }
+.chr-calm .chr-fore-r { animation: fore-rest-r 3.6s ease-in-out infinite; animation-delay: var(--chr-d, 0s); }
+.chr-run .chr-fore-l { animation: fore-run-l 0.32s ease-in-out infinite; }
+.chr-run .chr-fore-r { animation: fore-run-r 0.32s ease-in-out infinite reverse; }
+.chr-cheer .chr-fore-l, .chr-e-jump .chr-fore-l, .chr-e-cheer .chr-fore-l, .chr-e-float .chr-fore-l { animation: fore-cheer-l 0.5s ease-in-out infinite; }
+.chr-cheer .chr-fore-r, .chr-e-jump .chr-fore-r, .chr-e-cheer .chr-fore-r, .chr-e-float .chr-fore-r { animation: fore-cheer-r 0.5s ease-in-out infinite; }
+.chr-e-wave .chr-fore-r { animation: fore-wave 0.42s ease-in-out infinite alternate !important; }
+.chr-e-flex .chr-fore-l { animation: fore-flex-l 0.7s ease-in-out infinite alternate !important; }
+.chr-e-flex .chr-fore-r { animation: fore-flex-r 0.7s ease-in-out infinite alternate !important; }
+.chr-e-karate .chr-fore-l { animation: fore-punch-l 0.35s ease-in-out infinite alternate-reverse !important; }
+.chr-e-karate .chr-fore-r { animation: fore-punch-r 0.35s ease-in-out infinite alternate !important; }
+.chr-e-clap .chr-fore-l { animation: fore-clap-l 0.22s ease-in-out infinite alternate !important; }
+.chr-e-clap .chr-fore-r { animation: fore-clap-r 0.22s ease-in-out infinite alternate !important; }
+.chr-e-dance .chr-fore-l { animation: fore-cheer-l 0.5s ease-in-out infinite alternate !important; }
+.chr-e-dance .chr-fore-r { animation: fore-cheer-r 0.5s ease-in-out infinite alternate !important; }
+.pushed-l .chr-fore-l, .pushed-l .chr-fore-r, .pushed-r .chr-fore-l, .pushed-r .chr-fore-r { animation: fore-flail 0.3s ease-in-out infinite !important; }
+@media (prefers-reduced-motion: reduce) { .chr .chr-fore-l, .chr .chr-fore-r { animation: none !important; } }

@@ -29,6 +29,41 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "characters-real-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Personajlar yanada jonli va harakatlar arzon!",
+    slides: [
+      {
+        art: "character-hello",
+        title: "Haqiqiyroq yuz va tana",
+        text: "Personajingiz yuzi endi odamnikiga o'xshaydi: jag' va yonoq, bodom shaklidagi ko'zlar (qovoq, kiprik, rangli kamalak parda), burun va lablar. Qo'l va oyoqlar hajmli soyali, qo'llar tirsakdan bukiladi — salom berish, yugurish, karate va kuch ko'rsatish ancha tabiiy.",
+      },
+      {
+        art: "emotes",
+        title: "Harakatlar endi 5 coindan",
+        text: "«Personajim» → «Harakatlar»: barcha harakatlar arzonlashdi — 5 dan 30 coingacha. Raqs 12, gitara 22, chempion 30 coin. Salom berish, qo'lini o'pib salom va sakrash avvalgidek bepul.",
+      },
+    ],
+    cta: { label: "Harakatlarni ko'rish", href: "/profile?tab=character" },
+  },
+  {
+    id: "mentor-characters-real-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Personajlar: realistikroq ko'rinish, arzon harakatlar",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🧑",
+        title: "Yuz, soya va tirsak bo'g'imi",
+        text: "O'quvchilar personaji hozirgi uslubda realistikroq bo'ldi: jag'li yuz, haqiqiyroq ko'z, burun va lablar, qo'l-oyoqlarda hajmli soya, tirsakdan bukiladigan qo'llar. Harakatlar (emotlar) narxi 5–30 coinga tushirildi (avval 30–150).",
+      },
+    ],
+  },
+  {
     id: "lobby-throw-2026-11",
     date: "2026-11-20",
     audience: "student",

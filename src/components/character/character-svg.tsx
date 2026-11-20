@@ -119,6 +119,14 @@ function outfitOf(kind: string, main: string): Outfit {
   }
 }
 
+/** Yuz: keng peshona, yonoq suyagi, jag' va iyak (oddiy doira emas) */
+const FACE = "M50 15 C63.6 15 73.2 24.2 73 37.2 C72.8 46.8 68.6 54.4 60.6 58.8 Q55.6 61.6 50 61.6 Q44.4 61.6 39.4 58.8 C31.4 54.4 27.2 46.8 27 37.2 C26.8 24.2 36.4 15 50 15 Z";
+
+/** Yo'lni (faqat absolyut M/L/Q/C buyruqlari) vertikal o'q bo'yicha akslantirish: x → 100 − x (o'ng qo'l uchun) */
+function mx(d: string): string {
+  return d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x: string, y: string) => `${+(100 - Number(x)).toFixed(2)} ${y}`);
+}
+
 /** To'liq ko'rinishda bosh 82% (iyak atrofida) va 5 birlik yuqorida: bo'yin va gavda uzunroq — odamga yaqin nisbat */
 const HEAD_FIT = "translate(0 -5) translate(50 61) scale(0.82) translate(-50 -61)";
 
@@ -177,6 +185,28 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
         <linearGradient id={`${uid}legs`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={shade(o.legs, 1.15)} />
           <stop offset="100%" stopColor={shade(o.legs, 0.75)} />
+        </linearGradient>
+        {/* Silindrsimon soya: yorug'lik chapdan — qo'l va oyoq hajmli ko'rinadi */}
+        <linearGradient id={`${uid}bodyH`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={shade(o.body, 1.2)} />
+          <stop offset="45%" stopColor={o.body} />
+          <stop offset="100%" stopColor={shade(o.body, 0.7)} />
+        </linearGradient>
+        <linearGradient id={`${uid}legsH`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={shade(o.legs, 1.22)} />
+          <stop offset="50%" stopColor={o.legs} />
+          <stop offset="100%" stopColor={shade(o.legs, 0.7)} />
+        </linearGradient>
+        {/* O'ng oyoq ko'zgu aksida chiziladi — gradient ham teskari, yorug'lik baribir chapdan */}
+        <linearGradient id={`${uid}legsHr`} x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0%" stopColor={shade(o.legs, 1.22)} />
+          <stop offset="50%" stopColor={o.legs} />
+          <stop offset="100%" stopColor={shade(o.legs, 0.7)} />
+        </linearGradient>
+        <linearGradient id={`${uid}skinH`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={shade(skin, 1.12)} />
+          <stop offset="55%" stopColor={skin} />
+          <stop offset="100%" stopColor={skinDark} />
         </linearGradient>
         <linearGradient id={`${uid}hair`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={shade(hairHex, 1.35)} />
@@ -242,7 +272,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
             {(["chr-leg-l", "chr-leg-r"] as const).map((cls, i) => (
               <g key={cls} className={cls}>
                 <g transform={i ? "translate(100 0) scale(-1 1)" : undefined}>
-                  <path d="M35 93.5 L49.5 93.5 L48.7 104.6 Q48.5 106.9 46.1 106.9 L39 106.9 Q36.6 106.9 36.4 104.6 Z" fill={g("legs")} stroke={ol(o.legs)} strokeWidth={SW} strokeLinejoin="round" />
+                  <path d="M35 93.5 L49.5 93.5 L48.7 104.6 Q48.5 106.9 46.1 106.9 L39 106.9 Q36.6 106.9 36.4 104.6 Z" fill={g(i ? "legsHr" : "legsH")} stroke={ol(o.legs)} strokeWidth={SW} strokeLinejoin="round" />
                   {/* Tizza va shim burmasi */}
                   <ellipse cx="42.4" cy="100.2" rx="3.4" ry="1.6" fill="#fff" opacity={i ? 0.08 : 0.16} />
                   <path d="M44.6 95 Q45.4 99.5 44.8 105.8" fill="none" stroke="#000" strokeOpacity={0.16} strokeWidth="0.9" strokeLinecap="round" />
@@ -287,26 +317,34 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           </g>
         )}
 
-        {/* ---- Qo'llar: yeng (tirsak bukilishi bilan), manjet va barmoqli kaft ---- */}
+        {/* ---- Qo'llar: yelka va bilak (tirsak bo'g'imi — bilak alohida bukiladi), manjet, barmoqli kaft ---- */}
         {!headOnly && (
           <g>
-            {(["chr-arm-l", "chr-arm-r"] as const).map((cls, i) => (
-              <g key={cls} className={cls}>
-                <g transform={i ? "translate(100 0) scale(-1 1)" : undefined}>
-                  <path d="M33.4 58.4 C27.4 58.2 24 61 23.6 66.4 L23.2 75 Q22.9 81.6 24.5 86.6 L31.4 86.6 Q32.6 81.4 32.8 75 L34 64 Z" fill={g("body")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
-                  {/* Yelka yorug'i va tirsak burmasi */}
-                  <path d="M26 61.6 Q24.4 65.4 24.5 70" fill="none" stroke="#fff" strokeOpacity={i ? 0.12 : 0.3} strokeWidth="1.6" strokeLinecap="round" />
-                  <path d="M23.9 75.4 Q27.6 74 31.9 75.2" fill="none" stroke="#000" strokeOpacity={0.18} strokeWidth="0.9" strokeLinecap="round" />
-                  {/* Manjet */}
-                  <rect x="24" y="84.4" width="7.8" height="2.6" rx="1.1" fill={o.trim} stroke={ol(o.body)} strokeWidth={0.8} />
-                  {/* Kaft, bosh barmoq va barmoqlar */}
-                  <path d="M24.4 86.8 Q23.4 91.2 25.4 93.8 Q28 95.6 30.6 93.8 Q32.4 91.3 31.7 86.8 Z" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} strokeLinejoin="round" />
-                  <path d="M31.3 88 Q34 88.4 33.6 91.1 Q33 92.6 31.3 91.8" fill={g("skin")} stroke={ol(skin)} strokeWidth={0.9} strokeLinejoin="round" />
-                  <path d="M26.4 92.2 L26.6 94.2 M28.1 92.6 L28.1 94.9 M29.8 92.2 L29.6 94.3" stroke={ol(skin)} strokeWidth="0.7" strokeLinecap="round" opacity={0.7} />
+            {(["l", "r"] as const).map((side) => {
+              const m = side === "r" ? mx : (d: string) => d;
+              const X = (x: number, w = 0) => (side === "r" ? 100 - x - w : x);
+              return (
+                <g key={side} className={`chr-arm-${side}`}>
+                  {/* Yelkadan tirsakkacha */}
+                  <path d={m("M33.4 58.4 C27.4 58.2 24 61 23.6 66.4 L23.3 76 L32.9 76 L34 64 Z")} fill={g("bodyH")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
+                  <path d={m("M26 61.6 Q24.4 65.4 24.5 70")} fill="none" stroke="#fff" strokeOpacity={0.28} strokeWidth="1.6" strokeLinecap="round" />
+                  {/* Bilak: tirsak atrofida bukiladi; qo'ldagi buyum ham shu bilan */}
+                  <g className={`chr-fore-${side}`}>
+                    <ellipse cx={X(28.1)} cy="75.6" rx="4.9" ry="2.4" fill={g("bodyH")} />
+                    <path d={m("M23.3 75 Q22.9 81.6 24.5 86.6 L31.4 86.6 Q32.6 81.4 32.9 75 Z")} fill={g("bodyH")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
+                    <path d={m("M23.9 75.6 Q27.6 74.2 31.9 75.4")} fill="none" stroke="#000" strokeOpacity={0.2} strokeWidth="0.9" strokeLinecap="round" />
+                    {/* Manjet */}
+                    <rect x={X(24, 7.8)} y="84.4" width="7.8" height="2.6" rx="1.1" fill={o.trim} stroke={ol(o.body)} strokeWidth={0.8} />
+                    {/* Kaft, bosh barmoq, barmoqlar va bo'g'imlar */}
+                    <path d={m("M24.4 86.8 Q23.4 91.2 25.4 93.8 Q28 95.6 30.6 93.8 Q32.4 91.3 31.7 86.8 Z")} fill={g("skinH")} stroke={ol(skin)} strokeWidth={SW} strokeLinejoin="round" />
+                    <path d={m("M31.3 88 Q34 88.4 33.6 91.1 Q33 92.6 31.3 91.8")} fill={g("skinH")} stroke={ol(skin)} strokeWidth={0.9} strokeLinejoin="round" />
+                    <path d={m("M26.4 92.2 L26.6 94.2 M28.1 92.6 L28.1 94.9 M29.8 92.2 L29.6 94.3")} stroke={ol(skin)} strokeWidth="0.7" strokeLinecap="round" opacity={0.7} />
+                    <path d={m("M25.6 89.2 Q28 88.6 30.4 89.2")} fill="none" stroke="#000" strokeOpacity={0.12} strokeWidth="0.8" strokeLinecap="round" />
+                    {side === "r" && <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? look.hand} uid={uid} />}
+                  </g>
                 </g>
-                {i === 1 && <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? look.hand} uid={uid} />}
-              </g>
-            ))}
+              );
+            })}
           </g>
         )}
 
@@ -320,7 +358,11 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
               <circle cx={x} cy="40" r="2.4" fill={skinDark} opacity={0.6} />
             </g>
           ))}
-          <circle cx="50" cy="38" r="23" fill={!cos?.skin && look.skin === "galaxy" ? g("galaxy") : !cos?.skin && look.skin === "gold" ? g("gold") : g("skin")} stroke={ol(skin)} strokeWidth={SW} />
+          <path d={FACE} fill={!cos?.skin && look.skin === "galaxy" ? g("galaxy") : !cos?.skin && look.skin === "gold" ? g("gold") : g("skin")} stroke={ol(skin)} strokeWidth={SW} strokeLinejoin="round" />
+          {/* Jag' va chakka soyasi, iyak yorug'i — yuz hajmli */}
+          <path d="M69.5 44 C68 52 61.5 58.4 53 60.6 Q61 56.6 65.6 49.4 Q68.4 45.6 69.5 44 Z" fill="#000" opacity={0.1} />
+          <path d="M30.5 44 C31.6 49 34 52.6 37.4 55.4 Q33 53.8 30.5 44 Z" fill="#000" opacity={0.06} />
+          <ellipse cx="50" cy="57.8" rx="4.4" ry="1.6" fill="#fff" opacity={0.14} />
           {look.skin === "galaxy" && (
             <g fill="#fff" opacity={0.85}>
               <circle cx="40" cy="26" r="0.9" />
@@ -334,13 +376,13 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           <Hair style={look.hair} fill={hairFill} outline={ol(hairHex)} hidden={cos ? Boolean(cos.noHair) : look.head === "astro" || look.head === "helmet"} />
           {cos?.mask && <path d="M27 34 Q50 28 73 34 L72 45 Q50 41 28 45 Z" fill={cos.mask} stroke={ol(cos.mask)} strokeWidth="1.2" />}
           {/* Yuz */}
-          <ellipse cx="36.5" cy="47.5" rx="4" ry="2.6" fill="#fb7185" opacity={0.35} />
-          <ellipse cx="63.5" cy="47.5" rx="4" ry="2.6" fill="#fb7185" opacity={0.35} />
+          <ellipse cx="36.8" cy="47" rx="4.2" ry="2.4" fill="#fb7185" opacity={0.16} />
+          <ellipse cx="63.2" cy="47" rx="4.2" ry="2.4" fill="#fb7185" opacity={0.16} />
           {look.eyes !== "visor" && <Brows mood={mood} color={ol(hairHex)} />}
           <g className="chr-gaze" transform={gaze ? `translate(${(gaze.x * 2.4).toFixed(2)} ${(gaze.y * 1.6).toFixed(2)})` : undefined}>
             <Eyes kind={look.eyes} sad={sad} happy={cheer} galaxy={look.skin === "galaxy"} />
           </g>
-          {look.mouth !== "mask" && <path d="M48.6 45.4 Q50 46.9 51.4 45.4" fill="none" stroke={ol(skin)} strokeWidth="1.1" strokeLinecap="round" opacity={0.7} />}
+          {look.mouth !== "mask" && <Nose skin={skin} />}
           <Mouth kind={look.mouth} sad={sad} happy={cheer} />
           {cos ? <CostumeHead c={cos} uid={uid} /> : <HeadItem kind={look.head} main={main} uid={uid} />}
         </g>
@@ -735,9 +777,9 @@ function Brows({ mood, color }: { mood: CharMood; color: string }) {
       ? ["M35 28.5 Q40 29.5 45 31", "M55 31 Q60 29.5 65 28.5"]
       : ["M35 30.5 Q40 28 45 29.8", "M55 29.8 Q60 28 65 30.5"];
   return (
-    <g className="chr-brow" fill="none" stroke={color} strokeWidth="2.3" strokeLinecap="round">
-      <path d={d[0]} />
-      <path d={d[1]} />
+    <g className="chr-brow" fill="none" stroke={color} strokeLinecap="round">
+      <path d={d[0]} strokeWidth="2" />
+      <path d={d[1]} strokeWidth="2" />
     </g>
   );
 }
@@ -796,12 +838,28 @@ function Eyes({ kind, sad, happy, galaxy }: { kind: string; sad: boolean; happy:
       <path key={x} d={`M${x - 4.5} 41 Q${x} 37 ${x + 4.5} 41`} fill="none" stroke="#1e1b4b" strokeWidth="2.6" strokeLinecap="round" />
     ) : (
       <g key={x} className="chr-blink">
-        <ellipse cx={x} cy="40" rx="4.4" ry="5.2" fill="#fff" stroke="#334155" strokeWidth="0.9" />
-        <ellipse cx={x + 0.3} cy="40.8" rx="3.1" ry="3.7" fill={iris} />
-        <ellipse cx={x + 0.3} cy="41.2" rx="1.7" ry="2.1" fill="#0b0716" />
-        <circle cx={x + 1.5} cy="38.8" r="1.3" fill="#fff" />
-        <circle cx={x - 1} cy="42.8" r="0.6" fill="#fff" opacity={0.85} />
-        <path d={`M${x - 4.6} 37.6 Q${x} 34.2 ${x + 4.6} 37.6`} fill="none" stroke="#1e1b4b" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Ko'z kosasi soyasi va qovoq burmasi */}
+        <path d={`M${x - 5.4} 38.4 Q${x} 34.4 ${x + 5.4} 38.4`} fill="none" stroke="#000" strokeOpacity={0.1} strokeWidth="2.4" strokeLinecap="round" />
+        <path d={`M${x - 4.2} 36.6 Q${x} 34.6 ${x + 4.2} 36.6`} fill="none" stroke="#000" strokeOpacity={0.14} strokeWidth="0.7" strokeLinecap="round" />
+        {/* Ko'z oqi — bodom shakli */}
+        <path d={`M${x - 4.8} 40.4 Q${x - 1.6} 36.8 ${x + 0.4} 36.9 Q${x + 3.4} 37 ${x + 4.8} 40 Q${x + 2} 43.2 ${x - 0.4} 43.2 Q${x - 3.2} 43 ${x - 4.8} 40.4 Z`} fill="#f8fafc" stroke="#475569" strokeWidth="0.55" />
+        {/* Kamalak parda, qorachiq, yaltirash */}
+        <circle cx={x + 0.2} cy="40.1" r="2.45" fill={`url(#eyeIris${iris.slice(1)})`} />
+        <circle cx={x + 0.2} cy="40.1" r="2.45" fill="none" stroke="#0f172a" strokeWidth="0.45" opacity={0.7} />
+        <circle cx={x + 0.2} cy="40.1" r="1.05" fill="#0b0716" />
+        <circle cx={x + 1.1} cy="39.2" r="0.62" fill="#fff" />
+        <circle cx={x - 0.6} cy="41" r="0.3" fill="#fff" opacity={0.8} />
+        {/* Ustki qovoq (kiprik chizig'i) va pastki qovoq */}
+        <path d={`M${x - 5} 40.2 Q${x - 1.6} 36.4 ${x + 0.4} 36.6 Q${x + 3.6} 36.8 ${x + 5.1} 39.7`} fill="none" stroke="#1e1b4b" strokeWidth="1.25" strokeLinecap="round" />
+        <path d={`M${x + 4.6} 38.8 L${x + 5.8} 37.9`} stroke="#1e1b4b" strokeWidth="0.8" strokeLinecap="round" />
+        <path d={`M${x - 3.6} 42.6 Q${x} 44 ${x + 3.8} 42.2`} fill="none" stroke="#000" strokeOpacity={0.22} strokeWidth="0.6" strokeLinecap="round" />
+        <defs>
+          <radialGradient id={`eyeIris${iris.slice(1)}`} cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stopColor={shade(iris, 1.8)} />
+            <stop offset="55%" stopColor={iris} />
+            <stop offset="100%" stopColor={shade(iris, 0.55)} />
+          </radialGradient>
+        </defs>
       </g>
     );
   return (
@@ -850,9 +908,30 @@ function Mouth({ kind, sad, happy }: { kind: string; sad: boolean; happy: boolea
     );
   if (kind === "smirk") return <path d="M44 52.5 Q52 55.5 58 48.5" fill="none" stroke="#7f1d1d" strokeWidth="2.2" strokeLinecap="round" />;
   return (
-    <g>
-      <path d="M43 50 Q50 57.5 57 50 Q50 53 43 50 Z" fill="#9f1239" stroke="#7f1d1d" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M46.5 53.6 Q50 52.4 53.5 53.6 Q50 55.3 46.5 53.6 Z" fill="#fb7185" />
+    <g strokeLinejoin="round">
+      {/* Ustki lab: kupidon kamoni */}
+      <path d="M44.4 52.3 Q46.6 50.8 48.6 51.4 Q50 50.7 51.4 51.4 Q53.4 50.8 55.6 52.3 Q50 53.5 44.4 52.3 Z" fill="#b35962" stroke="#7f2d36" strokeWidth="0.55" />
+      {/* Pastki lab va uning yorug'i */}
+      <path d="M45.2 52.5 Q50 53.7 54.8 52.5 Q53.8 55.9 50 56 Q46.2 55.9 45.2 52.5 Z" fill="#c9737c" stroke="#7f2d36" strokeWidth="0.5" />
+      <path d="M47.6 54.3 Q50 55.1 52.4 54.3" fill="none" stroke="#fff" strokeOpacity={0.4} strokeWidth="0.7" strokeLinecap="round" />
+      {/* Lablar orasi, burchaklar tabassum bilan */}
+      <path d="M44 52.1 Q50 54 56 52.1" fill="none" stroke="#5b1a22" strokeWidth="0.8" strokeLinecap="round" />
+      <path d="M43.6 51.9 Q43.2 51.2 43.6 50.8 M56.4 51.9 Q56.8 51.2 56.4 50.8" fill="none" stroke="#000" strokeOpacity={0.18} strokeWidth="0.6" strokeLinecap="round" />
+      {/* Pastki lab ostidagi soya */}
+      <path d="M46.6 57.4 Q50 58.4 53.4 57.4" fill="none" stroke="#000" strokeOpacity={0.1} strokeWidth="1" strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Burun: qirrasi soyasi, qanotlari, burun teshiklari va uchidagi yorug' */
+function Nose({ skin }: { skin: string }) {
+  return (
+    <g strokeLinecap="round" fill="none">
+      <path d="M51.2 40.8 Q52 44.4 52.8 46.6" stroke="#000" strokeOpacity={0.12} strokeWidth="1.3" />
+      <path d="M46.9 47.6 Q46.2 49.2 47.8 49.6 Q48.9 49.8 49.4 49.2 M53.1 47.6 Q53.8 49.2 52.2 49.6 Q51.1 49.8 50.6 49.2" stroke={ol(skin)} strokeWidth="0.75" opacity={0.75} />
+      <ellipse cx="48.6" cy="49.2" rx="0.8" ry="0.45" fill="#000" fillOpacity={0.35} stroke="none" />
+      <ellipse cx="51.4" cy="49.2" rx="0.8" ry="0.45" fill="#000" fillOpacity={0.35} stroke="none" />
+      <ellipse cx="49.6" cy="47.2" rx="1.2" ry="0.8" fill="#fff" fillOpacity={0.3} stroke="none" />
     </g>
   );
 }
