@@ -3,9 +3,9 @@
 
 export type PushDir = "left" | "right";
 
-/** Itarish animatsiyasi davomiyligi va ikki itarish orasidagi eng kam vaqt (ms) */
-export const PUSH_MS = 1800;
-export const PUSH_GAP_MS = 1500;
+/** Ko'tarib otish animatsiyasi davomiyligi (ms) va itargandan keyin qayta itarish mumkin bo'lguncha (10 s) */
+export const PUSH_MS = 2800;
+export const PUSH_GAP_MS = 10_000;
 
 /** Qo'shnilar: `order` — proyektordagi tartib (id va jamoa) */
 export function lobbyNeighbors<T extends { id: string; team: number }>(order: T[], meId: string, teamMode: boolean): { left: T | null; right: T | null } {

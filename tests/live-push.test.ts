@@ -52,7 +52,7 @@ describe("kutish zalida itarish", () => {
     const st = await live.getLivePlayerStateAction(id);
     expect(st.success && st.data.lobby).toMatchObject({ left: { name: "Ali" }, right: { name: "Sardor" } });
     const r = await live.playPushAction(id, "right");
-    expect(r.success && r.data).toEqual({ pushed: true, name: "Sardor" });
+    expect(r.success && r.data).toEqual({ pushed: true, name: "Sardor", waitMs: 10_000 });
     expect((await live.playPushAction(id, "left")).success && (await live.playPushAction(id, "left"))).toMatchObject({ data: { pushed: false } });
     expect(((await live.getLivePlayerStateAction(id)) as { data: { lobby: { myPush: unknown } } }).data.lobby.myPush).toMatchObject({ name: "Sardor", dir: "right" });
     actAs(sessionFor(sardor));

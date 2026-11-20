@@ -955,28 +955,85 @@ h1,
 @keyframes fund-glow { 0%, 100% { box-shadow: 0 0 0 rgba(250, 204, 21, 0); } 50% { box-shadow: 0 0 24px rgba(250, 204, 21, 0.9); } }
 .fund-glow { animation: fund-glow 1s ease-in-out infinite; }
 
-/* ---- Kutish zali: itarish hazili ---- */
-/* Itaruvchi: o'sha tomonga tashlanadi, qo'llari oldinga */
-@keyframes push-lunge-l { 0% { transform: none; } 25% { transform: translateX(-16%) rotate(-10deg); } 45% { transform: translateX(-20%) rotate(-12deg); } 100% { transform: none; } }
-@keyframes push-lunge-r { 0% { transform: none; } 25% { transform: translateX(16%) rotate(10deg); } 45% { transform: translateX(20%) rotate(12deg); } 100% { transform: none; } }
-@keyframes push-arms-l { 0%, 100% { transform: none; } 20%, 50% { transform: rotate(75deg); } }
-@keyframes push-arms-r { 0%, 100% { transform: none; } 20%, 50% { transform: rotate(-75deg); } }
-/* Itarilgan: uchib ketadi, gandiraklaydi va joyiga qaytadi */
-@keyframes pushed-fly-l { 0%, 18% { transform: none; } 40% { transform: translateX(-45%) rotate(-18deg); } 60% { transform: translateX(-38%) rotate(8deg); } 78% { transform: translateX(-12%) rotate(-4deg); } 100% { transform: none; } }
-@keyframes pushed-fly-r { 0%, 18% { transform: none; } 40% { transform: translateX(45%) rotate(18deg); } 60% { transform: translateX(38%) rotate(-8deg); } 78% { transform: translateX(12%) rotate(4deg); } 100% { transform: none; } }
-@keyframes pushed-arms { 0%, 20%, 100% { transform: none; } 40%, 70% { transform: rotate(-150deg); } }
-@keyframes pushed-arms-r { 0%, 20%, 100% { transform: none; } 40%, 70% { transform: rotate(150deg); } }
-.push-l { transform-origin: 50% 100%; animation: push-lunge-l 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both; }
-.push-r { transform-origin: 50% 100%; animation: push-lunge-r 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both; }
-.push-l .chr-arm-l, .push-l .chr-arm-r { animation: push-arms-l 0.9s ease-out both !important; }
-.push-r .chr-arm-l, .push-r .chr-arm-r { animation: push-arms-r 0.9s ease-out both !important; }
-.pushed-l { transform-origin: 50% 100%; animation: pushed-fly-l 1.4s cubic-bezier(0.25, 0.8, 0.3, 1) both; }
-.pushed-r { transform-origin: 50% 100%; animation: pushed-fly-r 1.4s cubic-bezier(0.25, 0.8, 0.3, 1) both; }
-.pushed-l .chr-arm-l, .pushed-r .chr-arm-l { animation: pushed-arms-r 1.4s ease-out both !important; }
-.pushed-l .chr-arm-r, .pushed-r .chr-arm-r { animation: pushed-arms 1.4s ease-out both !important; }
-@media (prefers-reduced-motion: reduce) { .push-l, .push-r, .pushed-l, .pushed-r { animation-duration: 0.01s; } }
+/* ---- Kutish zali: ko'tarib otish hazili (2,6 s) ----
+   Itaruvchi qo'shnisiga qadam tashlaydi, engashadi, uni boshi uzra ko'taradi va yon tomonga otadi.
+   Otilgan o'yinchi havoda aylanib uchadi (harakat izi bilan), yerga tushib yassilanadi, sakraydi, chang ko'tariladi
+   va joyiga qaytadi. "-r" — o'ng tomondagi qo'shniga, "-l" — chapdagiga (ko'zgu aksi). */
+@keyframes lift-r {
+  0% { transform: none; }
+  12% { transform: translateX(22%); }
+  20% { transform: translateX(26%) translateY(3%) scaleY(0.94); }
+  34% { transform: translateX(24%) translateY(-3%) rotate(-4deg); }
+  48% { transform: translateX(26%) translateY(-4%) rotate(-6deg); }
+  58% { transform: translateX(36%) rotate(12deg); }
+  70% { transform: translateX(28%) rotate(4deg); }
+  100% { transform: none; }
+}
+@keyframes lift-l {
+  0% { transform: none; }
+  12% { transform: translateX(-22%); }
+  20% { transform: translateX(-26%) translateY(3%) scaleY(0.94); }
+  34% { transform: translateX(-24%) translateY(-3%) rotate(4deg); }
+  48% { transform: translateX(-26%) translateY(-4%) rotate(6deg); }
+  58% { transform: translateX(-36%) rotate(-12deg); }
+  70% { transform: translateX(-28%) rotate(-4deg); }
+  100% { transform: none; }
+}
+@keyframes lift-arms-r { 0%, 100% { transform: none; } 12% { transform: rotate(-60deg); } 22% { transform: rotate(-40deg); } 36%, 50% { transform: rotate(-168deg); } 58% { transform: rotate(-80deg); } 72% { transform: rotate(-30deg); } }
+@keyframes lift-arms-l { 0%, 100% { transform: none; } 12% { transform: rotate(60deg); } 22% { transform: rotate(40deg); } 36%, 50% { transform: rotate(168deg); } 58% { transform: rotate(80deg); } 72% { transform: rotate(30deg); } }
+@keyframes thrown-r {
+  0%, 12% { transform: none; }
+  18% { transform: translateX(-12%) rotate(-4deg); }
+  34% { transform: translate(-58%, -58%) rotate(-14deg); }
+  48% { transform: translate(-56%, -64%) rotate(-8deg); }
+  60% { transform: translate(14%, -88%) rotate(140deg); }
+  70% { transform: translate(74%, -26%) rotate(300deg); }
+  76% { transform: translate(96%, 0) rotate(360deg) scale(1.1, 0.84); }
+  82% { transform: translate(100%, -10%) rotate(360deg); }
+  88% { transform: translate(98%, 0) rotate(354deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes thrown-l {
+  0%, 12% { transform: none; }
+  18% { transform: translateX(12%) rotate(4deg); }
+  34% { transform: translate(58%, -58%) rotate(14deg); }
+  48% { transform: translate(56%, -64%) rotate(8deg); }
+  60% { transform: translate(-14%, -88%) rotate(-140deg); }
+  70% { transform: translate(-74%, -26%) rotate(-300deg); }
+  76% { transform: translate(-96%, 0) rotate(-360deg) scale(1.1, 0.84); }
+  82% { transform: translate(-100%, -10%) rotate(-360deg); }
+  88% { transform: translate(-98%, 0) rotate(-354deg); }
+  100% { transform: rotate(-360deg); }
+}
+@keyframes thrown-arms { 0%, 18%, 100% { transform: none; } 30%, 50% { transform: rotate(-150deg); } 58% { transform: rotate(-110deg); } 64% { transform: rotate(-170deg); } 72% { transform: rotate(-120deg); } 84% { transform: rotate(-40deg); } }
+@keyframes thrown-arms-r { 0%, 18%, 100% { transform: none; } 30%, 50% { transform: rotate(150deg); } 58% { transform: rotate(110deg); } 64% { transform: rotate(170deg); } 72% { transform: rotate(120deg); } 84% { transform: rotate(40deg); } }
+@keyframes thrown-legs { 0%, 30%, 100% { transform: none; } 40%, 52% { transform: rotate(22deg); } 46% { transform: rotate(-22deg); } 62% { transform: rotate(35deg); } }
+@keyframes thrown-blur { 0%, 55%, 74%, 100% { filter: none; } 60%, 70% { filter: blur(0.6px) drop-shadow(-10px 0 6px rgba(255, 255, 255, 0.35)); } }
+@keyframes push-dust { 0%, 74% { opacity: 0; transform: translateX(-50%) scale(0.3); } 78% { opacity: 0.9; transform: translateX(-50%) scale(1); } 100% { opacity: 0; transform: translateX(-50%) scale(2.2); } }
+.push-r, .push-l, .pushed-r, .pushed-l { transform-origin: 50% 100%; position: relative; z-index: 5; }
+.push-r { animation: lift-r 2.6s cubic-bezier(0.4, 0, 0.3, 1) both; }
+.push-l { animation: lift-l 2.6s cubic-bezier(0.4, 0, 0.3, 1) both; }
+.push-r .chr-arm-l, .push-r .chr-arm-r { animation: lift-arms-r 2.6s ease-in-out both !important; }
+.push-l .chr-arm-l, .push-l .chr-arm-r { animation: lift-arms-l 2.6s ease-in-out both !important; }
+.pushed-r, .pushed-l { z-index: 6; }
+.pushed-r { animation: thrown-r 2.6s cubic-bezier(0.35, 0, 0.25, 1) both; }
+.pushed-l { animation: thrown-l 2.6s cubic-bezier(0.35, 0, 0.25, 1) both; }
+.pushed-r .chr-arm-l, .pushed-l .chr-arm-l { animation: thrown-arms-r 2.6s ease-in-out both !important; }
+.pushed-r .chr-arm-r, .pushed-l .chr-arm-r { animation: thrown-arms 2.6s ease-in-out both !important; }
+.pushed-r .chr-leg-l, .pushed-l .chr-leg-r { animation: thrown-legs 2.6s ease-in-out both !important; }
+.pushed-r .chr-leg-r, .pushed-l .chr-leg-l { animation: thrown-legs 2.6s ease-in-out reverse both !important; }
+.pushed-r > svg, .pushed-l > svg, .pushed-r > div > svg, .pushed-l > div > svg { animation: thrown-blur 2.6s linear both; }
+.push-dust { position: absolute; left: 50%; bottom: 0; width: 90%; height: 18%; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(closest-side, rgba(241, 245, 249, 0.85), rgba(203, 213, 225, 0.45) 55%, transparent);
+  box-shadow: -18px -4px 0 -6px rgba(226, 232, 240, 0.5), 18px -6px 0 -7px rgba(226, 232, 240, 0.45);
+  animation: push-dust 2.6s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .push-l, .push-r, .pushed-l, .pushed-r, .push-dust { animation-duration: 0.01s !important; } }
 /* G'oliblar e'loni: telefonda "Monitorga qarang" */
 @keyframes watch-tv { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-6px) rotate(2deg); } }
 @keyframes monitor-glow { 0%, 100% { opacity: 0.5; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.15); } }
 .watch-tv { animation: watch-tv 1.6s ease-in-out infinite; }
 .monitor-glow { animation: monitor-glow 1.2s ease-in-out infinite; }
+@keyframes push-cool { from { width: 100%; } to { width: 0%; } }
+.push-cool { animation: push-cool linear both; }
+@keyframes push-shake { 0%, 74%, 100% { transform: none; } 77% { transform: translateY(3px); } 80% { transform: translate(-3px, -2px); } 84% { transform: translate(2px, 1px); } }
+.push-shake { animation: push-shake 2.6s linear both; }

@@ -661,6 +661,7 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
         )}
       >
         <CharacterSvg key={`c${p.emote?.at ?? "idle"}`} look={p.look} size={size} mood="idle" still={n > 40 && !p.emote && !p.push && !p.pushedBy} emote={p.push || p.pushedBy ? null : p.emote?.id} />
+        {p.pushedBy && <span className="push-dust" />}
       </div>
       <span className="-mt-1 max-w-full truncate rounded-xl bg-white px-2 py-0.5 text-xs font-black text-slate-900 shadow-lg sm:text-sm">{p.name.split(" ")[0]}</span>
     </div>

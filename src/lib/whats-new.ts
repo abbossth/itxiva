@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "lobby-throw-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Endi ko'tarib otasiz!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤾",
+        title: "Ko'tarib otish",
+        text: "Kutish zalida yoningizdagini endi shunchaki itarmaysiz: personajingiz unga yaqinlashib, boshi uzra ko'taradi va otib yuboradi — u havoda aylanib uchadi, yerga tushib chang ko'taradi. Bir marta otgandan keyin 10 soniya kutasiz.",
+      },
+    ],
+  },
+  {
+    id: "mentor-lobby-throw-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Kutish zali: ko'tarib otish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤾",
+        title: "Itarish o'rniga ko'tarib otish, 10 soniya oraliq",
+        text: "Kutish zalidagi hazil endi jonliroq: o'quvchi qo'shnisini boshi uzra ko'tarib yon tomonga otadi (havoda aylanadi, qo'nganda chang ko'tariladi) — proyektorda ham shunday ko'rinadi. Bir o'quvchi otgandan keyin 10 soniya qayta bosa olmaydi.",
+      },
+    ],
+  },
+  {
     id: "lobby-push-2026-11",
     date: "2026-11-20",
     audience: "student",

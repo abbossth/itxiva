@@ -1,36 +1,86 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { playPushAction, type LivePlayerState } from "@/actions/live-game.actions";
 import { CharacterSvg } from "@/components/character/character-svg";
 import type { GameLook } from "@/lib/character/catalog";
-import type { PushDir } from "@/lib/live-game/push";
+import { PUSH_GAP_MS, type PushDir } from "@/lib/live-game/push";
 import { haptic } from "@/lib/haptics";
-import { playWhoosh, unlockSound } from "@/lib/sound";
+import { playBoom, playHurt, playWhoosh, unlockSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
-// Kutish zali: chap va o'ng qo'shni bilan hazillashish — itarish. O'ziga, qo'shnisiga va proyektorda ko'rinadi.
+// Kutish zali: chap yoki o'ng qo'shnini hazil qilib ko'tarib otish. O'ziga, qo'shnisiga va proyektorda ko'rinadi.
+// Bir marta otgandan keyin 10 soniya tugma yopiq.
 
 type Lobby = NonNullable<LivePlayerState["lobby"]>;
+
+/** Animatsiya bosqichlari (2,6 s ichida): ko'tarish, otish, yerga tushish */
+const THROW_AT = 1500;
+const LAND_AT = 1980;
 
 export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lobby: Lobby; look: GameLook | null; onDone: () => void }) {
   // Bosilgan zahoti o'zida ko'rinsin (server javobini kutmasdan)
   const [local, setLocal] = useState<{ dir: PushDir; at: number; name: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const last = useRef(-1e9);
+  // Vaqtlar performance.now() asosida (bosish hodisasining timeStamp bilan bir xil)
+  const [coolUntil, setCoolUntil] = useState(0);
+  const [coolMs, setCoolMs] = useState(PUSH_GAP_MS);
+  const [cool, setCool] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  // Qayta itarishgacha qolgan soniyalar
+  useEffect(() => {
+    if (!coolUntil) return;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((coolUntil - performance.now()) / 1000));
+      setCool(left);
+      return left;
+    };
+    tick();
+    const id = setInterval(() => tick() === 0 && clearInterval(id), 250);
+    return () => clearInterval(id);
+  }, [coolUntil]);
+
+  const sounds = (thrown: boolean) => {
+    timers.current.push(
+      setTimeout(() => playWhoosh(0.6), THROW_AT),
+      setTimeout(() => {
+        playBoom();
+        if (thrown) playHurt();
+        haptic(thrown ? [60, 30, 90] : [30]);
+      }, LAND_AT)
+    );
+  };
+
+  // Meni otishdi: ovoz va titrash (har bir otish uchun bir marta)
+  const heard = useRef(0);
+  useEffect(() => {
+    const at = lobby.pushedBy?.at ?? 0;
+    if (!at || heard.current === at) return;
+    heard.current = at;
+    unlockSound();
+    haptic([20]);
+    sounds(true);
+  }, [lobby.pushedBy?.at]);
 
   const push = (dir: PushDir, ts: number) => {
     const who = lobby[dir];
-    if (!who || ts - last.current < 1500) return;
-    last.current = ts;
+    if (!who || ts < coolUntil) return;
     unlockSound();
-    playWhoosh(0.5);
     haptic([25, 20, 40]);
+    sounds(false);
     setLocal({ dir, at: ts, name: who.name });
+    setCoolUntil(ts + PUSH_GAP_MS);
+    setCoolMs(PUSH_GAP_MS);
     setMsg(null);
     void playPushAction(gameId, dir)
       .then((r) => {
         if (!r.success) setMsg(r.error);
+        else if (!r.data.pushed && r.data.waitMs > 0) {
+          setCoolUntil(ts + r.data.waitMs);
+          setCoolMs(r.data.waitMs);
+        }
         onDone();
       })
       .catch(() => {});
@@ -38,32 +88,33 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
 
   const mine = local ?? (lobby.myPush ? { dir: lobby.myPush.dir, at: lobby.myPush.at, name: lobby.myPush.name } : null);
   const hit = lobby.pushedBy;
-  // Kim harakatda: men itaryapman (tashlanaman) yoki meni itarishdi (uchaman)
+  // Kim harakatda: men ko'taraman (tashlanaman) yoki meni otishdi (uchaman)
   const meCls = hit ? (hit.dir === "left" ? "pushed-l" : "pushed-r") : mine ? (mine.dir === "left" ? "push-l" : "push-r") : undefined;
-  const sideCls = (side: PushDir) => (mine && mine.dir === side ? (side === "left" ? "pushed-l" : "pushed-r") : undefined);
+  const sideCls = (side: PushDir) => (mine && !hit && mine.dir === side ? (side === "left" ? "pushed-l" : "pushed-r") : undefined);
 
   if (!lobby.left && !lobby.right) {
-    return <p className="mt-2 text-center text-xs text-white/50">Yoningizga boshqalar qo&apos;shilsa — ularni hazil qilib itarishingiz mumkin</p>;
+    return <p className="mt-2 text-center text-xs text-white/50">Yoningizga boshqalar qo&apos;shilsa — ularni hazil qilib ko&apos;tarib otishingiz mumkin</p>;
   }
 
   return (
-    <div className="mx-auto mt-3 w-full max-w-sm rounded-3xl bg-white/5 p-3 ring-1 ring-white/10">
-      <div className="flex items-end justify-center gap-1">
+    <div className="mx-auto mt-3 w-full max-w-sm rounded-3xl bg-white/5 px-3 pb-3 pt-14 ring-1 ring-white/10">
+      <div className={cn("flex items-end justify-center gap-1", hit && "push-shake")} key={`st${hit?.at ?? 0}`}>
         <Side who={lobby.left} cls={sideCls("left")} k={mine?.dir === "left" ? mine.at : 0} />
-        <div key={`me${mine?.at ?? 0}-${hit?.at ?? 0}`} className={cn("relative z-[1] flex flex-col items-center", meCls)}>
+        <div key={`me${mine?.at ?? 0}-${hit?.at ?? 0}`} className={cn("relative flex flex-col items-center", meCls)}>
           <CharacterSvg look={look} size={74} mood="idle" pedestal={false} />
+          {hit && <span className="push-dust" />}
           <span className="-mt-1 rounded-full bg-amber-400 px-2 text-[10px] font-black text-slate-950">Siz</span>
         </div>
         <Side who={lobby.right} cls={sideCls("right")} k={mine?.dir === "right" ? mine.at : 0} />
       </div>
       {hit && (
         <p key={hit.at} className="live-pop mt-2 text-center text-sm font-black text-amber-300">
-          {hit.name.split(" ")[0]} sizni itarib yubordi!
+          {hit.name.split(" ")[0]} sizni ko&apos;tarib otib yubordi!
         </p>
       )}
       {!hit && mine && (
         <p key={mine.at} className="live-pop mt-2 text-center text-sm font-black text-emerald-300">
-          {mine.name.split(" ")[0]}ni itarib yubordingiz!
+          {mine.name.split(" ")[0]}ni ko&apos;tarib otib yubordingiz!
         </p>
       )}
       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -73,12 +124,20 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
             <button
               key={dir}
               type="button"
-              disabled={!who}
+              disabled={!who || cool > 0}
               onClick={(ev) => push(dir, ev.timeStamp)}
-              className="flex min-h-[48px] cursor-pointer items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-b from-sky-500 to-indigo-600 px-2 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:cursor-default disabled:opacity-30"
+              className="relative flex min-h-[48px] cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-500 to-indigo-600 px-2 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:cursor-default disabled:opacity-40"
             >
+              {/* Qayta itarishgacha qolgan vaqt — tugma ustida to'lib boruvchi chiziq */}
+              {cool > 0 && who && (
+                <span
+                  key={coolUntil}
+                  className="push-cool absolute inset-y-0 left-0 bg-white/20"
+                  style={{ animationDuration: `${coolMs / 1000}s` }}
+                />
+              )}
               {dir === "left" && <span aria-hidden>◀</span>}
-              <span className="truncate">{who ? `${who.name.split(" ")[0]}ni itarish` : "Hech kim yo'q"}</span>
+              <span className="relative truncate">{!who ? "Hech kim yo'q" : cool > 0 ? `${cool} s kuting` : `${who.name.split(" ")[0]}ni otish`}</span>
               {dir === "right" && <span aria-hidden>▶</span>}
             </button>
           );
@@ -92,8 +151,9 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
 function Side({ who, cls, k }: { who: Lobby["left"]; cls?: string; k: number }) {
   if (!who) return <div className="w-[64px]" />;
   return (
-    <div key={`s${k}`} className={cn("flex flex-col items-center opacity-90", cls)}>
+    <div key={`s${k}`} className={cn("relative flex flex-col items-center opacity-90", cls)}>
       <CharacterSvg look={who.look} size={58} mood="idle" pedestal={false} />
+      {cls && <span className="push-dust" />}
       <span className="-mt-1 max-w-[70px] truncate rounded-full bg-white/15 px-2 text-[10px] font-bold text-white">{who.name.split(" ")[0]}</span>
     </div>
   );

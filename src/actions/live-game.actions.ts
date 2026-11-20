@@ -2877,14 +2877,14 @@ function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: Live
 }
 
 /** Kutish zalida chap yoki o'ng qo'shnini hazil qilib itarish (o'ziga, qo'shniga va proyektorda ko'rinadi) */
-export async function playPushAction(gameId: string, dir: PushDir): Promise<Result<{ pushed: boolean; name: string }>> {
+export async function playPushAction(gameId: string, dir: PushDir): Promise<Result<{ pushed: boolean; name: string; waitMs: number }>> {
   try {
     const user = await requireStudent();
     if (!mongoose.isValidObjectId(gameId) || (dir !== "left" && dir !== "right")) return fail("Ma'lumotlar noto'g'ri");
     await connectDB();
     const game = await loadGameForStudent(gameId, user.groupId);
-    if (!game || game.status !== "lobby") return { success: true, data: { pushed: false, name: "" } };
-    const players = await LiveGamePlayer.find({ gameId: game._id }).select("name score eliminated eliminatedAt team createdAt studentId").lean();
+    if (!game || game.status !== "lobby") return { success: true, data: { pushed: false, name: "", waitMs: 0 } };
+    const players = await LiveGamePlayer.find({ gameId: game._id }).select("name score eliminated eliminatedAt team createdAt studentId push").lean();
     const mine = players.find((p) => p.studentId.toString() === user.userId);
     if (!mine) return fail("Avval o'yinga qo'shiling");
     const order = rankPlayers(
@@ -2899,7 +2899,9 @@ export async function playPushAction(gameId: string, dir: PushDir): Promise<Resu
       { $set: { push: { to: target.id, dir, at: now } } }
     );
     if (res.modifiedCount > 0) invalidateLiveSnapshot(game._id.toString());
-    return { success: true, data: { pushed: res.modifiedCount > 0, name: target.name } };
+    // Itargandan keyin 10 soniya qayta itarib bo'lmaydi — qancha qolgani
+    const waitMs = res.modifiedCount > 0 ? PUSH_GAP_MS : Math.max(0, (mine.push?.at ?? 0) + PUSH_GAP_MS - now);
+    return { success: true, data: { pushed: res.modifiedCount > 0, name: target.name, waitMs } };
   } catch (err) {
     return errorOf(err, "Itarib bo'lmadi");
   }
