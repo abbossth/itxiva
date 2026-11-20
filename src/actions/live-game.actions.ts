@@ -1393,7 +1393,7 @@ export async function getLiveGamesForMentorAction(): Promise<Result<LiveGameList
   try {
     await requireMentor();
     await connectDB();
-    const games = await LiveGame.find({ studentGame: { $ne: true } }).select("groupId mode status questions createdAt").sort({ createdAt: -1 }).limit(15).lean();
+    const games = await LiveGame.find({ studentGame: { $ne: true } }).select("groupId mode status questions createdAt").sort({ createdAt: -1 }).limit(60).lean();
     const [groups, counts, winners] = await Promise.all([
       Group.find({ _id: { $in: games.map((g) => g.groupId) } }).select("name").lean(),
       LiveGamePlayer.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([

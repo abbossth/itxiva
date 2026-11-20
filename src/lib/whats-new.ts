@@ -29,6 +29,53 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "characters-v3-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Personajlar yangilandi va arzonlashdi!",
+    slides: [
+      {
+        art: "character-hello",
+        title: "Haqiqiy odamga o'xshash tana",
+        text: "Personajingiz endi o'smir nisbatida: bo'yin, yelka, beli toraygan gavda, tirsakda bukiladigan qo'llar, barmoqli kaftlar, kamar, tizzali shim va krossovka. Hamma o'yinlarda shunday ko'rinadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🦸",
+        title: "Yangi qahramonlar — 50 coindan",
+        text: "«Personajim» → «Kostyum» bo'limida yangi qahramonlar: Asalari (50), Super qahramon (60), Soya ninja (80), Kosmonavt (90), Ritsar (100), Temir robot (120), Sehrgar (140). Eski kostyumlar ham arzonlashdi — 50 dan 150 coingacha.",
+      },
+      {
+        art: "character-shop",
+        title: "Buyumlar endi juda arzon",
+        text: "Soch, ko'z, kiyim, bosh kiyim, hamroh va boshqa buyumlar endi 2 coindan boshlanadi — ko'pchiligi 2–30 coin. Personajingizni xohlagancha bezang!",
+      },
+    ],
+    cta: { label: "Personajimni bezash", href: "/profile?tab=character" },
+  },
+  {
+    id: "mentor-characters-v3-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Personajlar narxi va jonli o'yinlar ro'yxati",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🧍",
+        title: "Personajlar: yangi tana, yangi narxlar",
+        text: "O'quvchilar personajining tanasi odamga yaqin nisbatda qayta chizildi. Personaj buyumlari narxi 2–30 coinga tushirildi, kostyumlar (butun personaj) 50–150 coin; 7 ta yangi original qahramon qo'shildi (Asalari, Super qahramon, Soya ninja, Kosmonavt, Ritsar, Temir robot, Sehrgar).",
+      },
+      {
+        art: "emoji",
+        emoji: "📄",
+        title: "Oxirgi o'yinlar — sahifalab",
+        text: "«Jonli o'yin» sahifasidagi «Oxirgi o'yinlar» endi 5 tadan sahifalab ko'rsatiladi (oxirgi 60 ta o'yin); o'quvchilar o'yinlari ro'yxati ham shunday.",
+      },
+    ],
+  },
+  {
     id: "student-games-prizes-2026-11",
     date: "2026-11-20",
     audience: "student",

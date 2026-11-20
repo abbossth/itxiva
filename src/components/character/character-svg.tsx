@@ -65,7 +65,9 @@ export interface Costume extends Outfit {
   hood?: string;
   ears?: "cat" | "horns" | "spikes" | "none";
   helmet?: boolean;
-  hat?: "pirate" | "ice" | "leaf";
+  /** Shlem turi: kiber (sukut), ritsar (tirqishli, pat), kosmonavt (shisha gumbaz — yuz ko'rinadi) */
+  helmetStyle?: "cyber" | "knight" | "astro";
+  hat?: "pirate" | "ice" | "leaf" | "wizard";
   mask?: string;
   eyepatch?: boolean;
   tail?: string;
@@ -86,6 +88,14 @@ export const COSTUMES: Record<string, Costume> = {
   night: { body: "#1e293b", trim: "#fbbf24", legs: "#0f172a", hood: "#111827", ears: "none", mask: "#111827", cape: "#312e81", emblem: "moon", noHair: true },
   ice: { body: "#bae6fd", trim: "#e0f2fe", legs: "#0369a1", hat: "ice", cape: "#7dd3fc", emblem: "snow" },
   cyber: { body: "#94a3b8", trim: "#22d3ee", legs: "#475569", helmet: true, emblem: "hex", noHair: true },
+  // Original qahramonlar (mashhur multfilm/film personajlari nusxasi emas)
+  hero: { body: "#0f766e", trim: "#f59e0b", legs: "#134e4a", mask: "#f59e0b", cape: "#f59e0b", emblem: "star" },
+  knight: { body: "#cbd5e1", trim: "#b91c1c", legs: "#64748b", helmet: true, helmetStyle: "knight", cape: "#b91c1c", emblem: "star", noHair: true },
+  wizard: { body: "#5b21b6", trim: "#fbbf24", legs: "#3b0764", hat: "wizard", cape: "#4c1d95", emblem: "moon" },
+  astronaut: { body: "#f8fafc", trim: "#f97316", legs: "#e2e8f0", helmet: true, helmetStyle: "astro", emblem: "star" },
+  shadow: { body: "#111827", trim: "#a855f7", legs: "#0f172a", hood: "#111827", ears: "none", mask: "#111827", emblem: "hex", noHair: true },
+  robot: { body: "#64748b", trim: "#facc15", legs: "#334155", skin: "#cbd5e1", helmet: true, emblem: "hex", noHair: true },
+  bee: { body: "#facc15", trim: "#111827", legs: "#111827", hood: "#facc15", ears: "spikes", tail: "#111827", emblem: "belly", noHair: true },
 };
 
 function outfitOf(kind: string, main: string): Outfit {
@@ -108,6 +118,9 @@ function outfitOf(kind: string, main: string): Outfit {
       return { body: main, trim: shade(main, 0.78), legs: "#1e40af" };
   }
 }
+
+/** To'liq ko'rinishda bosh 82% (iyak atrofida) va 5 birlik yuqorida: bo'yin va gavda uzunroq — odamga yaqin nisbat */
+const HEAD_FIT = "translate(0 -5) translate(50 61) scale(0.82) translate(-50 -61)";
 
 function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedestal = true, holding = null, className, title, still = false, headOnly = false, gaze = null, emote = null }: CharacterSvgProps) {
   const em = emoteOf(emote);
@@ -223,51 +236,82 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
         {/* ---- Orqadagi narsalar ---- */}
         {!headOnly && (cos ? <CostumeBack c={cos} /> : <BackItem kind={look.back} uid={uid} />)}
 
-        {/* ---- Oyoqlar ---- */}
+        {/* ---- Oyoqlar: shim (tizza va burma bilan) va krossovka ---- */}
         {!headOnly && (
           <g>
-            {[
-              { x: 39, cls: "chr-leg-l", sx: 43 },
-              { x: 52, cls: "chr-leg-r", sx: 57 },
-            ].map((l) => (
-              <g key={l.cls} className={l.cls}>
-                <rect x={l.x} y="91" width="9" height="15.5" rx="4" fill={g("legs")} stroke={ol(o.legs)} strokeWidth={SW} />
-                <path d={`M${l.sx - 7} 108.5 Q${l.sx - 7} 103.5 ${l.sx} 103.5 Q${l.sx + 7.5} 103.5 ${l.sx + 7.5} 108.5 Q${l.sx + 7.5} 110.5 ${l.sx} 110.5 Q${l.sx - 7} 110.5 ${l.sx - 7} 108.5 Z`} fill="#1e293b" stroke="#020617" strokeWidth={SW} />
-                <path d={`M${l.sx - 4} 105.5 Q${l.sx} 104.5 ${l.sx + 3} 105.5`} fill="none" stroke="#fff" strokeOpacity={0.35} strokeWidth="1.2" strokeLinecap="round" />
+            {(["chr-leg-l", "chr-leg-r"] as const).map((cls, i) => (
+              <g key={cls} className={cls}>
+                <g transform={i ? "translate(100 0) scale(-1 1)" : undefined}>
+                  <path d="M35 93.5 L49.5 93.5 L48.7 104.6 Q48.5 106.9 46.1 106.9 L39 106.9 Q36.6 106.9 36.4 104.6 Z" fill={g("legs")} stroke={ol(o.legs)} strokeWidth={SW} strokeLinejoin="round" />
+                  {/* Tizza va shim burmasi */}
+                  <ellipse cx="42.4" cy="100.2" rx="3.4" ry="1.6" fill="#fff" opacity={i ? 0.08 : 0.16} />
+                  <path d="M44.6 95 Q45.4 99.5 44.8 105.8" fill="none" stroke="#000" strokeOpacity={0.16} strokeWidth="0.9" strokeLinecap="round" />
+                  {/* Krossovka: ustki qism, oq tag, bog'ich */}
+                  <path d="M36.6 105.6 Q36.2 103.7 38.3 103.7 L46.4 103.7 Q48.9 103.9 49.3 106.6 L49.7 108.7 L35.3 108.7 Q35 106.6 36.6 105.6 Z" fill="#1e293b" stroke="#020617" strokeWidth={SW} strokeLinejoin="round" />
+                  <path d="M34.9 108.2 L50.1 108.2 Q50.5 110.5 48.7 110.7 L36.2 110.7 Q34.5 110.5 34.9 108.2 Z" fill="#f8fafc" stroke="#475569" strokeWidth={0.9} />
+                  <path d="M39.4 105.4 L41.6 104.6 M40.6 106.4 L42.8 105.6" stroke="#e2e8f0" strokeWidth="0.7" strokeLinecap="round" />
+                  <path d="M45.8 105 Q47.6 105.4 48.4 107" fill="none" stroke="#fff" strokeOpacity={0.35} strokeWidth="0.9" strokeLinecap="round" />
+                </g>
+              </g>
+            ))}
+            {/* Oyoqlar orasidagi soya */}
+            <path d="M49.5 94 L50.5 94 L50.2 101" stroke="#000" strokeOpacity={0.25} strokeWidth="1.1" fill="none" />
+          </g>
+        )}
+
+        {/* ---- Tana: bo'yin, yelka, bel (anatomik shakl), kiyim burmalari va kamar ---- */}
+        {!headOnly && (
+          <g>
+            {/* Bo'yin */}
+            <path d="M45.4 48 L45.2 58 Q50 60.6 54.8 58 L54.6 48 Z" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} />
+            <path d="M45.6 53.2 Q50 56 54.4 53.2" fill="none" stroke="#000" strokeOpacity={0.16} strokeWidth="1.8" />
+            <path
+              d="M43.8 56 C37 56.4 31.4 57.8 30.8 64 C30.4 70 32.4 78 33.6 84 Q34.6 89 34.4 95.5 L65.6 95.5 Q65.4 89 66.4 84 C67.6 78 69.6 70 69.2 64 C68.6 57.8 63 56.4 56.2 56 Z"
+              fill={g("body")}
+              stroke={ol(o.body)}
+              strokeWidth={SW}
+              strokeLinejoin="round"
+            />
+            {/* Yoqa: bo'yin ochig'i */}
+            <path d="M43.8 56.1 Q50 62.6 56.2 56.1 Z" fill={g("skin")} stroke={ol(o.body)} strokeWidth={1} />
+            <path d="M43.2 55.8 Q50 64 56.8 55.8" fill="none" stroke={o.trim} strokeWidth="1.8" strokeLinecap="round" />
+            {/* Ko'krak, qorin va yon soyalar — tana hajmli ko'rinadi */}
+            <path d="M37.5 67.5 Q44 71.4 50 70.4 Q56 71.4 62.5 67.5" fill="none" stroke="#000" strokeOpacity={0.1} strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M60.5 59 Q67.4 62 67.6 72 L66 86 Q65.4 92 65.2 95 L61.5 95 Q63.5 80 60.5 59 Z" fill="#000" opacity={0.13} />
+            <path d="M36.5 61 Q33.8 68 34.8 79" fill="none" stroke="#fff" strokeOpacity={0.3} strokeWidth="2" strokeLinecap="round" />
+            <path d="M42 80 Q44 84 42.6 89 M57 79 Q55.6 83 57.2 88" fill="none" stroke="#000" strokeOpacity={0.1} strokeWidth="0.9" strokeLinecap="round" />
+            {cos ? <CostumeChest c={cos} /> : <OutfitDetails kind={look.outfit} o={o} uid={uid} />}
+            {/* Kamar va to'qa */}
+            <rect x="34.2" y="90.8" width="31.6" height="4" rx="1.2" fill={shade(o.legs, 0.7)} stroke={ol(o.legs)} strokeWidth={0.9} />
+            <rect x="47.4" y="91.2" width="5.2" height="3.2" rx="0.8" fill={g("gold")} stroke="#92400e" strokeWidth={0.7} />
+          </g>
+        )}
+
+        {/* ---- Qo'llar: yeng (tirsak bukilishi bilan), manjet va barmoqli kaft ---- */}
+        {!headOnly && (
+          <g>
+            {(["chr-arm-l", "chr-arm-r"] as const).map((cls, i) => (
+              <g key={cls} className={cls}>
+                <g transform={i ? "translate(100 0) scale(-1 1)" : undefined}>
+                  <path d="M33.4 58.4 C27.4 58.2 24 61 23.6 66.4 L23.2 75 Q22.9 81.6 24.5 86.6 L31.4 86.6 Q32.6 81.4 32.8 75 L34 64 Z" fill={g("body")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
+                  {/* Yelka yorug'i va tirsak burmasi */}
+                  <path d="M26 61.6 Q24.4 65.4 24.5 70" fill="none" stroke="#fff" strokeOpacity={i ? 0.12 : 0.3} strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M23.9 75.4 Q27.6 74 31.9 75.2" fill="none" stroke="#000" strokeOpacity={0.18} strokeWidth="0.9" strokeLinecap="round" />
+                  {/* Manjet */}
+                  <rect x="24" y="84.4" width="7.8" height="2.6" rx="1.1" fill={o.trim} stroke={ol(o.body)} strokeWidth={0.8} />
+                  {/* Kaft, bosh barmoq va barmoqlar */}
+                  <path d="M24.4 86.8 Q23.4 91.2 25.4 93.8 Q28 95.6 30.6 93.8 Q32.4 91.3 31.7 86.8 Z" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} strokeLinejoin="round" />
+                  <path d="M31.3 88 Q34 88.4 33.6 91.1 Q33 92.6 31.3 91.8" fill={g("skin")} stroke={ol(skin)} strokeWidth={0.9} strokeLinejoin="round" />
+                  <path d="M26.4 92.2 L26.6 94.2 M28.1 92.6 L28.1 94.9 M29.8 92.2 L29.6 94.3" stroke={ol(skin)} strokeWidth="0.7" strokeLinecap="round" opacity={0.7} />
+                </g>
+                {i === 1 && <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? look.hand} uid={uid} />}
               </g>
             ))}
           </g>
         )}
 
-        {/* ---- Tana va kiyim ---- */}
-        {!headOnly && (
-          <g>
-            <path d="M32 72 Q32 61 42 60.5 L58 60.5 Q68 61 68 72 L69.5 91 Q69.5 97 63 97 L37 97 Q30.5 97 30.5 91 Z" fill={g("body")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
-            {/* Yon soya va yorug'lik */}
-            <path d="M60 63 Q67 66 67.5 78 L68 92 Q67 95 63 95.5 Q65 82 60 63 Z" fill="#000" opacity={0.12} />
-            <path d="M37 65 Q35 72 35.5 82" fill="none" stroke="#fff" strokeOpacity={0.28} strokeWidth="2" strokeLinecap="round" />
-            {cos ? <CostumeChest c={cos} /> : <OutfitDetails kind={look.outfit} o={o} uid={uid} />}
-            {/* Bosh ostidagi soya (bo'yin) */}
-            <ellipse cx="50" cy="61.5" rx="10" ry="2.6" fill="#000" opacity={0.18} />
-          </g>
-        )}
-
-        {/* ---- Qo'llar ---- */}
-        {!headOnly && (
-          <g>
-            <g className="chr-arm-l">
-              <rect x="23" y="63.5" width="10" height="24" rx="5" fill={g("body")} stroke={ol(o.body)} strokeWidth={SW} />
-              <circle cx="28" cy="89" r="5" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} />
-            </g>
-            <g className="chr-arm-r">
-              <rect x="67" y="63.5" width="10" height="24" rx="5" fill={g("body")} stroke={ol(o.body)} strokeWidth={SW} />
-              <circle cx="72" cy="89" r="5" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} />
-              <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? look.hand} uid={uid} />
-            </g>
-          </g>
-        )}
-
-        {/* ---- Bosh ---- */}
+        {/* ---- Bosh: to'liq ko'rinishda kichikroq va yuqoriroq — odamga yaqin nisbat (tana uzunroq) ---- */}
+        <g transform={headOnly ? undefined : HEAD_FIT}>
         <g className={cn("chr-head", sad && "chr-head-sad")} transform={gaze ? `rotate(${(gaze.x * 5).toFixed(1)} 50 60)` : undefined}>
           {/* Quloqlar */}
           {[27.5, 72.5].map((x) => (
@@ -299,6 +343,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           {look.mouth !== "mask" && <path d="M48.6 45.4 Q50 46.9 51.4 45.4" fill="none" stroke={ol(skin)} strokeWidth="1.1" strokeLinecap="round" opacity={0.7} />}
           <Mouth kind={look.mouth} sad={sad} happy={cheer} />
           {cos ? <CostumeHead c={cos} uid={uid} /> : <HeadItem kind={look.head} main={main} uid={uid} />}
+        </g>
         </g>
       </g>
 
@@ -469,7 +514,27 @@ function CostumeHead({ c, uid }: { c: Costume; uid: string }) {
           <path d="M33 18 Q42 12 54 12.5" fill="none" stroke="#fff" strokeOpacity={0.3} strokeWidth="1.8" strokeLinecap="round" />
         </g>
       )}
-      {c.helmet && (
+      {c.helmet && c.helmetStyle === "knight" && (
+        <g stroke="#334155" strokeWidth={SW} strokeLinejoin="round">
+          <path d="M50 12 Q44 2 50 -6 Q58 2 54 10 Z" fill="#dc2626" stroke="#7f1d1d" />
+          <path d="M25 46 Q22 11 50 11 Q78 11 75 46 Q75 60 62 62 L38 62 Q25 60 25 46 Z" fill={`url(#${uid}metal)`} />
+          <path d="M50 12 L50 62" stroke="#94a3b8" strokeWidth="1.2" />
+          <path d="M30 36 L70 36 L70 40 L30 40 Z" fill="#0f172a" />
+          {[34, 40, 46, 54, 60, 66].map((x) => (
+            <path key={x} d={`M${x} 46 L${x} 54`} stroke="#475569" strokeWidth="1.4" strokeLinecap="round" />
+          ))}
+          <path d="M32 20 Q42 14 54 14" fill="none" stroke="#fff" strokeOpacity={0.6} strokeWidth="2" strokeLinecap="round" />
+        </g>
+      )}
+      {c.helmet && c.helmetStyle === "astro" && (
+        <g strokeLinejoin="round">
+          <circle cx="50" cy="38" r="27" fill="#bae6fd" fillOpacity={0.18} stroke="#e2e8f0" strokeWidth="3" />
+          <path d="M30 20 Q40 12 52 12" fill="none" stroke="#fff" strokeOpacity={0.75} strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M66 52 Q70 46 71 40" fill="none" stroke="#fff" strokeOpacity={0.4} strokeWidth="1.6" strokeLinecap="round" />
+          <rect x="40" y="62" width="20" height="4" rx="2" fill="#f97316" stroke="#9a3412" strokeWidth="0.8" />
+        </g>
+      )}
+      {c.helmet && !c.helmetStyle && (
         <g stroke="#334155" strokeWidth={SW} strokeLinejoin="round">
           <path d="M25 46 Q22 11 50 11 Q78 11 75 46 Q75 60 62 62 L38 62 Q25 60 25 46 Z" fill={`url(#${uid}metal)`} />
           <path d="M31 33 Q50 27 69 33 L67 44 Q50 40 33 44 Z" fill="#082f49" />
@@ -484,6 +549,15 @@ function CostumeHead({ c, uid }: { c: Costume; uid: string }) {
           <path d="M28 25 Q50 12 72 25" fill="none" stroke="#fbbf24" strokeWidth="1.6" />
           <circle cx="50" cy="17" r="3" fill="#f8fafc" stroke="none" />
           <path d="M46.5 21.5 L53.5 21.5" stroke="#f8fafc" strokeWidth="1.4" />
+        </g>
+      )}
+      {c.hat === "wizard" && (
+        <g stroke="#2e1065" strokeWidth={SW} strokeLinejoin="round">
+          <path d="M22 27 Q50 20 78 27 Q50 33 22 27 Z" fill="#4c1d95" />
+          <path d="M33 26 Q44 14 52 -6 Q55 10 67 26 Q50 22 33 26 Z" fill="#6d28d9" />
+          <path d="M34.5 23.5 Q50 19.5 65.5 23.5" fill="none" stroke="#fbbf24" strokeWidth="2.2" />
+          <path d="M47 10 l1.2 2.6 2.8.3-2.1 1.9.6 2.8-2.5-1.4-2.5 1.4.6-2.8-2.1-1.9 2.8-.3z" fill="#fde047" stroke="#a16207" strokeWidth="0.5" />
+          <circle cx="58" cy="17" r="1.1" fill="#fde047" stroke="none" />
         </g>
       )}
       {c.hat === "ice" && (

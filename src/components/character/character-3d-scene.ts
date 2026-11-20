@@ -471,14 +471,27 @@ export class Character3DScene {
       if (c.ears === "horns") for (const s of [-1, 1]) this.mesh(new ConeGeometry(0.07, 0.32, 10), this.mat(0xfef3c7), s * 0.28, 0.7, -0.05, head).rotation.z = -s * 0.4;
       if (c.ears === "spikes") for (let i = 0; i < 4; i++) this.mesh(new ConeGeometry(0.08, 0.22, 6), this.mat(hex(c.trim)), 0, 0.66 - i * 0.12, -0.12 - i * 0.16, head).rotation.x = -0.4 - i * 0.35;
     }
-    if (c.helmet) {
+    if (c.helmet && c.helmetStyle === "astro") {
+      // Shisha gumbaz: yuz ko'rinadi
+      this.mesh(new SphereGeometry(0.8, 32, 24), this.mat(0xbae6fd, { transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.1 }), 0, 0, 0, head);
+      this.mesh(new TorusGeometry(0.62, 0.07, 10, 40), this.mat(0xf97316), 0, -0.55, 0, head).rotation.x = Math.PI / 2;
+    } else if (c.helmet) {
       this.mesh(new SphereGeometry(0.7, 32, 24), this.mat(hex(c.body), { metalness: 0.4, roughness: 0.25 }), 0, 0, 0, head);
-      this.mesh(new BoxGeometry(0.86, 0.2, 0.12), this.mat(0x22d3ee, { emissive: 0x0891b2, emissiveIntensity: 0.9 }), 0, 0.05, 0.62, head);
+      if (c.helmetStyle === "knight") {
+        this.mesh(new BoxGeometry(0.86, 0.09, 0.12), this.mat(0x0f172a), 0, 0.1, 0.62, head);
+        this.mesh(new ConeGeometry(0.1, 0.42, 10), this.mat(0xdc2626), 0, 0.86, 0, head);
+      } else this.mesh(new BoxGeometry(0.86, 0.2, 0.12), this.mat(0x22d3ee, { emissive: 0x0891b2, emissiveIntensity: 0.9 }), 0, 0.05, 0.62, head);
     }
     if (c.mask) this.mesh(new TorusGeometry(0.585, 0.08, 8, 40), this.mat(hex(c.mask)), 0, 0.04, 0, head).rotation.x = Math.PI / 2;
     if (c.hat === "pirate") {
       this.mesh(new CylinderGeometry(0.8, 0.8, 0.06, 3), this.mat(0x111827), 0, 0.42, 0, head);
       this.mesh(new SphereGeometry(0.45, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(0x111827), 0, 0.42, 0, head);
+    }
+    if (c.hat === "wizard") {
+      this.mesh(new CylinderGeometry(0.85, 0.85, 0.05, 32), this.mat(0x4c1d95), 0, 0.42, 0, head);
+      const cone = this.mesh(new ConeGeometry(0.48, 1.05, 24), this.mat(0x6d28d9), 0, 0.95, -0.05, head);
+      cone.rotation.x = -0.18;
+      this.mesh(new SphereGeometry(0.07, 10, 8), this.mat(0xfde047, { emissive: 0xfacc15, emissiveIntensity: 0.6 }), 0.18, 0.78, 0.3, head);
     }
     if (c.hat === "ice") for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;

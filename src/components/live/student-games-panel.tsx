@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Eye, Gamepad2, Settings2, Square, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Toggle } from "@/components/ui/toggle";
+import { Pager } from "@/components/ui/pager";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
 import { getStudentGamesForMentorAction, stopStudentGameAction, type StudentGameMonitorItem } from "@/actions/live-game.actions";
@@ -59,7 +60,10 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
   const setPrice = (m: LiveGameMode, v: string) => setSettings((s) => ({ ...s, prices: { ...s.prices, [m]: v === "" ? 0 : Math.max(0, Math.round(Number(v) || 0)) } }));
 
   const active = games.filter((g) => g.status !== "finished");
-  const recent = games.filter((g) => g.status === "finished").slice(0, 10);
+  const recent = games.filter((g) => g.status === "finished");
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(recent.length / 5));
+  const current = Math.min(page, pages);
 
   return (
     <section className="space-y-4 rounded-3xl border border-violet-200 bg-gradient-to-b from-violet-50 to-white p-4 sm:p-5 dark:border-violet-500/20 dark:from-violet-500/5 dark:to-transparent">
@@ -233,9 +237,10 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
         <details className="group">
           <summary className="cursor-pointer text-sm font-bold text-slate-600 dark:text-slate-400">Oxirgi o&apos;yinlar ({recent.length})</summary>
           <div className="mt-2 space-y-2">
-            {recent.map((g) => (
+            {recent.slice((current - 1) * 5, current * 5).map((g) => (
               <GameRow key={g.id} g={g} />
             ))}
+            <Pager page={current} total={pages} onPage={setPage} />
           </div>
         </details>
       )}

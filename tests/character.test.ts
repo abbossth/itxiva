@@ -54,19 +54,19 @@ describe("amallar", () => {
     expect((await act.buyCharacterItemAction("head", "crown")).success).toBe(false);
     // Sotib olish
     r = await act.buyCharacterItemAction("head", "cap");
-    expect(r.success && r.data?.balance).toBe(170);
+    expect(r.success && r.data?.balance).toBe(198);
     expect(r.success && r.data?.owned).toContain("head:cap");
     // Qayta bosish — ikkinchi marta yechilmaydi
     await act.buyCharacterItemAction("head", "cap");
-    expect((await User.findById(u._id).lean())?.spendableBalance).toBe(170);
+    expect((await User.findById(u._id).lean())?.spendableBalance).toBe(198);
     expect(await CoinLedger.countDocuments({ studentId: u._id, type: "purchase" })).toBe(1);
     r = await act.saveCharacterAction({ ...first!.look, head: "cap" });
     expect(r.success && r.data?.look.head).toBe("cap");
     // Kuch: 1-bosqich (50), 2-bosqich 3-darajada (100)
     r = await act.upgradeCharacterPowerAction();
-    expect(r.success && r.data).toMatchObject({ power: 1, balance: 120 });
+    expect(r.success && r.data).toMatchObject({ power: 1, balance: 148 });
     r = await act.upgradeCharacterPowerAction();
-    expect(r.success && r.data).toMatchObject({ power: 2, balance: 20 });
+    expect(r.success && r.data).toMatchObject({ power: 2, balance: 48 });
     // 3-bosqich 5-darajada
     expect((await act.upgradeCharacterPowerAction()).success).toBe(false);
     expect((await act.getMyCharacter())?.look.power).toBe(2);

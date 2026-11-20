@@ -7,6 +7,7 @@ import Link from "@/components/ui/link";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Pager } from "@/components/ui/pager";
 import { useToast } from "@/components/ui/toast";
 import { createLiveGameAction, getLiveGameSetupAction, type LiveGameListItem, type LiveGroupOption } from "@/actions/live-game.actions";
 import { DEFAULT_PRIZES, LIVE_MODES } from "@/lib/live-game/modes";
@@ -45,10 +46,17 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
 
 const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", galaxy: "3D poyga", zone: "Yashil zona", finished: "Yakunlangan" } as const;
 
+const PAGE_SIZE = 5;
+
 export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
   const [open, setOpen] = useState(false);
   const active = games.filter((g) => g.status !== "finished");
   const past = games.filter((g) => g.status === "finished");
+  // Oxirgi o'yinlar — 5 tadan sahifalab
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(past.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const shown = past.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   return (
     <div className="space-y-5">
@@ -76,13 +84,25 @@ export function LiveGamesManager({ games }: { games: LiveGameListItem[] }) {
       )}
 
       <section className="space-y-2">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Oxirgi o&apos;yinlar</h2>
+        <h2 className="flex items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <span>Oxirgi o&apos;yinlar</span>
+          {past.length > PAGE_SIZE && (
+            <span className="normal-case tracking-normal">
+              {(current - 1) * PAGE_SIZE + 1}–{Math.min(current * PAGE_SIZE, past.length)} / {past.length}
+            </span>
+          )}
+        </h2>
         {past.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
             Hali o&apos;yin o&apos;tkazilmagan. &quot;Yangi o&apos;yin&quot; ni bosing.
           </p>
         ) : (
-          past.map((g) => <GameRow key={g.id} game={g} />)
+          <>
+            {shown.map((g) => (
+              <GameRow key={g.id} game={g} />
+            ))}
+            <Pager page={current} total={pages} onPage={setPage} />
+          </>
         )}
       </section>
 
