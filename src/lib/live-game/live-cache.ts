@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { LiveGame, type ILiveGame } from "@/lib/db/models/live-game.model";
 import { LiveGamePlayer, type ILiveGamePlayer } from "@/lib/db/models/live-game-player.model";
 import { Group } from "@/lib/db/models/group.model";
+import { isFresh } from "@/lib/utils";
 
 // Jonli o'yinning umumiy holati (o'yin + barcha o'yinchilar) har server nusxasida qisqa muddat saqlanadi.
 // 100 o'quvchi har 1,5 soniyada holat so'raganda bazaga ~200 ta so'rov/s o'rniga o'yin uchun ~2,5 ta so'rov/s ketadi
@@ -25,7 +26,7 @@ const groupNames = new Map<string, { at: number; name: string }>();
 
 async function groupName(id: string): Promise<string> {
   const c = groupNames.get(id);
-  if (c && Date.now() - c.at < GROUP_TTL_MS) return c.name;
+  if (c && isFresh(c.at, GROUP_TTL_MS, Date.now())) return c.name;
   const g = await Group.findById(id).select("name").lean();
   const name = g?.name ?? "";
   if (groupNames.size > 500) groupNames.clear();
@@ -46,7 +47,7 @@ async function load(gameId: string): Promise<LiveSnapshot | null> {
 export function liveSnapshot(gameId: string): Promise<LiveSnapshot | null> {
   const now = Date.now();
   const c = snaps.get(gameId);
-  if (c && now - c.at < TTL_MS) return c.p;
+  if (c && isFresh(c.at, TTL_MS, now)) return c.p;
   const p = load(gameId).catch((err) => {
     snaps.delete(gameId);
     throw err;

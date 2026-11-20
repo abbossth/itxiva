@@ -11,7 +11,8 @@ import { getStudentGamesForMentorAction, stopStudentGameAction, type StudentGame
 import { updateStudentGamesSettingsAction } from "@/actions/settings.actions";
 import { LIVE_MODES } from "@/lib/live-game/modes";
 import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
-import { MIN_STUDENT_GAME_PRICE, type StudentGamesSettings } from "@/lib/live-game/student-games-config";
+import { MIN_DISCOUNTED_PRICE, MIN_STUDENT_GAME_PRICE, isFreeNow, type StudentGamesSettings } from "@/lib/live-game/student-games-config";
+import { dateFromKey, fromTashkentInputValue, toDateKey, toTashkentInputValue } from "@/lib/schedule";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { GoldCoin } from "@/components/ui/gold-coin";
@@ -37,17 +38,23 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
   const [stop, setStop] = useState<{ game: StudentGameMonitorItem; refund: boolean } | null>(null);
   const [stopping, setStopping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [nowMs, setNowMs] = useState(0);
 
   // Kuzatuv: har 5 soniyada (yashirin tabda — yo'q)
   useEffect(() => {
     const tick = () => {
+      setNowMs(Date.now());
       if (document.visibilityState !== "visible") return;
       void getStudentGamesForMentorAction()
         .then((r) => r.success && setGames(r.data))
         .catch(() => {});
     };
+    const first = setTimeout(tick, 0);
     const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, []);
 
   const save = () =>
@@ -165,6 +172,87 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
                   className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
                 />
               </label>
+            </div>
+          </div>
+          {/* Skidka va bepul davr */}
+          <div className="space-y-3 rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200 dark:bg-emerald-500/5 dark:ring-emerald-500/20">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                🏷️ Skidka: har bir o&apos;yin necha coin arzon (0 — skidka yo&apos;q)
+                <input
+                  type="number"
+                  min={0}
+                  max={500}
+                  value={settings.discount}
+                  onChange={(e) => setSettings((s) => ({ ...s, discount: Math.min(500, Math.max(0, Math.round(Number(e.target.value) || 0))) }))}
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                />
+                <span className="mt-1 block text-[11px] font-normal text-slate-500">Narx {MIN_DISCOUNTED_PRICE} coindan kam bo&apos;lmaydi. Masalan, klassik: {settings.prices.classic} → {Math.max(MIN_DISCOUNTED_PRICE, settings.prices.classic - settings.discount)}</span>
+              </label>
+              <div className="flex items-end">
+                <Toggle checked={settings.freePrizes} onChange={(v) => setSettings((s) => ({ ...s, freePrizes: v }))} label="Bepul o'yinlarda ham g'oliblarga coin" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                🎁 Bepul davr — shu vaqt ichida o&apos;quvchilar coin to&apos;lamasdan o&apos;yin ochadi{" "}
+                {nowMs > 0 && isFreeNow(settings, nowMs) ? (
+                  <span className="ml-1 rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-black text-white">hozir faol</span>
+                ) : nowMs > 0 && settings.freeUntil && Date.parse(settings.freeUntil) > nowMs ? (
+                  <span className="ml-1 rounded-full bg-amber-400 px-2 py-0.5 text-xs font-black text-slate-900">rejalashtirilgan</span>
+                ) : null}
+              </p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  Boshlanishi
+                  <input
+                    type="datetime-local"
+                    value={settings.freeFrom ? toTashkentInputValue(settings.freeFrom) : ""}
+                    onChange={(e) => setSettings((s) => ({ ...s, freeFrom: fromTashkentInputValue(e.target.value)?.toISOString() ?? null }))}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                  Tugashi
+                  <input
+                    type="datetime-local"
+                    value={settings.freeUntil ? toTashkentInputValue(settings.freeUntil) : ""}
+                    onChange={(e) => setSettings((s) => ({ ...s, freeUntil: fromTashkentInputValue(e.target.value)?.toISOString() ?? null }))}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                  />
+                </label>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { label: "1 soat", ms: 3_600_000 },
+                  { label: "Bugun kechgacha", ms: null },
+                  { label: "3 kun", ms: 3 * 86_400_000 },
+                  { label: "1 hafta", ms: 7 * 86_400_000 },
+                ].map((b) => (
+                  <button
+                    key={b.label}
+                    type="button"
+                    onClick={(ev) => {
+                      const now = performance.timeOrigin + ev.timeStamp;
+                      const until = b.ms === null ? dateFromKey(toDateKey(now), "23:59").getTime() : now + b.ms;
+                      setSettings((s) => ({ ...s, freeFrom: new Date(now).toISOString(), freeUntil: new Date(until).toISOString() }));
+                    }}
+                    className="cursor-pointer rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-300 hover:bg-emerald-50 dark:bg-slate-900 dark:text-emerald-300"
+                  >
+                    {b.label}
+                  </button>
+                ))}
+                {(settings.freeFrom || settings.freeUntil) && (
+                  <button
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, freeFrom: null, freeUntil: null }))}
+                    className="cursor-pointer rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-rose-600 ring-1 ring-rose-300 hover:bg-rose-50 dark:bg-slate-900"
+                  >
+                    Bepul davrni to&apos;xtatish
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">O&apos;zgarish «Saqlash» bosilgandan keyin kuchga kiradi.</p>
             </div>
           </div>
           <div className="grid gap-3 rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200 sm:grid-cols-2 dark:bg-rose-500/5 dark:ring-rose-500/20">

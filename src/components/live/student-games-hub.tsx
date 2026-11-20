@@ -10,7 +10,7 @@ import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
 import type { StudentGameAudience } from "@/lib/live-game/student-games-config";
 import { haptic } from "@/lib/haptics";
 import { playRankUp, unlockSound } from "@/lib/sound";
-import { cn, formatNumberUz } from "@/lib/utils";
+import { cn, formatDateTimeUz, formatNumberUz } from "@/lib/utils";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { PrizeLine } from "./student-fund";
 import { GoldCoin } from "@/components/ui/gold-coin";
@@ -31,13 +31,17 @@ const nonce = () => `${Date.now().toString(36)}${Math.random().toString(36).slic
 
 export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | null; games: PlayableGame[] }) {
   const router = useRouter();
-  const open = LIVE_GAME_MODES.filter((m) => setup?.prices[m]);
+  // Ochiq turlar — to'liq narx bo'yicha (bepul davrda yig'iladigan narx 0 bo'ladi)
+  const open = LIVE_GAME_MODES.filter((m) => setup?.fullPrices[m]);
+  const free = Boolean(setup?.freeUntil);
   const [mode, setMode] = useState<LiveGameMode | null>(open[0] ?? null);
   const [audience, setAudience] = useState<StudentGameAudience>("group");
   const [count, setCount] = useState(10);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const price = mode && setup?.prices[mode] ? setup.prices[mode]! + (audience === "grade" ? setup.gradeExtra : 0) : 0;
+  const extra = audience === "grade" ? setup?.gradeExtra ?? 0 : 0;
+  const price = free || !mode || setup?.prices[mode] == null ? 0 : setup.prices[mode]! + extra;
+  const fullPrice = mode && setup?.fullPrices[mode] ? setup.fullPrices[mode]! + extra : 0;
   const [firstRaw, setFirst] = useState(5);
   const first = Math.max(1, Math.min(price || 1, firstRaw, setup?.balance ?? 0));
 
@@ -46,7 +50,7 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
       if (!mode) return;
       unlockSound();
       setError(null);
-      const r = await createStudentGameAction({ mode, audience, count, first, nonce: nonce() });
+      const r = await createStudentGameAction({ mode, audience, count, first: free ? 0 : first, nonce: nonce() });
       if (!r.success) {
         setError(r.error);
         return;
@@ -143,7 +147,16 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-black">{LIVE_MODES[m].title}</span>
-                        <span className={cn("text-xs font-bold", on ? "text-amber-600" : "text-amber-200")}><GoldCoin /> {setup.prices[m]}</span>
+                        <span className={cn("text-xs font-bold", on ? "text-amber-600" : "text-amber-200")}>
+                          {free ? (
+                            <span className={on ? "text-emerald-600" : "text-emerald-300"}>Bepul</span>
+                          ) : (
+                            <>
+                              <GoldCoin /> {setup.prices[m]}
+                              {setup.discount > 0 && setup.fullPrices[m] !== setup.prices[m] && <s className="ml-1 opacity-60">{setup.fullPrices[m]}</s>}
+                            </>
+                          )}
+                        </span>
                       </span>
                     </button>
                   );
@@ -190,10 +203,26 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 </div>
               </div>
 
-              {mode && (
+              {mode && free && (
+                <div className="rounded-2xl bg-emerald-400/20 p-3 ring-1 ring-emerald-300/40">
+                  <p className="text-sm font-black text-emerald-100">🎁 Bepul davr! Coin kerak emas — o&apos;yinni oching, do&apos;stlaringiz qo&apos;shilgach o&apos;zingiz boshlaysiz.</p>
+                  <p className="mt-1 text-[11px] text-white/70">
+                    {formatDateTimeUz(setup.freeUntil!)} gacha{!setup.freePrizes ? " · bepul o'yinlarda sovrin yo'q" : ""}
+                  </p>
+                </div>
+              )}
+
+              {mode && !free && (
                 <div className="rounded-2xl bg-black/20 p-3">
                   <p className="text-sm font-bold">
-                    O&apos;yin narxi: <b className="text-amber-300"><GoldCoin /> {price}</b> — siz boshlab berasiz, qolganini qatnashchilar qo&apos;shadi
+                    O&apos;yin narxi: <b className="text-amber-300"><GoldCoin /> {price}</b>
+                    {fullPrice > price && (
+                      <>
+                        {" "}
+                        <s className="text-white/50">{fullPrice}</s> <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black">SKIDKA −{fullPrice - price}</span>
+                      </>
+                    )}{" "}
+                    — siz boshlab berasiz, qolganini qatnashchilar qo&apos;shadi
                   </p>
                   <div className="mt-2 flex items-center gap-3">
                     <span className="text-xs font-bold text-white/70">Sizning hissangiz:</span>
@@ -212,15 +241,15 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 </div>
               )}
 
-              {mode && <PrizeLine prizes={mode === "team" ? [setup.teamPrize] : setup.prizes} team={mode === "team"} minPlayers={setup.minPlayers} light />}
+              {mode && (!free || setup.freePrizes) && <PrizeLine prizes={mode === "team" ? [setup.teamPrize] : setup.prizes} team={mode === "team"} minPlayers={setup.minPlayers} light />}
               {error && <p className="rounded-xl bg-rose-500/30 px-3 py-2 text-sm font-bold">{error}</p>}
               <button
                 type="button"
-                disabled={pending || !mode || Boolean(setup.blocked) || setup.questions === 0 || setup.balance < 1}
+                disabled={pending || !mode || Boolean(setup.blocked) || setup.questions === 0 || (!free && setup.balance < 1)}
                 onClick={create}
                 className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-300 to-yellow-400 py-3.5 text-base font-black text-slate-900 shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {pending ? "Ochilmoqda…" : `O'yinni ochish · ${first} coin qo'shaman`}
+                {pending ? "Ochilmoqda…" : free ? "O'yinni ochish · bepul" : `O'yinni ochish · ${first} coin qo'shaman`}
               </button>
               <p className="text-center text-[11px] text-white/70">
                 Bugun: {setup.createdToday}/{setup.dailyLimit} ta o&apos;yin · Dars vaqtida va darsni sababsiz qoldirgandan keyin o&apos;yinlar yopiq bo&apos;lishi

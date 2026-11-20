@@ -34,6 +34,7 @@ import {
   teamSpawn,
   type PowerKind,
 } from "./pvp";
+import { isFresh } from "@/lib/utils";
 
 type Id = mongoose.Types.ObjectId | string;
 
@@ -60,7 +61,7 @@ export function invalidatePvp(gameId: Id) {
 export async function loadPvpGame(gameId: Id): Promise<CachedGame | null> {
   const k = String(gameId);
   const c = gameCache.get(k);
-  if (c && Date.now() - c.at < TTL) return c.v;
+  if (c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = (await LiveGame.findById(gameId).select("groupId grade status arena").lean()) as CachedGame | null;
   if (gameCache.size > 200) sweep();
   gameCache.set(k, { at: Date.now(), v });
@@ -70,7 +71,7 @@ export async function loadPvpGame(gameId: Id): Promise<CachedGame | null> {
 async function loadPlayers(gameId: Id): Promise<CachedPlayer[]> {
   const k = String(gameId);
   const c = playersCache.get(k);
-  if (c && Date.now() - c.at < TTL) return c.v;
+  if (c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = (await LiveGamePlayer.find({ gameId, arena: { $ne: null } }).select("name studentId arena createdAt").lean()) as CachedPlayer[];
   playersCache.set(k, { at: Date.now(), v });
   return v;

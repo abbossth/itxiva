@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { LiveGame, type ILiveGalaxy } from "@/lib/db/models/live-game.model";
 import { LiveGamePlayer, type ILiveGalaxyPlayer } from "@/lib/db/models/live-game-player.model";
 import { MAX_ORBS, MAX_SPEED_CHECK, type GalaxyPeer } from "./galaxy";
+import { isFresh } from "@/lib/utils";
 
 // "Galaktika poygasi 3D" server qismi: har o'quvchi soniyasiga ~4 marta o'z masofasi, yonlama joyi va kristallarini
 // yuboradi va javobda boshqa kemalarni oladi. Masofa vaqtga nisbatan cheklanadi (eng katta tezlikdan oshib bo'lmaydi).
@@ -24,7 +25,7 @@ function sweep() {
 export async function loadGalaxyGame(gameId: Id): Promise<CachedGame | null> {
   const key = String(gameId);
   const c = gameCache.get(key);
-  if (c && Date.now() - c.at < TTL) return c.v;
+  if (c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = await LiveGame.findById(gameId).select("groupId grade status galaxy").lean<CachedGame>();
   sweep();
   gameCache.set(key, { at: Date.now(), v });
@@ -34,7 +35,7 @@ export async function loadGalaxyGame(gameId: Id): Promise<CachedGame | null> {
 async function loadRacers(gameId: Id, round: number): Promise<CachedPlayer[]> {
   const key = `${gameId}:${round}`;
   const c = playersCache.get(key);
-  if (c && Date.now() - c.at < TTL) return c.v;
+  if (c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = await LiveGamePlayer.find({ gameId, "galaxy.round": round }).select("name studentId galaxy").lean<CachedPlayer[]>();
   playersCache.set(key, { at: Date.now(), v });
   return v;

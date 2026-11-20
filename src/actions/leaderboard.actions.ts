@@ -7,7 +7,7 @@ import { Group } from "@/lib/db/models/group.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { groupShortName } from "@/lib/group-name";
 import { requireAuth } from "@/lib/auth/guards";
-import { formatShortName } from "@/lib/utils";
+import { formatShortName, isFresh } from "@/lib/utils";
 import { getAppSettings } from "@/lib/settings";
 import { LEGACY_EARNING_TYPES } from "@/lib/gamification/backfill";
 import { buildLevels, levelForXp } from "@/lib/gamification/levels";
@@ -58,7 +58,7 @@ const boardCache = new Map<string, { at: number; p: Promise<BoardBase> }>();
 function boardBase(key: string, load: () => Promise<BoardBase>): Promise<BoardBase> {
   const now = Date.now();
   const c = boardCache.get(key);
-  if (c && now - c.at < BOARD_TTL_MS) return c.p;
+  if (c && isFresh(c.at, BOARD_TTL_MS, now)) return c.p;
   const p = load();
   if (boardCache.size > 200) boardCache.clear();
   boardCache.set(key, { at: now, p });

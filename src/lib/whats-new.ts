@@ -29,6 +29,38 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-games-sale-2026-11",
+    date: "2026-11-20",
+    audience: "student",
+    badge: "Skidka",
+    title: "Jonli o'yinlar arzonlashdi!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏷️",
+        title: "Har bir o'yin 5 coin arzon",
+        text: "«Jonli o'yin» bo'limida o'yin ochish endi skidkada: har bir tur 5 coin arzon — masalan, klassik 15 emas, 10 coin. Mentor ba'zan bepul davr ham ochadi — o'shanda coin to'lamasdan o'yin ochib, o'zingiz boshlaysiz!",
+      },
+    ],
+    cta: { label: "O'yin ochish", href: "/live" },
+  },
+  {
+    id: "mentor-student-games-sale-2026-11",
+    date: "2026-11-20",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchilar o'yini: skidka va bepul davr",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎁",
+        title: "Skidka va bepul davr sizning qo'lingizda",
+        text: "«Jonli o'yin» → «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»: skidka (sukutda har o'yin 5 coin arzon, 0 — o'chiq) va bepul davr — boshlanish/tugash vaqtini belgilang yoki «1 soat», «Bugun kechgacha», «3 kun», «1 hafta» tugmalarini bosing. Bepul davrda o'quvchilar coin to'lamasdan o'yin ochadi va o'zi boshlaydi; bepul o'yinlarda sovrin sukut bo'yicha berilmaydi (xohlasangiz yoqasiz).",
+      },
+    ],
+    cta: { label: "Sozlash", href: "/mentor/live" },
+  },
+  {
     id: "arena-shield-2026-11",
     date: "2026-11-20",
     audience: "student",

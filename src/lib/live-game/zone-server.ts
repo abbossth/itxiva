@@ -23,6 +23,7 @@ import {
   type ZoneSeat,
 } from "./zone";
 import type { ZoneRoomResults, ZoneTicket } from "./zone-room";
+import { isFresh } from "@/lib/utils";
 
 // "Yashil zona" server qismi.
 // 1) Real vaqt xonasi (Cloudflare, `zone-room.ts`) sozlangan bo'lsa — robotlar WebSocket orqali yuradi, to'lqin natijasini
@@ -54,7 +55,7 @@ function invalidate(gameId: Id, round: number) {
 export async function loadZoneGame(gameId: Id): Promise<CachedGame | null> {
   const key = String(gameId);
   const c = gameCache.get(key);
-  if (c && Date.now() - c.at < TTL) return c.v;
+  if (c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = await LiveGame.findById(gameId).select("groupId grade status zone").lean<CachedGame>();
   sweep();
   gameCache.set(key, { at: Date.now(), v });
@@ -64,7 +65,7 @@ export async function loadZoneGame(gameId: Id): Promise<CachedGame | null> {
 async function loadRunners(gameId: Id, round: number, fresh = false): Promise<CachedPlayer[]> {
   const key = `${gameId}:${round}`;
   const c = playersCache.get(key);
-  if (!fresh && c && Date.now() - c.at < TTL) return c.v;
+  if (!fresh && c && isFresh(c.at, TTL, Date.now())) return c.v;
   const v = await LiveGamePlayer.find({ gameId, "zone.round": round }).select("name studentId zone").lean<CachedPlayer[]>();
   playersCache.set(key, { at: Date.now(), v });
   return v;
@@ -234,7 +235,7 @@ export async function zoneRealtimeEnabled(): Promise<boolean> {
   const base = process.env.NEXT_PUBLIC_ARENA_WS_URL;
   if (!base || !process.env.ARENA_SECRET) return false;
   if (process.env.VITEST) return true;
-  if (healthCache && Date.now() - healthCache.at < 120_000) return healthCache.ok;
+  if (healthCache && isFresh(healthCache.at, 120_000, Date.now())) return healthCache.ok;
   let ok = false;
   try {
     const url = `${base.replace(/\/$/, "").replace(/^ws/, "http")}/health/zone`;

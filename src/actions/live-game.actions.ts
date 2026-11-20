@@ -21,7 +21,8 @@ import {
   FUNDED_START_S,
   STUDENT_GAME_COUNTS,
   STUDENT_LOBBY_MAX_MS,
-  studentGamePrice,
+  isFreeNow,
+  studentGameCost,
   studentGamePrizes,
   type StudentGameAudience,
 } from "@/lib/live-game/student-games-config";
@@ -124,6 +125,7 @@ function arenaRoundDue(mode: LiveGameMode, index: number, total: number, done: n
 }
 import { arenaSocketUrl, finishPvp, loadPvpGame, pvpTick, setupPvp, watchPvp, type PvpTickInput, type PvpTickResult, type PvpWorld } from "@/lib/live-game/pvp-server";
 import { mayPlay } from "@/lib/live-game/student-games";
+import { isFresh } from "@/lib/utils";
 
 // Jonli o'yin: mentor proyektorda boshqaradi, o'quvchilar telefondan qo'shiladi. Holat qisqa so'rovlar bilan olinadi.
 
@@ -154,7 +156,7 @@ const activeByGroup = new Map<string, { at: number; p: Promise<ActiveGame> }>();
 function activeGameOfGroup(groupId: string, grade: number | null = null): Promise<ActiveGame> {
   const now = Date.now();
   const c = activeByGroup.get(groupId);
-  if (c && now - c.at < ACTIVE_TTL_MS) return c.p;
+  if (c && isFresh(c.at, ACTIVE_TTL_MS, now)) return c.p;
   // Guruh o'yini yoki butun sinf uchun ochilgan o'quvchi o'yini; mentor o'yini birinchi
   const p = LiveGame.findOne({ ...activeFilter(), $or: [{ groupId }, ...(grade !== null ? [{ studentGame: true, grade }] : [])] })
     .select("mode status")
@@ -1242,7 +1244,7 @@ export interface LiveHostState {
 function recentPushes(players: ILiveGamePlayer[]): Map<string, { from: string; dir: PushDir; at: number }> {
   const now = Date.now();
   const m = new Map<string, { from: string; dir: PushDir; at: number }>();
-  for (const p of players) if (p.push && now - p.push.at < PUSH_MS) m.set(p.push.to, { from: p._id.toString(), dir: p.push.dir, at: p.push.at });
+  for (const p of players) if (p.push && isFresh(p.push.at, PUSH_MS, now)) m.set(p.push.to, { from: p._id.toString(), dir: p.push.dir, at: p.push.at });
   return m;
 }
 
@@ -1274,8 +1276,8 @@ const toRows = (players: ILiveGamePlayer[], mode: LiveGameMode, index: number, p
           : null,
       tactic: ans?.tactic ?? null,
       look: (p.look as GameLook | null | undefined) ?? null,
-      emote: p.emote && Date.now() - p.emote.at < EMOTE_MS ? { id: p.emote.id, at: p.emote.at } : null,
-      push: p.push && Date.now() - p.push.at < PUSH_MS ? { to: p.push.to, dir: p.push.dir, at: p.push.at } : null,
+      emote: p.emote && isFresh(p.emote.at, EMOTE_MS, Date.now()) ? { id: p.emote.id, at: p.emote.at } : null,
+      push: p.push && isFresh(p.push.at, PUSH_MS, Date.now()) ? { to: p.push.to, dir: p.push.dir, at: p.push.at } : null,
       pushedBy: pushed.get(p._id.toString()) ?? null,
     };
   });
@@ -1375,7 +1377,7 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
 const rosterCache = new Map<string, { at: number; list: { id: string; name: string }[] }>();
 async function groupRoster(groupId: string): Promise<{ id: string; name: string }[]> {
   const c = rosterCache.get(groupId);
-  if (c && Date.now() - c.at < 15_000) return c.list;
+  if (c && isFresh(c.at, 15_000, Date.now())) return c.list;
   const list = (await User.find({ groupId, role: "student" }).select("fullName").sort({ fullName: 1 }).lean()).map((u) => ({ id: u._id.toString(), name: u.fullName }));
   if (rosterCache.size > 100) rosterCache.clear();
   rosterCache.set(groupId, { at: Date.now(), list });
@@ -1683,6 +1685,8 @@ export interface LivePlayerState {
     funded: boolean;
     /** Boshlanmay bekor qilingan (coinlar qaytarilgan) */
     cancelled: boolean;
+    /** Bepul o'yin (coin yig'ilmaydi — egasi boshlaydi) */
+    free: boolean;
     /** G'oliblar sovrini (jamoaviyda — g'olib jamoa a'zolariga birinchisi) va kerakli o'yinchilar soni */
     prizes: number[];
     minPlayers: number;
@@ -1910,6 +1914,7 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
               paid: game.paid ?? 0,
               funded: Boolean(game.fundedAt),
               cancelled: game.status === "finished" && !game.introAt,
+              free: (game.price ?? 0) === 0,
               prizes: game.prizes ?? [],
               minPlayers: game.minPlayers ?? 0,
               startsInMs:
@@ -2475,8 +2480,15 @@ export interface StudentGameSetup {
   questions: number;
   dailyLimit: number;
   createdToday: number;
-  /** Tur → narx (guruh uchun); null — yopiq */
+  /** Tur → yig'iladigan narx (guruh uchun, skidka bilan); null — yopiq */
   prices: Record<LiveGameMode, number | null>;
+  /** Skidkasiz to'liq narx (ustidan chizib ko'rsatiladi) va skidka miqdori */
+  fullPrices: Record<LiveGameMode, number | null>;
+  discount: number;
+  /** Bepul davr: qachongacha (ISO); null — bepul emas */
+  freeUntil: string | null;
+  /** Bepul o'yinda g'oliblarga coin berilsinmi */
+  freePrizes: boolean;
   gradeExtra: number;
   /** G'oliblar sovrini (1-, 2-, 3-o'rin), jamoaviyda g'olib jamoaga, kerakli o'yinchilar */
   prizes: number[];
@@ -2535,7 +2547,13 @@ export async function getStudentGameSetupAction(): Promise<Result<StudentGameSet
       studentGameBlock(user, "group"),
     ]);
     const prices = {} as Record<LiveGameMode, number | null>;
-    for (const m of MODES) prices[m] = studentGamePrice(settings, m, "group");
+    const fullPrices = {} as Record<LiveGameMode, number | null>;
+    for (const m of MODES) {
+      const c = studentGameCost(settings, m, "group");
+      prices[m] = c?.price ?? null;
+      fullPrices[m] = c?.full ?? null;
+    }
+    const free = isFreeNow(settings);
     return {
       success: true,
       data: {
@@ -2549,6 +2567,10 @@ export async function getStudentGameSetupAction(): Promise<Result<StudentGameSet
         dailyLimit: settings.dailyLimit,
         createdToday,
         prices,
+        fullPrices,
+        discount: free ? 0 : settings.discount,
+        freeUntil: free ? settings.freeUntil : null,
+        freePrizes: settings.freePrizes,
         gradeExtra: settings.gradeExtra,
         prizes: [...settings.prizes],
         teamPrize: settings.teamPrize,
@@ -2635,10 +2657,12 @@ export async function createStudentGameAction(input: {
     if (!rate.allowed) return fail(`Juda ko'p urinish. ${rate.resetInSeconds} soniyadan keyin urinib ko'ring`);
     await connectDB();
     const settings = (await getAppSettings()).studentGames;
-    const price = studentGamePrice(settings, input.mode, input.audience);
-    if (price === null) return fail("Bu o'yin turi o'quvchilar uchun yopiq");
-    const first = Math.floor(Number(input.first));
-    if (!Number.isFinite(first) || first < 1 || first > price) return fail(`Birinchi hissa 1 dan ${price} coingacha bo'lishi kerak`);
+    const cost = studentGameCost(settings, input.mode, input.audience);
+    if (cost === null) return fail("Bu o'yin turi o'quvchilar uchun yopiq");
+    const price = cost.price;
+    // Bepul davrda coin yig'ilmaydi — egasi o'zi boshlaydi
+    const first = cost.free ? 0 : Math.floor(Number(input.first));
+    if (!cost.free && (!Number.isFinite(first) || first < 1 || first > price)) return fail(`Birinchi hissa 1 dan ${price} coingacha bo'lishi kerak`);
     const blocked = await studentGameBlock(user, input.audience);
     if (blocked) return fail(blocked);
     const [me, grade] = await Promise.all([User.findById(user.userId).select("fullName spendableBalance").lean(), gradeOfGroup(user.groupId)]);
@@ -2655,7 +2679,8 @@ export async function createStudentGameAction(input: {
       mode: input.mode,
       source: "all",
       teams: 2,
-      prizes: studentGamePrizes(settings, input.mode),
+      // Bepul o'yinda sovrin faqat mentor ruxsat bersa
+      prizes: cost.free && !settings.freePrizes ? [0, 0, 0] : studentGamePrizes(settings, input.mode),
       minPlayers: settings.minPlayersForPrizes,
       questions,
       options:
@@ -2673,10 +2698,12 @@ export async function createStudentGameAction(input: {
       price,
       paid: 0,
     });
-    const paid = await addContribution(game._id, { id: user.userId, name: me.fullName }, first, `${game._id}:${user.userId}:${input.nonce}`, title);
-    if (!paid.success) {
-      await LiveGame.deleteOne({ _id: game._id });
-      return fail(paid.error);
+    if (!cost.free) {
+      const paid = await addContribution(game._id, { id: user.userId, name: me.fullName }, first, `${game._id}:${user.userId}:${input.nonce}`, title);
+      if (!paid.success) {
+        await LiveGame.deleteOne({ _id: game._id });
+        return fail(paid.error);
+      }
     }
     activeByGroup.clear();
     await joinLiveGameAction(game._id.toString());
@@ -2707,6 +2734,24 @@ export async function contributeStudentGameAction(gameId: string, amount: number
     return await addContribution(game._id, { id: user.userId, name: me.fullName }, n, `${gameId}:${user.userId}:${nonce}`, LIVE_MODES[game.mode].title);
   } catch (err) {
     return errorOf(err, "Coin qo'shib bo'lmadi");
+  }
+}
+
+/** O'yin egasi: bepul o'yinni boshlash (coin yig'ilmaydi) — bir necha soniyadan keyin o'zi start oladi */
+export async function startFreeStudentGameAction(gameId: string): Promise<Result<{ started: boolean }>> {
+  try {
+    const user = await requireStudent();
+    if (!mongoose.isValidObjectId(gameId)) return fail("O'yin topilmadi");
+    await connectDB();
+    const res = await LiveGame.updateOne(
+      { _id: gameId, studentGame: true, creatorId: user.userId, status: "lobby", price: 0, fundedAt: null, introAt: null },
+      { $set: { fundedAt: new Date() } }
+    );
+    if (res.modifiedCount === 0) return fail("O'yinni boshlab bo'lmadi");
+    invalidateLiveSnapshot(gameId);
+    return { success: true, data: { started: true } };
+  } catch (err) {
+    return errorOf(err, "O'yinni boshlab bo'lmadi");
   }
 }
 
@@ -2867,7 +2912,7 @@ function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: Live
   const byId = new Map(players.map((p) => [p._id.toString(), p]));
   const now = Date.now();
   const incoming = recentPushes(players).get(myId);
-  const out = mine.push && now - mine.push.at < PUSH_MS ? mine.push : null;
+  const out = mine.push && isFresh(mine.push.at, PUSH_MS, now) ? mine.push : null;
   return {
     left: view(left),
     right: view(right),

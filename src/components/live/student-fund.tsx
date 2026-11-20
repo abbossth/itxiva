@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { cancelMyStudentGameAction, contributeStudentGameAction, type LivePlayerState } from "@/actions/live-game.actions";
+import { cancelMyStudentGameAction, contributeStudentGameAction, startFreeStudentGameAction, type LivePlayerState } from "@/actions/live-game.actions";
 import { CONTRIBUTION_STEPS } from "@/lib/live-game/student-games-config";
 import { LIVE_MODES } from "@/lib/live-game/modes";
 import { haptic } from "@/lib/haptics";
@@ -49,6 +49,18 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
       onChange();
     });
 
+  const startFree = () =>
+    start(async () => {
+      unlockSound();
+      const r = await startFreeStudentGameAction(state.id);
+      if (!r.success) setMsg({ text: r.error, ok: false });
+      else {
+        playRankUp();
+        haptic([20, 40, 20]);
+        onChange();
+      }
+    });
+
   const cancel = () =>
     start(async () => {
       const r = await cancelMyStudentGameAction(state.id);
@@ -68,13 +80,38 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
           </p>
           <p className="truncate text-lg font-black text-white">{LIVE_MODES[state.mode].title}</p>
         </div>
-        <span className="shrink-0 rounded-2xl bg-black/30 px-3 py-1.5 font-mono text-lg font-black text-amber-300">
-          <GoldCoin /> {sg.paid}/{sg.price}
-        </span>
+        {sg.free ? (
+          <span className="shrink-0 rounded-2xl bg-emerald-400 px-3 py-1.5 text-sm font-black text-slate-950">🎁 Bepul</span>
+        ) : (
+          <span className="shrink-0 rounded-2xl bg-black/30 px-3 py-1.5 font-mono text-lg font-black text-amber-300">
+            <GoldCoin /> {sg.paid}/{sg.price}
+          </span>
+        )}
       </div>
 
+      {/* Bepul o'yin: coin yig'ilmaydi — egasi boshlaydi */}
+      {sg.free && !sg.funded && (
+        <div className="mt-3 text-center">
+          {sg.creator ? (
+            <>
+              <p className="text-sm font-bold text-emerald-200">Bepul davr! Do&apos;stlaringiz qo&apos;shilgach o&apos;yinni boshlang</p>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={startFree}
+                className="mt-2 w-full cursor-pointer rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3 text-lg font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-60"
+              >
+                ▶ O&apos;yinni boshlash
+              </button>
+            </>
+          ) : (
+            <p className="text-sm font-bold text-emerald-200">Bepul o&apos;yin — {sg.creatorName.split(" ")[0]} boshlashini kuting</p>
+          )}
+        </div>
+      )}
+
       {/* Yig'ish shkalasi */}
-      <div className="relative mt-3 h-5 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
+      <div className={cn("relative mt-3 h-5 overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10", sg.free && "hidden")}>
         <div
           className={cn("h-full rounded-full bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-500 transition-[width] duration-700 ease-out", sg.funded && "fund-glow")}
           style={{ width: `${pct}%` }}
@@ -84,9 +121,9 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
 
       {sg.funded ? (
         <p className="quiz-pop mt-3 text-center text-xl font-black text-emerald-300">
-          🎉 Coin yig&apos;ildi! O&apos;yin {countdown > 0 ? `${countdown} soniyada` : "hozir"} boshlanadi
+          🎉 {sg.free ? "Boshlanmoqda" : "Coin yig'ildi"}! O&apos;yin {countdown > 0 ? `${countdown} soniyada` : "hozir"} boshlanadi
         </p>
-      ) : (
+      ) : sg.free ? null : (
         <>
           <p className="mt-2 text-center text-sm font-bold text-amber-100">
             O&apos;yin boshlanishi uchun yana <b className="text-amber-300">{left} coin</b> kerak — har kim qo&apos;sha oladi

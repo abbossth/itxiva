@@ -15,6 +15,7 @@ const { Quiz } = await import("@/lib/db/models/quiz.model");
 const { LiveGame } = await import("@/lib/db/models/live-game.model");
 const { LiveGamePlayer } = await import("@/lib/db/models/live-game-player.model");
 const { CoinLedger } = await import("@/lib/db/models/coin-ledger.model");
+const { AppSettings } = await import("@/lib/db/models/app-settings.model");
 const { AttendanceSession } = await import("@/lib/db/models/attendance-session.model");
 const { AttendanceRecord } = await import("@/lib/db/models/attendance-record.model");
 const live = await import("@/actions/live-game.actions");
@@ -65,14 +66,14 @@ const balance = async (u: { _id: unknown }) => (await User.findById(u._id).lean(
 const as = (u: Parameters<typeof sessionFor>[0]) => actAs(sessionFor(u));
 
 describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
-  it("klassik 15 coin: 5 + 2 + 4 + 3 + 1 — to'lgach boshlanadi; ortiqcha va yetmagan balans rad etiladi", async () => {
+  it("klassik butun sinf uchun 20 coin (15 + 10 − 5 skidka): 5 + 2 + 4 + 3 + 6 — to'lgach boshlanadi; ortiqchasi rad etiladi", async () => {
     const { ali, vali, sardor, laylo } = await seed();
     as(ali);
     const res = await live.createStudentGameAction({ mode: "classic", audience: "grade", count: 5, first: 5, nonce: nonce() });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
     const g0 = (await LiveGame.findById(id).lean())!;
-    expect(g0).toMatchObject({ studentGame: true, price: 25, paid: 5, grade: 8 }); // 15 + 10 (butun sinf)
+    expect(g0).toMatchObject({ studentGame: true, price: 20, paid: 5, grade: 8 }); // 15 + 10 (butun sinf) − 5 skidka
 
     as(vali);
     expect((await live.contributeStudentGameAction(id, 2, nonce())).success).toBe(true);
@@ -80,27 +81,27 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     expect((await live.contributeStudentGameAction(id, 4, nonce())).success).toBe(true);
     as(sardor);
     expect((await live.contributeStudentGameAction(id, 3, nonce())).success).toBe(true);
-    // 25 - 14 = 11 qoldi: 12 qo'shib bo'lmaydi va coin yechilmaydi
+    // 20 - 14 = 6 qoldi: 7 qo'shib bo'lmaydi va coin yechilmaydi
     as(vali);
-    const over = await live.contributeStudentGameAction(id, 12, nonce());
+    const over = await live.contributeStudentGameAction(id, 7, nonce());
     expect(over.success).toBe(false);
     expect(await balance(vali)).toBe(48);
     as(ali);
-    const last = await live.contributeStudentGameAction(id, 11, nonce());
-    expect(last.success && last.data).toEqual({ paid: 25, price: 25 });
-    expect(await balance(ali)).toBe(50 - 16);
+    const last = await live.contributeStudentGameAction(id, 6, nonce());
+    expect(last.success && last.data).toEqual({ paid: 20, price: 20 });
+    expect(await balance(ali)).toBe(50 - 11);
     const g1 = (await LiveGame.findById(id).lean())!;
     expect(g1.fundedAt).toBeTruthy();
     expect(await LiveGamePlayer.countDocuments({ gameId: id })).toBe(4); // hissa qo'shganlar o'yinga ham qo'shildi
 
     const st = await live.getLivePlayerStateAction(id);
-    expect(st.success && st.data.studentGame).toMatchObject({ creator: true, funded: true, paid: 25, price: 25, mine: 16 });
+    expect(st.success && st.data.studentGame).toMatchObject({ creator: true, funded: true, paid: 20, price: 20, mine: 11 });
   });
 
   it("server o'zi boshqaradi: boshlanadi, natija ochiladi, keyingi savol; 2 o'yinchida sovrin yo'q", async () => {
     const { ali, vali } = await seed();
     as(ali);
-    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 15, nonce: nonce() });
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 10, nonce: nonce() });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
     as(vali);
@@ -132,7 +133,7 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
   it("kamida 3 o'yinchi: g'oliblarga 30 / 20 / 10 coin, test savoli coini yo'q", async () => {
     const { ali, vali, sardor } = await seed();
     as(ali);
-    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 15, nonce: nonce() });
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 10, nonce: nonce() });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
     // Mini o'yinlar (omad g'ildiragi tasodifiy ochko beradi) o'rinlarni aralashtirmasin
@@ -162,7 +163,36 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     const won = async (u: { _id: import("mongoose").Types.ObjectId }) => (await CoinLedger.findOne({ studentId: u._id, type: "bonus" }).lean())?.amount ?? 0;
     expect([await won(ali), await won(vali), await won(sardor)]).toEqual([30, 20, 10]);
     expect(await CoinLedger.countDocuments({ type: "quiz" })).toBe(0);
-    expect(await balance(ali)).toBe(50 - 15 + 30);
+    expect(await balance(ali)).toBe(50 - 10 + 30);
+  });
+
+  it("bepul davr: coin yig'ilmaydi, egasi boshlaydi, sovrin yo'q; skidka 0 bo'lsa — to'liq narx", async () => {
+    const { ali, vali } = await seed();
+    await AppSettings.updateOne(
+      { key: "global" },
+      { $set: { studentGames: { freeFrom: new Date(NOW.getTime() - 60_000).toISOString(), freeUntil: new Date(NOW.getTime() + 3_600_000).toISOString() } } },
+      { upsert: true }
+    );
+    as(ali);
+    const setup = await live.getStudentGameSetupAction();
+    expect(setup.success && setup.data).toMatchObject({ freeUntil: expect.any(String), discount: 0 });
+    expect(setup.success && setup.data.prices.classic).toBe(0);
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 0, nonce: nonce() });
+    if (!res.success) throw new Error(res.error);
+    expect(await balance(ali)).toBe(50);
+    const g = (await LiveGame.findById(res.data.gameId).lean())!;
+    expect(g).toMatchObject({ price: 0, paid: 0, prizes: [0, 0, 0] });
+    as(vali);
+    expect((await live.startFreeStudentGameAction(res.data.gameId)).success).toBe(false); // faqat egasi
+    as(ali);
+    expect((await live.startFreeStudentGameAction(res.data.gameId)).success).toBe(true);
+    expect((await LiveGame.findById(res.data.gameId).lean())?.fundedAt).toBeTruthy();
+
+    // Bepul davr tugadi, skidka 0 — to'liq narx
+    await LiveGame.updateMany({}, { $set: { status: "finished" } });
+    await AppSettings.updateOne({ key: "global" }, { $set: { studentGames: { discount: 0 } } });
+    const full = await live.getStudentGameSetupAction();
+    expect(full.success && full.data.prices.classic).toBe(15);
   });
 
   it("bekor qilinsa yoki coin yig'ilmasa — har kimga o'z coini qaytariladi", async () => {

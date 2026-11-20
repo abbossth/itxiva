@@ -29,6 +29,13 @@ export interface StudentGamesSettings {
   teamPrize: number;
   /** Sovrin shuncha o'yinchi qatnashganda beriladi (o'zi yolg'iz o'ynab coin "ishlab topmasin") */
   minPlayersForPrizes: number;
+  /** Skidka: har bir o'yin turi shuncha coin arzon (0 — skidka yo'q) */
+  discount: number;
+  /** Bepul davr (ISO vaqt): shu oraliqda o'yin ochish bepul — coin yig'ilmaydi, egasi o'zi boshlaydi */
+  freeFrom: string | null;
+  freeUntil: string | null;
+  /** Bepul o'yinlarda ham g'oliblarga coin berilsinmi (sukutda yo'q — bepul o'ynab coin "ishlab topilmasin") */
+  freePrizes: boolean;
 }
 
 /** O'yin turlari bo'yicha boshlang'ich narxlar (birgalikda yig'iladi): 10 coindan, real vaqtli janglar qimmatroq */
@@ -62,6 +69,10 @@ export const DEFAULT_STUDENT_GAMES: StudentGamesSettings = {
   prizes: [30, 20, 10],
   teamPrize: 20,
   minPlayersForPrizes: 3,
+  discount: 5,
+  freeFrom: null,
+  freeUntil: null,
+  freePrizes: false,
 };
 
 const int = (v: unknown, min: number, max: number, fallback: number) => {
@@ -91,17 +102,49 @@ export function parseStudentGames(raw: unknown): StudentGamesSettings {
     prizes: [0, 1, 2].map((i) => int(Array.isArray(r.prizes) ? r.prizes[i] : undefined, 0, 500, DEFAULT_STUDENT_GAMES.prizes[i])) as [number, number, number],
     teamPrize: int(r.teamPrize, 0, 500, DEFAULT_STUDENT_GAMES.teamPrize),
     minPlayersForPrizes: int(r.minPlayersForPrizes, 1, 50, DEFAULT_STUDENT_GAMES.minPlayersForPrizes),
+    discount: int(r.discount, 0, 500, DEFAULT_STUDENT_GAMES.discount),
+    freeFrom: isoOrNull(r.freeFrom),
+    freeUntil: isoOrNull(r.freeUntil),
+    freePrizes: typeof r.freePrizes === "boolean" ? r.freePrizes : DEFAULT_STUDENT_GAMES.freePrizes,
   };
 }
 
+const isoOrNull = (v: unknown): string | null => {
+  if (typeof v !== "string" || !v) return null;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+};
+
 export type StudentGameAudience = "group" | "grade";
 
-/** O'yin narxi; tur yopiq bo'lsa null */
-export function studentGamePrice(s: StudentGamesSettings, mode: LiveGameMode, audience: StudentGameAudience): number | null {
+/** Hozir bepul davrmi */
+export function isFreeNow(s: StudentGamesSettings, now: number = Date.now()): boolean {
+  if (!s.freeUntil) return false;
+  const from = s.freeFrom ? Date.parse(s.freeFrom) : -Infinity;
+  return now >= from && now < Date.parse(s.freeUntil);
+}
+
+/** Skidkadan keyin ham narx shundan kam bo'lmaydi */
+export const MIN_DISCOUNTED_PRICE = 5;
+
+/** O'yin narxi: to'liq narx, skidka bilan narx va bepulmi; tur yopiq bo'lsa null */
+export function studentGameCost(
+  s: StudentGamesSettings,
+  mode: LiveGameMode,
+  audience: StudentGameAudience,
+  now: number = Date.now()
+): { full: number; price: number; free: boolean } | null {
   const base = s.prices[mode];
   if (!base) return null;
   if (audience === "grade" && !s.allowGrade) return null;
-  return base + (audience === "grade" ? s.gradeExtra : 0);
+  const full = base + (audience === "grade" ? s.gradeExtra : 0);
+  if (isFreeNow(s, now)) return { full, price: 0, free: true };
+  return { full, price: Math.max(MIN_DISCOUNTED_PRICE, full - s.discount), free: false };
+}
+
+/** Yig'iladigan narx (skidka va bepul davr hisobga olingan); tur yopiq bo'lsa null */
+export function studentGamePrice(s: StudentGamesSettings, mode: LiveGameMode, audience: StudentGameAudience, now: number = Date.now()): number | null {
+  return studentGameCost(s, mode, audience, now)?.price ?? null;
 }
 
 /** O'yin hujjatiga yoziladigan sovrinlar: jamoaviyda faqat birinchisi (g'olib jamoa a'zolariga) */

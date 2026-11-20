@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { getSession, SessionPayload } from "./session";
+import { isFresh } from "@/lib/utils";
 
 /**
  * Get current authenticated session or null.
@@ -21,7 +22,7 @@ const userFacts = new Map<string, { at: number; p: Promise<UserFacts> }>();
 function loadUserFacts(userId: string, fresh = false): Promise<UserFacts> {
   const now = Date.now();
   const c = userFacts.get(userId);
-  if (!fresh && c && now - c.at < USER_TTL_MS) return c.p;
+  if (!fresh && c && isFresh(c.at, USER_TTL_MS, now)) return c.p;
   const p = (async () => {
     await connectToDatabase();
     return User.findById(userId).select("groupId role mustChangePassword sessionVersion").lean<UserFacts>();

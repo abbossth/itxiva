@@ -6,6 +6,7 @@ import { toDateKey } from "@/lib/schedule";
 import { parseGamification, type GamificationSettings } from "@/lib/gamification/config";
 import { parseAmbience, type AmbienceSettings } from "@/lib/ambience";
 import { parseStudentGames, type StudentGamesSettings } from "@/lib/live-game/student-games-config";
+import { isFresh } from "@/lib/utils";
 
 export interface AppSettingsData {
   academicYear: string;
@@ -59,7 +60,7 @@ export function forgetAppSettings() {
 /** Platforma sozlamalari (bitta so'rov davomida bazadan bir marta, server nusxasida — 10 soniyada bir marta o'qiladi) */
 export const getAppSettings = cache(async (): Promise<AppSettingsData> => {
   const now = Date.now();
-  if (settingsCache && now - settingsCache.at < SETTINGS_TTL_MS) return settingsCache.p;
+  if (settingsCache && isFresh(settingsCache.at, SETTINGS_TTL_MS, now)) return settingsCache.p;
   const p = loadAppSettings();
   settingsCache = { at: now, p };
   p.catch(() => {

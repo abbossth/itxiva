@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Group } from "@/lib/db/models/group.model";
 import { LiveGame } from "@/lib/db/models/live-game.model";
 import { AttendanceRecord } from "@/lib/db/models/attendance-record.model";
-import { formatDateTimeUz } from "@/lib/utils";
+import { formatDateTimeUz, isFresh } from "@/lib/utils";
 import { awardCoins } from "@/lib/gamification/award";
 import { STUDENT_LOBBY_MAX_MS } from "./student-games-config";
 
@@ -16,7 +16,7 @@ const grades = new Map<string, { at: number; grade: number | null }>();
 export async function gradeOfGroup(groupId: string | null | undefined): Promise<number | null> {
   if (!groupId || !mongoose.isValidObjectId(groupId)) return null;
   const c = grades.get(groupId);
-  if (c && Date.now() - c.at < GRADE_TTL_MS) return c.grade;
+  if (c && isFresh(c.at, GRADE_TTL_MS, Date.now())) return c.grade;
   const g = await Group.findById(groupId).select("grade").lean();
   const grade = typeof g?.grade === "number" ? g.grade : null;
   if (grades.size > 500) grades.clear();

@@ -114,3 +114,12 @@ export function formatNumberUz(n: number): string {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
+
+/**
+ * Kesh yozuvi hali yangimi: yoshi 0 dan kichik bo'lsa (soat orqaga surilgan) — eskirgan deb hisoblanadi.
+ * Aks holda soat to'g'rilanganda eski qiymat cheksiz "yangi" bo'lib qolardi.
+ */
+export function isFresh(at: number, ttl: number, now: number = Date.now()): boolean {
+  const age = now - at;
+  return age >= 0 && age < ttl;
+}
