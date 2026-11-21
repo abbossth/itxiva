@@ -29,6 +29,22 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-ai-fix-all-2026-11-21",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Tuzatildi",
+    title: "«AI bilan hammasini tuzatish» ishlayapti",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛠️",
+        title: "AI band bo'lsa ham to'xtamaydi",
+        text: "«Darslar» sahifasidagi «AI bilan hammasini tuzatish» endi bir AI modeli band yoki kunlik limiti tugasa, boshqa modelga o'tadi va vaqtincha bandlikda o'zi qayta urinadi. Xato bo'lsa, «0 ta tuzatildi» o'rniga haqiqiy sababi yoziladi. Hammasi bir kunda tuzatilmasa, ertasi kuni yana bir bosing — qolganlaridan davom etadi.",
+      },
+    ],
+    cta: { label: "Darslarga o'tish", href: "/mentor/lessons" },
+  },
+  {
     id: "anti-cheat-2026-11",
     date: "2026-11-21",
     audience: "student",

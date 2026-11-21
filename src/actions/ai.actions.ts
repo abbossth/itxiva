@@ -259,7 +259,7 @@ export async function quizQualityReportAction(): Promise<ActionResult<{ items: Q
   }
 }
 
-/** Mentor: navbatdagi 10 ta savolni AI bilan tuzatadi (sahifa qayta-qayta chaqiradi). `skip` — tuzatib bo'lmaganlar */
+/** Mentor: navbatdagi 15 ta savolni AI bilan tuzatadi (sahifa qayta-qayta chaqiradi). `skip` — tuzatib bo'lmaganlar */
 export async function fixBiasedQuestionsAction(skip: string[] = []): Promise<ActionResult<{ fixed: number; failed: string[]; remaining: number; busy: number }>> {
   const blocked = await guard("ai-fix", 60);
   if (blocked) return { success: false, message: blocked };
@@ -270,7 +270,7 @@ export async function fixBiasedQuestionsAction(skip: string[] = []): Promise<Act
     const all = await biasedQuestions();
     const isBusy = (x: QuizQualityItem) => (x.kind === "quiz" ? busy.quizzes : busy.exams).has(x.docId);
     const todo = all.filter((x) => !skipped.has(x.key) && !isBusy(x));
-    const batch = todo.slice(0, 10);
+    const batch = todo.slice(0, 15);
     const fixed = batch.length ? await rebalanceChoices(batch.map((x) => x.q)) : new Map();
     const failed: string[] = [];
     let done = 0;

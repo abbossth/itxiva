@@ -5,7 +5,7 @@ import { fixBiasedQuestionsAction, quizQualityReportAction, type QuizQualityItem
 import { Button } from "@/components/ui/button";
 
 // Mentor: barcha test va imtihonlarda to'g'ri javobi uzunligidan bilinib qoladigan savollar.
-// "Hammasini tuzatish" — AI 10 tadan tenglashtirib boradi (variantlar bir xil uzunlik va uslubda).
+// "Hammasini tuzatish" — AI 15 tadan tenglashtirib boradi (variantlar bir xil uzunlik va uslubda).
 
 export function QuizQualityCard() {
   const [items, setItems] = useState<QuizQualityItem[] | null>(null);
@@ -44,13 +44,28 @@ export function QuizQualityCard() {
     const skip: string[] = [];
     let fixed = 0;
     let busy = 0;
+    let error: string | null = null;
+    let retries = 0;
     try {
-      for (let round = 0; round < 40; round++) {
-        const r = await fixBiasedQuestionsAction(skip);
-        if (!r.success || !r.data) {
-          setMsg(r.message || "Tuzatib bo'lmadi");
-          break;
+      for (let round = 0; round < 60; round++) {
+        let r: Awaited<ReturnType<typeof fixBiasedQuestionsAction>>;
+        try {
+          r = await fixBiasedQuestionsAction(skip);
+        } catch {
+          r = { success: false, message: "Server bilan aloqa uzildi" };
         }
+        if (!r.success || !r.data) {
+          error = r.message || "Tuzatib bo'lmadi";
+          // AI vaqtincha band — biroz kutib qayta urinamiz; kunlik limit tugagan bo'lsa to'xtaymiz
+          if (/limit/i.test(error) || retries >= 3) break;
+          retries++;
+          setMsg(`${error} — 20 soniyadan keyin qayta urinilmoqda (${retries}/3)…`);
+          await new Promise((res) => setTimeout(res, 20_000));
+          continue;
+        }
+        error = null;
+        retries = 0;
+        setMsg(null);
         fixed += r.data.fixed;
         busy = r.data.busy;
         skip.push(...r.data.failed);
@@ -60,7 +75,8 @@ export function QuizQualityCard() {
       setMsg(
         `${fixed} ta savol tuzatildi.` +
           (skip.length ? ` ${skip.length} tasini AI yaxshilay olmadi — ularni qo'lda tahrirlang.` : "") +
-          (busy ? ` ${busy} tasi hozir yechilayotgan testda — keyinroq qayta bosing.` : "")
+          (busy ? ` ${busy} tasi hozir yechilayotgan testda — keyinroq qayta bosing.` : "") +
+          (error ? ` To'xtadi: ${error}. Qolganlarini keyinroq qayta bosib tuzating.` : "")
       );
     } finally {
       setRunning(false);

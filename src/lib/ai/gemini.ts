@@ -6,7 +6,17 @@ import { readModelCooldowns, writeModelCooldown } from "./cache";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 // Bepul tarifda ishlaydigan eng kuchli model birinchi; u band bo'lsa (503/429) yoki topilmasa, keyingisiga o'tiladi.
 // (Pro modellar bepul tarifda yo'q — 429 qaytaradi.)
-const MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
+// Bepul tarifda kunlik limit har model uchun alohida (kuniga ~20 so'rov), shuning uchun ro'yxat uzun:
+// biri tugasa yoki "high demand" (503) bersa, keyingisi ishlaydi. Oxirgisi — eng yengil zaxira model.
+// ("gemini-flash-latest" = 3.8-flash bilan bir xil limit, shuning uchun qo'shilmagan.)
+const MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3-flash-preview",
+  "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
+];
 // Bitta so'rov uchun qat'iy chegara
 const TIMEOUT_MS = 90_000;
 // Kuchli model shu vaqt ichida javob bermasa, tayyor turgan yengil model javobi qaytariladi

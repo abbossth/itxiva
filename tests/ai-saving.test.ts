@@ -55,9 +55,9 @@ describe("Gemini so'rovlari", () => {
     );
     await expect(ask()).rejects.toThrow();
     const firstRound = calls.length;
-    expect(new Set(calls).size).toBe(3);
+    expect(new Set(calls).size).toBe(6);
     // Kutish vaqti bazada saqlangan (boshqa server nusxalari uchun)
-    expect(await AiCache.countDocuments({ key: /^cooldown:/ })).toBe(3);
+    expect(await AiCache.countDocuments({ key: /^cooldown:/ })).toBe(6);
 
     await expect(ask()).rejects.toThrow(/kunlik limiti/);
     expect(calls.length).toBe(firstRound);
