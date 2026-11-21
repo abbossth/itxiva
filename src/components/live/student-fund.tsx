@@ -49,7 +49,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
       onChange();
     });
 
-  const startFree = () =>
+  const startGame = () =>
     start(async () => {
       unlockSound();
       const r = await startStudentGameAction(state.id);
@@ -91,7 +91,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
 
       {/* O'yinchilar: kamida N kishi bo'lmasa o'yin boshlanmaydi; tayyor bo'lsa — egasi yoki mentor boshlaydi */}
       <p className={cn("mt-2 text-center text-sm font-black", sg.players >= sg.needPlayers ? "text-emerald-300" : "text-sky-200")}>
-        👥 {sg.players}/{sg.needPlayers} o&apos;yinchi{sg.players < sg.needPlayers ? ` — yana ${sg.needPlayers - sg.players} kishi kerak` : ""}
+        👥 {sg.players < sg.needPlayers ? `${sg.players}/${sg.needPlayers} o'yinchi — yana ${sg.needPlayers - sg.players} kishi kerak` : `${sg.players} o'yinchi ✓ (kamida ${sg.needPlayers})`}
       </p>
       {sg.ready && (
         <div className="mt-2 text-center">
@@ -99,7 +99,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
             <button
               type="button"
               disabled={pending}
-              onClick={startFree}
+              onClick={startGame}
               className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3 text-lg font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-60"
             >
               ▶ O&apos;yinni boshlash
@@ -108,25 +108,6 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
           <p className="mt-1 text-xs text-white/70">
             {sg.creator ? "" : `${sg.creatorName.split(" ")[0]} yoki mentor boshlaydi. `}Yangi o&apos;yinchi qo&apos;shilmasa {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")} dan keyin o&apos;zi boshlanadi
           </p>
-        </div>
-      )}
-      {false && (
-        <div className="mt-3 text-center">
-          {sg.creator ? (
-            <>
-              <p className="text-sm font-bold text-emerald-200">Bepul davr! Do&apos;stlaringiz qo&apos;shilgach o&apos;yinni boshlang</p>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={startFree}
-                className="mt-2 w-full cursor-pointer rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 py-3 text-lg font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-60"
-              >
-                ▶ O&apos;yinni boshlash
-              </button>
-            </>
-          ) : (
-            <p className="text-sm font-bold text-emerald-200">Bepul o&apos;yin — {sg.creatorName.split(" ")[0]} boshlashini kuting</p>
-          )}
         </div>
       )}
 

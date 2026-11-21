@@ -29,6 +29,22 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-student-games-start-2026-11",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchilar o'yinini boshlash — sozlamalar",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "▶️",
+        title: "O'yinchilar soni va avtomatik boshlanish",
+        text: "«Jonli o'yin» → «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»da endi o'yin boshlanishi uchun kamida nechta o'yinchi kerakligini (sukutda 5) va tayyor o'yin necha daqiqa yangi o'yinchi kutib o'zi boshlanishini (sukutda 5) o'zgartirasiz. Kuzatuv ro'yxatida tayyor o'yin yonida «▶ Boshlash» tugmasi chiqadi.",
+      },
+    ],
+    cta: { label: "Sozlash", href: "/mentor/live" },
+  },
+  {
     id: "student-games-min5-2026-11",
     date: "2026-11-20",
     audience: "student",

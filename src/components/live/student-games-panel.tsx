@@ -7,7 +7,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { Pager } from "@/components/ui/pager";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
-import { getStudentGamesForMentorAction, stopStudentGameAction, type StudentGameMonitorItem } from "@/actions/live-game.actions";
+import { getStudentGamesForMentorAction, startStudentGameByMentorAction, stopStudentGameAction, type StudentGameMonitorItem } from "@/actions/live-game.actions";
 import { updateStudentGamesSettingsAction } from "@/actions/settings.actions";
 import { LIVE_MODES } from "@/lib/live-game/modes";
 import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
@@ -37,6 +37,15 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
   const [saving, startSave] = useTransition();
   const [stop, setStop] = useState<{ game: StudentGameMonitorItem; refund: boolean } | null>(null);
   const [stopping, setStopping] = useState(false);
+  // Tayyor o'yinni mentor boshlaydi
+  const startGame = (id: string) =>
+    startSave(async () => {
+      const r = await startStudentGameByMentorAction(id);
+      if (!r.success) toast.error(r.error);
+      else toast.success("O'yin boshlandi");
+      const fresh = await getStudentGamesForMentorAction();
+      if (fresh.success) setGames(fresh.data);
+    });
   const [showSettings, setShowSettings] = useState(false);
   const [nowMs, setNowMs] = useState(0);
 
@@ -255,6 +264,33 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
               <p className="mt-1 text-[11px] text-slate-500">O&apos;zgarish «Saqlash» bosilgandan keyin kuchga kiradi.</p>
             </div>
           </div>
+          <div className="grid gap-3 rounded-xl bg-sky-50 p-3 ring-1 ring-sky-200 sm:grid-cols-2 dark:bg-sky-500/5 dark:ring-sky-500/20">
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              👥 O&apos;yin boshlanishi uchun kamida nechta o&apos;yinchi
+              <input
+                type="number"
+                min={2}
+                max={50}
+                value={settings.minPlayersToStart}
+                onChange={(e) => setSettings((s) => ({ ...s, minPlayersToStart: Math.min(50, Math.max(2, Math.round(Number(e.target.value) || 2))) }))}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+              />
+            </label>
+            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              ⏱️ Tayyor o&apos;yin: necha daqiqa yangi o&apos;yinchi qo&apos;shilmasa o&apos;zi boshlansin
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={settings.autoStartMin}
+                onChange={(e) => setSettings((s) => ({ ...s, autoStartMin: Math.min(30, Math.max(1, Math.round(Number(e.target.value) || 1))) }))}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+              />
+            </label>
+            <p className="text-[11px] text-slate-500 sm:col-span-2">
+              Tayyor o&apos;yinni (coin yig&apos;ilgan va o&apos;yinchilar yetarli) o&apos;yin egasi yoki siz «Boshlash» bilan boshlaysiz. Yangi o&apos;yinlarga qo&apos;llanadi.
+            </p>
+          </div>
           <div className="grid gap-3 rounded-xl bg-rose-50 p-3 ring-1 ring-rose-200 sm:grid-cols-2 dark:bg-rose-500/5 dark:ring-rose-500/20">
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Darsni sababsiz qoldirsa — jonli o&apos;yin necha kun yopiq (0 — cheklov yo&apos;q)
@@ -317,7 +353,7 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
         <p className="text-sm font-black text-slate-800 dark:text-slate-200">Hozir ketayotgan o&apos;yinlar ({active.length})</p>
         {active.length === 0 && <p className="rounded-xl bg-white/70 px-3 py-3 text-sm text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900/50 dark:ring-slate-800">Hozir o&apos;quvchilar o&apos;yini yo&apos;q</p>}
         {active.map((g) => (
-          <GameRow key={g.id} g={g} onStop={(refund) => setStop({ game: g, refund })} />
+          <GameRow key={g.id} g={g} onStop={(refund) => setStop({ game: g, refund })} onStart={() => startGame(g.id)} />
         ))}
       </div>
 
@@ -364,7 +400,7 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
   );
 }
 
-function GameRow({ g, onStop }: { g: StudentGameMonitorItem; onStop?: (refund: boolean) => void }) {
+function GameRow({ g, onStop, onStart }: { g: StudentGameMonitorItem; onStop?: (refund: boolean) => void; onStart?: () => void }) {
   const Icon = MODE_ICONS[g.mode];
   const st = STATUS[g.status] ?? STATUS.finished;
   const step = g.status === "lobby" ? null : g.status === "finished" ? null : `${Math.max(1, g.index + 1)}/${g.total}`;
@@ -383,7 +419,13 @@ function GameRow({ g, onStop }: { g: StudentGameMonitorItem; onStop?: (refund: b
           </p>
         </div>
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-black", st.tone)}>
-          {g.status === "lobby" ? (g.paid >= g.price ? "Boshlanmoqda" : `Coin yig'ilmoqda ${g.paid}/${g.price}`) : st.label}
+          {g.status === "lobby"
+            ? g.ready
+              ? `Tayyor · ${g.players.length} o'yinchi`
+              : g.price > 0 && g.paid < g.price
+                ? `Coin yig'ilmoqda ${g.paid}/${g.price}`
+                : `O'yinchi kutilmoqda ${g.players.length}/${g.needPlayers}`
+            : st.label}
           {step ? ` ${step}` : ""}
         </span>
         {g.status !== "finished" && (
@@ -393,6 +435,15 @@ function GameRow({ g, onStop }: { g: StudentGameMonitorItem; onStop?: (refund: b
           >
             <Eye className="h-3.5 w-3.5" /> Kuzatish
           </Link>
+        )}
+        {onStart && g.ready && (
+          <button
+            type="button"
+            onClick={onStart}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black text-white hover:bg-emerald-500"
+          >
+            ▶ Boshlash
+          </button>
         )}
         {onStop && (
           <>

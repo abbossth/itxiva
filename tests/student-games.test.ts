@@ -200,6 +200,41 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     expect(full.success && full.data.prices.classic).toBe(15);
   });
 
+  it("kamida N o'yinchi: tayyor bo'lmasa boshlanmaydi; mentor boshlaydi; yangi o'yinchi qo'shilmasa — o'zi boshlanadi", async () => {
+    const { mentor, ali, vali, sardor } = await seed();
+    await AppSettings.updateOne({ key: "global" }, { $set: { studentGames: { minPlayersToStart: 2, autoStartMin: 1 } } }, { upsert: true });
+    as(ali);
+    const a = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 10, nonce: nonce() });
+    if (!a.success) throw new Error(a.error);
+    // Coin yig'ilgan, lekin bitta o'yinchi — mentor ham boshlay olmaydi, o'zi ham boshlanmaydi
+    as(mentor);
+    expect((await live.startStudentGameByMentorAction(a.data.gameId)).success).toBe(false);
+    tick(5 * 60_000);
+    as(ali);
+    await live.getLivePlayerStateAction(a.data.gameId);
+    expect((await LiveGame.findById(a.data.gameId).lean())?.introAt).toBeFalsy();
+    // Ikkinchi o'yinchi qo'shildi — 1 daqiqa hech kim qo'shilmasa o'zi boshlanadi
+    as(vali);
+    await live.joinLiveGameAction(a.data.gameId);
+    tick(30_000);
+    await live.getLivePlayerStateAction(a.data.gameId);
+    expect((await LiveGame.findById(a.data.gameId).lean())?.introAt).toBeFalsy();
+    tick(31_000);
+    await live.getLivePlayerStateAction(a.data.gameId);
+    expect((await LiveGame.findById(a.data.gameId).lean())?.introAt).toBeTruthy();
+
+    // Mentor tayyor o'yinni boshlaydi
+    await LiveGame.updateMany({}, { $set: { status: "finished" } });
+    as(sardor);
+    const b = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 10, nonce: nonce() });
+    if (!b.success) throw new Error(b.error);
+    as(vali);
+    await live.joinLiveGameAction(b.data.gameId);
+    as(mentor);
+    expect((await live.startStudentGameByMentorAction(b.data.gameId)).success).toBe(true);
+    expect((await LiveGame.findById(b.data.gameId).lean())?.introAt).toBeTruthy();
+  });
+
   it("bekor qilinsa yoki coin yig'ilmasa — har kimga o'z coini qaytariladi", async () => {
     const { ali, vali } = await seed();
     as(ali);

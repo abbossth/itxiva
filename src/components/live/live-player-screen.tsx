@@ -267,7 +267,9 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           <div className="quiz-pop flex flex-col items-center gap-2 py-4 text-center">
             <p className="text-2xl font-black lg:text-4xl">Siz o&apos;yindasiz!</p>
             <p className="max-w-xs text-sm text-slate-300">
-              {state.studentGame ? "Coin yig'ilgach o'yin o'zi boshlanadi. Savollar shu yerda chiqadi." : "Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi."}
+              {state.studentGame
+                ? `Kamida ${state.studentGame.needPlayers} kishi yig'ilgach (va coin to'langach) o'yin egasi yoki mentor boshlaydi. Savollar shu yerda chiqadi.`
+                : "Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi."}
             </p>
             <EmotePad gameId={state.id} look={me?.look ?? null} />
             {state.lobby && <LobbyPush gameId={state.id} lobby={state.lobby} look={me?.look ?? null} onDone={() => void refresh()} />}
