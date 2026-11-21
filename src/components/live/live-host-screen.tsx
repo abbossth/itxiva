@@ -656,7 +656,8 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
       key={p.id}
       className="live-drop relative flex flex-col items-center"
       // Ekranga otilgan o'yinchi boshqalar ustida ko'rinsin
-      style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms`, zIndex: p.pushedBy ? 60 : p.push ? 40 : undefined }}
+      // Proyektorda ekranga urilgan personaj juda kattalashib ketmasin (--hit-s)
+      style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms`, zIndex: p.pushedBy ? 60 : p.push ? 40 : undefined, ["--hit-s" as string]: 1.35 }}
     >
       {/* Itarish hazili: itaruvchi tashlanadi, itarilgan uchib gandiraklaydi */}
       <div
