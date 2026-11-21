@@ -5,7 +5,7 @@
 
 import type { CharMood } from "@/components/character/character-svg";
 
-export type EmoteAnim = "wave" | "kiss" | "jump" | "dance" | "spin" | "clap" | "flex" | "laugh" | "bow" | "salute" | "sleep" | "shake" | "float" | "cheer" | "karate" | "guitar";
+export type EmoteAnim = "wave" | "kiss" | "jump" | "dance" | "spin" | "clap" | "flex" | "laugh" | "bow" | "salute" | "sleep" | "shake" | "float" | "cheer" | "karate" | "guitar" | "dab";
 
 export interface Emote {
   id: string;
@@ -44,7 +44,7 @@ export const EMOTES: Emote[] = [
   E("fireworks", "Salyut otish", "🎆", 26, "cheer", "cheer", ["🎆", "🎇", "✨"]),
   E("guitar", "Gitara", "🎸", 22, "guitar", "cheer", ["🎸", "🎵"]),
   E("karate", "Karate", "🥋", 18, "karate", "work", ["💥"]),
-  E("dab", "Dab", "🙆", 15, "flex", "cheer", ["⚡"]),
+  E("dab", "Dab", "🙆", 15, "dab", "cheer", ["⚡"]),
   E("rocket", "Raketa sakrash", "🚀", 28, "float", "cheer", ["🚀", "🔥"]),
   E("ghost", "Arvoh", "👻", 20, "float", "idle", ["👻"]),
   E("champion", "Chempion", "🏆", 30, "cheer", "cheer", ["🏆", "🥇", "🎉"]),

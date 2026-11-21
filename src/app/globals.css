@@ -1072,3 +1072,28 @@ h1,
 .chr-e-dance .chr-fore-r { animation: fore-cheer-r 0.5s ease-in-out infinite alternate !important; }
 .pushed-l .chr-fore-l, .pushed-l .chr-fore-r, .pushed-r .chr-fore-l, .pushed-r .chr-fore-r { animation: fore-flail 0.3s ease-in-out infinite !important; }
 @media (prefers-reduced-motion: reduce) { .chr .chr-fore-l, .chr .chr-fore-r { animation: none !important; } }
+
+/* ---- Tirsak bilan tabiiyroq harakatlar ---- */
+/* Qo'lini o'pib salom / yurakcha: kaft labga — keyin oldinga "uchiriladi" */
+@keyframes chre-kiss2 { 0%, 100% { transform: rotate(-10deg); } 25%, 50% { transform: rotate(34deg); } 72% { transform: rotate(-70deg); } }
+@keyframes fore-kiss { 0%, 100% { transform: rotate(10deg); } 25%, 50% { transform: rotate(140deg); } 72% { transform: rotate(-20deg); } }
+.chr-e-kiss .chr-arm-r { animation: chre-kiss2 1.3s ease-in-out infinite !important; }
+.chr-e-kiss .chr-fore-r { animation: fore-kiss 1.3s ease-in-out infinite !important; }
+/* Salyut: yelka yon tomonga, bilak bukilib kaft qosh oldida */
+@keyframes chre-salute2 { 0%, 100% { transform: rotate(-80deg); } 50% { transform: rotate(-84deg); } }
+@keyframes fore-salute { 0%, 100% { transform: rotate(-141deg); } 50% { transform: rotate(-136deg); } }
+.chr-e-salute .chr-arm-r { animation: chre-salute2 1.2s ease-in-out infinite !important; }
+.chr-e-salute .chr-fore-r { animation: fore-salute 1.2s ease-in-out infinite !important; }
+/* Dab: o'ng qo'l diagonal yuqoriga to'g'ri, chap qo'l yuzni tirsak bilan yopadi, bosh egiladi */
+@keyframes chre-dab-r { 0%, 100% { transform: rotate(-20deg); } 30%, 80% { transform: rotate(-128deg); } }
+@keyframes chre-dab-l { 0%, 100% { transform: rotate(20deg); } 30%, 80% { transform: rotate(-118deg); } }
+@keyframes fore-dab-l { 0%, 100% { transform: rotate(0deg); } 30%, 80% { transform: rotate(-14deg); } }
+@keyframes chre-dab-head { 0%, 100% { transform: none; } 30%, 80% { transform: rotate(-16deg) translateY(2px); } }
+.chr-e-dab .chr-arm-r { animation: chre-dab-r 1.4s ease-in-out infinite !important; }
+.chr-e-dab .chr-arm-l { animation: chre-dab-l 1.4s ease-in-out infinite !important; }
+.chr-e-dab .chr-fore-l { animation: fore-dab-l 1.4s ease-in-out infinite !important; }
+.chr-e-dab .chr-head { transform-origin: 50% 92%; animation: chre-dab-head 1.4s ease-in-out infinite; }
+
+/* Yelka aylanish nuqtasi qat'iy (bilak bukilganda qo'lning chegarasi o'zgarsa ham yelka siljimaydi) */
+.chr .chr-arm-l { transform-box: view-box !important; transform-origin: 28.6px 61px !important; }
+.chr .chr-arm-r { transform-box: view-box !important; transform-origin: 71.4px 61px !important; }

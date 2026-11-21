@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "emotes-natural-2026-11",
+    date: "2026-11-21",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Harakatlar tabiiyroq bo'ldi",
+    slides: [
+      {
+        art: "emotes",
+        title: "Haqiqiy harakatlar",
+        text: "«Qo'lini o'pib salom» — personaj kaftini labiga olib boradi va o'pichni uchiradi; «Salyut» — tirsak yonga, kaft qosh oldida; «Dab» — ikkala qo'l bir chiziqda, yuz tirsakka yashiringan. Qo'llar endi hamma harakatda yelkadan to'g'ri aylanadi.",
+      },
+    ],
+    cta: { label: "Harakatlarni ko'rish", href: "/profile?tab=character" },
+  },
+  {
     id: "xp-rules-2026-11",
     date: "2026-11-21",
     audience: "student",
