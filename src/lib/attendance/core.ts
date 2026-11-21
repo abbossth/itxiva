@@ -103,10 +103,10 @@ export async function settleRecordCoins(
     : rules[record.status];
   const prevTotal = record.coinsAwarded ?? 0;
   const prevBalance = record.balanceDelta ?? prevTotal;
-  // XP ham coin kabi: mukofot qo'shadi, jarima ayiradi (eski yozuvlarda jarima XP ga tegmagan — 0 dan pastga emas)
+  // XP faqat mukofotda (kelgan/kechikkan); jarima (kelmagan) XP ga tegmaydi — avval olingan bo'lsa, qaytariladi
   const prevXp = record.xpDelta ?? Math.max(prevTotal, 0);
 
-  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance, target - prevXp);
+  const moved = await moveCoins(record.studentId, target - prevTotal, target - prevBalance, Math.max(target, 0) - prevXp);
   record.coinsAwarded = prevTotal + moved.dTotal;
   record.balanceDelta = prevBalance + moved.dBalance;
   record.xpDelta = prevXp + moved.dXp;

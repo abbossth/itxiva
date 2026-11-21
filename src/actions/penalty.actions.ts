@@ -5,7 +5,7 @@ import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
 import { Penalty, type PenaltyKind } from "@/lib/db/models/penalty.model";
 import { getCurrentUser } from "@/lib/auth/guards";
-import { monthKeyOf, penaltyAmount } from "@/lib/penalty-ladder";
+import { HOMEWORK_PENALTY, monthKeyOf, penaltyAmount } from "@/lib/penalty-ladder";
 
 // Jarima oynasi: o'quvchi saytga kirganda hali ko'rmagan jarimalari (sababsiz qoldirish, topshirilmagan vazifa)
 // balansdan qancha olingani va sababi bilan bir marta ko'rsatiladi.
@@ -44,6 +44,7 @@ export async function getUnseenPenaltiesAction(): Promise<PenaltyNotice | null> 
   const rows = await Penalty.find({
     studentId,
     seenAt: null,
+    voidedAt: null,
     createdAt: { $gt: new Date(Date.now() - SHOW_DAYS * 24 * 60 * 60 * 1000) },
   })
     .select("kind reason wanted applied no")
@@ -56,7 +57,7 @@ export async function getUnseenPenaltiesAction(): Promise<PenaltyNotice | null> 
   const kinds = [...new Set(rows.map((r) => r.kind))];
   const [user, ...counts] = await Promise.all([
     User.findById(studentId).select("spendableBalance celebrationsEnabled").lean(),
-    ...kinds.map((kind) => Penalty.countDocuments({ studentId, kind, monthKey })),
+    ...kinds.map((kind) => Penalty.countDocuments({ studentId, kind, monthKey, voidedAt: null })),
   ]);
 
   return {
@@ -70,7 +71,7 @@ export async function getUnseenPenaltiesAction(): Promise<PenaltyNotice | null> 
     })),
     total: rows.reduce((sum, r) => sum + (r.applied ?? 0), 0),
     balance: user?.spendableBalance ?? 0,
-    next: Object.fromEntries(kinds.map((kind, i) => [kind, penaltyAmount((counts[i] as number) + 1)])),
+    next: Object.fromEntries(kinds.map((kind, i) => [kind, kind === "homework" ? HOMEWORK_PENALTY : penaltyAmount((counts[i] as number) + 1)])),
     effects: user?.celebrationsEnabled !== false,
   };
 }

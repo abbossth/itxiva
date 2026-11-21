@@ -164,6 +164,8 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     for (let i = 0; i < 40 && (await poll()).data.status !== "finished"; i++) tick(30_000);
     const won = async (u: { _id: import("mongoose").Types.ObjectId }) => (await CoinLedger.findOne({ studentId: u._id, type: "bonus" }).lean())?.amount ?? 0;
     expect([await won(ali), await won(vali), await won(sardor)]).toEqual([30, 20, 10]);
+    // Jonli o'yin sovrini — faqat coin, XP berilmaydi
+    expect(await CoinLedger.countDocuments({ type: "bonus", xp: { $ne: 0 } })).toBe(0);
     expect(await CoinLedger.countDocuments({ type: "quiz" })).toBe(0);
     expect(await balance(ali)).toBe(50 - 10 + 30);
   });

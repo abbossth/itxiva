@@ -49,6 +49,8 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
     const res = await awardCoins({
       studentId: p.studentId,
       coin: a.coins,
+      // Jonli o'yin sovrini — faqat coin, XP berilmaydi
+      xp: 0,
       type: "bonus",
       description: reason,
       referenceId: game._id,
@@ -65,7 +67,7 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
       .map((ans) => ({ questionId: game.questions[ans.index]?.sourceQuestionId ?? null, isCorrect: ans.isCorrect }))
       .filter((x): x is { questionId: string; isCorrect: boolean } => Boolean(x.questionId));
     if (answered.length > 0) {
-      await rewardQuizAnswers(p.studentId, answered).catch((error) => console.error("Live game quiz reward error:", error));
+      await rewardQuizAnswers(p.studentId, answered, { xp: false }).catch((error) => console.error("Live game quiz reward error:", error));
     }
   }
 

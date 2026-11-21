@@ -141,28 +141,29 @@ describe("sababsiz dars qoldirish", () => {
   });
 });
 
-describe("jarima XP ni ham kamaytiradi", () => {
+describe("jarima XP ga tegmaydi (faqat coin)", () => {
   const xpOf = async (id: unknown) => (await User.findById(id).lean())?.xp ?? 0;
 
-  it("sababsiz qoldirish: coin bilan birga XP ham olinadi, 'sababli' qilinsa XP qaytadi; 0 dan pastga tushmaydi", async () => {
+  it("sababsiz qoldirish: faqat coin olinadi, XP o'zgarmaydi; kelgan deb tuzatilsa mukofot XP beriladi", async () => {
     const { gid, guli, ali } = await setup();
     await User.updateOne({ _id: guli._id }, { $set: { xp: 100 } });
     await User.updateOne({ _id: ali._id }, { $set: { xp: 4 } });
     const first = await lessonDay(gid, "2026-10-05");
-    expect(await xpOf(guli._id)).toBe(90);
-    expect(await xpOf(ali._id)).toBe(0);
+    expect(await xpOf(guli._id)).toBe(100);
+    expect(await xpOf(ali._id)).toBe(4);
     await lessonDay(gid, "2026-10-07");
-    expect(await xpOf(guli._id)).toBe(60);
+    expect(await xpOf(guli._id)).toBe(100);
     await attendance.manualUpdateAttendanceAction({ sessionId: first, studentId: guli._id.toString(), status: "excused" });
-    expect(await xpOf(guli._id)).toBe(70);
-    // Kelgan deb tuzatilsa: jarima XP qaytadi va mukofot XP beriladi
+    expect(await xpOf(guli._id)).toBe(100);
+    // Kelgan deb tuzatilsa: mukofot XP beriladi
     await attendance.manualUpdateAttendanceAction({ sessionId: first, studentId: guli._id.toString(), status: "present" });
-    expect(await xpOf(guli._id)).toBe(80);
+    expect(await xpOf(guli._id)).toBe(110);
     const ledger = await CoinLedger.find({ studentId: guli._id, type: "penalty" }).lean();
-    expect(ledger.every((l) => (l.xp ?? 0) < 0)).toBe(true);
+    expect(ledger.length).toBeGreaterThan(0);
+    expect(ledger.every((l) => (l.xp ?? 0) === 0)).toBe(true);
   });
 
-  it("uyga vazifa jarimasi XP ni ham kamaytiradi", async () => {
+  it("uyga vazifa jarimasi: doimiy 20 coin, XP olinmaydi", async () => {
     const { group, guli } = await setup();
     await User.updateOne({ _id: guli._id }, { $set: { xp: 25 } });
     await Lesson.create({
@@ -174,8 +175,8 @@ describe("jarima XP ni ham kamaytiradi", () => {
       homework: { isEnabled: true, instructions: "x", attachments: [], dueAt: at("2026-11-11", "16:30"), coinsReward: 20 },
     });
     await applyMissedHomeworkPenalties(at("2026-11-11", "16:35"));
-    expect(await xpOf(guli._id)).toBe(15);
-    expect((await CoinLedger.findOne({ studentId: guli._id, type: "penalty" }).lean())?.xp).toBe(-10);
+    expect(await xpOf(guli._id)).toBe(25);
+    expect((await CoinLedger.findOne({ studentId: guli._id, type: "penalty" }).lean())).toMatchObject({ xp: 0, amount: -20 });
   });
 });
 
@@ -199,23 +200,23 @@ describe("topshirilmagan uyga vazifa", () => {
 
     expect(await applyMissedHomeworkPenalties(at("2026-11-11", "16:00"))).toEqual({ lessons: 0, penalized: 0 }); // muddat hali o'tmagan
     expect(await applyMissedHomeworkPenalties(at("2026-11-11", "16:35"))).toEqual({ lessons: 1, penalized: 1 });
-    expect(await coinsOf(guli._id)).toEqual([190, 190]);
+    expect(await coinsOf(guli._id)).toEqual([180, 180]);
     expect(await coinsOf(ali._id)).toEqual([50, 50]);
 
     expect(await applyMissedHomeworkPenalties(at("2026-11-11", "16:40"))).toEqual({ lessons: 0, penalized: 0 });
-    expect(await coinsOf(guli._id)).toEqual([190, 190]);
+    expect(await coinsOf(guli._id)).toEqual([180, 180]);
     const p = await Penalty.findOne({ studentId: guli._id }).lean();
-    expect(p).toMatchObject({ kind: "homework", no: 1, wanted: 10, applied: 10 });
+    expect(p).toMatchObject({ kind: "homework", no: 1, wanted: 20, applied: 20 });
     expect(p?.reason).toBe("«HTML» uyga vazifasi muddatida topshirilmagani uchun (noyabrda 1-marta)");
   });
 
-  it("vazifa jarimalari davomatdan alohida sanaladi va oy ichida oshadi", async () => {
+  it("vazifa jarimasi davomatdan alohida: har safar bir xil 20 coin (oy ichida oshmaydi)", async () => {
     const { gid, group, guli } = await setup();
     await lessonDay(gid, "2026-11-09"); // davomat: −10
     await homeworkLesson(group._id, at("2026-11-11", "16:30"), "HTML");
     await homeworkLesson(group._id, at("2026-11-13", "16:30"), "CSS");
     await applyMissedHomeworkPenalties(at("2026-11-14", "09:00"));
-    // davomat −10, vazifa −10 va −30
+    // davomat −10, vazifa −20 va −20
     expect(await coinsOf(guli._id)).toEqual([150, 150]);
   });
 
@@ -225,7 +226,7 @@ describe("topshirilmagan uyga vazifa", () => {
     await applyMissedHomeworkPenalties(at("2026-11-11", "17:00"));
     await Lesson.updateOne({ _id: lesson._id }, { $set: { "homework.dueAt": at("2026-11-12", "16:30") } });
     expect((await applyMissedHomeworkPenalties(at("2026-11-12", "17:00"))).lessons).toBe(1);
-    expect(await coinsOf(guli._id)).toEqual([190, 190]);
+    expect(await coinsOf(guli._id)).toEqual([180, 180]);
   });
 
   it("qoida kuchga kirgunga qadar tugagan muddatlar va keyin qo'shilgan o'quvchilar jarimasiz", async () => {
@@ -272,5 +273,39 @@ describe("saytdagi jarima oynasi", () => {
     await penaltyActions.acknowledgePenaltiesAction(ids);
     actAs(sessionFor(guli));
     expect((await penaltyActions.getUnseenPenaltiesAction())?.items).toHaveLength(1);
+  });
+});
+
+
+describe("mentor jarimani qaytarsa — oy ichidagi sanoq ham qaytadi", () => {
+  it("xato jarima bekor qilingach keyingi haqiqiy jarima birinchidek (−10) hisoblanadi", async () => {
+    const { gid, guli, mentor } = await setup();
+    await lessonDay(gid, "2026-10-05"); // 1-jarima: −10
+    const wrong = (await CoinLedger.findOne({ studentId: guli._id, type: "penalty" }).lean())!;
+    actAs(sessionFor(mentor));
+    const admin = await import("@/actions/coin-admin.actions");
+    expect((await admin.editCoinEntryAction({ entryId: wrong._id.toString(), coin: 0, xp: 0, reason: "Xato jarima" })).success).toBe(true);
+    await lessonDay(gid, "2026-10-07"); // haqiqiy jarima — birinchi sifatida
+    const real = await CoinLedger.find({ studentId: guli._id, type: "penalty", voidedAt: null }).lean();
+    expect(real.map((l) => l.amount)).toEqual([-10]);
+  });
+});
+
+
+describe("bir martalik tuzatish", () => {
+  it("jarimada olingan XP qaytariladi; qaytarilgan jarima sanoqdan chiqadi; ikkinchi marta ishlamaydi", async () => {
+    const { guli } = await setup();
+    const { Penalty } = await import("@/lib/db/models/penalty.model");
+    const { applyGamificationFixes } = await import("@/lib/gamification-fixes");
+    await User.updateOne({ _id: guli._id }, { $set: { xp: 50 } });
+    const ref = new (await import("mongoose")).default.Types.ObjectId();
+    await CoinLedger.create({ studentId: guli._id, amount: -10, xp: -10, type: "penalty", description: "eski", referenceId: ref });
+    await CoinLedger.create({ studentId: guli._id, amount: 0, xp: 0, type: "penalty", description: "qaytarilgan", referenceId: ref, voidedAt: new Date() });
+    await Penalty.create({ studentId: guli._id, kind: "absence", refId: ref, monthKey: "2026-11", no: 1, wanted: 10, applied: 10, reason: "x" });
+    const r = await applyGamificationFixes();
+    expect(r).toMatchObject({ xpRestored: 1, penaltiesVoided: 1 });
+    expect((await User.findById(guli._id).lean())?.xp).toBe(60);
+    expect((await Penalty.findOne({ refId: ref }).lean())?.voidedAt).toBeTruthy();
+    expect(await applyGamificationFixes()).toBeNull();
   });
 });

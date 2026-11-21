@@ -29,6 +29,48 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "xp-rules-2026-11",
+    date: "2026-11-21",
+    audience: "student",
+    badge: "Qoida",
+    title: "XP va jarimalar yangilandi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⚡",
+        title: "Jarima endi XP olmaydi",
+        text: "Darsni sababsiz qoldirsangiz yoki uyga vazifani topshirmasangiz — faqat coin olinadi, XP (tajriba) kamaymaydi. Avval jarima bilan olingan XP sizga qaytarildi! Uyga vazifa jarimasi endi har safar bir xil — 20 coin.",
+      },
+      {
+        art: "emoji",
+        emoji: "🎮",
+        title: "Jonli o'yinda — faqat coin",
+        text: "Jonli o'yinlarda g'olib bo'lsangiz yoki sovg'a qutisini ochsangiz faqat coin olasiz. XP esa o'qish uchun: darsga kelish, test, uyga vazifa va topshiriqlar.",
+      },
+    ],
+  },
+  {
+    id: "mentor-xp-rules-2026-11",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "XP va coin qoidalari qayta ko'rib chiqildi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⚖️",
+        title: "XP — faqat o'qish uchun",
+        text: "Jarimalar endi XP olmaydi (faqat coin); avval olingan XP o'quvchilarga avtomatik qaytarildi. Uyga vazifa jarimasi — har safar bir xil 20 coin; dars qoldirish — avvalgidek oy ichida 10 / 30 / 50 coin. Jonli o'yin sovrinlari, sovg'a qutilari va o'yindagi to'g'ri javoblar — faqat coin. Profil to'ldirish va Telegram ulash bonusi ham faqat coin. Davomat, test, vazifa, nishon va topshiriqlar XP beradi; siz qo'lda coin berganda XP ni o'zingiz belgilaysiz.",
+      },
+      {
+        art: "emoji",
+        emoji: "↩️",
+        title: "Xato jarimani qaytarsangiz — sanoq ham qaytadi",
+        text: "«Coin iqtisodi»da xato yozilgan jarimani bekor qilsangiz, u oy ichidagi jarima sanog'idan ham chiqadi: o'quvchining keyingi haqiqiy jarimasi birinchidek (−10) hisoblanadi. Avval qaytarilgan jarimalar ham to'g'rilandi. «Bekor qilish» ro'yxati endi sana bo'yicha — bugunga yaqini birinchi.",
+      },
+    ],
+  },
+  {
     id: "mentor-student-games-start-2026-11",
     date: "2026-11-21",
     audience: "mentor",

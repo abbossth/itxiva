@@ -22,6 +22,8 @@ export interface IPenaltyData {
   reason: string;
   /** O'quvchi saytda ko'rgan vaqt; null — hali ko'rsatilmagan */
   seenAt?: Date | string | null;
+  /** Mentor jarimani qaytargan (coin yozuvi bekor qilingan) — oy ichidagi tartib hisobiga kirmaydi */
+  voidedAt?: Date | string | null;
   createdAt?: Date | string;
 }
 
@@ -40,6 +42,7 @@ const PenaltySchema = new Schema<IPenalty>(
     applied: { type: Number, default: 0, min: 0 },
     reason: { type: String, required: true, trim: true },
     seenAt: { type: Date, default: null },
+    voidedAt: { type: Date, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

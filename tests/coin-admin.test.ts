@@ -132,14 +132,15 @@ describe("mentor: guruhda bir xil xato yozuvlarni birdaniga bekor qilish", () =>
     const res = await admin.getGroupCoinBatchesAction(String(g), "minus");
     if (!res.success) throw new Error(res.message);
     expect(res.data.batches.map((b) => [b.description, b.entries.length, b.amount, b.total])).toEqual([
-      ["Darsga kelmagani uchun", 3, -5, -15],
+      // Sana bo'yicha: bugunga yaqini (oxirgi yozilgani) birinchi
       ["Vazifa topshirilmadi", 1, -10, -10],
+      ["Darsga kelmagani uchun", 3, -5, -15],
     ]);
     const plus = await admin.getGroupCoinBatchesAction(String(g), "plus");
     expect(plus.success && plus.data.batches.map((b) => b.description)).toEqual(["Bonus"]);
 
     // Olimnikini qoldirib, qolgan ikkitasini bekor qilish
-    const batch = res.data.batches[0];
+    const batch = res.data.batches.find((b) => b.description === "Darsga kelmagani uchun")!;
     const ids = batch.entries.filter((e) => e.name !== "OLIM").map((e) => e.id);
     const v = await admin.voidCoinEntriesAction({ entryIds: ids, reason: "Dars bekor qilingan edi" });
     expect(v.success && v.data).toMatchObject({ voided: 2, skipped: [] });

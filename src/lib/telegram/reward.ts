@@ -10,6 +10,7 @@ export async function rewardTelegramLink(studentId: string): Promise<boolean> {
   const res = await awardCoins({
     studentId,
     coin: TELEGRAM_LINK_REWARD,
+    xp: 0,
     type: "bonus",
     description: "Telegram ulandi",
     idempotencyKey: telegramRewardKey(studentId),

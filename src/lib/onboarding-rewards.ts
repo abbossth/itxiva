@@ -20,6 +20,7 @@ export async function rewardCompleteProfile(studentId: string, data: OwnProfileI
   const res = await awardCoins({
     studentId,
     coin: PROFILE_COMPLETE_REWARD,
+    xp: 0,
     type: "bonus",
     description: "Profil 100% to'ldirildi",
     idempotencyKey: profileRewardKey(studentId),

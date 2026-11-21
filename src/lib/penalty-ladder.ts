@@ -10,6 +10,9 @@ export function penaltyAmount(no: number): number {
   return PENALTY_LADDER[Math.min(Math.max(no, 1), PENALTY_LADDER.length) - 1];
 }
 
+/** Uyga vazifa muddatida topshirilmasa — har safar bir xil jarima (coin; XP olinmaydi) */
+export const HOMEWORK_PENALTY = 20;
+
 /** "−10 / −30 / −50" */
 export const PENALTY_LADDER_LABEL = PENALTY_LADDER.map((n) => `−${n}`).join(" / ");
 

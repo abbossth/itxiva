@@ -1,5 +1,6 @@
 "use server";
 
+import { syncPenaltyVoid } from "@/lib/penalties";
 import mongoose from "mongoose";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
@@ -123,7 +124,7 @@ type Change =
 
 /** Bitta yozuvni o'zgartirish (yoki 0/0 — bekor qilish): yozuv, o'quvchi hisobi, audit va xabar */
 async function changeEntry(mentorId: string, entryId: string, coin: number, xp: number, reason: string): Promise<Change> {
-  const entry = await CoinLedger.findById(entryId).select("studentId amount xp type").lean();
+  const entry = await CoinLedger.findById(entryId).select("studentId amount xp type referenceId").lean();
   if (!entry) return { ok: false, message: "Yozuv topilmadi" };
   if (LOCKED_TYPES.has(entry.type)) {
     return { ok: false, message: entry.type === "purchase" ? "Xaridni bu yerda o'zgartirib bo'lmaydi — buyurtmani rad eting, coin o'zi qaytadi" : "Bu yozuvni o'zgartirib bo'lmaydi" };
@@ -168,6 +169,9 @@ async function changeEntry(mentorId: string, entryId: string, coin: number, xp: 
     const u = await User.findById(entry.studentId).select("spendableBalance").lean();
     return { ok: false, message: `Balans yetmaydi: o'quvchida ${u?.spendableBalance ?? 0} coin bor, ${-dCoin} coin olib bo'lmaydi. Kamroq miqdor kiriting` };
   }
+
+  // Jarima qaytarilsa — oy ichidagi jarima sanog'i ham qaytadi (keyingi haqiqiy jarima birinchidek hisoblanadi)
+  if (entry.type === "penalty") await syncPenaltyVoid(entry.studentId, entry.referenceId, coin);
 
   await AuditLog.create({
     actorId: mentorId,
@@ -254,6 +258,7 @@ export async function getGroupCoinBatchesAction(groupId: string, sign: "minus" |
       b.total += r.amount;
       by.set(key, b);
     }
+    const latest = (b: CoinBatch) => b.entries.reduce((m, e) => (e.at > m ? e.at : m), "");
     const batches = [...by.values()]
       .map((b) => {
         // Eng ko'p uchraydigan summa
@@ -262,8 +267,8 @@ export async function getGroupCoinBatchesAction(groupId: string, sign: "minus" |
         const amount = [...freq.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? 0;
         return { ...b, amount, entries: b.entries.sort((x, y) => compareUz(x.name, y.name)) };
       })
-      // Avval ko'p o'quvchiga tegishli, keyin yangilari
-      .sort((a, b) => b.entries.length - a.entries.length || b.day.localeCompare(a.day))
+      // Sukutda sana bo'yicha: bugunga eng yaqini birinchi (bir kunda — oxirgi yozilgani, keyin ko'p o'quvchilisi)
+      .sort((a, b) => b.day.localeCompare(a.day) || latest(b).localeCompare(latest(a)) || b.entries.length - a.entries.length)
       .slice(0, 40);
     return { success: true, data: { batches } };
   } catch (err) {

@@ -28,7 +28,12 @@ export async function quizCoinsToday(studentId: mongoose.Types.ObjectId): Promis
  * Javob berilgan savollarni faollik sifatida yozadi va to'g'ri javoblar uchun coin beradi.
  * Natija: berilgan coin. Gamifikatsiya o'chiq bo'lsa hech narsa qilmaydi.
  */
-export async function rewardQuizAnswers(studentIdRaw: string | mongoose.Types.ObjectId, answers: AnsweredQuestion[]): Promise<number> {
+export async function rewardQuizAnswers(
+  studentIdRaw: string | mongoose.Types.ObjectId,
+  answers: AnsweredQuestion[],
+  /** Jonli o'yindan: faqat coin (XP berilmaydi) */
+  opts: { xp?: boolean } = {}
+): Promise<number> {
   const { gamification: s } = await getAppSettings();
   if (!s.enabled) return 0;
   const studentId = new mongoose.Types.ObjectId(String(studentIdRaw));
@@ -45,6 +50,7 @@ export async function rewardQuizAnswers(studentIdRaw: string | mongoose.Types.Ob
       const res = await awardCoins({
         studentId,
         coin: per,
+        ...(opts.xp === false ? { xp: 0 } : {}),
         type: "quiz",
         description: "Test savoliga to'g'ri javob",
         // Savol uchun mukofot bir marta: qayta to'g'ri javob coin bermaydi

@@ -2250,6 +2250,7 @@ export async function openLivePrizeAction(
       await awardCoins({
         studentId: user.userId,
         coin: saved.coins,
+        xp: 0,
         type: "bonus",
         description: `${reason}: +${saved.coins} coin`,
         referenceId: game._id,
