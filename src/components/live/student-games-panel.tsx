@@ -420,7 +420,9 @@ function GameRow({ g, onStop, onStart }: { g: StudentGameMonitorItem; onStop?: (
         </div>
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-black", st.tone)}>
           {g.status === "lobby"
-            ? g.ready
+            ? g.starting
+              ? "Boshlanmoqda…"
+              : g.ready
               ? `Tayyor · ${g.players.length} o'yinchi`
               : g.price > 0 && g.paid < g.price
                 ? `Coin yig'ilmoqda ${g.paid}/${g.price}`

@@ -2884,6 +2884,8 @@ export interface StudentGameMonitorItem {
   /** Boshlash uchun kerakli o'yinchilar va tayyormi (mentor boshlay oladi) */
   needPlayers: number;
   ready: boolean;
+  /** Boshlandi — kirish sanog'i ketmoqda (holat hali lobby) */
+  starting: boolean;
   contributors: { name: string; amount: number }[];
   refunded: boolean;
   createdAt: string;
@@ -2896,6 +2898,12 @@ export async function getStudentGamesForMentorAction(): Promise<Result<StudentGa
   try {
     await requireMentor();
     await connectDB();
+    // Mentor kuzatayotganda o'yinlar o'zi oldinga yuradi (o'quvchilar telefonini yopib qo'ygan bo'lsa ham)
+    const active = await LiveGame.find({ studentGame: true, status: { $ne: "finished" } }).select("_id").limit(10).lean();
+    for (const a of active) {
+      const snap = await liveSnapshot(String(a._id));
+      if (snap) await autopilot(snap).catch(() => false);
+    }
     const games = await LiveGame.find({ studentGame: true })
       .select("mode status creatorName creatorId grade groupId index questions.timeLimit price paid contributions refundedAt createdAt finishedAt fundedAt introAt needPlayers")
       .sort({ createdAt: -1 })
@@ -2929,6 +2937,7 @@ export async function getStudentGamesForMentorAction(): Promise<Result<StudentGa
         paid: g.paid ?? 0,
         needPlayers: g.needPlayers ?? 0,
         ready: g.status === "lobby" && !g.introAt && studentGameReady(g, (byGame.get(g._id.toString()) ?? []).length),
+        starting: g.status === "lobby" && Boolean(g.introAt),
         contributors: contributorsOf(g.contributions),
         refunded: Boolean(g.refundedAt),
         createdAt: new Date(g.createdAt ?? Date.now()).toISOString(),

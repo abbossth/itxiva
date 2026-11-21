@@ -292,4 +292,18 @@ describe("o'yin jarayoni", () => {
     expect(await finishStaleLiveGames(new Date(NOW.getTime() + 4 * 3600_000))).toBe(1);
     expect((await LiveGame.findOne().lean())?.status).toBe("finished");
   });
+
+  it("tashlab ketilgan o'quvchi o'yini 1 soatdan keyin yakunlanadi (boshlanmagani esa qaytarim uchun qoladi)", async () => {
+    const { gid, mentor } = await seed();
+    const started = await create(gid, mentor, "classic");
+    await LiveGame.updateOne({ _id: started }, { $set: { studentGame: true, introAt: NOW } });
+    // Boshlanmagan kutish zali — nusxa (bitta guruhda bir vaqtda bitta o'yin ochiladi)
+    const copy = await LiveGame.findById(started).lean();
+    const lobby = new (await import("mongoose")).default.Types.ObjectId();
+    await LiveGame.collection.insertOne({ ...copy!, _id: lobby, introAt: null });
+    expect(await finishStaleLiveGames(new Date(NOW.getTime() + 30 * 60_000))).toBe(0);
+    expect(await finishStaleLiveGames(new Date(NOW.getTime() + 70 * 60_000))).toBe(1);
+    expect((await LiveGame.findById(started).lean())?.status).toBe("finished");
+    expect((await LiveGame.findById(lobby).lean())?.status).toBe("lobby");
+  });
 });

@@ -12,6 +12,8 @@ type Id = string | mongoose.Types.ObjectId;
 
 /** Mentor yopishni unutgan o'yin shuncha vaqtdan keyin yakunlanadi */
 export const LIVE_GAME_MAX_MS = 3 * 60 * 60 * 1000;
+/** O'quvchi o'yini (kutish zali 20 daqiqagacha + o'yin) — tashlab ketilsa guruhni bundan uzoq band qilmasin */
+export const STUDENT_GAME_MAX_MS = 60 * 60 * 1000;
 
 export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promise<boolean> {
   const game = await LiveGame.findOneAndUpdate(
@@ -77,7 +79,14 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
 
 /** Cron: uzoq vaqt ochiq qolib ketgan o'yinlar */
 export async function finishStaleLiveGames(now: Date = new Date()): Promise<number> {
-  const stale = await LiveGame.find({ status: { $ne: "finished" }, createdAt: { $lt: new Date(now.getTime() - LIVE_GAME_MAX_MS) } })
+  const stale = await LiveGame.find({
+    status: { $ne: "finished" },
+    $or: [
+      { createdAt: { $lt: new Date(now.getTime() - LIVE_GAME_MAX_MS) } },
+      // Boshlanmagan (coin yig'ilmagan) kutish zallarini expireStudentLobbies qaytarim bilan yopadi
+      { studentGame: true, createdAt: { $lt: new Date(now.getTime() - STUDENT_GAME_MAX_MS) }, $or: [{ status: { $ne: "lobby" } }, { introAt: { $ne: null } }] },
+    ],
+  })
     .select("_id")
     .lean();
   let n = 0;

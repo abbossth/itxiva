@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-student-games-monitor-2026-11",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Yaxshilandi",
+    title: "O'quvchi o'yinlari kuzatuvi aniqroq",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛰️",
+        title: "Holat to'g'ri ko'rinadi, o'yin osilib qolmaydi",
+        text: "«▶ Boshlash» bosilgach kuzatuvda «Boshlanmoqda…» chiqadi (avval adashtirib «O'yinchi kutilmoqda» yozilardi). Siz panelni ochib turganingizda o'yin o'zi oldinga yuradi — o'quvchilar telefonini yopib qo'ysa ham. Tashlab ketilgan o'quvchi o'yini endi 3 soat emas, 1 soatda yopiladi va guruhni band qilib turmaydi.",
+      },
+    ],
+  },
+  {
     id: "lobby-screen-throw-2026-11",
     date: "2026-11-21",
     audience: "student",
