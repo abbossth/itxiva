@@ -29,6 +29,7 @@ import { playCheckInSound, playGameStart, playTickSound, unlockSound } from "@/l
 import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
+import { PushCrack } from "./push-crack";
 import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, useMusicChoice, type MusicChoice } from "./live-track";
 import { MinigameHost } from "./live-minigame";
 import { ArenaHost } from "./arena/arena-screens";
@@ -651,7 +652,12 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
   // Kutish zali skrollsiz sig'sin: personaj o'lchami ekran balandligidan
   const vh = useViewportHeight();
   const one = (p: LiveHostState["players"][number], i: number, size: number) => (
-    <div key={p.id} className="live-drop relative flex flex-col items-center" style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+    <div
+      key={p.id}
+      className="live-drop relative flex flex-col items-center"
+      // Ekranga otilgan o'yinchi boshqalar ustida ko'rinsin
+      style={{ width: size * 1.15, animationDelay: `${Math.min(i, 10) * 40}ms`, zIndex: p.pushedBy ? 60 : p.push ? 40 : undefined }}
+    >
       {/* Itarish hazili: itaruvchi tashlanadi, itarilgan uchib gandiraklaydi */}
       <div
         key={`p${p.push?.at ?? 0}-${p.pushedBy?.at ?? 0}`}
@@ -661,7 +667,12 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
         )}
       >
         <CharacterSvg key={`c${p.emote?.at ?? "idle"}`} look={p.look} size={size} mood="idle" still={n > 40 && !p.emote && !p.push && !p.pushedBy} emote={p.push || p.pushedBy ? null : p.emote?.id} />
-        {p.pushedBy && <span className="push-dust" />}
+        {p.pushedBy && (
+          <>
+            <PushCrack />
+            <span className="push-dust" />
+          </>
+        )}
       </div>
       <span className="-mt-1 max-w-full truncate rounded-xl bg-white px-2 py-0.5 text-xs font-black text-slate-900 shadow-lg sm:text-sm">{p.name.split(" ")[0]}</span>
     </div>

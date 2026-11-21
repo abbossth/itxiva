@@ -1673,8 +1673,9 @@ export interface LivePlayerState {
   finishedAgoMs: number | null;
   /** Kutish zali: chap/o'ng qo'shnilar (itarish uchun) va so'nggi itarishlar */
   lobby: {
-    left: { id: string; name: string; look: GameLook | null } | null;
-    right: { id: string; name: string; look: GameLook | null } | null;
+    /** busy — hozir otishda (otib/otilib bo'lguncha bosib bo'lmaydi) */
+    left: { id: string; name: string; look: GameLook | null; busy: boolean } | null;
+    right: { id: string; name: string; look: GameLook | null; busy: boolean } | null;
     /** Meni kim itardi (dir — men qaysi tomonga uchdim) */
     pushedBy: { name: string; dir: PushDir; at: number } | null;
     /** Men kimni itardim */
@@ -2953,6 +2954,18 @@ export async function stopStudentGameAction(gameId: string, refund: boolean): Pr
 }
 
 
+/** Hozir otishda qatnashayotganlar (otuvchi va otilgan) */
+function busyInPush(players: Pick<ILiveGamePlayer, "push" | "_id">[], now: number): Set<string> {
+  const busy = new Set<string>();
+  for (const p of players) {
+    if (p.push && now - p.push.at >= 0 && now - p.push.at < PUSH_MS) {
+      busy.add(p._id.toString());
+      busy.add(p.push.to);
+    }
+  }
+  return busy;
+}
+
 /** Telefon uchun kutish zali: qo'shnilar va so'nggi itarishlar */
 function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: LiveGameMode): NonNullable<LivePlayerState["lobby"]> {
   const order = rankPlayers(
@@ -2961,7 +2974,8 @@ function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: Live
   );
   const myId = mine._id.toString();
   const { left, right } = lobbyNeighbors(order, myId, mode === "team");
-  const view = (x: (typeof order)[number] | null) => (x ? { id: x.id, name: x.p.name, look: (x.p.look as GameLook | null | undefined) ?? null } : null);
+  const busy = busyInPush(players, Date.now());
+  const view = (x: (typeof order)[number] | null) => (x ? { id: x.id, name: x.p.name, look: (x.p.look as GameLook | null | undefined) ?? null, busy: busy.has(x.id) } : null);
   const byId = new Map(players.map((p) => [p._id.toString(), p]));
   const now = Date.now();
   const incoming = recentPushes(players).get(myId);
@@ -2992,6 +3006,10 @@ export async function playPushAction(gameId: string, dir: PushDir): Promise<Resu
     const target = lobbyNeighbors(order, mine._id.toString(), game.mode === "team")[dir];
     if (!target) return fail(dir === "left" ? "Chap tomoningizda hech kim yo'q" : "O'ng tomoningizda hech kim yo'q");
     const now = Date.now();
+    // Otish davom etayotganda unda qatnashayotgan ikkalasi (otuvchi ham, otilgan ham) — na otadi, na otiladi
+    const busy = busyInPush(players, now);
+    if (busy.has(mine._id.toString())) return fail("Otish tugashini kuting");
+    if (busy.has(target.id)) return fail(`${target.name.split(" ")[0]} hozir otishda — biroz kuting`);
     const res = await LiveGamePlayer.updateOne(
       { _id: mine._id, $or: [{ push: null }, { push: { $exists: false } }, { "push.at": { $lt: now - PUSH_GAP_MS } }] },
       { $set: { push: { to: target.id, dir, at: now } } }

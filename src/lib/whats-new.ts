@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "lobby-screen-throw-2026-11",
+    date: "2026-11-21",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Endi to'g'ri ekranga otasiz!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💥",
+        title: "Ekranga urilib yopishadi",
+        text: "Kutish zalida yoningizdagini ko'tarib, endi to'g'ri ekranga otasiz: u kattalashib uchib keladi, oynaga urilib yopishadi (oyna yoriladi!), pastga sirpanib tushadi va yugurib joyiga qaytadi. Otish tugamaguncha ikkalangiz ham boshqa tugmani bosa olmaysiz.",
+      },
+    ],
+  },
+  {
+    id: "mentor-lobby-screen-throw-2026-11",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Kutish zali: ekranga otish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💥",
+        title: "Ko'tarib ekranga otish",
+        text: "O'quvchi qo'shnisini endi yonga emas, to'g'ri ekranga otadi: personaj proyektorda kattalashib oynaga urilib yopishadi, pastga sirpanadi va yugurib joyiga qaytadi (~4 soniya). Otish davomida ikkala ishtirokchi boshqa otishda qatnasha olmaydi; har bir o'quvchi uchun 10 soniyalik oraliq avvalgidek.",
+      },
+    ],
+  },
+  {
     id: "emotes-natural-2026-11",
     date: "2026-11-21",
     audience: "student",

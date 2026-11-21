@@ -4,7 +4,7 @@
 export type PushDir = "left" | "right";
 
 /** Ko'tarib otish animatsiyasi davomiyligi (ms) va itargandan keyin qayta itarish mumkin bo'lguncha (10 s) */
-export const PUSH_MS = 2800;
+export const PUSH_MS = 4400;
 export const PUSH_GAP_MS = 10_000;
 
 /** Qo'shnilar: `order` — proyektordagi tartib (id va jamoa) */

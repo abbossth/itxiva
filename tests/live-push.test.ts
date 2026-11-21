@@ -53,15 +53,27 @@ describe("kutish zalida itarish", () => {
     expect(st.success && st.data.lobby).toMatchObject({ left: { name: "Ali" }, right: { name: "Sardor" } });
     const r = await live.playPushAction(id, "right");
     expect(r.success && r.data).toEqual({ pushed: true, name: "Sardor", waitMs: 10_000 });
-    expect((await live.playPushAction(id, "left")).success && (await live.playPushAction(id, "left"))).toMatchObject({ data: { pushed: false } });
+    // Otish tugamaguncha o'zi ham qayta ota olmaydi
+    expect((await live.playPushAction(id, "left")).success).toBe(false);
     expect(((await live.getLivePlayerStateAction(id)) as { data: { lobby: { myPush: unknown } } }).data.lobby.myPush).toMatchObject({ name: "Sardor", dir: "right" });
     actAs(sessionFor(sardor));
     expect(((await live.getLivePlayerStateAction(id)) as { data: { lobby: { pushedBy: unknown } } }).data.lobby.pushedBy).toMatchObject({ name: "Vali", dir: "right" });
     expect((await live.playPushAction(id, "right")).success).toBe(false); // o'ngida hech kim yo'q
+    // Otish davom etayotganda ishtirokchilar (Vali va Sardor) na otadi, na otiladi
+    actAs(sessionFor(ali));
+    const blocked = await live.playPushAction(id, "right");
+    expect(!blocked.success && blocked.error).toMatch(/otishda/);
+    actAs(sessionFor(sardor));
+    expect((await live.playPushAction(id, "left")).success).toBe(false);
     actAs(sessionFor(mentor));
     const host = await live.getLiveHostStateAction(id);
     const rows = host.success ? host.data.players : [];
     expect(rows.find((p) => p.name === "Vali")?.push).toMatchObject({ dir: "right" });
     expect(rows.find((p) => p.name === "Sardor")?.pushedBy).toMatchObject({ dir: "right" });
+    // Otish tugadi — Ali endi Valini ota oladi
+    const { LiveGamePlayer } = await import("@/lib/db/models/live-game-player.model");
+    await LiveGamePlayer.updateMany({ gameId: id, push: { $ne: null } }, { $set: { "push.at": Date.now() - 60_000 } });
+    actAs(sessionFor(ali));
+    expect((await live.playPushAction(id, "right")).success && (await LiveGamePlayer.findOne({ name: "Ali" }).lean())?.push?.dir).toBe("right");
   });
 });

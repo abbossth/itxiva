@@ -8,15 +8,17 @@ import { PUSH_GAP_MS, type PushDir } from "@/lib/live-game/push";
 import { haptic } from "@/lib/haptics";
 import { playBoom, playHurt, playWhoosh, unlockSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
+import { PushCrack } from "./push-crack";
 
 // Kutish zali: chap yoki o'ng qo'shnini hazil qilib ko'tarib otish. O'ziga, qo'shnisiga va proyektorda ko'rinadi.
 // Bir marta otgandan keyin 10 soniya tugma yopiq.
 
 type Lobby = NonNullable<LivePlayerState["lobby"]>;
 
-/** Animatsiya bosqichlari (2,6 s ichida): ko'tarish, otish, yerga tushish */
-const THROW_AT = 1500;
-const LAND_AT = 1980;
+/** Animatsiya bosqichlari (4,2 s ichida): otish, ekranga urilish, yerga tushish */
+const THROW_AT = 1900;
+const HIT_AT = 2100;
+const LAND_AT = 3400;
 
 export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lobby: Lobby; look: GameLook | null; onDone: () => void }) {
   // Bosilgan zahoti o'zida ko'rinsin (server javobini kutmasdan)
@@ -44,11 +46,17 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
 
   const sounds = (thrown: boolean) => {
     timers.current.push(
-      setTimeout(() => playWhoosh(0.6), THROW_AT),
+      setTimeout(() => playWhoosh(0.7), THROW_AT),
+      // Ekran oynasiga urilish
       setTimeout(() => {
         playBoom();
         if (thrown) playHurt();
-        haptic(thrown ? [60, 30, 90] : [30]);
+        haptic(thrown ? [80, 30, 120] : [40]);
+      }, HIT_AT),
+      // Yerga tushish
+      setTimeout(() => {
+        playWhoosh(0.3);
+        if (thrown) haptic([30]);
       }, LAND_AT)
     );
   };
@@ -88,6 +96,8 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
 
   const mine = local ?? (lobby.myPush ? { dir: lobby.myPush.dir, at: lobby.myPush.at, name: lobby.myPush.name } : null);
   const hit = lobby.pushedBy;
+  // Otish davom etayotganda (men otayotgan yoki meni otishgan bo'lsa) — tugaguncha bosib bo'lmaydi
+  const meBusy = Boolean(hit) || Boolean(lobby.myPush);
   // Kim harakatda: men ko'taraman (tashlanaman) yoki meni otishdi (uchaman)
   const meCls = hit ? (hit.dir === "left" ? "pushed-l" : "pushed-r") : mine ? (mine.dir === "left" ? "push-l" : "push-r") : undefined;
   const sideCls = (side: PushDir) => (mine && !hit && mine.dir === side ? (side === "left" ? "pushed-l" : "pushed-r") : undefined);
@@ -102,19 +112,24 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
         <Side who={lobby.left} cls={sideCls("left")} k={mine?.dir === "left" ? mine.at : 0} />
         <div key={`me${mine?.at ?? 0}-${hit?.at ?? 0}`} className={cn("relative flex flex-col items-center", meCls)}>
           <CharacterSvg look={look} size={74} mood="idle" pedestal={false} />
-          {hit && <span className="push-dust" />}
+          {hit && (
+            <>
+              <PushCrack />
+              <span className="push-dust" />
+            </>
+          )}
           <span className="-mt-1 rounded-full bg-amber-400 px-2 text-[10px] font-black text-slate-950">Siz</span>
         </div>
         <Side who={lobby.right} cls={sideCls("right")} k={mine?.dir === "right" ? mine.at : 0} />
       </div>
       {hit && (
         <p key={hit.at} className="live-pop mt-2 text-center text-sm font-black text-amber-300">
-          {hit.name.split(" ")[0]} sizni ko&apos;tarib otib yubordi!
+          {hit.name.split(" ")[0]} sizni ko&apos;tarib ekranga otdi!
         </p>
       )}
       {!hit && mine && (
         <p key={mine.at} className="live-pop mt-2 text-center text-sm font-black text-emerald-300">
-          {mine.name.split(" ")[0]}ni ko&apos;tarib otib yubordingiz!
+          {mine.name.split(" ")[0]}ni ko&apos;tarib ekranga otdingiz!
         </p>
       )}
       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -124,7 +139,7 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
             <button
               key={dir}
               type="button"
-              disabled={!who || cool > 0}
+              disabled={!who || cool > 0 || meBusy || who.busy}
               onClick={(ev) => push(dir, ev.timeStamp)}
               className="relative flex min-h-[48px] cursor-pointer items-center justify-center gap-1.5 overflow-hidden rounded-2xl bg-gradient-to-b from-sky-500 to-indigo-600 px-2 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:cursor-default disabled:opacity-40"
             >
@@ -137,7 +152,9 @@ export function LobbyPush({ gameId, lobby, look, onDone }: { gameId: string; lob
                 />
               )}
               {dir === "left" && <span aria-hidden>◀</span>}
-              <span className="relative truncate">{!who ? "Hech kim yo'q" : cool > 0 ? `${cool} s kuting` : `${who.name.split(" ")[0]}ni otish`}</span>
+              <span className="relative truncate">
+                {!who ? "Hech kim yo'q" : meBusy ? "Otish tugashini kuting" : who.busy ? `${who.name.split(" ")[0]} otishda…` : cool > 0 ? `${cool} s kuting` : `${who.name.split(" ")[0]}ni otish`}
+              </span>
               {dir === "right" && <span aria-hidden>▶</span>}
             </button>
           );
@@ -153,7 +170,12 @@ function Side({ who, cls, k }: { who: Lobby["left"]; cls?: string; k: number }) 
   return (
     <div key={`s${k}`} className={cn("relative flex flex-col items-center opacity-90", cls)}>
       <CharacterSvg look={who.look} size={58} mood="idle" pedestal={false} />
-      {cls && <span className="push-dust" />}
+      {cls && (
+        <>
+          <PushCrack />
+          <span className="push-dust" />
+        </>
+      )}
       <span className="-mt-1 max-w-[70px] truncate rounded-full bg-white/15 px-2 text-[10px] font-bold text-white">{who.name.split(" ")[0]}</span>
     </div>
   );
