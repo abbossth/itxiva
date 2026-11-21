@@ -152,7 +152,7 @@ describe("o'yin jarayoni", () => {
     // 2-savol: faqat Guli javob beradi va Valini quvib o'tadi
     await live.startLiveQuestionAction(id);
     as(guli);
-    tick(500);
+    tick(800);
     await live.answerLiveQuestionAction(id, 1, await correctOf(id));
     as(mentor);
     await live.revealLiveQuestionAction(id);
@@ -283,6 +283,31 @@ describe("o'yin jarayoni", () => {
     await live.revealLiveQuestionAction(id);
     await live.finishLiveGameAction(id);
     expect((await CoinLedger.find({ idempotencyKey: /^live:/ }).lean()).map((l) => [String(l.studentId), l.amount])).toEqual([[String(vali._id), 10]]);
+  });
+
+  it("anti-cheat: inson ulgurmaydigan tezlikdagi javob tezlik bali olmaydi va mentorga qayd etiladi", async () => {
+    const { CheatEvent } = await import("@/lib/db/models/cheat-event.model");
+    const { gid, mentor, ali, vali } = await seed();
+    const id = await create(gid, mentor, "classic");
+    for (const s of [ali, vali]) {
+      as(s);
+      await live.joinLiveGameAction(id);
+    }
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    const ok = await correctOf(id);
+    as(ali);
+    tick(100); // bot: savol chiqqanidan 0,1 s o'tib
+    await live.answerLiveQuestionAction(id, 0, ok);
+    as(vali);
+    tick(1900); // odam: 2 s
+    await live.answerLiveQuestionAction(id, 0, ok);
+    const pts = async (u: { _id: import("mongoose").Types.ObjectId }) => (await LiveGamePlayer.findOne({ studentId: u._id }).lean())?.answers[0]?.points ?? 0;
+    expect(await pts(ali)).toBeLessThan(await pts(vali));
+    expect(await pts(ali)).toBe(500); // eng kam ochko (vaqt tugagandagidek)
+    await new Promise((r) => setTimeout(r, 30));
+    expect(await CheatEvent.findOne({ studentId: ali._id, context: "live", refId: id }).lean()).toMatchObject({ total: 1, counts: { fast: 1 } });
+    expect(await CheatEvent.countDocuments({ studentId: vali._id })).toBe(0);
   });
 
   it("yopilmay qolgan o'yin 3 soatdan keyin yakunlanadi", async () => {

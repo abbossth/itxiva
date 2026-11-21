@@ -2,6 +2,7 @@ import { requireMentorPage } from "@/lib/auth/guards";
 import { getLiveGamesForMentorAction, getStudentGamesForMentorAction } from "@/actions/live-game.actions";
 import { LiveGamesManager } from "@/components/live/live-games-manager";
 import { StudentGamesPanel } from "@/components/live/student-games-panel";
+import { RecentCheatsCard } from "@/components/mentor/recent-cheats-card";
 import { getAppSettings } from "@/lib/settings";
 
 export const metadata = {
@@ -20,6 +21,7 @@ export default async function MentorLiveGamesPage() {
       {live && panel}
       <LiveGamesManager games={res.success ? res.data : []} />
       {!live && panel}
+      <RecentCheatsCard />
     </div>
   );
 }

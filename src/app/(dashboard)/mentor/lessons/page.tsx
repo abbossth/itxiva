@@ -4,6 +4,7 @@ import { getGroups } from "@/actions/group.actions";
 import { getLessonsByGroupAndQuarter } from "@/actions/lesson.actions";
 import { getHomeworkJournal, getHomeworkOverviewForMentor, getHomeworkStatsForLessons } from "@/actions/homework.actions";
 import { LessonsManager } from "@/components/mentor/lessons-manager";
+import { QuizQualityCard } from "@/components/mentor/quiz-quality-card";
 import { pickNearestLessonGroup } from "@/lib/schedule";
 import { EmptyState } from "@/components/shared/empty-state";
 import Link from "@/components/ui/link";
@@ -62,6 +63,8 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
   const stats = await getHomeworkStatsForLessons(lessons.map((l) => l._id.toString()));
 
   return (
+    <>
+    <QuizQualityCard />
     <LessonsManager
       key={`${selectedGroupId}-${selectedQuarter}-${view}`}
       groups={groups}
@@ -73,5 +76,6 @@ export default async function MentorLessonsPage({ searchParams }: MentorLessonsP
       toCheck={overview.filter((o) => o.ungraded > 0)}
       journal={journal}
     />
+    </>
   );
 }

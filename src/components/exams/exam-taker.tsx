@@ -1,5 +1,6 @@
 "use client";
 
+import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { STUDENT_MAX_UPLOAD_MB } from "@/lib/homework-status";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -380,8 +381,8 @@ export function ExamTaker({
                         <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                           {idx + 1}-savol &bull; {q.points} ball
                         </span>
-                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap leading-relaxed">
-                          {q.prompt}
+                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 pt-1 leading-relaxed">
+                          <ProtectedText text={q.prompt} lines={8} minScale={0.7} lineHeight={1.5} />
                         </h2>
                       </div>
                     </div>
@@ -411,7 +412,7 @@ export function ExamTaker({
                               >
                                 {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                               </span>
-                              <span>{opt}</span>
+                              <ProtectedText text={opt} lines={4} minScale={0.75} className="min-w-0 flex-1" />
                             </button>
                           );
                         })}
@@ -452,7 +453,7 @@ export function ExamTaker({
                               >
                                 {isSelected && <span className="w-2 h-1 border-l-2 border-b-2 border-white -rotate-45" />}
                               </span>
-                              <span>{opt}</span>
+                              <ProtectedText text={opt} lines={4} minScale={0.75} className="min-w-0 flex-1" />
                             </button>
                           );
                         })}

@@ -1,5 +1,7 @@
 "use server";
 
+import { MIN_HUMAN_ANSWER_MS } from "@/lib/anti-cheat/kinds";
+import { recordCheats } from "@/lib/anti-cheat/record";
 import mongoose from "mongoose";
 import { unstable_rethrow } from "next/navigation";
 import { connectDB } from "@/lib/db/connect";
@@ -1551,7 +1553,10 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
       submittedAnswers: [{ questionId: "q", value: clean }],
     });
     const isCorrect = Boolean(graded.answers[0]?.isCorrect);
-    const o = scoreAnswer(game.mode, player, { isCorrect, elapsedMs: elapsed, limitSec: q.timeLimit, bonus: game.bonusIndex === index });
+    // Anti-cheat: inson ulgurmaydigan tezlikdagi javob (skript/bot) — tezlik bali berilmaydi va mentorga qayd etiladi
+    const tooFast = elapsed < MIN_HUMAN_ANSWER_MS;
+    if (tooFast) void recordCheats(user.userId, "live", gameId, { fast: 1 }).catch(() => {});
+    const o = scoreAnswer(game.mode, player, { isCorrect, elapsedMs: tooFast ? q.timeLimit * 1000 : elapsed, limitSec: q.timeLimit, bonus: game.bonusIndex === index });
 
     // Shartli: bitta savolga ikki marta javob yozilmaydi
     const res = await LiveGamePlayer.updateOne(

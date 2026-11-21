@@ -1,5 +1,6 @@
 "use client";
 
+import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { IQuizData } from "@/lib/db/models/quiz.model";
@@ -174,9 +175,9 @@ export function QuizView({ quiz, initialSubmission, role, footer }: QuizViewProp
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     {idx + 1}-savol ({q.points} ball)
                   </span>
-                  <p className="text-base font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap">
-                    {q.prompt}
-                  </p>
+                  <div className="text-base font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap">
+                    {role === "student" ? <ProtectedText text={q.prompt} lines={8} minScale={0.7} /> : q.prompt}
+                  </div>
                 </div>
 
                 {subAns && submission?.status === "graded" && (
@@ -224,7 +225,7 @@ export function QuizView({ quiz, initialSubmission, role, footer }: QuizViewProp
                         >
                           {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                         </span>
-                        <span>{opt}</span>
+                        {role === "student" ? <ProtectedText text={opt} lines={4} minScale={0.75} className="min-w-0 flex-1" /> : <span>{opt}</span>}
                       </button>
                     );
                   })}
@@ -257,7 +258,7 @@ export function QuizView({ quiz, initialSubmission, role, footer }: QuizViewProp
                         >
                           {isSelected && <span className="w-2 h-1 border-l-2 border-b-2 border-white -rotate-45" />}
                         </span>
-                        <span>{opt}</span>
+                        {role === "student" ? <ProtectedText text={opt} lines={4} minScale={0.75} className="min-w-0 flex-1" /> : <span>{opt}</span>}
                       </button>
                     );
                   })}

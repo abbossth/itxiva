@@ -1,5 +1,6 @@
 "use server";
 
+import { seededShuffle } from "@/lib/quiz-quality";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { Exam, IExam, IExamData, IExamQuestion } from "@/lib/db/models/exam.model";
@@ -388,7 +389,8 @@ export async function getExamForStudent(examId: string): Promise<
       _id: q._id?.toString(),
       type: q.type,
       prompt: q.prompt,
-      options: q.options || [],
+      // Variantlar har o'quvchiga o'z tartibida
+      options: seededShuffle(q.options || [], `${user.userId}:${q._id?.toString() ?? q.prompt}`),
       correctAnswers: [],
       points: q.points,
       allowedFileTypes: q.allowedFileTypes,

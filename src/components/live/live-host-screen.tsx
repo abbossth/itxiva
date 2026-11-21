@@ -1,5 +1,6 @@
 "use client";
 
+import { promptScale } from "@/lib/quiz-quality";
 import { CharacterSvg } from "@/components/character/character-svg";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
@@ -777,7 +778,10 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
       )}
       <div className="flex items-stretch gap-4">
         <div className="quiz-pop flex min-h-[22vh] min-w-0 flex-1 flex-col items-center justify-center rounded-3xl bg-white px-5 py-8 text-center text-slate-900 shadow-xl sm:px-10 sm:py-12">
-          <p className="whitespace-pre-wrap text-3xl font-black leading-snug sm:text-5xl lg:text-6xl">{q.prompt}</p>
+          <p className="whitespace-pre-wrap text-3xl font-black leading-snug sm:text-5xl lg:text-6xl">
+            {/* Uzun savol ekranni buzmasin: uzunligiga qarab shrift kichrayadi */}
+            <span style={{ fontSize: `${promptScale(q.prompt)}em` }}>{q.prompt}</span>
+          </p>
           {q.type === "multiple_choice" && <p className="mt-2 text-sm font-semibold text-slate-500">Bir nechta to&apos;g&apos;ri javob</p>}
           {q.type === "short_answer" && <p className="mt-2 text-sm font-semibold text-slate-500">Javobni telefonda yozing</p>}
         </div>

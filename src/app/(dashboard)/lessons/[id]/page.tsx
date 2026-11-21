@@ -122,7 +122,12 @@ export default async function LessonDetailPage({ params }: LessonDetailPageProps
 
           {quizData?.quiz && (
             <LessonTabPanel id="quiz">
-              <QuizGame lessonId={lessonId} quiz={quizData.quiz} submission={quizData.submission} />
+              <QuizGame
+                lessonId={lessonId}
+                quiz={quizData.quiz}
+                submission={quizData.submission}
+                watermark={viewer?.role === "student" ? `${viewer.fullName} · @${viewer.login}` : undefined}
+              />
             </LessonTabPanel>
           )}
         </LessonTabs>

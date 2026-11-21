@@ -13,6 +13,8 @@ export interface LessonResultRow {
   homeworkState: HomeworkState;
   homeworkScore: number | null;
   quiz: { score: number; max: number; percent: number | null } | null;
+  /** Test paytidagi anti-cheat qaydlari: soni va izohi */
+  cheats?: { total: number; text: string } | null;
 }
 
 const pill = "inline-block min-w-[3.5rem] px-2 py-1 rounded-lg text-xs font-bold tabular-nums text-center";
@@ -64,6 +66,14 @@ export function LessonResultsTable({ rows, showHomework, showQuiz }: { rows: Les
                       </span>
                     ) : (
                       <span className={cn(pill, SCORE_TONE.none.soft)}>—</span>
+                    )}
+                    {r.cheats && r.cheats.total > 0 && (
+                      <span
+                        title={`Test paytida: ${r.cheats.text}`}
+                        className="ml-1 inline-flex cursor-help items-center rounded-lg bg-rose-500/10 px-1.5 py-1 text-[11px] font-black text-rose-600 dark:text-rose-300"
+                      >
+                        ⚠️ {r.cheats.total}
+                      </span>
                     )}
                   </td>
                 )}

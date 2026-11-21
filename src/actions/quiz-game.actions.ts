@@ -1,5 +1,8 @@
 "use server";
 
+import { seededShuffle } from "@/lib/quiz-quality";
+import { MIN_HUMAN_ANSWER_MS } from "@/lib/anti-cheat/kinds";
+import { recordCheats } from "@/lib/anti-cheat/record";
 import mongoose from "mongoose";
 import { unstable_rethrow } from "next/navigation";
 import { connectDB } from "@/lib/db/connect";
@@ -166,7 +169,8 @@ export async function nextQuizQuestionAction(runId: string): Promise<Result<Game
         id: String(question._id),
         type: question.type,
         prompt: question.prompt,
-        options: question.options ?? [],
+        // Variantlar har o'quvchiga o'z tartibida (to'g'ri javob doim bir joyda turmasin)
+        options: seededShuffle(question.options ?? [], `${user.userId}:${String(question._id)}`),
         points: question.points,
         timeLimit: limit,
         index: run.index,
@@ -215,7 +219,10 @@ export async function answerQuizQuestionAction(runId: string, questionId: string
     const isOpen = question.type === "open_ended";
     const isCorrect = Boolean(answer.isCorrect);
     const streak = isOpen ? run.streak : isCorrect ? run.streak + 1 : 0;
-    const pts = isOpen ? { base: 0, bonus: 0, total: 0 } : answerPoints({ isCorrect, elapsedMs: elapsed, limitSec: limit, streak });
+    // Anti-cheat: inson ulgurmaydigan tezlikdagi javob — tezlik bonusi yo'q, mentorga qayd etiladi
+    const tooFast = !isOpen && elapsed < MIN_HUMAN_ANSWER_MS;
+    if (tooFast) void recordCheats(user.userId, "quiz", String(run.quizId), { fast: 1 }).catch(() => {});
+    const pts = isOpen ? { base: 0, bonus: 0, total: 0 } : answerPoints({ isCorrect, elapsedMs: tooFast ? limit * 1000 : elapsed, limitSec: limit, streak });
     const runAnswer: IQuizRunAnswer = {
       ...answer,
       ms: Math.min(elapsed, limit * 1000),

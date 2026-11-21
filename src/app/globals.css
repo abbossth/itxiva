@@ -1116,3 +1116,8 @@ h1,
 /* Yelka aylanish nuqtasi qat'iy (bilak bukilganda qo'lning chegarasi o'zgarsa ham yelka siljimaydi) */
 .chr .chr-arm-l { transform-box: view-box !important; transform-origin: 28.6px 61px !important; }
 .chr .chr-arm-r { transform-box: view-box !important; transform-origin: 71.4px 61px !important; }
+
+/* Anti-cheat: test/imtihon/jonli o'yinda matnni belgilab, uzoq bosib nusxalab bo'lmaydi (o'z javobini yozish maydonlari bundan mustasno) */
+.anti-cheat { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.anti-cheat input, .anti-cheat textarea, .anti-cheat [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+.anti-cheat img, .anti-cheat canvas { -webkit-user-drag: none; }

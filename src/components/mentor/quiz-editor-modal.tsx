@@ -5,7 +5,8 @@ import { OpenQuestionGrading } from "@/components/mentor/open-question-grading";
 import { IQuizData, IQuizQuestion, QuizQuestionType } from "@/lib/db/models/quiz.model";
 import { upsertQuizAction } from "@/actions/quiz.actions";
 import { QUIZ_TIME_LIMITS, questionTimeLimit } from "@/lib/quiz-game";
-import { generateQuizAction, LessonContextInput } from "@/actions/ai.actions";
+import { generateQuizAction, rebalanceQuestionsAction, LessonContextInput } from "@/actions/ai.actions";
+import { answerLengthBias } from "@/lib/quiz-quality";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,16 +52,41 @@ export function QuizEditorModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [balancing, setBalancing] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  // To'g'ri javobi uzunligidan bilinib qoladigan savollar (o'quvchilar uzun variantni tanlab topib olishadi)
+  const biased = questions.map((q) => answerLengthBias({ type: q.type, options: q.options, correctAnswers: q.correctAnswers }).biased);
+  const biasedCount = biased.filter(Boolean).length;
+
+  const handleBalance = async () => {
+    if (balancing) return;
+    setError(null);
+    setInfo(null);
+    setBalancing(true);
+    try {
+      const res = await rebalanceQuestionsAction(questions);
+      if (res.success && res.data) {
+        setQuestions(res.data.questions);
+        setInfo(res.data.fixed > 0 ? `${res.data.fixed} ta savolning variantlari tenglashtirildi — tekshirib, saqlang` : "AI bu savollarni yaxshilay olmadi — variantlarni qo'lda tenglashtiring");
+      } else setError(res.message || "Tenglashtirib bo'lmadi");
+    } catch {
+      setError("AI yordamchiga ulanib bo'lmadi");
+    } finally {
+      setBalancing(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!lessonContext || generating) return;
     setError(null);
     setGenerating(true);
     try {
-      const res = await generateQuizAction(lessonContext, 5);
+      setInfo(null);
+      const res = await generateQuizAction(lessonContext, 20);
       if (res.success && res.data) {
         // Hali to'ldirilmagan (bo'sh) savollar o'rniga qo'yiladi, mentor yozganlari saqlanadi
         setQuestions((prev) => [...prev.filter((q) => q.prompt.trim()), ...res.data!.questions]);
+        setInfo(`AI ${res.data.questions.length} ta savol tuzdi${res.data.balanced ? `, ${res.data.balanced} tasida variantlar uzunligi tenglashtirildi` : ""}. Tekshirib, saqlang.`);
       } else {
         setError(res.message || "AI savol tuza olmadi");
       }
@@ -228,7 +254,12 @@ export function QuizEditorModal({
                     isLoading={generating}
                     className="text-xs h-9"
                   >
-                    <Sparkles className="w-3.5 h-3.5 mr-1" /> AI bilan tuzish
+                    <Sparkles className="w-3.5 h-3.5 mr-1" /> AI bilan 20 ta savol
+                  </Button>
+                )}
+                {aiEnabled && biasedCount > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={handleBalance} isLoading={balancing} className="text-xs h-9 border-amber-400 text-amber-700 dark:text-amber-300">
+                    ⚖️ Variantlarni tenglashtirish ({biasedCount})
                   </Button>
                 )}
                 <Button
@@ -261,11 +292,20 @@ export function QuizEditorModal({
               </div>
             </div>
 
+            {info && <p className="rounded-xl bg-teal-500/10 px-3 py-2 text-xs font-semibold text-teal-700 dark:text-teal-300">{info}</p>}
+            {biasedCount > 0 && (
+              <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                ⚠️ {biasedCount} ta savolda to&apos;g&apos;ri javob boshqa variantlardan ancha uzun — o&apos;quvchilar uni uzunligidan topib olishadi. Variantlarni bir xil uzunlikda yozing
+                {aiEnabled ? " yoki «Variantlarni tenglashtirish» tugmasini bosing" : ""}.
+              </p>
+            )}
+
             {questions.map((q, qIdx) => (
               <div
                 key={qIdx}
-                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-3"
+                className={`p-4 rounded-xl border bg-slate-50/50 dark:bg-slate-900/40 space-y-3 ${biased[qIdx] ? "border-amber-400 dark:border-amber-500/60" : "border-slate-200 dark:border-slate-800"}`}
               >
+                {biased[qIdx] && <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">⚠️ To&apos;g&apos;ri javob uzunligidan bilinib qoladi</p>}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1 basis-56">
                   <span className="shrink-0 whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">

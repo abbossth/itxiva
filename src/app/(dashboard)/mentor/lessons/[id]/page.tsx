@@ -18,6 +18,9 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { LessonResultsTable } from "@/components/mentor/lesson-results-table";
+import { cheatsFor } from "@/lib/anti-cheat/record";
+import { cheatTotal, describeCheats, type CheatCounts } from "@/lib/anti-cheat/kinds";
+import { connectToDatabase } from "@/lib/db/connect";
 import { type HomeworkState } from "@/lib/homework-status";
 import { SCORE_TONE, scoreTone } from "@/lib/score-tone";
 import { groupShortName } from "@/lib/group-name";
@@ -53,6 +56,8 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
 
   const homeworkByStudent = new Map((roster?.rows ?? []).map((r) => [r.studentId, r]));
   const quizByLogin = new Map(quizSubs.map((q) => [q.studentLogin, q]));
+  // Anti-cheat: test paytida boshqa oynaga o'tish, nusxalash, screenshot va h.k.
+  const cheats = quiz?._id ? await connectToDatabase().then(() => cheatsFor("quiz", String(quiz._id))) : new Map<string, CheatCounts>();
   const rows = students.map((s) => {
     const hw = homeworkByStudent.get(s._id.toString());
     const q = quizByLogin.get(s.login);
@@ -62,6 +67,10 @@ export default async function MentorLessonViewPage({ params }: { params: Promise
       homeworkState: (hw?.state ?? "missing") as HomeworkState,
       homeworkScore: hw?.submission?.status === "graded" ? hw.submission.score ?? null : null,
       quiz: q ? { score: q.totalScore, max: q.maxScore, percent: q.maxScore > 0 ? Math.round((q.totalScore / q.maxScore) * 100) : null } : null,
+      cheats: (() => {
+        const c = cheats.get(s._id.toString());
+        return c ? { total: cheatTotal(c), text: describeCheats(c) } : null;
+      })(),
     };
   });
   const submitted = rows.filter((r) => r.homeworkState !== "missing").length;

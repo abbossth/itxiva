@@ -216,8 +216,9 @@ describe("o'yin ichida", () => {
     const g = (await LiveGame.findById(id).lean())!;
     as(ali);
     expect((await live.getLivePlayerStateAction(id)).success && true).toBe(true);
+    tick(800);
     await live.answerLiveQuestionAction(id, 3, g.questions[3].correctAnswers[0]);
-    expect((await LiveGamePlayer.findOne({ studentId: ali._id }).lean())?.answers.find((a) => a.index === 3)?.points).toBe(2000);
+    expect((await LiveGamePlayer.findOne({ studentId: ali._id }).lean())?.answers.find((a) => a.index === 3)?.points).toBe(1920); // 960 × 2
   });
 
   it("omad g'ildiragi: har kim o'z g'ildiragini aylantiradi — natija har xil, tugaganda har kimga o'ziniki qo'llanadi", async () => {

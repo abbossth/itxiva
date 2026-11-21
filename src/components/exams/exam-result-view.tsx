@@ -1,5 +1,6 @@
 "use client";
 
+import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import Link from "@/components/ui/link";
 import { IExamData } from "@/lib/db/models/exam.model";
 import { IExamSubmissionData } from "@/lib/db/models/exam-submission.model";
@@ -159,8 +160,8 @@ export function ExamResultView({ exam, submission, attempts = [] }: ExamResultVi
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
                     {idx + 1}-savol &bull; Ball: {studentAns?.pointsAwarded || 0} / {q.points}
                   </span>
-                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1 whitespace-pre-wrap">
-                    {q.prompt}
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 pt-1">
+                    <ProtectedText text={q.prompt} lines={8} minScale={0.7} />
                   </h3>
                 </div>
 

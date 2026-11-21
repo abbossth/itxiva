@@ -15,6 +15,12 @@ import { Lesson } from "@/lib/db/models/lesson.model";
 import { Group } from "@/lib/db/models/group.model";
 import { findSimilarSubmissions } from "@/lib/homework-integrity";
 import { quizQuestionSchema } from "@/lib/validations/quiz.schema";
+import { BALANCE_RULES, rebalanceChoices, type BalanceInput } from "@/lib/ai/rebalance-options";
+import { answerLengthBias } from "@/lib/quiz-quality";
+import { Quiz } from "@/lib/db/models/quiz.model";
+import { Exam } from "@/lib/db/models/exam.model";
+import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
+import { QuizRun } from "@/lib/db/models/quiz-run.model";
 import type { IQuizQuestion } from "@/lib/db/models/quiz.model";
 import type { IMaterial } from "@/lib/db/models/lesson.model";
 import { ActionResult } from "./auth.actions";
@@ -104,7 +110,7 @@ const aiQuizSchema = z.object({
     z.object({
       type: z.enum(["single_choice", "multiple_choice", "short_answer"]),
       prompt: z.string(),
-      options: z.array(z.string()).describe("Tanlov savollarida 3-4 ta turli variant; short_answer uchun bo'sh massiv"),
+      options: z.array(z.string()).describe("Tanlov savollarida 4 ta turli variant, hammasi bir xil uzunlik va uslubda; short_answer uchun bo'sh massiv"),
       correctAnswers: z
         .array(z.string())
         .describe("Tanlov savollarida options ichidagi matnning aynan o'zi; short_answer uchun qabul qilinadigan qisqa javob(lar)"),
@@ -115,8 +121,8 @@ const aiQuizSchema = z.object({
 
 export async function generateQuizAction(
   context: LessonContextInput,
-  count = 5
-): Promise<ActionResult<{ questions: IQuizQuestion[] }>> {
+  count = 20
+): Promise<ActionResult<{ questions: IQuizQuestion[]; balanced: number }>> {
   const blocked = await guard();
   if (blocked) return { success: false, message: blocked };
 
@@ -124,7 +130,7 @@ export async function generateQuizAction(
   if (!ctx.success || (!ctx.data.title && !ctx.data.description)) {
     return { success: false, message: "Test tuzish uchun avval dars nomi yoki konspektini kiriting" };
   }
-  const n = Math.min(10, Math.max(3, Math.round(Number(count)) || 5));
+  const n = Math.min(20, Math.max(3, Math.round(Number(count)) || 20));
 
   try {
     const data = await generateStructured({
@@ -135,9 +141,14 @@ ${describeLesson(ctx.data)}
 
 Talablar:
 - Savollar dars mazmunini tushunishni tekshirsin, yodlashni emas; osondan qiyinga qarab joylashtir.
-- Aksariyati single_choice bo'lsin, 1-2 tasi multiple_choice yoki short_answer.
+- Savollar mavzuning turli tomonlarini qamrab olsin, bir-birini takrorlamasin.
+- Aksariyati single_choice (4 variant) bo'lsin, ${Math.max(1, Math.round(n / 7))}-${Math.max(2, Math.round(n / 5))} tasi multiple_choice yoki short_answer.
 - Noto'g'ri variantlar ishonarli bo'lsin, lekin to'g'ri javob bitta ma'noda aniq bo'lsin.
+- O'quvchi to'g'ri javobni mazmunini bilmay turib topa olmasin:
+${BALANCE_RULES}
+- To'g'ri javobning o'rni savoldan savolga har xil bo'lsin (doim birinchi yoki doim ikkinchi emas).
 - short_answer javobi bir so'z yoki qisqa ibora bo'lsin.`,
+      maxTokens: 16000,
     });
 
     // AI javobi mavjud test sxemasi bilan tekshiriladi; yaroqsiz savollar tashlab yuboriladi
@@ -149,7 +160,136 @@ Talablar:
     if (questions.length === 0) {
       return { success: false, message: "AI yaroqli savol tuza olmadi. Qaytadan urinib ko'ring" };
     }
-    return { success: true, data: { questions } };
+    // Nazorat: to'g'ri javob baribir uzunligidan bilinib qolgan savollar — ikkinchi so'rov bilan tenglashtiriladi
+    const balanced = await balanceList(questions);
+    return { success: true, data: { questions, balanced } };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+// ---------- 2a. To'g'ri javob uzunligidan bilinmasin ----------
+
+type ChoiceQ = { type: string; prompt: string; options?: string[]; correctAnswers?: string[] };
+const asBalance = (q: ChoiceQ): BalanceInput => ({ type: q.type, prompt: q.prompt, options: q.options ?? [], correctAnswers: q.correctAnswers ?? [] });
+
+/** Ro'yxatdagi uzunligidan bilinadigan savollarni joyida tuzatadi; nechtasi tuzatilganini qaytaradi */
+async function balanceList<T extends ChoiceQ>(questions: T[]): Promise<number> {
+  const biased = questions.map((q, i) => ({ q, i })).filter(({ q }) => answerLengthBias(asBalance(q)).biased);
+  if (biased.length === 0) return 0;
+  try {
+    const fixed = await rebalanceChoices(biased.map(({ q }) => asBalance(q)));
+    for (const [k, r] of fixed) {
+      const q = questions[biased[k].i];
+      q.options = r.options;
+      q.correctAnswers = r.correctAnswers;
+    }
+    return fixed.size;
+  } catch (error) {
+    console.error("rebalance failed:", error);
+    return 0;
+  }
+}
+
+/** Test muharriri: hali saqlanmagan savollardagi uzunlik muammosini AI bilan tuzatish */
+export async function rebalanceQuestionsAction(questions: IQuizQuestion[]): Promise<ActionResult<{ questions: IQuizQuestion[]; fixed: number }>> {
+  const blocked = await guard();
+  if (blocked) return { success: false, message: blocked };
+  if (!Array.isArray(questions) || questions.length > 60) return { success: false, message: "Savollar ro'yxati noto'g'ri" };
+  try {
+    const copy = questions.map((q) => ({ ...q, options: [...(q.options ?? [])], correctAnswers: [...(q.correctAnswers ?? [])] }));
+    const fixed = await balanceList(copy);
+    return { success: true, data: { questions: copy, fixed } };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export interface QuizQualityItem {
+  key: string;
+  kind: "quiz" | "exam";
+  docId: string;
+  title: string;
+  prompt: string;
+  ratio: number;
+}
+
+/** Hozir o'quvchi yechayotgan test/imtihonga tegilmaydi (javobi eski variant matni bilan yozilib qolmasin) */
+async function busyDocs(): Promise<{ quizzes: Set<string>; exams: Set<string> }> {
+  const [runs, subs] = await Promise.all([
+    QuizRun.find({ finishedAt: null, createdAt: { $gte: new Date(Date.now() - 2 * 3600_000) } }).select("quizId").lean(),
+    ExamSubmission.find({ status: "in_progress" }).select("examId").lean(),
+  ]);
+  return { quizzes: new Set(runs.map((r) => String(r.quizId))), exams: new Set(subs.map((s) => String(s.examId))) };
+}
+
+async function biasedQuestions(): Promise<(QuizQualityItem & { questionId: string; q: BalanceInput })[]> {
+  const [quizzes, exams] = await Promise.all([
+    Quiz.find({}).select("title questions._id questions.type questions.prompt questions.options questions.correctAnswers").lean(),
+    Exam.find({}).select("title questions._id questions.type questions.prompt questions.options questions.correctAnswers").lean(),
+  ]);
+  const out: (QuizQualityItem & { questionId: string; q: BalanceInput })[] = [];
+  const scan = (kind: "quiz" | "exam", docs: { _id: unknown; title: string; questions: (ChoiceQ & { _id?: unknown })[] }[]) => {
+    for (const d of docs) {
+      for (const q of d.questions) {
+        const b = answerLengthBias(asBalance(q));
+        if (!b.biased) continue;
+        const questionId = String(q._id);
+        out.push({ key: `${kind}:${String(d._id)}:${questionId}`, kind, docId: String(d._id), title: d.title, prompt: q.prompt.slice(0, 140), ratio: b.ratio, questionId, q: asBalance(q) });
+      }
+    }
+  };
+  scan("quiz", quizzes as never);
+  scan("exam", exams as never);
+  return out.sort((a, b) => b.ratio - a.ratio);
+}
+
+/** Mentor: barcha test va imtihonlarda to'g'ri javobi uzunligidan bilinadigan savollar */
+export async function quizQualityReportAction(): Promise<ActionResult<{ items: QuizQualityItem[]; total: number; aiReady: boolean }>> {
+  try {
+    await requireMentor();
+    await connectToDatabase();
+    const all = await biasedQuestions();
+    return {
+      success: true,
+      data: { items: all.slice(0, 50).map(({ key, kind, docId, title, prompt, ratio }) => ({ key, kind, docId, title, prompt, ratio })), total: all.length, aiReady: isAiConfigured() },
+    };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Mentor: navbatdagi 10 ta savolni AI bilan tuzatadi (sahifa qayta-qayta chaqiradi). `skip` — tuzatib bo'lmaganlar */
+export async function fixBiasedQuestionsAction(skip: string[] = []): Promise<ActionResult<{ fixed: number; failed: string[]; remaining: number; busy: number }>> {
+  const blocked = await guard("ai-fix", 60);
+  if (blocked) return { success: false, message: blocked };
+  try {
+    await connectToDatabase();
+    const skipped = new Set(Array.isArray(skip) ? skip.slice(0, 500) : []);
+    const busy = await busyDocs();
+    const all = await biasedQuestions();
+    const isBusy = (x: QuizQualityItem) => (x.kind === "quiz" ? busy.quizzes : busy.exams).has(x.docId);
+    const todo = all.filter((x) => !skipped.has(x.key) && !isBusy(x));
+    const batch = todo.slice(0, 10);
+    const fixed = batch.length ? await rebalanceChoices(batch.map((x) => x.q)) : new Map();
+    const failed: string[] = [];
+    let done = 0;
+    for (let i = 0; i < batch.length; i++) {
+      const x = batch[i];
+      const r = fixed.get(i);
+      if (!r) {
+        failed.push(x.key);
+        continue;
+      }
+      const Model = (x.kind === "quiz" ? Quiz : Exam) as unknown as typeof Quiz;
+      const res = await Model.updateOne(
+        { _id: x.docId, "questions._id": x.questionId },
+        { $set: { "questions.$.options": r.options, "questions.$.correctAnswers": r.correctAnswers } }
+      );
+      if (res.modifiedCount > 0) done++;
+      else failed.push(x.key);
+    }
+    return { success: true, data: { fixed: done, failed, remaining: Math.max(0, todo.length - batch.length), busy: all.filter(isBusy).length } };
   } catch (error) {
     return fail(error);
   }

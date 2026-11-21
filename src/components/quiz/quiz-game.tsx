@@ -1,5 +1,7 @@
 "use client";
 
+import { AntiCheatGuard } from "@/components/anti-cheat/anti-cheat-guard";
+import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Clock, Flame, Gamepad2, ListChecks, Medal, Play, RotateCcw, Trophy, X, Zap } from "lucide-react";
@@ -43,9 +45,11 @@ interface QuizGameProps {
   quiz: IQuizData;
   submission: IQuizSubmissionData | null;
   lessonId: string;
+  /** O'quvchi uchun: anti-cheat suv belgisi (ism · login); yo'q bo'lsa himoya o'chiq (mentor ko'rinishi) */
+  watermark?: string;
 }
 
-export function QuizGame({ quiz, submission, lessonId }: QuizGameProps) {
+export function QuizGame({ quiz, submission, lessonId, watermark }: QuizGameProps) {
   const router = useRouter();
   const answeredIds = new Set((submission?.answers ?? []).map((a) => a.questionId));
   const pending = quiz.questions.filter((q) => !answeredIds.has(String(q._id)));
@@ -193,11 +197,19 @@ export function QuizGame({ quiz, submission, lessonId }: QuizGameProps) {
   }
 
   if (phase === "question" && question) {
-    return <QuestionScreen key={question.id} question={question} busy={busy} effects={effects} onSubmit={submit} error={error} />;
+    return (
+      <AntiCheatGuard context="quiz" refId={String(quiz._id)} watermark={watermark} enabled={Boolean(watermark)}>
+        <QuestionScreen key={question.id} question={question} busy={busy} effects={effects} onSubmit={submit} error={error} />
+      </AntiCheatGuard>
+    );
   }
 
   if (phase === "feedback" && feedback && question) {
-    return <FeedbackScreen question={question} feedback={feedback} value={lastValue} expired={expired} onNext={next} />;
+    return (
+      <AntiCheatGuard context="quiz" refId={String(quiz._id)} watermark={watermark} enabled={Boolean(watermark)}>
+        <FeedbackScreen question={question} feedback={feedback} value={lastValue} expired={expired} onNext={next} />
+      </AntiCheatGuard>
+    );
   }
 
   return (
@@ -418,7 +430,9 @@ function QuestionScreen({
         </div>
 
         <div className="quiz-pop rounded-2xl bg-white px-4 py-5 text-center text-slate-900 shadow-lg sm:px-6 sm:py-7">
-          <p className="whitespace-pre-wrap text-lg font-black leading-snug sm:text-2xl">{question.prompt}</p>
+          <div className="text-lg font-black leading-snug sm:text-2xl">
+            <ProtectedText text={question.prompt} lines={5} />
+          </div>
           {question.type === "multiple_choice" && <p className="mt-2 text-xs font-semibold text-slate-500">Bir nechta to&apos;g&apos;ri javob bo&apos;lishi mumkin</p>}
         </div>
 
@@ -447,7 +461,7 @@ function QuestionScreen({
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono text-base font-black">
                     {on ? <Check className="h-5 w-5" strokeWidth={3} /> : LETTERS[i] ?? i + 1}
                   </span>
-                  <span className="min-w-0 break-words">{opt}</span>
+                  <ProtectedText text={opt} lines={3} minScale={0.6} className="min-w-0 flex-1" />
                 </button>
               );
             })}

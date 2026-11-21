@@ -29,6 +29,49 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "anti-cheat-2026-11",
+    date: "2026-11-21",
+    audience: "student",
+    badge: "Muhim",
+    title: "Testlarda halol o'yin",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Endi har kim o'z bilimi bilan",
+        text: "Test, imtihon va jonli o'yin paytida savollarni nusxalab, AI yoki kengaytmaga berib bo'lmaydi. Boshqa oyna yoki ilovaga o'tsangiz, screenshot olmoqchi bo'lsangiz — ekran xiralashadi va bu mentorga ko'rinadi. Ekranda ismingiz yozilgan suv belgisi turadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔀",
+        title: "Uzun javob — to'g'ri javob emas",
+        text: "Variantlar endi bir xil uzunlikda va har kimga o'z tartibida chiqadi. Eng uzun variantni yoki «doim B»ni tanlash ishlamaydi — savolni o'qib, o'ylab javob bering. Uzun savollarda shrift o'zi kichrayadi, ekran buzilmaydi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-anti-cheat-2026-11",
+    date: "2026-11-21",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Anti-cheat va AI bilan 20 ta savol",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Anti-cheat",
+        text: "Test va jonli o'yinda savol va variantlar matn emas, rasm bo'lib chiziladi: nusxalab ham, AI kengaytmasi o'qiy olmaydi. Copy/paste, o'ng tugma, DevTools yopiq; boshqa oynaga o'tish va screenshot urinishida ekran xiralashadi. Inson ulgurmaydigan tezlikdagi (bot) javob tezlik balini olmaydi. Qaydlar: dars natijalarida test bali yonida ⚠️, «Jonli o'yin» sahifasida «Anti-cheat: so'nggi qaydlar». Eslatma: telefon screenshotini yoki boshqa qurilmadan suratga olishni brauzer to'liq taqiqlay olmaydi — suv belgisi kimniki ekanini ko'rsatadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "⚖️",
+        title: "To'g'ri javob uzunligidan bilinmaydi",
+        text: "«AI bilan 20 ta savol» — mavzu bo'yicha 20 ta savol, variantlar bir xil uzunlik va uslubda; bilinib qolganlari avtomatik tenglashtiriladi. Muharrirda bunday savollar sariq belgilanadi va «Variantlarni tenglashtirish» tugmasi bor. «Darslar» sahifasida «AI bilan hammasini tuzatish» — barcha eski test va imtihonlarni bir bosishda tuzatadi. Variantlar har o'quvchiga o'z tartibida chiqadi.",
+      },
+    ],
+    cta: { label: "Darslarga o'tish", href: "/mentor/lessons" },
+  },
+  {
     id: "mentor-student-games-monitor-2026-11",
     date: "2026-11-21",
     audience: "mentor",

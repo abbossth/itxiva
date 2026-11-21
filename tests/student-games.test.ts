@@ -154,6 +154,7 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     expect((await poll()).data.status).toBe("question");
     // Ali tez, Vali sekinroq, Sardor eng oxirida — hammasi to'g'ri
     as(ali);
+    tick(800);
     await live.answerLiveQuestionAction(id, 0, "ha");
     tick(2000);
     as(vali);

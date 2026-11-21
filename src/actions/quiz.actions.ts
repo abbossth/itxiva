@@ -1,5 +1,6 @@
 "use server";
 
+import { seededShuffle } from "@/lib/quiz-quality";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { Quiz, IQuizQuestion, IQuizData } from "@/lib/db/models/quiz.model";
@@ -72,7 +73,8 @@ export async function getQuizForLesson(lessonId: string): Promise<ActionState<{
         _id: q._id?.toString(),
         type: q.type,
         prompt: q.prompt,
-        options: q.options || [],
+        // O'quvchiga variantlar o'z tartibida (mentor — asl tartibda)
+        options: user.role === "mentor" ? q.options || [] : seededShuffle(q.options || [], `${user.userId}:${String(q._id)}`),
         correctAnswers: reveal ? q.correctAnswers : [],
         points: q.points,
         explanation: reveal ? q.explanation : undefined,

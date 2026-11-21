@@ -1,5 +1,7 @@
 "use client";
 
+import { AntiCheatGuard } from "@/components/anti-cheat/anti-cheat-guard";
+import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { CharacterSvg } from "@/components/character/character-svg";
 import type { GameLook } from "@/lib/character/catalog";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -286,7 +288,9 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
               <EmoteStrip gameId={state.id} />
             </div>
           ) : (
-            <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
+            <AntiCheatGuard context="live" refId={state.id} watermark={state.me?.name}>
+              <AnswerView key={state.index} state={state} busy={busy} onAnswer={answer} />
+            </AntiCheatGuard>
           )
         ) : state.status === "arena" && state.arena ? (
           <ArenaPlayer key={state.arena.round} gameId={state.id} arena={state.arena} myName={state.me?.name ?? "Siz"} />
@@ -403,7 +407,9 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
     <div className="space-y-3 lg:space-y-5">
       {state.bonus && <p className="live-pop mx-auto w-fit rounded-xl bg-amber-400 px-4 py-1.5 text-sm font-black text-slate-950 lg:text-lg">⚡ BONUS: ochko ×2</p>}
       <div className="flex items-start gap-3 lg:gap-5">
-        <p className="min-w-0 flex-1 whitespace-pre-wrap rounded-2xl bg-white px-4 py-3 text-base font-black text-slate-900 sm:text-xl md:px-6 md:py-5 lg:text-4xl lg:leading-snug">{q.prompt}</p>
+        <div className="min-w-0 flex-1 rounded-2xl bg-white px-4 py-3 text-base font-black text-slate-900 sm:text-xl md:px-6 md:py-5 lg:text-4xl lg:leading-snug">
+          <ProtectedText text={q.prompt} lines={4} />
+        </div>
         <span className="lg:hidden">
           <TimerBadge ms={remaining} limit={q.timeLimit} />
         </span>
@@ -441,7 +447,7 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono lg:h-14 lg:w-14 lg:text-2xl">
                   {on ? <Check className="h-5 w-5" strokeWidth={3} /> : LETTERS[i]}
                 </span>
-                <span className="min-w-0 break-words">{opt}</span>
+                <ProtectedText text={opt} lines={3} minScale={0.55} className="min-w-0 flex-1" />
               </button>
             );
           })}

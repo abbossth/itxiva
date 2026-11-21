@@ -105,9 +105,10 @@ describe("o'yin jarayoni", () => {
     expect(a1.success && a1.data).toMatchObject({ isCorrect: true, base: 900, bonus: 0, streak: 1, correctAnswers: ["4"], explanation: "Oddiy", finished: false });
 
     const q2 = await game.nextQuizQuestionAction(runId);
-    tick(0);
+    tick(800);
     const a2 = await game.answerQuizQuestionAction(runId, q2.success ? q2.data.id : "", ["4", "2"]);
-    expect(a2.success && a2.data).toMatchObject({ isCorrect: true, base: 1000, bonus: 100, streak: 2, score: 2000 });
+    // 0,8 s / 20 s: 1000 × (1 − 0,5 × 0,04) = 980 (0,6 s dan tezi — bot deb hisoblanadi)
+    expect(a2.success && a2.data).toMatchObject({ isCorrect: true, base: 980, bonus: 100, streak: 2, score: 1980 });
 
     const q3 = await game.nextQuizQuestionAction(runId);
     const a3 = await game.answerQuizQuestionAction(runId, q3.success ? q3.data.id : "", "Samarqand");
@@ -115,7 +116,7 @@ describe("o'yin jarayoni", () => {
     expect(a3.success && a3.data.final).toMatchObject({ totalScore: 5, maxScore: 6, status: "graded", correct: 2, total: 3, maxStreak: 2 });
 
     const sub = await QuizSubmission.findOne({ studentId: ali._id }).lean();
-    expect(sub?.game).toMatchObject({ score: 2000, correct: 2, total: 3, maxStreak: 2 });
+    expect(sub?.game).toMatchObject({ score: 1980, correct: 2, total: 3, maxStreak: 2 });
     expect(sub?.answers).toHaveLength(3);
     expect(await QuizRun.countDocuments({ finishedAt: null })).toBe(0);
   });
@@ -203,8 +204,8 @@ describe("o'yin jarayoni", () => {
 describe("reyting va bonus", () => {
   it("o'z guruhi bo'yicha ochko tartibida; boshqa guruh ko'rinmaydi", async () => {
     const { ali, vali, guli, quizId } = await seed();
-    await play(vali, quizId, ["4", ["2", "4"], "Toshkent"], 500);
-    await play(ali, quizId, ["4", ["2"], "Toshkent"], 500);
+    await play(vali, quizId, ["4", ["2", "4"], "Toshkent"], 800);
+    await play(ali, quizId, ["4", ["2"], "Toshkent"], 800);
     await QuizSubmission.create({ quizId, lessonId: (await Quiz.findById(quizId))!.lessonId, studentId: guli._id, answers: [], totalScore: 0, maxScore: 6, status: "graded" });
 
     actAs(sessionFor(ali));
@@ -219,9 +220,9 @@ describe("reyting va bonus", () => {
 
   it("1–3 o'ringa bonus dars sanasidan 7 kun o'tib, bir marta", async () => {
     const { ali, vali, guli, quizId } = await seed();
-    await play(vali, quizId, ["4", ["2", "4"], "Toshkent"], 500);
+    await play(vali, quizId, ["4", ["2", "4"], "Toshkent"], 800);
     await play(ali, quizId, ["4", ["2", "4"], "Toshkent"], 3000);
-    await play(guli, quizId, ["3", ["2"], "Toshkent"], 500);
+    await play(guli, quizId, ["3", ["2"], "Toshkent"], 800);
 
     expect(await awardQuizPlaces(new Date(T0.getTime() + 6 * 86_400_000))).toEqual({ quizzes: 0, awarded: 0 });
     const later = new Date(T0.getTime() + 8 * 86_400_000);
