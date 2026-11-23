@@ -29,6 +29,20 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-group-balance-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Guruhlar",
+    title: "Guruh ro'yxatida — coin balansi",
+    slides: [
+      {
+        art: "character-shop",
+        title: "Hozir ishlatsa bo'ladigan coin",
+        text: "Guruhlar bo'limidagi o'quvchilar ro'yxatida endi \"Balans\" ustuni: o'quvchining hozir do'konda ishlata oladigan coini (sarflangan va jarimalar ayirilgan). Ustun bo'yicha saralash ham balans bo'yicha ishlaydi. Jami ishlab topilgan coin o'quvchi profilida.",
+      },
+    ],
+  },
+  {
     id: "student-game-telegram-2026-11-23",
     date: "2026-11-23",
     audience: "student",

@@ -36,7 +36,7 @@ import { ColumnHeader, TableFilterBar, useTableControls, type ColumnDef } from "
 const COLUMNS: ColumnDef<IUserData>[] = [
   { key: "fullName", label: "O'quvchi", value: (s) => s.fullName, filter: "text" },
   { key: "login", label: "Login", value: (s) => s.login, filter: "text" },
-  { key: "coins", label: "Coinlar", value: (s) => s.totalCoins ?? 0 },
+  { key: "coins", label: "Balans", value: (s) => s.spendableBalance ?? 0 },
   { key: "lastLogin", label: "Oxirgi kirish", value: (s) => (s.lastLoginAt ? new Date(s.lastLoginAt).toISOString() : null), filter: false },
 ];
 
@@ -75,7 +75,10 @@ export function GroupStudentsView({
   const [grantFor, setGrantFor] = useState<{ id: string; name: string }[] | null>(null);
   const [voidOpen, setVoidOpen] = useState(false);
   const onVoided = (byStudent: Record<string, number>) =>
-    setStudents((list) => list.map((s) => (byStudent[s._id.toString()] ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + byStudent[s._id.toString()]) } : s)));
+    setStudents((list) => list.map((s) => {
+      const d = byStudent[s._id.toString()];
+      return d ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + d), spendableBalance: Math.max(0, (s.spendableBalance ?? 0) + d) } : s;
+    }));
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -85,7 +88,9 @@ export function GroupStudentsView({
     });
   const onGranted = ({ coin, ids }: { coin: number; ids: string[] }) => {
     // Ro'yxatdagi coinlar darhol yangilanadi (faqat haqiqatda yozilganlar)
-    setStudents((list) => list.map((s) => (ids.includes(s._id.toString()) ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + coin) } : s)));
+    setStudents((list) => list.map((s) =>
+        ids.includes(s._id.toString()) ? { ...s, totalCoins: Math.max(0, (s.totalCoins ?? 0) + coin), spendableBalance: Math.max(0, (s.spendableBalance ?? 0) + coin) } : s
+      ));
     setSelected(new Set());
   };
 
@@ -206,7 +211,7 @@ export function GroupStudentsView({
               <th className="px-4 py-2.5 font-bold w-12">#</th>
               <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="fullName">O&apos;quvchi</ColumnHeader></th>
               <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="login">Login</ColumnHeader></th>
-              <th className="px-4 py-2.5 font-bold text-center"><ColumnHeader table={table} column="coins" align="center">Coinlar</ColumnHeader></th>
+              <th className="px-4 py-2.5 font-bold text-center"><ColumnHeader table={table} column="coins" align="center">Balans</ColumnHeader></th>
               <th className="px-4 py-2.5 font-bold"><ColumnHeader table={table} column="lastLogin">Oxirgi kirish</ColumnHeader></th>
               <th className="px-4 py-2.5 font-bold text-right">Amallar</th>
             </tr>
@@ -252,7 +257,7 @@ export function GroupStudentsView({
                     @{s.login}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <CoinBadge amount={s.totalCoins || 0} size="sm" animate={false} />
+                    <CoinBadge amount={s.spendableBalance || 0} size="sm" animate={false} />
                   </td>
                   <td className="px-4 py-2 text-slate-500 dark:text-slate-400 text-xs">
                     {s.lastLoginAt ? formatDateUz(s.lastLoginAt) : "Hali kirmagan"}
@@ -353,7 +358,7 @@ export function GroupStudentsView({
               {/* Card middle: Coins & Last Login */}
               <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <CoinBadge amount={s.totalCoins || 0} size="sm" animate={false} />
+                  <CoinBadge amount={s.spendableBalance || 0} size="sm" animate={false} />
                 </div>
                 <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
                   <Clock className="w-3.5 h-3.5" />
