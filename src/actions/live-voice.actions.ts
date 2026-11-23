@@ -14,6 +14,8 @@ import { mayPlay } from "@/lib/live-game/student-games";
 import { phaseOfGame, pushVoice, voiceRoomReady, voiceSocketUrl } from "@/lib/live-game/voice-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 
+const AFTER_FINISH_MS = 15 * 60_000;
+
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 
 function errorOf(err: unknown, fallback: string): { success: false; error: string } {
@@ -39,11 +41,13 @@ export async function getVoiceTicketAction(gameId: string): Promise<Result<Voice
     if (!rate.allowed) return { success: false, error: "Juda ko'p urinish — birozdan keyin" };
     await connectDB();
     const game = await LiveGame.findById(gameId)
-      .select({ groupId: 1, grade: 1, status: 1, index: 1, questionStartedAt: 1, revealedAt: 1, voice: 1, "questions.timeLimit": 1 })
+      .select({ groupId: 1, grade: 1, status: 1, index: 1, questionStartedAt: 1, revealedAt: 1, finishedAt: 1, voice: 1, "questions.timeLimit": 1 })
       .lean();
     if (!game) return { success: false, error: "O'yin topilmadi" };
     const muted = Boolean(game.voice?.muted);
-    if (game.status === "finished" || !(await voiceRoomReady())) return { success: true, data: { url: null, host: user.role === "mentor", muted } };
+    // G'oliblar e'lon qilingach ham suhbat davom etadi (tugaganidan keyin 15 daqiqa)
+    const over = game.status === "finished" && Date.now() - new Date(game.finishedAt ?? 0).getTime() > AFTER_FINISH_MS;
+    if (over || !(await voiceRoomReady())) return { success: true, data: { url: null, host: user.role === "mentor", muted } };
     const phase = phaseOfGame(game);
 
     let url: string | null;

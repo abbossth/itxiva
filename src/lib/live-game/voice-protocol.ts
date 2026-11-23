@@ -2,10 +2,10 @@
 // Ovoz hech qayerda saqlanmaydi: xona faqat bir o'quvchidan kelgan Opus paketlarini boshqalarga uzatadi.
 //
 // Qoidalar (xona majburlaydi — brauzerga ishonilmaydi):
-//  - Savol paytida javob bermagan o'quvchi "qulf"da: na gapira, na eshita oladi.
-//    Javob berganlar (va o'yindan chiqqanlar) faqat bir-biri bilan gaplashadi.
+//  - Savol paytida javob bermagan o'quvchi "qulf"da: hech kimni eshitmaydi, gapirsa — faqat ustoz eshitadi.
+//    Javob berganlar (va o'yindan chiqqanlar) faqat bir-biri bilan (va ustoz bilan) gaplashadi.
 //  - Ustoz "hammaning mikrofonini o'chirish" qilsa — o'quvchilar gapira olmaydi (eshitishadi).
-//  - Ustoz (host) hammani eshitadi, uning ovozi qulfda bo'lmaganlarga boradi.
+//  - Ustoz (host) hammani eshitadi (savol paytida ham), uning ovozi qulfda bo'lmaganlarga boradi.
 // Bu fayl brauzer, Node va Cloudflare Worker'da ishlaydi — tashqi bog'liqlik yo'q.
 
 export interface VoiceTicket {
@@ -76,18 +76,23 @@ export function isLocked(m: VoiceMember, s: VoiceRoomState, now: number): boolea
   return !m.host && questionActive(s.phase, now) && !m.answered;
 }
 
-/** Gapira oladimi */
-export function maySpeak(m: VoiceMember, s: VoiceRoomState, now: number): boolean {
-  if (m.host) return true;
-  return !s.muted && !isLocked(m, s, now);
+/** Gapira oladimi (savol paytida qulfdagi o'quvchi ham gapiradi — uni faqat ustoz eshitadi) */
+export function maySpeak(m: VoiceMember, s: VoiceRoomState): boolean {
+  return m.host || !s.muted;
 }
 
-/** Tinglovchi gapiruvchini eshitadimi (gapiruvchi gapira olishi alohida tekshiriladi) */
+/**
+ * Tinglovchi gapiruvchini eshitadimi:
+ *  - ustoz hammani eshitadi (savol paytida ham);
+ *  - qulfdagi o'quvchi hech kimni eshitmaydi;
+ *  - qulfdagi o'quvchining ovozi faqat ustozga boradi (o'quvchilar test paytida bir-birini eshitmaydi);
+ *  - javob berganlar bir-birini va ustozni eshitadi.
+ */
 export function mayHear(listener: VoiceMember, speaker: VoiceMember, s: VoiceRoomState, now: number): boolean {
   if (listener.deaf) return false;
   if (listener.host) return true;
   if (isLocked(listener, s, now)) return false;
-  return speaker.host || !isLocked(speaker, s, now);
+  return !isLocked(speaker, s, now);
 }
 
 /** Yangiroq bosqich ustun (sayt xabarlari tartibsiz kelishi mumkin) */

@@ -128,7 +128,7 @@ export class VoiceRoomCore<C> {
     const a = this.members.get(c);
     if (!a || !a.mic || !validPacket(b)) return [];
     const speaker = this.member(a);
-    if (!maySpeak(speaker, this.state, now)) return [];
+    if (!maySpeak(speaker, this.state)) return [];
     const bud = this.budget.get(c);
     if (!bud || now - bud.at >= 1000) this.budget.set(c, { at: now, bytes: b.length, packets: 1 });
     else {
@@ -143,16 +143,15 @@ export class VoiceRoomCore<C> {
       if (k === c) continue;
       const listener = this.member(l);
       if (mayHear(listener, speaker, this.state, now)) out.push([k, (full ??= relayPacket(a.s, b, true))]);
-      // Karnayi o'chiq — ovoz emas, faqat kim gapirayotgani (qulfdagilarga hech narsa)
-      else if (l.deaf && !isLocked(listener, this.state, now) && (l.host || speaker.host || !isLocked(speaker, this.state, now)))
-        out.push([k, (level ??= relayPacket(a.s, b, false))]);
+      // Karnayi o'chiq — ovoz emas, faqat kim gapirayotgani (eshitishga ruxsati bo'lganlarga)
+      else if (l.deaf && mayHear({ ...listener, deaf: false }, speaker, this.state, now)) out.push([k, (level ??= relayPacket(a.s, b, false))]);
     }
     return out;
   }
 
   roster(now: number): string {
     const peers: VoicePeer[] = [...this.members.values()]
-      .map((a) => ({ s: a.s, n: a.n, host: a.host, mic: a.mic && maySpeak(this.member(a), this.state, now), lock: isLocked(this.member(a), this.state, now) }))
+      .map((a) => ({ s: a.s, n: a.n, host: a.host, mic: a.mic && maySpeak(this.member(a), this.state), lock: isLocked(this.member(a), this.state, now) }))
       .sort((x, y) => x.s - y.s);
     return JSON.stringify({ t: "roster", muted: this.state.muted, question: questionActive(this.state.phase, now), peers });
   }

@@ -215,7 +215,7 @@ export class VoiceEngine {
   canSpeak(): boolean {
     const me = this.snap.peers.find((p) => p.s === this.snap.me);
     if (!me) return false;
-    return me.host || (!this.snap.muted && !me.lock);
+    return me.host || !this.snap.muted;
   }
 
   private onAudio(b: Uint8Array) {

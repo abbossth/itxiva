@@ -256,8 +256,8 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           </div>
         )}
 
-        {/* Ovozli suhbat: o'yinga qo'shilganlar uchun (savol paytida — faqat javob berganlar bilan) */}
-        {state.joined && state.status !== "finished" && <VoiceChat gameId={state.id} />}
+        {/* Ovozli suhbat: o'yinga qo'shilganlar uchun (savol paytida — faqat javob berganlar bilan; g'oliblar e'lonida ham) */}
+        {state.joined && !state.studentGame?.cancelled && <VoiceChat gameId={state.id} />}
 
         {weak && (
           <p role="status" className="mb-3 flex items-center justify-center gap-2 rounded-xl bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-200">

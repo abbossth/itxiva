@@ -66,14 +66,16 @@ describe("ovoz xonasi: kim kimni eshitadi", () => {
     expect(r.audio("ali", new Uint8Array([10, 3, 0, 9]), 1000)).toEqual([]);
   });
 
-  it("savol paytida qulfdagi o'quvchi gapira olmaydi; javob berganlar bir-birini eshitadi", () => {
+  it("savol paytida: qulfdagi o'quvchini faqat ustoz eshitadi, u hech kimni eshitmaydi; javob berganlar bir-biri bilan", () => {
     const r = room("ali", "vali", "guli", "host");
     r.control({ g: "g", t: "phase", phase: { q: 0, until: 20_000, v: 1 } });
-    expect(r.audio("ali", pkt(), 1000)).toEqual([]);
+    // Hech kim javob bermagan: o'quvchilar bir-birini eshitmaydi, ustoz hammani eshitadi
+    expect(routes(r, "ali")).toEqual(["host:full"]);
+    expect(routes(r, "host")).toEqual([]);
     r.control({ g: "g", t: "answered", q: 0, p: ["ali", "vali"] });
     expect(routes(r, "ali")).toEqual(["host:full", "vali:full"]); // guli javob bermagan — eshitmaydi
-    expect(r.audio("guli", pkt(), 1000)).toEqual([]);
-    // Ustoz hammani eshitadi, uning ovozi qulfdagilarga bormaydi
+    expect(routes(r, "guli")).toEqual(["host:full"]); // guli gapirsa — faqat ustoz
+    // Ustozning ovozi qulfdagilarga bormaydi
     expect(routes(r, "host")).toEqual(["ali:full", "vali:full"]);
     // Boshqa savolga javob — hisobga olinmaydi
     expect(r.control({ g: "g", t: "answered", q: 5, p: ["guli"] })).toBeNull();
@@ -81,11 +83,18 @@ describe("ovoz xonasi: kim kimni eshitadi", () => {
     expect(routes(r, "guli", 25_000)).toEqual(["ali:full", "host:full", "vali:full"]);
   });
 
+  it("karnayi o'chiq ustoz — savol paytida ham kim gapirayotganini ko'radi", () => {
+    const r = room("ali", "host");
+    r.message("host", JSON.stringify({ t: "deaf", on: true }));
+    r.control({ g: "g", t: "phase", phase: { q: 0, until: 20_000, v: 1 } });
+    expect(routes(r, "ali")).toEqual(["host:level"]);
+  });
+
   it("natija ochilsa hamma gaplashadi; eski bosqich xabari (kech kelgan) e'tiborsiz", () => {
     const r = room("ali", "vali");
     r.control({ g: "g", t: "phase", phase: { q: 0, until: 20_000, v: 5 } });
     expect(r.control({ g: "g", t: "phase", phase: { q: null, until: 0, v: 4 } })).toBeNull();
-    expect(routes(r, "ali")).toEqual([]);
+    expect(routes(r, "ali")).toEqual([]); // savol davom etyapti — o'quvchilar bir-birini eshitmaydi
     r.control({ g: "g", t: "phase", phase: { q: null, until: 0, v: 6 } });
     expect(routes(r, "ali")).toEqual(["vali:full"]);
   });
@@ -211,6 +220,18 @@ describe("ovozli suhbat: bilet va o'yin bosqichlari", () => {
     as(mentor);
     await live.revealLiveQuestionAction(id);
     expect(push).toHaveBeenLastCalledWith(expect.objectContaining({ g: id, t: "phase", phase: expect.objectContaining({ q: null }) }));
+  });
+
+  it("g'oliblar e'lon qilingach ham 15 daqiqa suhbatga kirish mumkin, keyin yo'q", async () => {
+    const { ali, id } = await seed();
+    as(ali);
+    await live.joinLiveGameAction(id);
+    await LiveGame.updateOne({ _id: id }, { $set: { status: "finished", finishedAt: NOW } });
+    vi.setSystemTime(new Date(NOW.getTime() + 10 * 60_000));
+    const r1 = await voice.getVoiceTicketAction(id);
+    expect(r1.success && r1.data.url).toBeTruthy();
+    vi.setSystemTime(new Date(NOW.getTime() + 16 * 60_000));
+    expect(await voice.getVoiceTicketAction(id)).toMatchObject({ success: true, data: { url: null } });
   });
 
   it("ustoz hammaning mikrofonini o'chiradi; o'quvchi buni qila olmaydi", async () => {

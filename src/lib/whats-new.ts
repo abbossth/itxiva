@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-live-sound-menu-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Jonli o'yin",
+    title: "Ovoz sozlamalari bir joyda",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎚️",
+        title: "Musiqa balandligi va suhbat tugmalari",
+        text: "O'yin ekranining tepasida: 🎙 mikrofon, 🎧 suhbat va 👥 \"Hammani o'chirish\" bitta guruhda. ⚙ tugmasida hamma ovoz sozlamalari: kuy tanlash, musiqa balandligi, effekt ovozlari, suhbat balandligi va mikrofon kuchi. Kim gapirayotgani ekran tepasida suzib chiqadi. Test paytida ham o'quvchilar gapirsa — siz eshitasiz, ular esa bir-birini eshitmaydi. G'oliblar e'lon qilingach ham suhbat 15 daqiqa davom etadi.",
+      },
+    ],
+  },
+  {
+    id: "student-live-voice-rules-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Ovozli suhbat",
+    title: "Test paytida — faqat ustoz eshitadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎙️",
+        title: "Savol paytida va g'oliblar e'lonida",
+        text: "Savolga javob bermaguningizcha hech kimni eshitmaysiz, gapirsangiz — sizni faqat ustoz eshitadi. Javob bergach — javob berganlar bilan gaplashasiz. O'yin tugab, g'oliblar e'lon qilinganda ham hamma bilan 15 daqiqa gaplasha olasiz.",
+      },
+    ],
+  },
+  {
     id: "student-live-voice-2026-11-23",
     date: "2026-11-23",
     audience: "student",
@@ -44,7 +74,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "🔒",
         title: "Savol paytida — avval javob",
-        text: "Savol chiqqanda javob bermaguningizcha hech kimni eshitmaysiz va gapira olmaysiz. Javob bergach — javob berganlar bilan gaplashasiz; natija chiqqach yana hamma birga. Ustoz dars paytida hammaning mikrofonini o'chirib qo'yishi mumkin. Ovoz yozib olinmaydi va hech qayerda saqlanmaydi.",
+        text: "Savol chiqqanda javob bermaguningizcha hech kimni eshitmaysiz, gapirsangiz — sizni faqat ustoz eshitadi. Javob bergach — javob berganlar bilan gaplashasiz; natija chiqqach (va g'oliblar e'lonida) yana hamma birga. Ustoz dars paytida hammaning mikrofonini o'chirib qo'yishi mumkin. Ovoz yozib olinmaydi va hech qayerda saqlanmaydi.",
       },
     ],
   },
@@ -58,7 +88,7 @@ export const NEWS: NewsItem[] = [
       {
         art: "character-games",
         title: "O'quvchilar o'yin davomida gaplashadi",
-        text: "Jonli o'yinda (sizniki ham, o'quvchilarniki ham) ovozli suhbat bor: mikrofon, karnay va balandlik tugmalari, tepada kim gapirayotgani. Savol paytida javob bermagan o'quvchi na gapiradi, na eshitadi — javob berganlar faqat bir-biri bilan gaplashadi, natija chiqqach hamma birga. Buni server majburlaydi. Ovoz yozilmaydi va saqlanmaydi.",
+        text: "Jonli o'yinda (sizniki ham, o'quvchilarniki ham) ovozli suhbat bor: mikrofon, karnay va balandlik tugmalari, tepada kim gapirayotgani. Savol paytida javob bermagan o'quvchi hech kimni eshitmaydi, uning gapini faqat siz eshitasiz; javob berganlar bir-biri bilan gaplashadi, natija chiqqach (va g'oliblar e'lonida) hamma birga. Buni server majburlaydi. Ovoz yozilmaydi va saqlanmaydi.",
       },
       {
         art: "emoji",

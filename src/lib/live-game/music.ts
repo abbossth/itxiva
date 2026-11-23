@@ -182,6 +182,8 @@ const tone = (c: Chord, i: number) => c.root + INTERVALS[c.type][((i % 4) + 4) %
 class LiveMusic {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private out: GainNode | null = null;
+  private volume = 1;
   private drums: GainNode | null = null;
   private music: GainNode | null = null;
   private duck: GainNode | null = null;
@@ -235,7 +237,11 @@ class LiveMusic {
     limiter.ratio.value = 20;
     limiter.attack.value = 0.002;
     limiter.release.value = 0.1;
-    limiter.connect(ctx.destination);
+    // Foydalanuvchi tanlagan balandlik — eng oxirida (miks o'zgarmaydi)
+    this.out = ctx.createGain();
+    this.out.gain.value = this.volume;
+    this.out.connect(ctx.destination);
+    limiter.connect(this.out);
     const glue = ctx.createDynamicsCompressor();
     glue.threshold.value = -16;
     glue.knee.value = 8;
@@ -304,6 +310,12 @@ class LiveMusic {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     return ctx;
+  }
+
+  /** Musiqa balandligi (0..1) */
+  setVolume(v: number) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.out) this.out.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
   }
 
   setEnabled(on: boolean) {

@@ -3,7 +3,7 @@
 import { promptScale } from "@/lib/quiz-quality";
 import { CharacterSvg } from "@/components/character/character-svg";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Swords, Play, Repeat, SkipForward, Square, Users, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Bot, Check, Crown, Music, Pause, Rocket, Settings2, Sparkles, Swords, Play, Repeat, SkipForward, Square, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -31,7 +31,7 @@ import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
 import { LivePodium } from "./live-podium";
 import { PushCrack } from "./push-crack";
-import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, useMusicChoice, type MusicChoice } from "./live-track";
+import { BackgroundTrack, MUSIC_TRACKS, setMusicChoice, setMusicVolume, useMusicChoice, useMusicVolume, type MusicChoice } from "./live-track";
 import { MinigameHost } from "./live-minigame";
 import { ArenaHost } from "./arena/arena-screens";
 import { GalaxyHost } from "./galaxy/galaxy-host";
@@ -39,7 +39,7 @@ import { ZoneHost } from "./zone/zone-host";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown, useViewportHeight } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
-import { VoiceChat } from "./voice/voice-chat";
+import { RangeRow, VoiceButtons, VoiceFloatingTalkers, VoiceSliders, useOutside, useVoice, type Voice } from "./voice/voice-chat";
 
 const POLL_MS = 1000;
 /** Kutish zali kuyi (o'quvchilar qo'shilayotganda) */
@@ -91,6 +91,9 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   const choice = useMusicChoice(initial.mode);
   const track = choice === "synth" ? null : MUSIC_TRACKS[choice];
   const synthOn = music && !track;
+  const musicVolume = useMusicVolume();
+  // Ovozli suhbat: tugmalar asboblar panelida, "kim gapiryapti" ekran tepasida suzib turadi
+  const voice = useVoice(initial.id, true);
   // Natijaning ikkinchi qadami (reyting) qaysi savol uchun ochilgan
   const [boardFor, setBoardFor] = useState<number | null>(null);
   const autoplay = useSyncExternalStore(subscribeAuto, readAuto, () => false);
@@ -228,6 +231,9 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
   useEffect(() => {
     liveMusic.setTheme(MODE_THEMES[state.mode]?.music ?? null);
   }, [state.mode]);
+  useEffect(() => {
+    liveMusic.setVolume(musicVolume);
+  }, [musicVolume]);
 
   // Fon musiqasi: holatga qarab kuy (g'oliblar musiqasini shohsupa o'zi boshqaradi)
   useEffect(() => {
@@ -434,30 +440,23 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
           >
             <Music className="h-4 w-4" /> <span className="hidden sm:inline">Musiqa</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setMusicMenu((v) => !v)}
-            title="Musiqani tanlash"
-            aria-expanded={musicMenu}
-            className="inline-flex min-h-[40px] cursor-pointer items-center rounded-xl bg-white/10 px-2.5 text-slate-200 hover:bg-white/20"
-          >
-            <Settings2 className="h-4 w-4" />
-          </button>
-          {musicMenu && <MusicMenu mode={state.mode} choice={choice} onClose={() => setMusicMenu(false)} />}
-          <button
-            type="button"
-            onClick={() => setSound((v) => !v)}
-            aria-pressed={sound}
-            className="inline-flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm font-semibold text-slate-200 hover:bg-white/20"
-          >
-            {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />} <span className="hidden sm:inline">Ovoz</span>
-          </button>
+          {voice.visible && <VoiceButtons v={voice} />}
+          <SoundMenu
+            open={musicMenu}
+            onToggle={() => setMusicMenu((v) => !v)}
+            onClose={() => setMusicMenu(false)}
+            mode={state.mode}
+            choice={choice}
+            musicVolume={musicVolume}
+            sound={sound}
+            onSound={() => setSound((v) => !v)}
+            voice={voice.visible ? voice : null}
+          />
         </>
       }
     >
+      <VoiceFloatingTalkers v={voice} />
       <LiveShell className="min-h-[70vh]">
-        {/* Ovozli suhbat: ustoz eshitadi, gapiradi va dars paytida hammaning mikrofonini o'chiradi (proyektorda karnay sukutda o'chiq) */}
-        {state.status !== "finished" && <VoiceChat gameId={state.id} host />}
         {/* Jangda sarlavha yashiriladi — xaritaga ko'proq joy */}
         {state.status !== "arena" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -644,8 +643,8 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
         {state.status === "finished" && <LivePodium state={state} sound={sound} music={synthOn} />}
       </LiveShell>
       {/* Kutish zali kuyi: o'quvchilar qo'shilayotganda; "Boshlash" bosilganda to'xtaydi */}
-      <BackgroundTrack src={LOBBY_TRACK} playing={music && state.status === "lobby" && !introOn} volume={0.5} />
-      {track && <BackgroundTrack src={track.src} playing={music && state.status !== "lobby"} volume={state.status === "finished" ? 0.35 : 0.55} />}
+      <BackgroundTrack src={LOBBY_TRACK} playing={music && state.status === "lobby" && !introOn} volume={0.5 * musicVolume} />
+      {track && <BackgroundTrack src={track.src} playing={music && state.status !== "lobby"} volume={(state.status === "finished" ? 0.35 : 0.55) * musicVolume} />}
     </ImmersiveFrame>
   );
 }
@@ -1111,35 +1110,90 @@ function ChestFeed({ events }: { events: LiveHostState["events"] }) {
 }
 
 /** Musiqa tanlash: shu o'yin turi uchun tayyor kuy yoki o'yinning original kuylari */
-function MusicMenu({ mode, choice, onClose }: { mode: LiveHostState["mode"]; choice: MusicChoice; onClose: () => void }) {
+/** Barcha ovoz sozlamalari bitta joyda: musiqa (kuy va balandlik), effektlar, ovozli suhbat */
+function SoundMenu({
+  open,
+  onToggle,
+  onClose,
+  mode,
+  choice,
+  musicVolume,
+  sound,
+  onSound,
+  voice,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  mode: LiveHostState["mode"];
+  choice: MusicChoice;
+  musicVolume: number;
+  sound: boolean;
+  onSound: () => void;
+  voice: Voice | null;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useOutside(ref, open, onClose);
   const options: { id: MusicChoice; title: string; hint: string }[] = [
-    ...(Object.entries(MUSIC_TRACKS) as [MusicChoice, { title: string }][]).map(([id, t]) => ({ id, title: t.title, hint: "Tayyor fon kuyi, takrorlanib chalinadi" })),
-    { id: "synth", title: "Original kuylar", hint: "Holatga qarab o'zgaradi: kutish, savol, reyting, g'alaba" },
+    ...(Object.entries(MUSIC_TRACKS) as [MusicChoice, { title: string }][]).map(([id, t]) => ({ id, title: t.title, hint: "Tayyor kuy" })),
+    { id: "synth", title: "Original kuylar", hint: "Holatga qarab o'zgaradi" },
   ];
   return (
-    <div className="absolute right-3 top-14 z-20 w-[min(92vw,340px)] space-y-2 rounded-2xl bg-slate-900 p-3 text-left shadow-2xl ring-1 ring-white/15 sm:right-6">
-      <p className="px-1 text-sm font-black">{LIVE_MODES[mode].title} uchun musiqa</p>
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => {
-            setMusicChoice(mode, o.id);
-            onClose();
-          }}
-          aria-pressed={choice === o.id}
-          className={cn(
-            "flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
-            choice === o.id ? "bg-fuchsia-500/25 ring-1 ring-fuchsia-400" : "hover:bg-white/10"
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        title="Ovoz sozlamalari"
+        aria-label="Ovoz sozlamalari"
+        aria-expanded={open}
+        className={cn("inline-flex min-h-[40px] cursor-pointer items-center rounded-xl px-2.5 text-slate-200 transition-colors", open ? "bg-white/25" : "bg-white/10 hover:bg-white/20")}
+      >
+        <Settings2 className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(92vw,320px)] divide-y divide-white/10 rounded-2xl bg-slate-900/95 text-left shadow-2xl ring-1 ring-white/15 backdrop-blur">
+          <section className="p-3">
+            <p className="mb-2 flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-slate-400">
+              <Music className="h-3.5 w-3.5" /> {LIVE_MODES[mode].title} · musiqa
+            </p>
+            <div className="mb-2 grid grid-cols-2 gap-1.5">
+              {options.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setMusicChoice(mode, o.id)}
+                  aria-pressed={choice === o.id}
+                  className={cn(
+                    "cursor-pointer rounded-xl px-2.5 py-2 text-left transition-colors",
+                    choice === o.id ? "bg-fuchsia-500/25 ring-1 ring-fuchsia-400/70" : "bg-white/5 hover:bg-white/10"
+                  )}
+                >
+                  <span className="block truncate text-xs font-bold">{o.title}</span>
+                  <span className="block truncate text-[10px] text-slate-400">{o.hint}</span>
+                </button>
+              ))}
+            </div>
+            <RangeRow label="Musiqa balandligi" icon={<Music className="h-4 w-4" />} value={musicVolume} onChange={setMusicVolume} />
+          </section>
+          <section className="p-3">
+            <button type="button" onClick={onSound} aria-pressed={sound} className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl py-1 text-left">
+              <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-300">
+                <Sparkles className="h-4 w-4" /> Effekt ovozlari
+              </span>
+              <span className={cn("relative h-5 w-9 rounded-full transition-colors", sound ? "bg-emerald-500" : "bg-white/20")} aria-hidden>
+                <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all", sound ? "left-[18px]" : "left-0.5")} />
+              </span>
+            </button>
+          </section>
+          {voice && (
+            <section className="p-3">
+              <p className="mb-1 text-[11px] font-black uppercase tracking-wider text-slate-400">Ovozli suhbat · {voice.others} kishi</p>
+              <VoiceSliders v={voice} />
+              <p className="mt-1 text-[11px] leading-snug text-slate-500">Ovoz yozib olinmaydi va saqlanmaydi.</p>
+            </section>
           )}
-        >
-          <Music className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            <span className="block text-sm font-bold">{o.title}</span>
-            <span className="block text-[11px] text-slate-400">{o.hint}</span>
-          </span>
-        </button>
-      ))}
+        </div>
+      )}
     </div>
   );
 }

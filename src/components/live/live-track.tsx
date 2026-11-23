@@ -49,6 +49,32 @@ export function useMusicChoice(mode: LiveGameMode): MusicChoice {
   return useSyncExternalStore(subscribe, () => read(mode), () => DEFAULTS[mode] ?? "synth");
 }
 
+// Musiqa balandligi (0..1): tayyor kuy ham, original kuylar ham — brauzerda saqlanadi
+const VOL_KEY = "itxiva:live-music-volume";
+
+function readVolume(): number {
+  try {
+    const v = Number(localStorage.getItem(VOL_KEY));
+    if (localStorage.getItem(VOL_KEY) !== null && Number.isFinite(v)) return Math.max(0, Math.min(1, v));
+  } catch {
+    // o'qib bo'lmasa — sukutdagisi
+  }
+  return 1;
+}
+
+export function setMusicVolume(v: number) {
+  try {
+    localStorage.setItem(VOL_KEY, String(Math.max(0, Math.min(1, v))));
+  } catch {
+    // saqlab bo'lmasa — faqat shu sahifada
+  }
+  window.dispatchEvent(new Event(EVENT));
+}
+
+export function useMusicVolume(): number {
+  return useSyncExternalStore(subscribe, readVolume, () => 1);
+}
+
 /**
  * Fon kuyi: `playing` bo'lsa chaladi (silliq ko'tariladi), aks holda to'xtaydi.
  * Brauzer ovozni foydalanuvchi bosguncha bermasligi mumkin — shunda birinchi bosishda boshlanadi.
