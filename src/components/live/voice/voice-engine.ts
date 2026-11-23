@@ -14,7 +14,10 @@ import {
 } from "@/lib/live-game/voice-protocol";
 
 export interface VoiceSnapshot {
-  status: "idle" | "connecting" | "live" | "error" | "unsupported";
+  /** off — ovozli suhbat yo'q (sozlanmagan yoki o'yin tugagan): panel ko'rinmaydi, qayta so'ralmaydi */
+  status: "idle" | "connecting" | "live" | "error" | "unsupported" | "off";
+  /** Hech bo'lmasa bir marta ulangan (panel faqat shundan keyin ko'rinadi — "ulanmoqda" miltillamasin) */
+  everLive: boolean;
   error: string | null;
   me: number | null;
   peers: VoicePeer[];
@@ -53,6 +56,7 @@ export function voiceSupported(): boolean {
 export class VoiceEngine {
   private snap: VoiceSnapshot = {
     status: "idle",
+    everLive: false,
     error: null,
     me: null,
     peers: [],
@@ -85,7 +89,8 @@ export class VoiceEngine {
   private myLevel = 0;
 
   constructor(
-    private getUrl: () => Promise<string | null>,
+    /** Bilet manzili; null — vaqtincha olinmadi (qayta urinadi), "off" — ovozli suhbat yo'q */
+    private getUrl: () => Promise<string | null | "off">,
     opts: { deaf?: boolean; volume?: number; micGain?: number } = {}
   ) {
     this.snap.deaf = Boolean(opts.deaf);
@@ -135,13 +140,17 @@ export class VoiceEngine {
   private async connect() {
     if (this.closed) return;
     this.set({ status: this.snap.status === "live" ? "live" : "connecting" });
-    let url: string | null = null;
+    let url: string | null | "off" = null;
     try {
       url = await this.getUrl();
     } catch {
       url = null;
     }
     if (this.closed) return;
+    if (url === "off") {
+      this.set({ status: "off" });
+      return;
+    }
     if (!url) {
       this.scheduleRetry();
       return;
@@ -151,7 +160,7 @@ export class VoiceEngine {
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
-      this.set({ status: "live", error: null });
+      this.set({ status: "live", everLive: true, error: null });
       if (this.snap.mic) ws.send(JSON.stringify({ t: "mic", on: true }));
       if (this.snap.deaf) ws.send(JSON.stringify({ t: "deaf", on: true }));
     };
@@ -434,6 +443,7 @@ export class VoiceEngine {
 
   stop() {
     this.closed = true;
+    this.snap = { ...this.snap, mic: false };
     if (this.retryTimer) clearTimeout(this.retryTimer);
     if (this.uiTimer) clearInterval(this.uiTimer);
     this.stopMic();

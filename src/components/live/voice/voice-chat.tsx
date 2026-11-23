@@ -11,8 +11,12 @@ import { VoiceEngine, type VoiceSnapshot } from "./voice-engine";
 
 const PREFS_KEY = "itx-voice-prefs";
 
+// "Ovozli suhbat yo'q" javobi o'yin bo'yicha 2 daqiqa eslab qolinadi: panel qayta ochilganda miltillamaydi va server qayta-qayta so'ralmaydi
+const OFF_TTL_MS = 120_000;
+const offUntil = new Map<string, number>();
+
 function readPrefs(host: boolean): { deaf: boolean; volume: number; micGain: number } {
-  const def = { deaf: host, volume: 1, micGain: 1 };
+  const def = { deaf: false, volume: 1, micGain: 1 };
   try {
     const raw = localStorage.getItem(`${PREFS_KEY}${host ? "-host" : ""}`);
     if (!raw) return def;
@@ -37,6 +41,7 @@ function savePrefs(host: boolean, s: VoiceSnapshot) {
 
 const EMPTY: VoiceSnapshot = {
   status: "idle",
+  everLive: false,
   error: null,
   me: null,
   peers: [],
@@ -50,18 +55,21 @@ const EMPTY: VoiceSnapshot = {
 };
 
 export function VoiceChat({ gameId, host = false, className }: { gameId: string; host?: boolean; className?: string }) {
-  const [enabled, setEnabled] = useState(true);
   const [panel, setPanel] = useState(false);
   const [muting, setMuting] = useState(false);
   // Dvigatel bir marta yaratiladi (yon ta'sirsiz); ulanish effektda boshlanadi
   const [engine] = useState(
     () =>
       new VoiceEngine(async () => {
+        if ((offUntil.get(gameId) ?? 0) > Date.now()) return "off";
         const res = await getVoiceTicketAction(gameId);
         if (!res.success) return null;
-        if (!res.data.url) setEnabled(false);
+        if (!res.data.url) {
+          offUntil.set(gameId, Date.now() + OFF_TTL_MS);
+          return "off";
+        }
         return res.data.url;
-      }, typeof window === "undefined" ? { deaf: host } : readPrefs(host))
+      }, typeof window === "undefined" ? {} : readPrefs(host))
   );
 
   useEffect(() => {
@@ -85,7 +93,8 @@ export function VoiceChat({ gameId, host = false, className }: { gameId: string;
     }
   }, [engine, host, s]);
 
-  if (!enabled) return null;
+  // Faqat haqiqatda ulangach (yoki brauzer qo'llamasa — sababi bilan) ko'rinadi
+  if (s.status === "off" || (!s.everLive && s.status !== "unsupported")) return null;
 
   const me = s.peers.find((p) => p.s === s.me);
   const locked = Boolean(me?.lock);
@@ -124,8 +133,8 @@ export function VoiceChat({ gameId, host = false, className }: { gameId: string;
             talkers.map((t) => <Talker key={t.slot} name={nameOf(t.slot)} level={t.level} self={t.slot === s.me} />)
           ) : (
             <span className="truncate text-xs text-slate-400">
-              {s.status === "connecting" || s.status === "idle"
-                ? "Ovozli suhbatga ulanmoqda…"
+              {s.status !== "live"
+                ? "Ovozli suhbat qayta ulanmoqda…"
                 : mutedForMe
                 ? "🔇 Ustoz mikrofonlarni o'chirib qo'ygan — faqat eshitasiz"
                 : s.question

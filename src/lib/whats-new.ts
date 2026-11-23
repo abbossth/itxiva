@@ -64,7 +64,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "🔇",
         title: "Dars paytida — \"Hammani o'chirish\"",
-        text: "O'yin ekranidagi ovoz panelida \"Hammani o'chirish\" tugmasi bor: bosilsa, o'quvchilarning hech biri gapira olmaydi (eshitishadi). Yana bosilsa, mikrofonlar qaytadi. Siz ham gapira olasiz; proyektorda karnay sukutda o'chiq, kerak bo'lsa yoqing.",
+        text: "O'yin ekranidagi ovoz panelida \"Hammani o'chirish\" tugmasi bor: bosilsa, o'quvchilarning hech biri gapira olmaydi (eshitishadi). Yana bosilsa, mikrofonlar qaytadi. Siz ham mentor akkauntidan o'yin ekranida suhbatga qo'shilib, o'quvchilar bilan gaplasha olasiz (mikrofon tugmasi). Proyektordan o'quvchilar ovozi chiqmasin desangiz — karnay tugmasini o'chiring.",
       },
     ],
   },
