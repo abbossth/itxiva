@@ -60,7 +60,8 @@ export async function grantCoinsAction(input: {
     if (ids.length === 0) return fail("O'quvchi tanlanmagan");
     if (ids.length > MAX_STUDENTS) return fail(`Bir vaqtda ko'pi bilan ${MAX_STUDENTS} ta o'quvchi`);
     const coin = int(input.coin);
-    const xp = input.xp === null || input.xp === undefined || (input.xp as unknown) === "" ? Math.max(coin, 0) : int(input.xp);
+    // Ustoz bonusi sukut bo'yicha faqat coin; XP faqat aniq ko'rsatilsa (XP o'qish uchun beriladi)
+    const xp = input.xp === null || input.xp === undefined || (input.xp as unknown) === "" ? 0 : int(input.xp);
     if (!Number.isFinite(coin) || !Number.isFinite(xp) || Math.abs(coin) > LIMIT || Math.abs(xp) > LIMIT) return fail(`Miqdor −${LIMIT}…${LIMIT} oralig'ida bo'lsin`);
     if (coin === 0 && xp === 0) return fail("Coin yoki XP miqdorini kiriting");
     const reason = cleanReason(input.reason);

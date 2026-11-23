@@ -80,7 +80,7 @@ describe("kunlik topshiriqlar", () => {
     await ensureSystemQuests();
     await Promise.all([dailyCheckIn(ali._id), dailyCheckIn(ali._id), dailyCheckIn(ali._id)]);
     const u = await User.findById(ali._id).lean();
-    expect(u).toMatchObject({ spendableBalance: 2, xp: 2, streak: { current: 1, best: 1 } });
+    expect(u).toMatchObject({ spendableBalance: 2, xp: 0, streak: { current: 1, best: 1 } }); // kirish — faqat coin
     expect(await CoinLedger.countDocuments({ studentId: ali._id, type: "login" })).toBe(1);
   });
 

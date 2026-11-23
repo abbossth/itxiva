@@ -121,9 +121,9 @@ describe("tekshiruv", () => {
     const results = await Promise.all([1, 2, 3].map(() => review.approveQuestSubmissionAction({ submissionId: id, coins: 120 })));
     expect(results.filter((r) => r.success)).toHaveLength(1);
     expect(await CoinLedger.countDocuments({ studentId: ali._id, type: "quest" })).toBe(1);
-    // 120 — topshiriq, 10 — birinchi sertifikat nishoni (bronza)
+    // 120 — topshiriq, 10 — birinchi sertifikat nishoni (bronza; nishon faqat coin, XP bermaydi)
     expect(await CoinLedger.countDocuments({ studentId: ali._id, type: "badge" })).toBe(1);
-    expect(await User.findById(ali._id).lean()).toMatchObject({ spendableBalance: 130, xp: 130 });
+    expect(await User.findById(ali._id).lean()).toMatchObject({ spendableBalance: 130, xp: 120 });
     expect(await CertificateRegistry.countDocuments()).toBe(1);
     expect(notify).toHaveBeenCalledWith(ali._id, "quest_result", expect.objectContaining({ approved: true, coins: 120 }));
   });
@@ -157,7 +157,7 @@ describe("tekshiruv", () => {
     await review.approveQuestSubmissionAction({ submissionId: second.data!.id, coins: 90 });
     expect((await review.revokeQuestSubmissionAction({ submissionId: second.data!.id, reason: "Soxta sertifikat" })).success).toBe(true);
     // Topshiriq mukofoti (90) qaytarildi; sertifikat nishoni (10) qaytarib olinmaydi
-    expect(await User.findById(ali._id).lean()).toMatchObject({ spendableBalance: 10, xp: 10 });
+    expect(await User.findById(ali._id).lean()).toMatchObject({ spendableBalance: 10, xp: 0 });
     // Reyestr yozuvi qoladi — xuddi shu dalil qayta qabul qilinmaydi
     actAs(sessionFor(ali));
     expect((await review.submitQuestEvidenceAction(cert(quest._id))).success).toBe(false);

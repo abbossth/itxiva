@@ -92,7 +92,7 @@ const SYSTEM_QUESTS: Array<{
     description: "Har kuni kiring — kunlik seriyangiz davom etadi.",
     target: 1,
     coins: (s) => s.dailyLoginCoins,
-    xp: (s) => s.dailyLoginCoins,
+    xp: () => 0,
   },
 ];
 
@@ -221,7 +221,9 @@ export async function completeAutoQuest(
 ): Promise<boolean> {
   const periodKey = periodKeyOverride ?? periodKeyFor(quest.repeat) ?? `d:${dayKey()}`;
   const reward = coins ?? quest.reward.coinsMin;
-  const xp = questXp(quest, reward);
+  // Kirish (va kirish seriyasi) — o'qish emas: faqat coin, XP bermaydi
+  const loginKind = quest.autoRule?.kind === "login" || quest.autoRule?.kind === "login_streak";
+  const xp = loginKind ? 0 : questXp(quest, reward);
   await QuestSubmission.init();
   try {
     await QuestSubmission.create({

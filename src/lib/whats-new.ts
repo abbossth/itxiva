@@ -29,6 +29,34 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-xp-learning-only-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Muhim",
+    title: "XP — faqat o'qish uchun",
+    slides: [
+      {
+        art: "character-levels",
+        title: "Darajangiz bilimingizni ko'rsatadi",
+        text: "Endi XP (tajriba) faqat o'qish uchun beriladi: uyga vazifa, test va imtihon, darsga kelish va topshiriqlar. Platformaga kirish, ustoz bonusi, nishonlar va o'yin sovrinlari coin beradi, lekin XP bermaydi. Darajangizni ko'tarish uchun — darsga keling, testlarni yeching, vazifalarni topshiring!",
+      },
+    ],
+  },
+  {
+    id: "mentor-xp-learning-only-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "XP faqat o'qish faoliyatidan",
+    slides: [
+      {
+        art: "character-levels",
+        title: "XP qoidasi o'zgardi",
+        text: "XP endi faqat uyga vazifa, test/imtihon, darsga kelish va topshiriqlar uchun beriladi (coin miqdoriga teng). Kunlik kirish, ustoz bonusi, nishonlar va jonli o'yin sovrinlari faqat coin beradi. «Coin berish» oynasida XP sukut bo'yicha «XP bermaslik» — kerak bo'lsa, qo'lda tanlaysiz. Avval olingan XP o'zgarmadi.",
+      },
+    ],
+  },
+  {
     id: "student-games-grade-default-2026-11-23",
     date: "2026-11-23",
     audience: "student",

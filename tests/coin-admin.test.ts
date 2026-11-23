@@ -29,29 +29,29 @@ async function seed() {
 const user = async (id: unknown) => (await User.findById(id).select("spendableBalance totalCoins xp").lean())!;
 
 describe("mentor: coin berish", () => {
-  it("bir nechta o'quvchiga coin va XP; takror yuborilsa ikkinchi marta yozilmaydi; o'quvchi qila olmaydi", async () => {
+  it("bir nechta o'quvchiga coin (XP sukut bo'yicha yo'q); takror yuborilsa ikkinchi marta yozilmaydi; o'quvchi qila olmaydi", async () => {
     const { mentor, ali, vali } = await seed();
     actAs(sessionFor(mentor));
     const input = { studentIds: [ali._id.toString(), vali._id.toString()], coin: 20, reason: "Faol qatnashgani uchun", requestId: "req-12345678" };
     const res = await admin.grantCoinsAction(input);
     expect(res.success && res.data.applied).toBe(2);
-    expect(await user(ali._id)).toMatchObject({ spendableBalance: 120, totalCoins: 120, xp: 120 });
+    expect(await user(ali._id)).toMatchObject({ spendableBalance: 120, totalCoins: 120, xp: 100 }); // ustoz bonusi — faqat coin
     // Ikki marta bosildi
     const again = await admin.grantCoinsAction(input);
     expect(again.success && again.data.applied).toBe(0);
     expect((await user(ali._id)).spendableBalance).toBe(120);
     const row = await CoinLedger.findOne({ studentId: ali._id }).lean();
-    expect(row).toMatchObject({ type: "bonus", amount: 20, xp: 20, description: "Ustozdan: Faol qatnashgani uchun" });
+    expect(row).toMatchObject({ type: "bonus", amount: 20, xp: 0, description: "Ustozdan: Faol qatnashgani uchun" });
     expect(await AuditLog.countDocuments({ action: "GRANT_COINS" })).toBe(2);
 
     // Faqat XP, boshqa miqdor
     await admin.grantCoinsAction({ studentIds: [ali._id.toString()], coin: 0, xp: 50, reason: "Loyiha", requestId: "req-xp-000001" });
-    expect(await user(ali._id)).toMatchObject({ spendableBalance: 120, xp: 170 });
+    expect(await user(ali._id)).toMatchObject({ spendableBalance: 120, xp: 150 });
 
     // Olib qo'yish: balans yetmaganlar o'tkazib yuboriladi
     const take = await admin.grantCoinsAction({ studentIds: [ali._id.toString(), vali._id.toString()], coin: -30, reason: "Xato berilgan edi", requestId: "req-take-0001" });
     expect(take.success && take.data).toMatchObject({ applied: 1, skipped: ["VALI"] });
-    expect(await user(ali._id)).toMatchObject({ spendableBalance: 90, xp: 170 });
+    expect(await user(ali._id)).toMatchObject({ spendableBalance: 90, xp: 150 });
     expect((await user(vali._id)).spendableBalance).toBe(25);
 
     // Sababsiz, juda katta, o'quvchi tomonidan — rad

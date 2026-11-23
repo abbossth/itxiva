@@ -36,7 +36,7 @@ export function GrantCoinsDialog({
   const { toast } = useToast();
   const [mode, setMode] = useState<"give" | "take">("give");
   const [amount, setAmount] = useState("10");
-  const [xpMode, setXpMode] = useState<"same" | "custom" | "none">("same");
+  const [xpMode, setXpMode] = useState<"same" | "custom" | "none">("none");
   const [xpValue, setXpValue] = useState("0");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);

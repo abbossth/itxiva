@@ -13,11 +13,17 @@ import type { GamificationSettings } from "./config";
 
 type Id = string | mongoose.Types.ObjectId;
 
+/**
+ * XP faqat o'qish uchun: uyga vazifa, test/imtihon, darsga kelish va topshiriqlar. Boshqa mukofotlar (kirish, ustoz bonusi,
+ * nishon, o'yin sovrini) faqat coin beradi — `xp` aniq berilmasa 0.
+ */
+export const XP_EARNING_TYPES: ReadonlySet<CoinTransactionType> = new Set(["attendance", "quiz", "exam", "homework", "quest"]);
+
 export interface AwardInput {
   studentId: Id;
   /** Balans o'zgarishi (manfiy — yechish) */
   coin: number;
-  /** XP o'zgarishi. Berilmasa: musbat coin bilan teng, manfiyda 0 (jarima XP ni kamaytirmaydi) */
+  /** XP o'zgarishi. Berilmasa: o'qish turlarida (XP_EARNING_TYPES) musbat coin bilan teng, boshqasida va manfiyda 0 */
   xp?: number;
   type: CoinTransactionType;
   description: string;
@@ -50,7 +56,7 @@ export async function awardCoins(input: AwardInput): Promise<AwardResult> {
   await connectToDatabase();
   await ensureIndexes();
   const coin = Math.round(input.coin);
-  const xp = Math.round(input.xp ?? Math.max(coin, 0));
+  const xp = Math.round(input.xp ?? (XP_EARNING_TYPES.has(input.type) ? Math.max(coin, 0) : 0));
   const affectsTotal = input.affectsTotal ?? input.type !== "purchase";
   const session = input.session;
   const studentId = new mongoose.Types.ObjectId(String(input.studentId));
