@@ -19,8 +19,6 @@ import { BALANCE_RULES, rebalanceChoices, type BalanceInput } from "@/lib/ai/reb
 import { answerLengthBias } from "@/lib/quiz-quality";
 import { Quiz } from "@/lib/db/models/quiz.model";
 import { Exam } from "@/lib/db/models/exam.model";
-import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
-import { QuizRun } from "@/lib/db/models/quiz-run.model";
 import type { IQuizQuestion } from "@/lib/db/models/quiz.model";
 import type { IMaterial } from "@/lib/db/models/lesson.model";
 import { ActionResult } from "./auth.actions";
@@ -214,28 +212,18 @@ export interface QuizQualityItem {
   ratio: number;
 }
 
-/** Hozir o'quvchi yechayotgan test/imtihonga tegilmaydi (javobi eski variant matni bilan yozilib qolmasin) */
-async function busyDocs(): Promise<{ quizzes: Set<string>; exams: Set<string> }> {
-  const [runs, subs] = await Promise.all([
-    QuizRun.find({ finishedAt: null, createdAt: { $gte: new Date(Date.now() - 2 * 3600_000) } }).select("quizId").lean(),
-    ExamSubmission.find({ status: "in_progress" }).select("examId").lean(),
-  ]);
-  return { quizzes: new Set(runs.map((r) => String(r.quizId))), exams: new Set(subs.map((s) => String(s.examId))) };
-}
-
-async function biasedQuestions(): Promise<(QuizQualityItem & { questionId: string; q: BalanceInput })[]> {
+async function biasedQuestions(): Promise<QuizQualityItem[]> {
   const [quizzes, exams] = await Promise.all([
     Quiz.find({}).select("title questions._id questions.type questions.prompt questions.options questions.correctAnswers").lean(),
     Exam.find({}).select("title questions._id questions.type questions.prompt questions.options questions.correctAnswers").lean(),
   ]);
-  const out: (QuizQualityItem & { questionId: string; q: BalanceInput })[] = [];
+  const out: QuizQualityItem[] = [];
   const scan = (kind: "quiz" | "exam", docs: { _id: unknown; title: string; questions: (ChoiceQ & { _id?: unknown })[] }[]) => {
     for (const d of docs) {
       for (const q of d.questions) {
         const b = answerLengthBias(asBalance(q));
         if (!b.biased) continue;
-        const questionId = String(q._id);
-        out.push({ key: `${kind}:${String(d._id)}:${questionId}`, kind, docId: String(d._id), title: d.title, prompt: q.prompt.slice(0, 140), ratio: b.ratio, questionId, q: asBalance(q) });
+        out.push({ key: `${kind}:${String(d._id)}:${String(q._id)}`, kind, docId: String(d._id), title: d.title, prompt: q.prompt.slice(0, 140), ratio: b.ratio });
       }
     }
   };
@@ -245,51 +233,15 @@ async function biasedQuestions(): Promise<(QuizQualityItem & { questionId: strin
 }
 
 /** Mentor: barcha test va imtihonlarda to'g'ri javobi uzunligidan bilinadigan savollar */
-export async function quizQualityReportAction(): Promise<ActionResult<{ items: QuizQualityItem[]; total: number; aiReady: boolean }>> {
+export async function quizQualityReportAction(): Promise<ActionResult<{ items: QuizQualityItem[]; total: number }>> {
   try {
     await requireMentor();
     await connectToDatabase();
     const all = await biasedQuestions();
     return {
       success: true,
-      data: { items: all.slice(0, 50).map(({ key, kind, docId, title, prompt, ratio }) => ({ key, kind, docId, title, prompt, ratio })), total: all.length, aiReady: isAiConfigured() },
+      data: { items: all.slice(0, 50), total: all.length },
     };
-  } catch (error) {
-    return fail(error);
-  }
-}
-
-/** Mentor: navbatdagi 15 ta savolni AI bilan tuzatadi (sahifa qayta-qayta chaqiradi). `skip` — tuzatib bo'lmaganlar */
-export async function fixBiasedQuestionsAction(skip: string[] = []): Promise<ActionResult<{ fixed: number; failed: string[]; remaining: number; busy: number }>> {
-  const blocked = await guard("ai-fix", 60);
-  if (blocked) return { success: false, message: blocked };
-  try {
-    await connectToDatabase();
-    const skipped = new Set(Array.isArray(skip) ? skip.slice(0, 500) : []);
-    const busy = await busyDocs();
-    const all = await biasedQuestions();
-    const isBusy = (x: QuizQualityItem) => (x.kind === "quiz" ? busy.quizzes : busy.exams).has(x.docId);
-    const todo = all.filter((x) => !skipped.has(x.key) && !isBusy(x));
-    const batch = todo.slice(0, 15);
-    const fixed = batch.length ? await rebalanceChoices(batch.map((x) => x.q)) : new Map();
-    const failed: string[] = [];
-    let done = 0;
-    for (let i = 0; i < batch.length; i++) {
-      const x = batch[i];
-      const r = fixed.get(i);
-      if (!r) {
-        failed.push(x.key);
-        continue;
-      }
-      const Model = (x.kind === "quiz" ? Quiz : Exam) as unknown as typeof Quiz;
-      const res = await Model.updateOne(
-        { _id: x.docId, "questions._id": x.questionId },
-        { $set: { "questions.$.options": r.options, "questions.$.correctAnswers": r.correctAnswers } }
-      );
-      if (res.modifiedCount > 0) done++;
-      else failed.push(x.key);
-    }
-    return { success: true, data: { fixed: done, failed, remaining: Math.max(0, todo.length - batch.length), busy: all.filter(isBusy).length } };
   } catch (error) {
     return fail(error);
   }

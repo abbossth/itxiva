@@ -29,17 +29,38 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
-    id: "mentor-ai-fix-all-2026-11-21",
-    date: "2026-11-21",
-    audience: "mentor",
-    badge: "Tuzatildi",
-    title: "«AI bilan hammasini tuzatish» ishlayapti",
+    id: "student-games-min3-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Jonli o'yin endi 3 kishidan",
     slides: [
       {
         art: "emoji",
-        emoji: "🛠️",
-        title: "AI band bo'lsa ham to'xtamaydi",
-        text: "«Darslar» sahifasidagi «AI bilan hammasini tuzatish» endi bir AI modeli band yoki kunlik limiti tugasa, boshqa modelga o'tadi va vaqtincha bandlikda o'zi qayta urinadi. Xato bo'lsa, «0 ta tuzatildi» o'rniga haqiqiy sababi yoziladi. Hammasi bir kunda tuzatilmasa, ertasi kuni yana bir bosing — qolganlaridan davom etadi.",
+        emoji: "👥",
+        title: "Uch kishi yig'ilsa — boshlanadi",
+        text: "O'zingiz ochgan jonli o'yin endi 5 emas, 3 ta o'yinchi qo'shilishi bilan boshlanadi. Ikki do'stingizni chaqiring — kutib o'tirmaysiz!",
+      },
+    ],
+  },
+  {
+    id: "mentor-quiz-balanced-min3-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "Testlar tenglashtirildi, o'yin 3 kishidan",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⚖️",
+        title: "385 ta savol tuzatildi",
+        text: "To'g'ri javobi uzunligidan bilinib qolayotgan barcha test va imtihon savollarining variantlari bir xil uzunlik va uslubda qayta yozildi — to'g'ri javob ma'nosi o'zgarmadi. «AI bilan hammasini tuzatish» tugmasi olib tashlandi; yangi savollarda muammo bo'lsa, «Darslar» sahifasida ogohlantirish chiqadi, test muharririda «Variantlarni tenglashtirish» bor.",
+      },
+      {
+        art: "emoji",
+        emoji: "👥",
+        title: "O'quvchi o'yini — kamida 3 kishi",
+        text: "O'quvchilar ochgan jonli o'yin endi 3 ta o'yinchi bilan boshlanadi (avval 5). Kerak bo'lsa, «Jonli o'yin» sozlamalarida o'zgartirishingiz mumkin.",
       },
     ],
     cta: { label: "Darslarga o'tish", href: "/mentor/lessons" },
@@ -82,7 +103,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "⚖️",
         title: "To'g'ri javob uzunligidan bilinmaydi",
-        text: "«AI bilan 20 ta savol» — mavzu bo'yicha 20 ta savol, variantlar bir xil uzunlik va uslubda; bilinib qolganlari avtomatik tenglashtiriladi. Muharrirda bunday savollar sariq belgilanadi va «Variantlarni tenglashtirish» tugmasi bor. «Darslar» sahifasida «AI bilan hammasini tuzatish» — barcha eski test va imtihonlarni bir bosishda tuzatadi. Variantlar har o'quvchiga o'z tartibida chiqadi.",
+        text: "«AI bilan 20 ta savol» — mavzu bo'yicha 20 ta savol, variantlar bir xil uzunlik va uslubda; bilinib qolganlari avtomatik tenglashtiriladi. Muharrirda bunday savollar sariq belgilanadi va «Variantlarni tenglashtirish» tugmasi bor. Variantlar har o'quvchiga o'z tartibida chiqadi.",
       },
     ],
     cta: { label: "Darslarga o'tish", href: "/mentor/lessons" },

@@ -77,7 +77,7 @@ export const DEFAULT_STUDENT_GAMES: StudentGamesSettings = {
   freeFrom: null,
   freeUntil: null,
   freePrizes: false,
-  minPlayersToStart: 5,
+  minPlayersToStart: 3,
   autoStartMin: 5,
 };
 
