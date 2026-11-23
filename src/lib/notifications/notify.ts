@@ -54,7 +54,7 @@ export interface NotificationPayloads {
       paid: number;
     };
   };
-  student_game_new: { gameId: string; creatorName: string; groupName?: string; modeTitle: string; audience: string; questions: number; price: number; paid: number; recipients: number };
+  student_game_new: { gameId: string; creatorName: string; groupName?: string; modeTitle: string; audience: string; questions: number; price: number; paid: number; recipients: number; /** Botni ulamaganlar (ularga xabar bormaydi) */ noTelegram?: number };
   quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
@@ -164,7 +164,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       `\n${b(p.modeTitle)} · ${p.questions} ta savol`,
       `👥 ${escapeHtml(p.audience)}`,
       p.price > 0 ? `🪙 Yig'ildi: ${b(`${p.paid}/${p.price}`)} coin` : "🆓 Bepul o'yin",
-      `📨 Telegram e'loni: ${b(p.recipients)} ta o'quvchiga`,
+      `📨 Telegram e'loni: ${b(p.recipients)} ta o'quvchiga${p.noTelegram ? ` (yana ${p.noTelegram} tasi botni ulamagan — ularga bormadi)` : ""}`,
     ].join("\n"),
     button: link("Kuzatish", `/mentor/live/${p.gameId}`),
   }),

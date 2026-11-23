@@ -45,6 +45,7 @@ import {
   teamStandings,
 } from "@/lib/live-game/modes";
 import { LIVE_GAME_MAX_MS, finishLiveGame } from "@/lib/live-game/finish";
+import { pushVoice, questionPhase } from "@/lib/live-game/voice-server";
 import {
   MINIGAMES,
   MINIGAME_GRACE_MS,
@@ -329,7 +330,7 @@ export async function startLiveQuestionAction(gameId: string): Promise<Result<{ 
  */
 async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Result<{ finished: boolean }>> {
   {
-    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds minigameKinds arena arenaRounds galaxy galaxyRounds zone zoneRounds").lean();
+    const game = await LiveGame.findById(gameId).select("mode status index questions options minigame minigameRounds minigameKinds arena arenaRounds galaxy galaxyRounds zone zoneRounds voice").lean();
     if (!game || game.status === "finished") return fail("O'yin topilmadi yoki yakunlangan");
     if (game.status === "question") return { success: true, data: { finished: false } };
     // Har 3 savoldan keyin — qisqa o'yin (bir marta)
@@ -384,10 +385,16 @@ async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Re
       await finishLiveGame(game._id);
       return { success: true, data: { finished: true } };
     }
-    await LiveGame.updateOne(
+    const startedAt = new Date();
+    const moved = await LiveGame.updateOne(
       { _id: game._id, index: game.index, status: game.status },
-      { $set: { status: "question", index: next, questionStartedAt: new Date(), revealedAt: null } }
+      { $set: { status: "question", index: next, questionStartedAt: startedAt, revealedAt: null } }
     );
+    // Ovozli suhbat: savol paytida faqat javob berganlar gaplashadi (o'yindan chiqqanlar — darhol)
+    if (moved.modifiedCount > 0 && game.voice?.used) {
+      const out = await LiveGamePlayer.find({ gameId: game._id, eliminated: true }).select("studentId").lean();
+      void pushVoice({ g: String(game._id), t: "phase", phase: questionPhase(next, startedAt, game.questions[next].timeLimit), free: out.map((p) => String(p.studentId)) });
+    }
     return { success: true, data: { finished: false } };
   }
 }
@@ -413,6 +420,8 @@ async function revealGame(gameId: string | mongoose.Types.ObjectId): Promise<boo
       { returnDocument: "after" }
     );
     if (!game) return false;
+    // Natija ochildi — hamma yana gaplasha oladi
+    if (game.voice?.used) void pushVoice({ g: String(game._id), t: "phase", phase: { q: null, until: 0, v: new Date(game.revealedAt ?? Date.now()).getTime() } });
 
     // Javob bermaganlar — bitta so'rovda (100 o'quvchida 100 ta ketma-ket so'rov emas)
     const missing = await LiveGamePlayer.find({ gameId: game._id, eliminated: false, "answers.index": { $ne: game.index } })
@@ -1533,8 +1542,8 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
     // 100 o'quvchi bir vaqtda javob beradi: butun o'yin emas, faqat tekshiruv uchun kerakli maydonlar va shu savol
     const [game, player] = await Promise.all([
       LiveGame.findById(gameId)
-        .select({ groupId: 1, grade: 1, status: 1, index: 1, questionStartedAt: 1, mode: 1, bonusIndex: 1, questions: { $slice: [index, 1] } })
-        .lean<Pick<ILiveGame, "groupId" | "grade" | "status" | "index" | "questionStartedAt" | "mode" | "bonusIndex" | "questions"> & { _id: mongoose.Types.ObjectId }>(),
+        .select({ groupId: 1, grade: 1, status: 1, index: 1, questionStartedAt: 1, mode: 1, bonusIndex: 1, voice: 1, questions: { $slice: [index, 1] } })
+        .lean<Pick<ILiveGame, "groupId" | "grade" | "status" | "index" | "questionStartedAt" | "mode" | "bonusIndex" | "questions" | "voice"> & { _id: mongoose.Types.ObjectId }>(),
       LiveGamePlayer.findOne({ gameId, studentId: user.userId }).select("-minigames -arena").lean<ILiveGamePlayer & { _id: mongoose.Types.ObjectId }>(),
     ]);
     if (!game || !(await mayPlay(game, user.groupId))) return fail("Bu savolga hozir javob berib bo'lmaydi");
@@ -1568,6 +1577,8 @@ export async function answerLiveQuestionAction(gameId: string, index: number, va
       }
     );
     if (res.modifiedCount === 0) return fail("Bu savolga javob berdingiz");
+    // Javob bergach — javob berganlar bilan gaplasha oladi
+    if (game.voice?.used) void pushVoice({ g: gameId, t: "answered", q: index, p: [user.userId] });
     if (o.eliminated) await pushEvents(game._id, [{ text: `${player.name} o'yindan chiqdi`, kind: "out" }]);
     return { success: true, data: { accepted: true } };
   } catch (err) {
@@ -2752,9 +2763,11 @@ async function announceStudentGame(game: ILiveGame & { _id: mongoose.Types.Objec
     grade !== null
       ? await Group.find({ grade, isActive: { $ne: false } }).select("_id name").lean()
       : await Group.find({ _id: game.groupId }).select("_id name").lean();
-  const students = await User.find({ role: "student", groupId: { $in: groups.map((g) => g._id) }, _id: { $ne: creator.id }, "telegram.chatId": { $type: "string" } })
-    .select("_id")
-    .lean();
+  const audienceFilter = { role: "student" as const, groupId: { $in: groups.map((g) => g._id) }, _id: { $ne: creator.id } };
+  const [students, total] = await Promise.all([
+    User.find({ ...audienceFilter, "telegram.chatId": { $type: "string" } }).select("_id").lean(),
+    User.countDocuments(audienceFilter),
+  ]);
   const fresh = await LiveGame.findById(game._id).select("paid").lean();
   const audience = grade !== null ? `${grade}-sinflar uchun umumiy o'yin` : `Guruh: ${groups[0]?.name ?? ""}`;
   // Mentorlarga: kim, qaysi tur va kimlar uchun ochgani
@@ -2769,6 +2782,7 @@ async function announceStudentGame(game: ILiveGame & { _id: mongoose.Types.Objec
     price: game.price ?? 0,
     paid: fresh?.paid ?? 0,
     recipients: students.length,
+    noTelegram: Math.max(0, total - students.length),
   });
   if (students.length === 0) return;
   notifyMany(

@@ -27,6 +27,7 @@ import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
 import { EmotePad, EmoteStrip } from "./emote-pad";
+import { VoiceChat } from "./voice/voice-chat";
 import { BoosterBar, BoosterShop } from "./boosters";
 import { StudentFundPanel } from "./student-fund";
 import { PODIUM_REVEAL_MS } from "@/lib/live-game/podium";
@@ -254,6 +255,9 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
             {me.streak > 1 && <span className="rounded-full bg-orange-500/20 px-3 py-1 text-orange-200">🔥 {me.streak} ketma-ket</span>}
           </div>
         )}
+
+        {/* Ovozli suhbat: o'yinga qo'shilganlar uchun (savol paytida — faqat javob berganlar bilan) */}
+        {state.joined && state.status !== "finished" && <VoiceChat gameId={state.id} />}
 
         {weak && (
           <p role="status" className="mb-3 flex items-center justify-center gap-2 rounded-xl bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-200">

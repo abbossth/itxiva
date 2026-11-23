@@ -39,6 +39,7 @@ import { ZoneHost } from "./zone/zone-host";
 import { MODE_COLORS, MODE_ICONS } from "./live-games-manager";
 import { ImmersiveFrame, LETTERS, LiveShell, Lives, TEAM_STYLES, TILE_COLORS, TimerBadge, useCountdown, useViewportHeight } from "./live-ui";
 import { cn, formatNumberUz } from "@/lib/utils";
+import { VoiceChat } from "./voice/voice-chat";
 
 const POLL_MS = 1000;
 /** Kutish zali kuyi (o'quvchilar qo'shilayotganda) */
@@ -455,6 +456,8 @@ export function LiveHostScreen({ initial }: { initial: LiveHostState }) {
       }
     >
       <LiveShell className="min-h-[70vh]">
+        {/* Ovozli suhbat: ustoz eshitadi, gapiradi va dars paytida hammaning mikrofonini o'chiradi (proyektorda karnay sukutda o'chiq) */}
+        {state.status !== "finished" && <VoiceChat gameId={state.id} host />}
         {/* Jangda sarlavha yashiriladi — xaritaga ko'proq joy */}
         {state.status !== "arena" && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

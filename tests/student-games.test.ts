@@ -328,7 +328,7 @@ describe("o'quvchilar o'yini: Telegram e'loni", () => {
     // Mentorga ham xabar
     expect(vi.mocked(notifyMod.notifyMentors)).toHaveBeenLastCalledWith(
       "student_game_new",
-      expect.objectContaining({ gameId: res.data.gameId, creatorName: "Ali", groupName: "8-A", audience: "8-sinflar uchun umumiy o'yin", recipients: 3 })
+      expect.objectContaining({ gameId: res.data.gameId, creatorName: "Ali", groupName: "8-A", audience: "8-sinflar uchun umumiy o'yin", recipients: 3, noTelegram: 0 })
     );
   });
 

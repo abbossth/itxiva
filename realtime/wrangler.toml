@@ -17,6 +17,11 @@ class_name = "ArenaRoom"
 name = "ZONE_ROOM"
 class_name = "ZoneRoomDO"
 
+# Ovozli suhbat xonasi (o'yin bo'yicha bitta)
+[[durable_objects.bindings]]
+name = "VOICE_ROOM"
+class_name = "VoiceRoomDO"
+
 # Bepul tarifda faqat SQLite asosidagi Durable Object'lar
 [[migrations]]
 tag = "v1"
@@ -25,3 +30,7 @@ new_sqlite_classes = ["ArenaRoom"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["ZoneRoomDO"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["VoiceRoomDO"]

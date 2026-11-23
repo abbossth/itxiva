@@ -106,6 +106,8 @@ export interface ILiveGameData {
   zone?: ILiveZone | null;
   zoneRounds?: number[];
   finishedAt?: Date | string | null;
+  /** Ovozli suhbat: used — kimdir ulangan (shundan keyin xonaga bosqichlar yuboriladi), muted — ustoz hammaning mikrofonini o'chirgan */
+  voice?: { used?: boolean; muted?: boolean } | null;
   /** O'quvchi yaratgan o'yin: server o'zi boshqaradi; g'oliblarga `prizes` (kamida `minPlayers` o'yinchi bo'lsa), sovg'a qutisi yo'q */
   studentGame?: boolean;
   /** Sovrin berilishi uchun kamida shuncha o'yinchi (o'quvchi o'yini) */
@@ -261,6 +263,10 @@ const LiveGameSchema = new Schema<ILiveGame>(
     known: { type: [Number], default: [] },
     introAt: { type: Date, default: null },
     bonusIndex: { type: Number, default: null },
+    voice: {
+      type: new Schema({ used: { type: Boolean, default: false }, muted: { type: Boolean, default: false } }, { _id: false }),
+      default: undefined,
+    },
     studentGame: { type: Boolean, default: false },
     minPlayers: { type: Number, default: 0 },
     needPlayers: { type: Number, default: 0 },

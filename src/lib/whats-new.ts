@@ -29,6 +29,46 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-live-voice-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Ovozli suhbat",
+    title: "Jonli o'yinda endi gaplashish mumkin",
+    slides: [
+      {
+        art: "character-games",
+        title: "🎙 Mikrofon va 🎧 karnay tugmalari",
+        text: "O'yinga qo'shilgach, tepada ovozli suhbat paneli chiqadi: mikrofonni yoqing va do'stlaringiz bilan gaplashing. Kim gapirayotgani tepada ismi va \"sakraydigan\" ovoz ustunchalari bilan ko'rinadi. Sozlama tugmasida karnay balandligi va mikrofon kuchini o'zgartirasiz.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔒",
+        title: "Savol paytida — avval javob",
+        text: "Savol chiqqanda javob bermaguningizcha hech kimni eshitmaysiz va gapira olmaysiz. Javob bergach — javob berganlar bilan gaplashasiz; natija chiqqach yana hamma birga. Ustoz dars paytida hammaning mikrofonini o'chirib qo'yishi mumkin. Ovoz yozib olinmaydi va hech qayerda saqlanmaydi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-live-voice-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Jonli o'yin",
+    title: "O'yinda ovozli suhbat",
+    slides: [
+      {
+        art: "character-games",
+        title: "O'quvchilar o'yin davomida gaplashadi",
+        text: "Jonli o'yinda (sizniki ham, o'quvchilarniki ham) ovozli suhbat bor: mikrofon, karnay va balandlik tugmalari, tepada kim gapirayotgani. Savol paytida javob bermagan o'quvchi na gapiradi, na eshitadi — javob berganlar faqat bir-biri bilan gaplashadi, natija chiqqach hamma birga. Buni server majburlaydi. Ovoz yozilmaydi va saqlanmaydi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔇",
+        title: "Dars paytida — \"Hammani o'chirish\"",
+        text: "O'yin ekranidagi ovoz panelida \"Hammani o'chirish\" tugmasi bor: bosilsa, o'quvchilarning hech biri gapira olmaydi (eshitishadi). Yana bosilsa, mikrofonlar qaytadi. Siz ham gapira olasiz; proyektorda karnay sukutda o'chiq, kerak bo'lsa yoqing.",
+      },
+    ],
+  },
+  {
     id: "mentor-group-balance-2026-11-23",
     date: "2026-11-23",
     audience: "mentor",
