@@ -30,7 +30,31 @@ export interface NotificationPayloads {
   quest_new: { questId: string; title: string; coinsLabel: string };
   quest_result: { questId: string; title: string; approved: boolean; coins?: number; xp?: number; reason?: string };
   weekly_result: { questId: string; title: string; place: number | null; coins?: number };
-  live_game: { gameId: string; modeTitle: string; tagline: string; /** 1-o'rin mukofoti (coin) */ topPrize?: number };
+  live_game: {
+    gameId: string;
+    modeTitle: string;
+    tagline: string;
+    /** 1-o'rin mukofoti (coin) */
+    topPrize?: number;
+    /** O'quvchi ochgan o'yin: kim ochdi, kimlar uchun, sovrinlar va coin yig'ish holati */
+    student?: {
+      creatorName: string;
+      /** "8-sinflar uchun umumiy" yoki "Guruh: 8-A" */
+      audience: string;
+      questions: number;
+      /** 1-, 2-, 3-o'rin (jamoaviyda faqat birinchisi — g'olib jamoaning har bir a'zosiga) */
+      prizes: number[];
+      team: boolean;
+      /** Sovrin shuncha o'yinchi bo'lsa beriladi */
+      minPlayers: number;
+      /** Boshlanishi uchun kerakli o'yinchilar */
+      needPlayers: number;
+      /** Yig'iladigan narx (0 — bepul) va hozir yig'ilgani */
+      price: number;
+      paid: number;
+    };
+  };
+  student_game_new: { gameId: string; creatorName: string; groupName?: string; modeTitle: string; audience: string; questions: number; price: number; paid: number; recipients: number };
   quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
@@ -62,8 +86,39 @@ function link(text: string, path: string): MessageButton | null {
 const b = (v: unknown) => `<b>${escapeHtml(v)}</b>`;
 const clip = (v: string, max = 300) => (v.length > max ? `${v.slice(0, max - 1)}…` : v);
 
+function studentLiveGame(p: NotificationPayloads["live_game"], s: NonNullable<NotificationPayloads["live_game"]["student"]>): Message {
+  const places = s.prizes.map((n, i) => (n > 0 ? `${i + 1}-o'rin ${b(`+${n}`)}` : "")).filter(Boolean);
+  const prize = s.team
+    ? s.prizes[0] > 0
+      ? `🏆 G'olib jamoaning har bir a'zosiga ${b(`+${s.prizes[0]} coin`)}`
+      : ""
+    : places.length > 0
+    ? `🏆 Coin yutib oling: ${places.join(" · ")}`
+    : "";
+  const left = Math.max(0, s.price - s.paid);
+  return {
+    text: [
+      `🎮 ${b(`${s.creatorName} jonli o'yin ochdi!`)}`,
+      `${b(p.modeTitle)} — ${escapeHtml(p.tagline)}`,
+      `\n👥 ${escapeHtml(s.audience)}`,
+      `❓ ${s.questions} ta savol`,
+      prize ? `\n${prize}` : "",
+      prize && s.minPlayers > 1 ? `<i>(kamida ${s.minPlayers} o'yinchi qatnashsa)</i>` : "",
+      s.price > 0
+        ? `\n🪙 O'yin uchun ${b(`${s.price} coin`)} birgalikda yig'iladi — hozir ${b(`${s.paid}/${s.price}`)}${left > 0 ? `, yana ${left} coin kerak` : ""}.\nIstalgancha hissa qo'shing; o'yin boshlanmasa coin qaytariladi.`
+        : `\n🆓 Bepul o'yin — coin to'lash shart emas`,
+      s.needPlayers > 1 ? `▶️ ${s.needPlayers} ta o'yinchi to'plangach boshlanadi` : "",
+      "\nTugmani bosing va o'yinga qo'shiling 👇",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    button: link("🎮 O'yinga qo'shilish", `/live/${p.gameId}`),
+  };
+}
+
 const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Message } = {
-  live_game: (p) => ({
+  live_game: (p) =>
+    p.student ? studentLiveGame(p, p.student) : {
     text: [
       `🎮 ${b("Jonli o'yin boshlanmoqda!")}`,
       `${b(escapeHtml(p.modeTitle))} — ${escapeHtml(p.tagline)}`,
@@ -73,7 +128,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       .filter(Boolean)
       .join("\n"),
     button: link("🎮 Qatnashish", `/live/${p.gameId}`),
-  }),
+  },
   level_up: (p) => ({
     text: [`🎉 ${b("Yangi daraja!")}`, `${LEVEL_EMOJI[p.level - 1] ?? "⭐"} ${p.level}-daraja · ${b(escapeHtml(p.name))}`, p.bonus > 0 ? `\n🪙 Bonus: ${b(`+${p.bonus}`)} coin` : ""]
       .filter(Boolean)
@@ -101,6 +156,17 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       .filter(Boolean)
       .join("\n"),
     button: link("Topshiriqlar", "/quests"),
+  }),
+  student_game_new: (p) => ({
+    text: [
+      `🎮 ${b("O'quvchi jonli o'yin ochdi")}`,
+      `${escapeHtml(p.creatorName)}${p.groupName ? ` · ${escapeHtml(p.groupName)}` : ""}`,
+      `\n${b(p.modeTitle)} · ${p.questions} ta savol`,
+      `👥 ${escapeHtml(p.audience)}`,
+      p.price > 0 ? `🪙 Yig'ildi: ${b(`${p.paid}/${p.price}`)} coin` : "🆓 Bepul o'yin",
+      `📨 Telegram e'loni: ${b(p.recipients)} ta o'quvchiga`,
+    ].join("\n"),
+    button: link("Kuzatish", `/mentor/live/${p.gameId}`),
   }),
   quest_submitted: (p) => ({
     text: [

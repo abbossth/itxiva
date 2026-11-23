@@ -29,7 +29,7 @@ import {
   type StudentGameAudience,
 } from "@/lib/live-game/student-games-config";
 import { absenceBanMessage, absenceBanUntil, gradeOfGroup, refundStudentGame } from "@/lib/live-game/student-games";
-import { notifyGroup } from "@/lib/notifications/notify";
+import { notifyGroup, notifyMany, notifyMentors } from "@/lib/notifications/notify";
 import {
   LIVE_MODES,
   DEFAULT_PRIZES,
@@ -2738,10 +2738,59 @@ export async function createStudentGameAction(input: {
     }
     activeByGroup.clear();
     await joinLiveGameAction(game._id.toString());
+    // E'lon yuborilmasa ham o'yin ochiladi
+    await announceStudentGame(game, { name: me.fullName, id: user.userId }, input.audience === "grade" ? grade : null).catch((e) => console.error("Student game announce:", e));
     return { success: true, data: { gameId: game._id.toString() } };
   } catch (err) {
     return errorOf(err, "O'yinni yaratib bo'lmadi");
   }
+}
+
+/** O'quvchi o'yini ochilganda guruh (yoki butun sinf) o'quvchilariga Telegram: sovrinlar va "O'yinga qo'shilish" tugmasi; mentorlarga — qisqa xabar */
+async function announceStudentGame(game: ILiveGame & { _id: mongoose.Types.ObjectId }, creator: { name: string; id: string }, grade: number | null) {
+  const groups =
+    grade !== null
+      ? await Group.find({ grade, isActive: { $ne: false } }).select("_id name").lean()
+      : await Group.find({ _id: game.groupId }).select("_id name").lean();
+  const students = await User.find({ role: "student", groupId: { $in: groups.map((g) => g._id) }, _id: { $ne: creator.id }, "telegram.chatId": { $type: "string" } })
+    .select("_id")
+    .lean();
+  const fresh = await LiveGame.findById(game._id).select("paid").lean();
+  const audience = grade !== null ? `${grade}-sinflar uchun umumiy o'yin` : `Guruh: ${groups[0]?.name ?? ""}`;
+  // Mentorlarga: kim, qaysi tur va kimlar uchun ochgani
+  const own = grade !== null ? await Group.findById(game.groupId).select("name").lean() : groups[0];
+  notifyMentors("student_game_new", {
+    gameId: game._id.toString(),
+    creatorName: creator.name,
+    groupName: own?.name,
+    modeTitle: LIVE_MODES[game.mode].title,
+    audience,
+    questions: game.questions.length,
+    price: game.price ?? 0,
+    paid: fresh?.paid ?? 0,
+    recipients: students.length,
+  });
+  if (students.length === 0) return;
+  notifyMany(
+    students.map((s) => s._id),
+    "live_game",
+    {
+      gameId: game._id.toString(),
+      modeTitle: LIVE_MODES[game.mode].title,
+      tagline: LIVE_MODES[game.mode].tagline,
+      student: {
+        creatorName: creator.name,
+        audience,
+        questions: game.questions.length,
+        prizes: [...(game.prizes ?? [])],
+        team: game.mode === "team",
+        minPlayers: game.minPlayers ?? 0,
+        needPlayers: game.needPlayers ?? 0,
+        price: game.price ?? 0,
+        paid: fresh?.paid ?? 0,
+      },
+    }
+  );
 }
 
 /** Qatnashchi o'yinga coin qo'shadi (o'zi ham qo'shiladi). Narx to'lsa o'yin bir necha soniyada boshlanadi */

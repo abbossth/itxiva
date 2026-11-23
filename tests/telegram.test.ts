@@ -242,6 +242,22 @@ describe("telegram: bildirishnoma yuborish", () => {
     expect(sent[0].reply_markup?.inline_keyboard[0][0]).toEqual({ text: "🎮 Qatnashish", url: "https://itxiva.uz/live/6ac000000000000000000009" });
   });
 
+  it("o'quvchi o'yini: kim ochgani, sovrinlar, coin yig'ish va \"O'yinga qo'shilish\" tugmasi", async () => {
+    const user = await linked("ali", 777);
+    await sendNotifications({ ids: [user._id] }, "live_game", {
+      gameId: "6ac000000000000000000009",
+      modeTitle: "Klassik",
+      tagline: "Tez va to'g'ri javob ber",
+      student: { creatorName: "Vali", audience: "9-sinflar uchun umumiy o'yin", questions: 10, prizes: [30, 20, 10], team: false, minPlayers: 3, needPlayers: 3, price: 10, paid: 4 },
+    });
+    const t = sent[0].text;
+    expect(t).toContain("<b>Vali jonli o'yin ochdi!</b>");
+    expect(t).toContain("9-sinflar uchun umumiy o'yin");
+    expect(t).toContain("1-o'rin <b>+30</b> · 2-o'rin <b>+20</b> · 3-o'rin <b>+10</b>");
+    expect(t).toContain("<b>4/10</b>, yana 6 coin kerak");
+    expect(sent[0].reply_markup?.inline_keyboard[0][0]).toEqual({ text: "🎮 O'yinga qo'shilish", url: "https://itxiva.uz/live/6ac000000000000000000009" });
+  });
+
   it("mentorlarga yuborish faqat mentorlarga boradi", async () => {
     await linked("oquvchi", 111);
     await linked("ustoz", 222, "mentor");

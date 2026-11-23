@@ -20,6 +20,7 @@ export type NotificationType =
   | "homework_submitted"
   | "order_new"
   | "exam_finished"
+  | "student_game_new"
   // Ikkala rol
   | "lesson_reminder";
 
@@ -31,7 +32,7 @@ export interface NotificationOption {
 
 export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
   { type: "lesson_reminder", label: "Dars eslatmasi", description: "Dars boshlanishiga bir soat qolganda" },
-  { type: "live_game", label: "Jonli o'yin", description: "Ustoz guruhingizda jonli o'yin ochganda — \"Qatnashish\" tugmasi bilan" },
+  { type: "live_game", label: "Jonli o'yin", description: "Ustoz yoki o'quvchi guruhingiz/sinfingiz uchun jonli o'yin ochganda — sovrinlar va \"Qo'shilish\" tugmasi bilan" },
   { type: "homework_graded", label: "Vazifa tekshirildi", description: "Baho, izoh yoki qayta ishlashga qaytarilgani" },
   { type: "lesson_new", label: "Yangi dars", description: "Guruhingizga yangi dars nashr etilganda" },
   { type: "material_new", label: "Yangi material", description: "Darsga video, fayl yoki havola qo'shilganda" },
@@ -52,6 +53,7 @@ export const MENTOR_NOTIFICATIONS: NotificationOption[] = [
   { type: "order_new", label: "Do'kon so'rovi", description: "O'quvchi do'kondan buyurtma berganda" },
   { type: "exam_finished", label: "Imtihon yakunlandi", description: "Imtihon vaqti tugaganda qisqa statistika" },
   { type: "quest_submitted", label: "Topshiriqqa yangi dalil", description: "O'quvchi topshiriq uchun ish yoki sertifikat yuborganda" },
+  { type: "student_game_new", label: "O'quvchi jonli o'yin ochdi", description: "O'quvchi guruhi yoki butun sinf uchun jonli o'yin yaratganda — kim, qaysi tur va kimlar uchun" },
 ];
 
 export function notificationsForRole(role: "mentor" | "student"): NotificationOption[] {

@@ -29,6 +29,35 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-game-telegram-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Telegram",
+    title: "O'quvchi o'yinlari endi botda e'lon qilinadi",
+    slides: [
+      {
+        art: "character-games",
+        title: "Do'stingiz o'yin ochdi — bot darhol xabar beradi",
+        text: "Kimdir guruhingiz yoki butun sinfingiz (masalan, barcha 9-sinflar) uchun jonli o'yin ochsa, Telegram botga xabar keladi: kim ochgani, o'yin turi, nechta savol, g'oliblarga qancha coin berilishi va o'yin uchun qancha coin yig'ilgani. \"🎮 O'yinga qo'shilish\" tugmasini bosing — to'g'ri o'yinga kirasiz. Xabar kerak bo'lmasa, profilda \"Jonli o'yin\" bildirishnomasini o'chirib qo'yishingiz mumkin.",
+      },
+    ],
+    cta: { label: "Telegram sozlamalari", href: "/profile" },
+  },
+  {
+    id: "mentor-student-game-telegram-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Telegram",
+    title: "O'quvchi o'yin ochsa — sizga xabar",
+    slides: [
+      {
+        art: "character-games",
+        title: "Bot o'quvchilarga ham, sizga ham yozadi",
+        text: "O'quvchi jonli o'yin ochganda guruhi (yoki butun sinf uchun bo'lsa — shu sinfning barcha guruhlari) o'quvchilariga Telegram e'loni boradi: sovrinlar, coin yig'ish holati va \"O'yinga qo'shilish\" tugmasi. Sizga esa kim, qaysi tur, kimlar uchun ochgani va e'lon nechta o'quvchiga ketgani haqida xabar keladi — \"Kuzatish\" tugmasi bilan. Profildagi \"O'quvchi jonli o'yin ochdi\" sozlamasi bilan o'chirish mumkin.",
+      },
+    ],
+  },
+  {
     id: "student-new-minigames-2026-11-23",
     date: "2026-11-23",
     audience: "student",

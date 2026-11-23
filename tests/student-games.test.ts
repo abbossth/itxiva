@@ -20,6 +20,7 @@ const { AttendanceSession } = await import("@/lib/db/models/attendance-session.m
 const { AttendanceRecord } = await import("@/lib/db/models/attendance-record.model");
 const live = await import("@/actions/live-game.actions");
 const { expireStudentLobbies } = await import("@/lib/live-game/student-games");
+const notifyMod = await import("@/lib/notifications/notify");
 
 const NOW = new Date("2026-11-21T15:00:00Z"); // Shanba kechqurun (Toshkent 20:00) — dars yo'q
 const tick = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
@@ -302,5 +303,44 @@ describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
     // Sababli deb belgilandi — darhol ochiladi
     await AttendanceRecord.updateOne({ _id: rec._id }, { $set: { status: "excused" } });
     expect((await live.joinLiveGameAction(mg.data.gameId)).success).toBe(true);
+  });
+});
+
+describe("o'quvchilar o'yini: Telegram e'loni", () => {
+  const link = (ids: import("mongoose").Types.ObjectId[]) => Promise.all(ids.map((id, i) => User.updateOne({ _id: id }, { $set: { "telegram.chatId": String(100 + i) } })));
+
+  it("butun sinf o'yini — shu sinfning barcha guruhlariga (egasidan tashqari), sovrin va coin yig'ish ma'lumoti bilan", async () => {
+    const { ali, vali, sardor, laylo, olim } = await seed();
+    await link([ali._id, vali._id, sardor._id, laylo._id, olim._id]);
+    const spy = vi.mocked(notifyMod.notifyMany);
+    spy.mockClear();
+    as(ali);
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "grade", count: 5, first: 2, nonce: nonce() });
+    if (!res.success) throw new Error(res.error);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [ids, type, payload] = spy.mock.calls[0];
+    expect(type).toBe("live_game");
+    expect(ids.map(String).sort()).toEqual([vali._id, sardor._id, laylo._id].map(String).sort()); // 9-sinf va egasi yo'q
+    expect(payload).toMatchObject({
+      gameId: res.data.gameId,
+      student: { creatorName: "Ali", audience: "8-sinflar uchun umumiy o'yin", questions: 5, prizes: [30, 20, 10], price: 10, paid: 2, needPlayers: 3 },
+    });
+    // Mentorga ham xabar
+    expect(vi.mocked(notifyMod.notifyMentors)).toHaveBeenLastCalledWith(
+      "student_game_new",
+      expect.objectContaining({ gameId: res.data.gameId, creatorName: "Ali", groupName: "8-A", audience: "8-sinflar uchun umumiy o'yin", recipients: 3 })
+    );
+  });
+
+  it("guruh o'yini — faqat o'z guruhiga", async () => {
+    const { ali, vali, sardor, laylo } = await seed();
+    await link([vali._id, sardor._id, laylo._id]);
+    const spy = vi.mocked(notifyMod.notifyMany);
+    spy.mockClear();
+    as(ali);
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "group", count: 5, first: 2, nonce: nonce() });
+    if (!res.success) throw new Error(res.error);
+    expect(spy.mock.calls[0][0].map(String).sort()).toEqual([vali._id, sardor._id].map(String).sort());
+    expect(spy.mock.calls[0][2]).toMatchObject({ student: { audience: "Guruh: 8-A" } });
   });
 });
