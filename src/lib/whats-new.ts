@@ -29,6 +29,34 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-new-minigames-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Yangi o'yinlar",
+    title: "5 ta yangi mini-o'yin",
+    slides: [
+      {
+        art: "games",
+        title: "Har 3 savoldan keyin — yangi sinovlar",
+        text: "Jonli o'yindagi qisqa o'yinlarga 5 ta yangisi qo'shildi: 🔍 Farqni top — bir xil belgilar orasidan boshqachasini toping; ⚖️ Qaysi katta? — ikki misoldan kattasini tanlang; 🔢 Keyingi son — qatordagi qonuniyatni toping; 🍎 Sanab ko'r — aralash belgilar ichida nechtaligini toping; ✅ Rost yoki yolg'on — IT haqidagi gaplar. Har to'g'ri javob +40 ochko, xato — 1,5 soniya pauza!",
+      },
+    ],
+  },
+  {
+    id: "mentor-new-minigames-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Jonli o'yin",
+    title: "5 ta yangi mini-o'yin",
+    slides: [
+      {
+        art: "games",
+        title: "Savollar orasidagi o'yinlar ko'paydi",
+        text: "Har 3 savoldan keyingi qisqa o'yinlarga qo'shildi: Farqni top, Qaysi katta?, Keyingi son, Sanab ko'r va Rost yoki yolg'on (IT faktlari). Hammasi telefonda o'ynaladi, tez bosishga emas — diqqat va fikrlashga qurilgan; har to'g'ri javob 40 ochko. Bir o'yinda turlar takrorlanmaydi — endi 12 xil raund aylanadi.",
+      },
+    ],
+  },
+  {
     id: "student-xp-learning-only-2026-11-23",
     date: "2026-11-23",
     audience: "student",

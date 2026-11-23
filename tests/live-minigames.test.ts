@@ -94,14 +94,27 @@ describe("qoidalar", () => {
     const firsts = new Set<string>();
     for (let r = 0; r < 1; r += 0.07) firsts.add(mg.pickRound([], false, r));
     expect(firsts.size).toBeGreaterThan(4);
-    // Bir aylanish: 7 tur (zona bilan 8) — hammasi har xil
+    // Bir aylanish: barcha turlar (zona bilan yana bitta) — hammasi har xil
     for (const zone of [false, true]) {
       const history: string[] = [];
-      for (let i = 0; i < (zone ? 8 : 7); i++) history.push(mg.pickRound(history, zone, Math.random()));
+      const kinds = mg.MINIGAME_KINDS.length + (zone ? 1 : 0);
+      expect(mg.MINIGAME_KINDS.length).toBe(12);
+      for (let i = 0; i < kinds; i++) history.push(mg.pickRound(history, zone, Math.random()));
       expect(new Set(history).size).toBe(history.length);
       expect(history.includes("zone")).toBe(zone);
       // Yangi aylanish: oxirgisi ketma-ket takrorlanmaydi
       for (let r = 0; r < 1; r += 0.1) expect(mg.pickRound(history, zone, r)).not.toBe(history[history.length - 1]);
+    }
+  });
+
+  it("yangi savolli o'yinlar: har to'g'ri javob 40 ochko, 40 tadan ortig'i hisoblanmaydi", () => {
+    for (const kind of ["spot", "compare", "sequence", "count", "truth"] as const) {
+      expect(mg.isScoredMinigame(kind)).toBe(true);
+      expect(mg.MINIGAMES[kind].title.length).toBeGreaterThan(3);
+      const p = mg.minigamePoints(kind, [{ id: "a", value: 7 }, { id: "b", value: 0 }]);
+      expect(p.get("a")).toBe(280);
+      expect(p.get("b")).toBe(0);
+      expect(mg.clampMinigameValue(kind, 999)).toBe(40);
     }
   });
 
@@ -224,8 +237,8 @@ describe("o'yin ichida", () => {
   it("omad g'ildiragi: har kim o'z g'ildiragini aylantiradi — natija har xil, tugaganda har kimga o'ziniki qo'llanadi", async () => {
     const { mentor, ali, vali, id } = await seed();
     await playQuestions(mentor, id, 3);
-    // Tur: 0.8 → g'ildirak; o'yinchilar uchun: 0.01 → +500, 0.5 → +100
-    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.8).mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
+    // Tur: 0.9 → g'ildirak (vaznlar jami 24, g'ildirak 20–23); o'yinchilar uchun: 0.01 → +500, 0.5 → +100
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.9).mockReturnValueOnce(0.01).mockReturnValueOnce(0.5);
     await live.startLiveQuestionAction(id);
     spy.mockRestore();
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("wheel");
@@ -262,8 +275,8 @@ describe("o'yin ichida", () => {
     const { mentor, ali, id } = await seed();
     await playQuestions(mentor, id, 3);
     await skipFirstWheel(id);
-    // tur: reaksiya (vaznlar: target 2, memory 2, math 2, colors 2, reaction 2 → 0.6 * 15 = 9)
-    vi.spyOn(Math, "random").mockReturnValue(0.6);
+    // tur: reaksiya (vaznlar: target, memory, math, colors, reaction 2 tadan → 0.375 * 24 = 9)
+    vi.spyOn(Math, "random").mockReturnValue(0.375);
     await live.startLiveQuestionAction(id);
     vi.restoreAllMocks();
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("reaction");
@@ -295,7 +308,7 @@ describe("o'yin ichida", () => {
     };
     const players = await LiveGamePlayer.find({ gameId: id }).sort({ _id: 1 }).lean();
     const order = players.map((p) => p.studentId.toString());
-    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.8); // tur: g'ildirak
+    const spy = vi.spyOn(Math, "random").mockReturnValueOnce(0.9); // tur: g'ildirak
     for (const sid of order) spy.mockReturnValueOnce(sid === ali._id.toString() ? superAt("super") : superAt("superWheel"));
     await live.startLiveQuestionAction(id);
     spy.mockRestore();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Brain, Calculator, Crosshair, Gift, Hand, Palette, Sparkles, Timer, Zap } from "lucide-react";
+import { Brain, Calculator, CheckCheck, Crosshair, Gift, Hand, ListOrdered, Palette, Scale, ScanSearch, Sparkles, Tally5, Timer, Zap } from "lucide-react";
 import { submitMinigameAction, type LiveMinigameView, type LivePlayerState } from "@/actions/live-game.actions";
 import { MINIGAMES, WHEEL, prizeOf, wheelPoints, wheelText, type MinigameKind } from "@/lib/live-game/minigames";
 import { haptic } from "@/lib/haptics";
@@ -23,6 +23,11 @@ const ICONS: Record<MinigameKind, typeof Hand> = {
   math: Calculator,
   colors: Palette,
   reaction: Timer,
+  spot: ScanSearch,
+  compare: Scale,
+  sequence: ListOrdered,
+  count: Tally5,
+  truth: CheckCheck,
 };
 const GRADIENT: Record<MinigameKind, string> = {
   tap: "from-orange-500 to-rose-600",
@@ -33,6 +38,11 @@ const GRADIENT: Record<MinigameKind, string> = {
   math: "from-emerald-500 to-teal-600",
   colors: "from-pink-500 to-orange-500",
   reaction: "from-lime-500 to-emerald-600",
+  spot: "from-cyan-500 to-blue-600",
+  compare: "from-amber-500 to-red-500",
+  sequence: "from-indigo-500 to-sky-500",
+  count: "from-rose-500 to-fuchsia-600",
+  truth: "from-teal-500 to-lime-500",
 };
 const WHEEL_SEGMENTS = WHEEL.map((w) => ({ label: w.label, icon: w.icon, color: w.color }));
 
@@ -299,6 +309,16 @@ export function MinigamePlayer({ gameId, m }: { gameId: string; m: PlayerMinigam
       return <ChoiceGame {...props} make={makeColors} title="Rang tuzog'i" />;
     case "reaction":
       return <ReactionGame {...props} />;
+    case "spot":
+      return <ChoiceGame {...props} make={makeSpot} title="Farqni top" />;
+    case "compare":
+      return <ChoiceGame {...props} make={makeCompare} title="Qaysi katta?" />;
+    case "sequence":
+      return <ChoiceGame {...props} make={makeSequence} title="Keyingi son" />;
+    case "count":
+      return <ChoiceGame {...props} make={makeCount} title="Sanab ko'r" />;
+    case "truth":
+      return <TruthGame {...props} />;
     case "tap":
     case "target":
     default:
@@ -562,6 +582,8 @@ interface Challenge {
   prompt: React.ReactNode;
   options: { label: string; key: string }[];
   answer: string;
+  /** Variantlar to'r bo'lib chiqadi (Farqni top): ustunlar soni; berilmasa — 2 ustun katta tugmalar */
+  cols?: number;
 }
 
 const shuffle = <T,>(a: T[]) => {
@@ -636,6 +658,227 @@ function makeColors(): Challenge {
   };
 }
 
+/* ---------- Farqni top: bir xil belgilar orasida boshqachasi ---------- */
+
+const SPOT_PAIRS: [string, string][] = [
+  ["😀", "😄"],
+  ["🙂", "🙃"],
+  ["🐶", "🐺"],
+  ["🍏", "🍐"],
+  ["🌲", "🌳"],
+  ["⭐", "🌟"],
+  ["🐟", "🐠"],
+  ["😺", "😸"],
+  ["🕐", "🕑"],
+  ["🔴", "🟠"],
+  ["💙", "💜"],
+  ["🌑", "🌚"],
+];
+
+/** To'r daraja oshgani sari kattalashadi (4×4 → 6×6), juftlar ham tasodifiy */
+function makeSpot(level: number): Challenge {
+  const cols = Math.min(6, 4 + Math.floor(level / 3));
+  const [base, odd] = shuffle(SPOT_PAIRS[rnd(0, SPOT_PAIRS.length - 1)]);
+  const at = rnd(0, cols * cols - 1);
+  return {
+    prompt: <span className="text-2xl lg:text-4xl">Boshqachasini toping: {odd}</span>,
+    options: Array.from({ length: cols * cols }, (_, i) => ({ label: i === at ? odd : base, key: String(i) })),
+    answer: String(at),
+    cols,
+  };
+}
+
+/* ---------- Qaysi katta? Ikki misol solishtiriladi ---------- */
+
+function expression(level: number): { text: string; value: number } {
+  const kind = level < 2 ? rnd(0, 1) : rnd(0, 2);
+  if (kind === 2) {
+    const a = rnd(2, 9);
+    const b = rnd(2, level < 5 ? 9 : 12);
+    return { text: `${a} × ${b}`, value: a * b };
+  }
+  const max = 15 + level * 6;
+  if (kind === 0) {
+    const a = rnd(3, max);
+    const b = rnd(3, max);
+    return { text: `${a} + ${b}`, value: a + b };
+  }
+  const a = rnd(10, max + 10);
+  const b = rnd(1, a - 1);
+  return { text: `${a} − ${b}`, value: a - b };
+}
+
+function makeCompare(level: number): Challenge {
+  const left = expression(level);
+  let right = expression(level);
+  // Ba'zan teng bo'ladi — «Teng» ham to'g'ri javob bo'lishi mumkin
+  if (Math.random() < 0.18) {
+    const a = rnd(1, Math.max(1, left.value - 1));
+    right = { text: `${a} + ${left.value - a}`, value: left.value };
+  }
+  for (let i = 0; i < 5 && right.value !== left.value && Math.abs(right.value - left.value) > 15; i++) right = expression(level);
+  const answer = left.value > right.value ? "L" : left.value < right.value ? "R" : "E";
+  return {
+    prompt: <span className="text-3xl lg:text-5xl">Qaysi biri katta?</span>,
+    options: [
+      { label: left.text, key: "L" },
+      { label: right.text, key: "R" },
+      { label: "Teng", key: "E" },
+    ],
+    answer,
+  };
+}
+
+/* ---------- Keyingi son: qonuniyatni topish ---------- */
+
+function makeSequence(level: number): Challenge {
+  const kind = rnd(0, level < 2 ? 1 : level < 4 ? 3 : 4);
+  let terms: number[];
+  if (kind === 0) {
+    const step = rnd(2, 5 + level);
+    const start = rnd(1, 20);
+    terms = Array.from({ length: 5 }, (_, i) => start + i * step);
+  } else if (kind === 1) {
+    const step = rnd(2, 6);
+    const start = rnd(step * 5, step * 5 + 40);
+    terms = Array.from({ length: 5 }, (_, i) => start - i * step);
+  } else if (kind === 2) {
+    const k = rnd(2, 3);
+    const start = rnd(1, 4);
+    terms = Array.from({ length: 5 }, (_, i) => start * k ** i);
+  } else if (kind === 3) {
+    const off = rnd(1, 4);
+    terms = Array.from({ length: 5 }, (_, i) => (i + off) ** 2);
+  } else {
+    // Ikki qadam navbatma-navbat: +a, +b, +a, +b
+    const a = rnd(1, 5);
+    const b = rnd(6, 10);
+    terms = [rnd(1, 10)];
+    for (let i = 1; i < 5; i++) terms.push(terms[i - 1] + (i % 2 ? a : b));
+  }
+  const answer = terms[4];
+  const near = new Set<number>([answer]);
+  while (near.size < 4) {
+    const d = answer + (Math.random() < 0.5 ? -1 : 1) * rnd(1, Math.max(3, Math.round(Math.abs(terms[4] - terms[3]) / 2) + 2));
+    if (d >= 0) near.add(d);
+  }
+  return {
+    prompt: <span className="font-mono text-3xl lg:text-5xl">{terms.slice(0, 4).join(", ")}, ?</span>,
+    options: shuffle([...near]).map((n) => ({ label: String(n), key: String(n) })),
+    answer: String(answer),
+  };
+}
+
+/* ---------- Sanab ko'r: aralash belgilar ichida nechta ---------- */
+
+const COUNT_SETS: string[][] = [
+  ["🍎", "🍅", "🍒"],
+  ["🐱", "🐯", "🦁"],
+  ["⚽", "🏀", "🏐"],
+  ["🚗", "🚕", "🚙"],
+  ["⭐", "✨", "🌟"],
+  ["🐸", "🐢", "🦎"],
+  ["💻", "🖥️", "📱"],
+];
+
+function makeCount(level: number): Challenge {
+  const set = shuffle(COUNT_SETS[rnd(0, COUNT_SETS.length - 1)]);
+  const target = set[0];
+  const answer = rnd(3, Math.min(12, 6 + level));
+  const total = Math.min(24, answer + rnd(5, 8 + level));
+  const items = shuffle([...Array(answer).fill(target), ...Array.from({ length: total - answer }, () => set[rnd(1, 2)])]);
+  const near = new Set<number>([answer]);
+  while (near.size < 4) {
+    const d = answer + (Math.random() < 0.5 ? -1 : 1) * rnd(1, 3);
+    if (d > 0) near.add(d);
+  }
+  return {
+    prompt: (
+      <span className="flex flex-col items-center gap-2">
+        <span className="text-xl lg:text-3xl">{target} nechta?</span>
+        <span className="flex max-w-sm flex-wrap justify-center gap-1 text-2xl leading-none lg:max-w-xl lg:text-4xl">
+          {items.map((e, i) => (
+            <span key={i}>{e}</span>
+          ))}
+        </span>
+      </span>
+    ),
+    options: [...near].sort((a, b) => a - b).map((n) => ({ label: String(n), key: String(n) })),
+    answer: String(answer),
+  };
+}
+
+/* ---------- Rost yoki yolg'on: IT haqida tez savollar ---------- */
+
+const TRUTHS: [string, boolean][] = [
+  ["1 bayt = 8 bit", true],
+  ["1 KB = 1024 bayt", true],
+  ["CPU — kompyuterning markaziy protsessori", true],
+  ["RAM kompyuter o'chganda ma'lumotni yo'qotadi", true],
+  ["HTML — veb-sahifa tuzilishini yozish tili", true],
+  ["CSS sahifaning rangi va shriftini belgilaydi", true],
+  ["Python'da print() ekranga chiqaradi", true],
+  ["Ikkilik sanoq tizimida faqat 0 va 1 bor", true],
+  ["Git — versiyalarni boshqarish tizimi", true],
+  ["URL — saytning manzili", true],
+  ["Windows — operatsion tizim", true],
+  ["Klaviatura — kiritish qurilmasi", true],
+  ["Monitor — chiqarish qurilmasi", true],
+  ["Python'da ro'yxat indeksi 0 dan boshlanadi", true],
+  ["HTTPS — shifrlangan, xavfsiz ulanish", true],
+  ["SSD odatda HDD dan tezroq ishlaydi", true],
+  ["Algoritm — aniq qadamlar ketma-ketligi", true],
+  ["10 soni ikkilik tizimda 1010 bo'ladi", true],
+  ["Ctrl+Z oxirgi amalni bekor qiladi", true],
+  ["Fishing — soxta xabar bilan parol o'g'irlash", true],
+  ["1 KB = 100 bayt", false],
+  ["Printer — kiritish qurilmasi", false],
+  ["RAM o'chirilganda ham ma'lumotni saqlaydi", false],
+  ["HTML'da for sikli yoziladi", false],
+  ["Python'da = ikki qiymatni taqqoslaydi", false],
+  ["Ikkilik tizimda 2 raqami ham bor", false],
+  ["Sichqoncha — chiqarish qurilmasi", false],
+  ["Brauzer — operatsion tizim", false],
+  ["Ctrl+C belgilangan matnni o'chiradi", false],
+  ["1 bayt = 10 bit", false],
+  ["Git va GitHub — aynan bir narsa", false],
+  ["«123456» — kuchli parol", false],
+  ["CSS — ma'lumotlar bazasi", false],
+  ["Python'da ro'yxat indeksi 1 dan boshlanadi", false],
+  ["Monitor — kiritish qurilmasi", false],
+  ["5 soni ikkilik tizimda 110 bo'ladi", false],
+  ["HTTP — shifrlangan ulanish", false],
+  ["Wi-Fi — kabel orqali ulanish", false],
+  ["print(2 + 3) natijasi 23 bo'ladi", false],
+  ["Ctrl+V matndan nusxa oladi", false],
+];
+
+/** Gaplar aralashtirilgan to'plamdan ketma-ket olinadi — bir o'yinda takrorlanmaydi */
+function truthDeck(): (level: number) => Challenge {
+  let deck = shuffle(TRUTHS);
+  let i = 0;
+  return () => {
+    if (i >= deck.length) {
+      deck = shuffle(TRUTHS);
+      i = 0;
+    }
+    const [text, truth] = deck[i++];
+    return {
+      prompt: <span className="text-2xl leading-snug lg:text-4xl">{text}</span>,
+      options: [
+        { label: "✅ Rost", key: "T" },
+        { label: "❌ Yolg'on", key: "F" },
+      ],
+      answer: truth ? "T" : "F",
+    };
+  };
+}
+
+function TruthGame(props: GameProps) {
+  const [make] = useState(truthDeck);
+  return <ChoiceGame {...props} make={make} title="Rost yoki yolg'on" />;
+}
+
 const LOCK_MS = 1500;
 
 function ChoiceGame({ gameId, round, remaining, active, make, title }: GameProps & { make: (level: number) => Challenge; title: string }) {
@@ -681,19 +924,35 @@ function ChoiceGame({ gameId, round, remaining, active, make, title }: GameProps
         {flash && <span key={flash.key} className={cn("live-flash absolute inset-0", flash.ok ? "bg-emerald-500/40" : "bg-rose-500/50")} />}
         <span className="relative">{locked ? "⏳" : challenge.prompt}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        {challenge.options.map((o) => (
-          <button
-            key={o.key + o.label}
-            type="button"
-            disabled={locked}
-            onClick={() => pick(o.key)}
-            className="min-h-[64px] rounded-2xl bg-white/10 px-3 text-xl font-black text-white ring-1 ring-white/15 transition hover:bg-white/20 active:scale-95 disabled:opacity-40 lg:min-h-[84px] lg:text-3xl"
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
+      {challenge.cols ? (
+        <div className="mx-auto grid w-full max-w-md gap-1.5" style={{ gridTemplateColumns: `repeat(${challenge.cols}, minmax(0, 1fr))` }}>
+          {challenge.options.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              disabled={locked}
+              onClick={() => pick(o.key)}
+              className="aspect-square rounded-xl bg-white/10 text-2xl ring-1 ring-white/10 transition hover:bg-white/20 active:scale-90 disabled:opacity-40 sm:text-3xl"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {challenge.options.map((o) => (
+            <button
+              key={o.key + o.label}
+              type="button"
+              disabled={locked}
+              onClick={() => pick(o.key)}
+              className="min-h-[64px] rounded-2xl bg-white/10 px-3 text-xl font-black text-white ring-1 ring-white/15 transition hover:bg-white/20 active:scale-95 disabled:opacity-40 lg:min-h-[84px] lg:text-3xl"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
