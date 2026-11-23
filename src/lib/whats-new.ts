@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-games-grade-default-2026-11-23",
+    date: "2026-11-23",
+    audience: "student",
+    badge: "Yangilik",
+    title: "Butun sinf bilan o'ynang",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏫",
+        title: "Sinflarga umumiy o'yin — o'sha narxda",
+        text: "O'yin ochganda endi sukut bo'yicha «8-sinflarga umumiy» (o'z sinfingiz) tanlangan bo'ladi: barcha parallel guruhlar qo'shila oladi va narxi guruh o'yini bilan bir xil — qo'shimcha coin yo'q. Faqat guruhingiz uchun kerak bo'lsa, «Guruhim»ni tanlang.",
+      },
+    ],
+  },
+  {
+    id: "mentor-student-games-grade-default-2026-11-23",
+    date: "2026-11-23",
+    audience: "mentor",
+    badge: "Platformada yangilik",
+    title: "O'quvchi o'yini: sinfga umumiy — sukut bo'yicha",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏫",
+        title: "Sinfga umumiy, qo'shimcha narxsiz",
+        text: "O'quvchi o'yin ochganda «N-sinflarga umumiy» birinchi turadi va sukut bo'yicha tanlangan. Butun sinf o'yini endi guruh o'yini bilan bir xil narxda — «qo'shimcha narx» sozlamasi olib tashlandi. «Butun sinf uchun ruxsat» o'chirilsa, faqat «Guruhim» qoladi.",
+      },
+    ],
+  },
+  {
     id: "student-games-min3-2026-11-23",
     date: "2026-11-23",
     audience: "student",
@@ -549,7 +579,7 @@ export const NEWS: NewsItem[] = [
         art: "emoji",
         emoji: "🛠️",
         title: "To'liq boshqaruv sizda",
-        text: "Jonli o'yin sahifasidagi «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»: yoqish/o'chirish, dars vaqtida taqiqlash, har tur narxi (0 — yopiq), butun sinf uchun ruxsat va qo'shimcha narx, kunlik limit. Darsni sababsiz qoldirgan o'quvchi uchun jonli o'yinlar necha kun yopilishini ham shu yerda belgilaysiz (sukutda 2 kun, mentor o'yinlariga ham).",
+        text: "Jonli o'yin sahifasidagi «O'quvchilar yaratgan o'yinlar» → «Sozlamalar»: yoqish/o'chirish, dars vaqtida taqiqlash, har tur narxi (0 — yopiq), butun sinf uchun ruxsat, kunlik limit. Darsni sababsiz qoldirgan o'quvchi uchun jonli o'yinlar necha kun yopilishini ham shu yerda belgilaysiz (sukutda 2 kun, mentor o'yinlariga ham).",
       },
       {
         art: "emoji",

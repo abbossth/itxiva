@@ -35,13 +35,14 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
   const open = LIVE_GAME_MODES.filter((m) => setup?.fullPrices[m]);
   const free = Boolean(setup?.freeUntil);
   const [mode, setMode] = useState<LiveGameMode | null>(open[0] ?? null);
-  const [audience, setAudience] = useState<StudentGameAudience>("group");
+  // Sukut bo'yicha — butun sinf uchun umumiy (narxi guruhnikidek), ruxsat bo'lmasa — guruh
+  const gradeOpen = Boolean(setup?.allowGrade && setup.grade !== null);
+  const [audience, setAudience] = useState<StudentGameAudience>(gradeOpen ? "grade" : "group");
   const [count, setCount] = useState(10);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const extra = audience === "grade" ? setup?.gradeExtra ?? 0 : 0;
-  const price = free || !mode || setup?.prices[mode] == null ? 0 : setup.prices[mode]! + extra;
-  const fullPrice = mode && setup?.fullPrices[mode] ? setup.fullPrices[mode]! + extra : 0;
+  const price = free || !mode || setup?.prices[mode] == null ? 0 : setup.prices[mode]!;
+  const fullPrice = mode && setup?.fullPrices[mode] ? setup.fullPrices[mode]! : 0;
   const [firstRaw, setFirst] = useState(5);
   const first = Math.max(1, Math.min(price || 1, firstRaw, setup?.balance ?? 0));
 
@@ -168,6 +169,15 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 <div>
                   <p className="mb-1 text-xs font-bold uppercase tracking-wider text-white/70">Kimlar uchun</p>
                   <div className="flex gap-1.5 rounded-2xl bg-black/20 p-1">
+                    {gradeOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setAudience("grade")}
+                        className={cn("flex-1 cursor-pointer rounded-xl px-3 py-2 text-sm font-black", audience === "grade" ? "bg-white text-slate-900" : "text-white/80")}
+                      >
+                        {setup.grade}-sinflarga umumiy
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setAudience("group")}
@@ -175,15 +185,6 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                     >
                       Guruhim
                     </button>
-                    {setup.allowGrade && setup.grade !== null && (
-                      <button
-                        type="button"
-                        onClick={() => setAudience("grade")}
-                        className={cn("flex-1 cursor-pointer rounded-xl px-3 py-2 text-sm font-black", audience === "grade" ? "bg-white text-slate-900" : "text-white/80")}
-                      >
-                        Barcha {setup.grade}-sinflar{setup.gradeExtra > 0 ? ` (+${setup.gradeExtra})` : ""}
-                      </button>
-                    )}
                   </div>
                 </div>
                 <div>

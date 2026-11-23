@@ -116,16 +116,6 @@ export function StudentGamesPanel({ initialSettings, initialGames }: { initialSe
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Butun sinf uchun qo&apos;shimcha narx (coin)
-              <input
-                type="number"
-                min={0}
-                value={settings.gradeExtra}
-                onChange={(e) => setSettings((s) => ({ ...s, gradeExtra: Math.max(0, Math.round(Number(e.target.value) || 0)) }))}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Bir o&apos;quvchi kuniga nechta o&apos;yin yarata oladi
               <input
                 type="number"

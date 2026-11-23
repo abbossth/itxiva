@@ -2520,7 +2520,6 @@ export interface StudentGameSetup {
   freeUntil: string | null;
   /** Bepul o'yinda g'oliblarga coin berilsinmi */
   freePrizes: boolean;
-  gradeExtra: number;
   /** G'oliblar sovrini (1-, 2-, 3-o'rin), jamoaviyda g'olib jamoaga, kerakli o'yinchilar */
   prizes: number[];
   teamPrize: number;
@@ -2602,7 +2601,6 @@ export async function getStudentGameSetupAction(): Promise<Result<StudentGameSet
         discount: free ? 0 : settings.discount,
         freeUntil: free ? settings.freeUntil : null,
         freePrizes: settings.freePrizes,
-        gradeExtra: settings.gradeExtra,
         prizes: [...settings.prizes],
         teamPrize: settings.teamPrize,
         minPlayers: settings.minPlayersForPrizes,

@@ -13,8 +13,6 @@ export interface StudentGamesSettings {
   blockDuringLessons: boolean;
   /** Butun sinf uchun o'yin ruxsat etilganmi */
   allowGrade: boolean;
-  /** Butun sinf uchun qo'shimcha narx (coin) */
-  gradeExtra: number;
   /** Bir o'quvchi kuniga nechta o'yin yarata oladi */
   dailyLimit: number;
   /** O'yin turlari narxi (coin); 0 yoki yo'q — bu tur o'quvchilarga yopiq */
@@ -65,7 +63,6 @@ export const DEFAULT_STUDENT_GAMES: StudentGamesSettings = {
   enabled: true,
   blockDuringLessons: true,
   allowGrade: true,
-  gradeExtra: 10,
   dailyLimit: 3,
   prices: DEFAULT_STUDENT_GAME_PRICES,
   absenceBanDays: 2,
@@ -100,7 +97,6 @@ export function parseStudentGames(raw: unknown): StudentGamesSettings {
     enabled: typeof r.enabled === "boolean" ? r.enabled : DEFAULT_STUDENT_GAMES.enabled,
     blockDuringLessons: typeof r.blockDuringLessons === "boolean" ? r.blockDuringLessons : DEFAULT_STUDENT_GAMES.blockDuringLessons,
     allowGrade: typeof r.allowGrade === "boolean" ? r.allowGrade : DEFAULT_STUDENT_GAMES.allowGrade,
-    gradeExtra: int(r.gradeExtra, 0, 1000, DEFAULT_STUDENT_GAMES.gradeExtra),
     dailyLimit: int(r.dailyLimit, 1, 20, DEFAULT_STUDENT_GAMES.dailyLimit),
     prices,
     absenceBanDays: int(r.absenceBanDays, 0, 14, DEFAULT_STUDENT_GAMES.absenceBanDays),
@@ -145,7 +141,8 @@ export function studentGameCost(
   const base = s.prices[mode];
   if (!base) return null;
   if (audience === "grade" && !s.allowGrade) return null;
-  const full = base + (audience === "grade" ? s.gradeExtra : 0);
+  // Butun sinf uchun o'yin guruhnikidek narxda
+  const full = base;
   if (isFreeNow(s, now)) return { full, price: 0, free: true };
   return { full, price: Math.max(MIN_DISCOUNTED_PRICE, full - s.discount), free: false };
 }

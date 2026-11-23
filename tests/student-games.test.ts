@@ -66,36 +66,36 @@ const balance = async (u: { _id: unknown }) => (await User.findById(u._id).lean(
 const as = (u: Parameters<typeof sessionFor>[0]) => actAs(sessionFor(u));
 
 describe("o'quvchilar o'yini: birgalikda coin yig'ish", () => {
-  it("klassik butun sinf uchun 20 coin (15 + 10 − 5 skidka): 5 + 2 + 4 + 3 + 6 — to'lgach boshlanadi; ortiqchasi rad etiladi", async () => {
+  it("klassik butun sinf — guruhnikidek 10 coin (15 − 5 skidka): 2 + 2 + 3 + 1 + 2 — to'lgach boshlanadi; ortiqchasi rad etiladi", async () => {
     const { ali, vali, sardor, laylo } = await seed();
     as(ali);
-    const res = await live.createStudentGameAction({ mode: "classic", audience: "grade", count: 5, first: 5, nonce: nonce() });
+    const res = await live.createStudentGameAction({ mode: "classic", audience: "grade", count: 5, first: 2, nonce: nonce() });
     if (!res.success) throw new Error(res.error);
     const id = res.data.gameId;
     const g0 = (await LiveGame.findById(id).lean())!;
-    expect(g0).toMatchObject({ studentGame: true, price: 20, paid: 5, grade: 8 }); // 15 + 10 (butun sinf) − 5 skidka
+    expect(g0).toMatchObject({ studentGame: true, price: 10, paid: 2, grade: 8 }); // butun sinf uchun qo'shimcha narx yo'q
 
     as(vali);
     expect((await live.contributeStudentGameAction(id, 2, nonce())).success).toBe(true);
     as(laylo); // boshqa guruh, lekin 8-sinf
-    expect((await live.contributeStudentGameAction(id, 4, nonce())).success).toBe(true);
-    as(sardor);
     expect((await live.contributeStudentGameAction(id, 3, nonce())).success).toBe(true);
-    // 20 - 14 = 6 qoldi: 7 qo'shib bo'lmaydi va coin yechilmaydi
+    as(sardor);
+    expect((await live.contributeStudentGameAction(id, 1, nonce())).success).toBe(true);
+    // 10 - 8 = 2 qoldi: 7 qo'shib bo'lmaydi va coin yechilmaydi
     as(vali);
     const over = await live.contributeStudentGameAction(id, 7, nonce());
     expect(over.success).toBe(false);
     expect(await balance(vali)).toBe(48);
     as(ali);
-    const last = await live.contributeStudentGameAction(id, 6, nonce());
-    expect(last.success && last.data).toEqual({ paid: 20, price: 20 });
-    expect(await balance(ali)).toBe(50 - 11);
+    const last = await live.contributeStudentGameAction(id, 2, nonce());
+    expect(last.success && last.data).toEqual({ paid: 10, price: 10 });
+    expect(await balance(ali)).toBe(50 - 4);
     const g1 = (await LiveGame.findById(id).lean())!;
     expect(g1.fundedAt).toBeTruthy();
     expect(await LiveGamePlayer.countDocuments({ gameId: id })).toBe(4); // hissa qo'shganlar o'yinga ham qo'shildi
 
     const st = await live.getLivePlayerStateAction(id);
-    expect(st.success && st.data.studentGame).toMatchObject({ creator: true, funded: true, paid: 20, price: 20, mine: 11 });
+    expect(st.success && st.data.studentGame).toMatchObject({ creator: true, funded: true, paid: 10, price: 10, mine: 4 });
   });
 
   it("server o'zi boshqaradi: boshlanadi, natija ochiladi, keyingi savol; 2 o'yinchida sovrin yo'q", async () => {
