@@ -22,6 +22,7 @@ import {
   Inbox,
   Coins,
   Megaphone,
+  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,7 +50,7 @@ export interface NavLink {
   sidebar?: false;
 }
 
-export type NavBadgeKind = "orders" | "homework" | "quests";
+export type NavBadgeKind = "orders" | "homework" | "quests" | "chat";
 export type NavBadges = Partial<Record<NavBadgeKind, number>>;
 
 export const MENTOR_LINKS: NavLink[] = [
@@ -60,6 +61,7 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/lessons", label: "Darslar", shortLabel: "Darslar", icon: BookOpen, primary: true, badge: "homework", badgeHref: "/mentor/homework", match: ["/mentor/homework"] },
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
   { href: "/mentor/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2 },
+  { href: "/chat", label: "Chat", shortLabel: "Chat", icon: MessagesSquare, badge: "chat" },
   { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true },
   { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
   { href: "/mentor/announcements", label: "E'lonlar", shortLabel: "E'lon", icon: Megaphone },
@@ -120,6 +122,7 @@ export const STUDENT_LINKS: NavLink[] = [
   { href: "/attendance", label: "Davomat", shortLabel: "Davomat", icon: QrCode, primary: true },
   { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy, primary: true, primaryWithGamification: false },
   { href: "/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2, match: ["/live/"] },
+  { href: "/chat", label: "Chat", shortLabel: "Chat", icon: MessagesSquare, badge: "chat" },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
   { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User, sidebar: false },
 ];

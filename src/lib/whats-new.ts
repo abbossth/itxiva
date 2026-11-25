@@ -29,6 +29,50 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-chat-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Chat: sinfdoshlar bilan yozishing",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💬",
+        title: "Umumiy, guruh va shaxsiy chat",
+        text: "Menyuda yangi \"Chat\" bo'limi: umumiy chat (hamma o'quvchilar va ustozlar), o'z guruhingiz chati va shaxsiy xabarlar (\"Yangi xabar\" → ismni qidiring). \"Guruh yaratish\" bilan o'zingiz guruh ochib, do'stlaringizni qo'shishingiz mumkin — masalan, loyiha jamoasi uchun.",
+      },
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Qoidalar",
+        text: "Xabarlar 7 kundan keyin avtomatik o'chadi. Xavfsizlik uchun ustozlar barcha suhbatlarni ko'ra oladi, qo'pol xabarni o'chirib, yozishni vaqtincha taqiqlashi mumkin. Odobli bo'ling va hech qachon parol, SMS-kod yoki shaxsiy ma'lumot yubormang!",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
+    id: "mentor-chat-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Chat va moderatsiya",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💬",
+        title: "Umumiy, o'quv guruhlari, o'quvchilar guruhlari, shaxsiy xabarlar",
+        text: "\"Chat\" bo'limida: umumiy chat, har bir o'quv guruhining chati (avtomatik), siz va o'quvchilar yaratgan guruhlar, shaxsiy xabarlar. O'quvchilar o'zi guruh yaratib, a'zo qo'sha oladi (guruh egasi qo'shadi/chiqaradi). Xabarlar 7 kundan keyin avtomatik o'chadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Kuzatuv",
+        text: "\"Kuzatuv\" tabida o'quvchilar guruhlari va shaxsiy xabarlarini ko'rasiz (siz a'zo bo'lmasangiz — faqat o'qish). O'quvchi xabari yonidagi qalqon belgisi: xabarni o'chirish yoki 1 soat / 1 kun yozishni taqiqlash. O'chirilgan xabarlar amallar tarixiga yoziladi.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
     id: "mentor-auto-publish-2026-11-25",
     date: "2026-11-25",
     audience: "mentor",

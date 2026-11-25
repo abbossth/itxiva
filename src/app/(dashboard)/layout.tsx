@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { unreadTotal } from "@/lib/chat/core";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { Header } from "@/components/layout/header";
 import { DesktopNav } from "@/components/layout/desktop-nav";
@@ -41,10 +42,12 @@ export default async function DashboardLayout({
   }
   await connectToDatabase();
 
-  const [orders, homework, quests, cookieStore, settings, levelState] = await Promise.all([
+  const [orders, homework, quests, chat, cookieStore, settings, levelState] = await Promise.all([
     getOrdersBadgeCount(),
     getHomeworkBadgeCount(),
     getQuestsBadgeCount(),
+    // Chat nishoni xato bersa ham sahifa ochilaveradi
+    unreadTotal({ userId: session.userId, role: session.role, groupId: session.groupId ?? null, fullName: session.fullName }).catch(() => 0),
     cookies(),
     getAppSettings(),
     getStudentLevelState(),
@@ -60,7 +63,7 @@ export default async function DashboardLayout({
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const gamification = settings.gamification.enabled;
-  const badges = { orders, homework, quests };
+  const badges = { orders, homework, quests, chat };
   // Bezaklar: o'quvchi profilida effektlarni o'chirgan bo'lsa — ko'rsatilmaydi
   const effectsOn = session.role !== "student" || me?.celebrationsEnabled !== false;
   const ambience = effectsOn ? resolveAmbience(settings.ambience, toDateKey()) : null;
