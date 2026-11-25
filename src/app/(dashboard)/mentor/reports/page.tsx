@@ -4,6 +4,8 @@ import { getAppSettings } from "@/lib/settings";
 import { getGroups } from "@/actions/group.actions";
 import { getReportData } from "@/actions/report.actions";
 import { ReportsView } from "@/components/reports/reports-view";
+import { getTelegramAdoption } from "@/actions/dashboard.actions";
+import { TelegramAdoptionCard } from "@/components/dashboard/telegram-adoption";
 import { addDaysToKey, toDateKey } from "@/lib/schedule";
 
 export const metadata = {
@@ -42,18 +44,22 @@ export default async function MentorReportsPage({ searchParams }: ReportsPagePro
   const settings = await getAppSettings();
   const range = resolveRange(period, settings.academicYear, params.from, params.to);
 
-  const [groups, data] = await Promise.all([
+  const [groups, data, telegram] = await Promise.all([
     getGroups(),
     getReportData({ ...range, groupId: params.group }),
+    getTelegramAdoption().catch(() => null),
   ]);
 
   return (
-    <ReportsView
-      data={data}
-      groups={groups.map((g) => ({ _id: g._id.toString(), name: `${groupShortName(g)} — ${g.name}` }))}
-      period={period}
-      groupId={params.group ?? ""}
-      academicYear={settings.academicYear}
-    />
+    <div className="space-y-4">
+      <ReportsView
+        data={data}
+        groups={groups.map((g) => ({ _id: g._id.toString(), name: `${groupShortName(g)} — ${g.name}` }))}
+        period={period}
+        groupId={params.group ?? ""}
+        academicYear={settings.academicYear}
+      />
+      {telegram && <TelegramAdoptionCard {...telegram} />}
+    </div>
   );
 }

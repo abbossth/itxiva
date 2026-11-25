@@ -393,10 +393,10 @@ describe("telegram: nechta o'quvchi ulagan", () => {
   });
 });
 
-describe("mentor bosh sahifasi: Telegram ulaganlar", () => {
+describe("hisobotlar: Telegram ulaganlar", () => {
   it("faol guruhlar bo'yicha ulaganlar sonini beradi", async () => {
     const { Group } = await import("@/lib/db/models/group.model");
-    const { getMentorDashboard } = await import("@/actions/dashboard.actions");
+    const { getTelegramAdoption } = await import("@/actions/dashboard.actions");
     const mk = (name: string, isActive = true) =>
       Group.create({ name, shortName: name, grade: 8, academicYear: "2026-2027", isActive });
     const [a, b, old] = await Promise.all([mk("A"), mk("B"), mk("OLD", false)]);
@@ -410,10 +410,26 @@ describe("mentor bosh sahifasi: Telegram ulaganlar", () => {
     const mentor = await mkUser("ustoz", "mentor");
     actAs(sessionFor(mentor));
 
-    const data = await getMentorDashboard();
+    const data = (await getTelegramAdoption())!;
     expect(data.telegram).toMatchObject({ linked: 2, total: 3 });
-    expect(data.telegram!.recent.sort()).toEqual(["AV", "BS"]);
+    expect(data.telegram.recent.sort()).toEqual(["AV", "BS"]);
     const byName = Object.fromEntries(data.groups.map((g) => [g.name, [g.telegram, g.students]]));
     expect(byName).toEqual({ A: [2, 2], B: [0, 1] });
+  });
+});
+
+describe("mentor bosh sahifasi", () => {
+  it("bugungi darslar, navbat va haftalik ko'rsatkichlar xatosiz hisoblanadi", async () => {
+    const { Group } = await import("@/lib/db/models/group.model");
+    const { getMentorDashboard } = await import("@/actions/dashboard.actions");
+    const { User } = await import("@/lib/db/models/user.model");
+    await Group.create({ name: "A", grade: 8, schedule: { days: [1, 2, 3, 4, 5, 6, 0], startTime: "14:00", endTime: "15:20" } });
+    const mentor = await User.create({ login: "ustoz2", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
+    actAs(sessionFor(mentor));
+    const d = await getMentorDashboard();
+    expect(d.queue).toEqual({ homework: 0, exams: 0, quests: 0, orders: 0 });
+    expect(d.week).toMatchObject({ attendancePct: null, lessonsHeld: 0, homeworkSubmitted: 0 });
+    expect(d.attention).toEqual([]);
+    expect(Array.isArray(d.today)).toBe(true);
   });
 });

@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-home-redesign-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Yangi bosh sahifa",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🧭",
+        title: "Kun bir qarashda",
+        text: "Bugungi darslar mavzusi va davomat holati bilan, \"Bajarish kerak\" navbati (vazifa, imtihon, topshiriq, buyurtma), 7 kunlik davomat trendi, ketma-ket darsni qoldirganlar va ertangi darslar. Telegram statistikasi endi Hisobotlar bo'limida.",
+      },
+    ],
+  },
+  {
     id: "student-arena-knockdown-2026-11-25",
     date: "2026-11-25",
     audience: "student",

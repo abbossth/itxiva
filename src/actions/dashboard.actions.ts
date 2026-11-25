@@ -11,7 +11,9 @@ import { AttendanceSession } from "@/lib/db/models/attendance-session.model";
 import { AttendanceRecord } from "@/lib/db/models/attendance-record.model";
 import { HomeworkSubmission, HomeworkStatus } from "@/lib/db/models/homework-submission.model";
 import { requireMentor, requireStudent } from "@/lib/auth/guards";
-import { formatSchedule, getNextLesson, hasLessonOn } from "@/lib/schedule";
+import { dateFromKey, formatSchedule, getNextLesson, hasLessonOn } from "@/lib/schedule";
+import { ExamSubmission } from "@/lib/db/models/exam-submission.model";
+import { QuestSubmission } from "@/lib/db/models/quest-submission.model";
 import { getAppSettings } from "@/lib/settings";
 import { getBotUsername, isTelegramConfigured } from "@/lib/telegram/api";
 import { recentLinkedInitials } from "@/lib/telegram/community";
@@ -290,8 +292,59 @@ export interface MentorDashboard {
     telegram: number;
   }[];
   totals: { students: number; groups: number; lessons: number };
-  /** Telegram'ni ulaganlar (bot sozlanmagan bo'lsa null): faol guruhlardagi o'quvchilar bo'yicha */
-  telegram: { linked: number; total: number; recent: string[] } | null;
+  /** Bugungi darslar (vaqt bo'yicha): mavzusi va davomat holati */
+  today: MentorDayLesson[];
+  /** Ertangi darslar */
+  tomorrow: MentorDayLesson[];
+  /** Tekshirish navbati */
+  queue: { homework: number; exams: number; quests: number; orders: number };
+  /** So'nggi 7 kun: davomat ulushi (avvalgi 7 kun bilan), topshirilgan vazifalar */
+  week: { attendancePct: number | null; prevAttendancePct: number | null; homeworkSubmitted: number; lessonsHeld: number };
+  /** Oxirgi 2 darsga kelmaganlar */
+  attention: { studentId: string; name: string; group: string; missed: number }[];
+}
+
+export interface MentorDayLesson {
+  groupId: string;
+  shortName: string;
+  name: string;
+  time: string | null;
+  students: number;
+  lesson: { id: string; title: string; published: boolean } | null;
+  session: { id: string; active: boolean; present: number; absent: number } | null;
+}
+
+/** Telegram'ni ulaganlar (bot sozlanmagan bo'lsa null): Hisobotlar sahifasi uchun */
+export async function getTelegramAdoption(): Promise<{
+  telegram: { linked: number; total: number; recent: string[] };
+  groups: { _id: string; shortName: string; name: string; students: number; telegram: number }[];
+} | null> {
+  await requireMentor();
+  await connectToDatabase();
+  if (!isTelegramConfigured() || !getBotUsername()) return null;
+  const [groups, counts] = await Promise.all([
+    Group.find({ isActive: true }).select("name shortName grade").sort({ grade: 1, name: 1 }).lean(),
+    User.aggregate<{ _id: mongoose.Types.ObjectId | null; count: number; telegram: number }>([
+      { $match: { role: "student" } },
+      { $group: { _id: "$groupId", count: { $sum: 1 }, telegram: { $sum: { $cond: [{ $eq: [{ $type: "$telegram.chatId" }, "string"] }, 1, 0] } } } },
+    ]),
+  ]);
+  const by = new Map(counts.map((c) => [String(c._id), c]));
+  const rows = groups.map((g) => ({
+    _id: g._id.toString(),
+    shortName: groupShortName(g),
+    name: g.name,
+    students: by.get(g._id.toString())?.count ?? 0,
+    telegram: by.get(g._id.toString())?.telegram ?? 0,
+  }));
+  return {
+    telegram: {
+      linked: rows.reduce((n, r) => n + r.telegram, 0),
+      total: rows.reduce((n, r) => n + r.students, 0),
+      recent: await recentLinkedInitials(groups.map((g) => g._id)),
+    },
+    groups: rows,
+  };
 }
 
 export async function getMentorDashboard(): Promise<MentorDashboard> {
@@ -334,8 +387,7 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
   const lessonsIn = new Map(lessonCounts.map((c) => [c._id.toString(), c.count]));
   const telegramIn = new Map(studentCounts.map((c) => [String(c._id), c.telegram]));
   const totalStudents = [...studentsIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0);
-  const telegramAvailable = isTelegramConfigured() && Boolean(getBotUsername());
-  const recentTelegram = telegramAvailable ? await recentLinkedInitials(groups.map((g) => g._id)) : [];
+  const extra = await mentorDayData(groups, studentsIn);
 
   return {
     firstName: session.fullName.trim().split(/\s+/)[0] || session.fullName,
@@ -378,12 +430,108 @@ export async function getMentorDashboard(): Promise<MentorDashboard> {
       groups: groups.length,
       lessons: [...lessonsIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0),
     },
-    telegram: telegramAvailable
-      ? {
-          linked: [...telegramIn.entries()].filter(([id]) => groupName.has(id)).reduce((sum, [, c]) => sum + c, 0),
-          total: totalStudents,
-          recent: recentTelegram,
-        }
-      : null,
+    ...extra,
+    queue: { ...extra.queue, homework: ungradedByLesson.reduce((sum, u) => sum + u.count, 0), orders: pendingOrders },
+  };
+}
+
+/** Bosh sahifa: bugun/ertaga darslar, navbat, haftalik davomat va e'tibor kerak bo'lgan o'quvchilar */
+async function mentorDayData(
+  groups: { _id: mongoose.Types.ObjectId; name: string; shortName?: string | null; grade: number; schedule?: Parameters<typeof hasLessonOn>[0] }[],
+  studentsIn: Map<string, number>
+) {
+  const todayKey = toDateKey();
+  const tomorrowKey = addDaysToKey(todayKey, 1);
+  const dayStart = dateFromKey(todayKey);
+  const dayAfter = dateFromKey(addDaysToKey(todayKey, 2));
+  const weekAgo = dateFromKey(addDaysToKey(todayKey, -6));
+  const twoWeeksAgo = dateFromKey(addDaysToKey(todayKey, -13));
+  const groupIds = groups.map((g) => g._id);
+
+  const [lessons, sessions, exams, quests, records, recentSessions, hwWeek] = await Promise.all([
+    Lesson.find({ groupId: { $in: groupIds }, date: { $gte: dayStart, $lt: dayAfter } }).select("groupId title date isPublished").lean(),
+    AttendanceSession.find({ groupId: { $in: groupIds }, date: { $gte: dayStart, $lt: dateFromKey(tomorrowKey) } }).select("groupId status summary").lean(),
+    ExamSubmission.countDocuments({ status: "submitted" }),
+    QuestSubmission.countDocuments({ status: "pending" }),
+    AttendanceRecord.aggregate<{ _id: string; total: number; came: number }>([
+      { $match: { groupId: { $in: groupIds }, markedAt: { $gte: twoWeeksAgo } } },
+      {
+        $group: {
+          _id: { $cond: [{ $gte: ["$markedAt", weekAgo] }, "now", "prev"] },
+          total: { $sum: 1 },
+          came: { $sum: { $cond: [{ $in: ["$status", ["present", "late"]] }, 1, 0] } },
+        },
+      },
+    ]),
+    AttendanceSession.find({ groupId: { $in: groupIds }, status: "closed" }).select("groupId date").sort({ date: -1 }).limit(groupIds.length * 2 + 6).lean(),
+    HomeworkSubmission.countDocuments({ groupId: { $in: groupIds }, submittedAt: { $gte: weekAgo } }),
+  ]);
+
+  const day = (key: string): MentorDayLesson[] =>
+    groups
+      .filter((g) => hasLessonOn(g.schedule, dateFromKey(key, "12:00")))
+      .map((g) => {
+        const start = dateFromKey(key).getTime();
+        const end = dateFromKey(addDaysToKey(key, 1)).getTime();
+        const l = lessons.find((x) => String(x.groupId) === g._id.toString() && x.date && new Date(x.date).getTime() >= start && new Date(x.date).getTime() < end);
+        const sess = key === todayKey ? sessions.filter((x) => String(x.groupId) === g._id.toString()).sort((a, b) => Number(b.status === "active") - Number(a.status === "active"))[0] : undefined;
+        const sch = g.schedule as { startTime?: string; endTime?: string } | undefined;
+        return {
+          groupId: g._id.toString(),
+          shortName: groupShortName(g),
+          name: g.name,
+          time: sch?.startTime ? `${sch.startTime}–${sch.endTime ?? ""}` : null,
+          students: studentsIn.get(g._id.toString()) ?? 0,
+          lesson: l ? { id: l._id.toString(), title: l.title, published: Boolean(l.isPublished) } : null,
+          session: sess
+            ? {
+                id: sess._id.toString(),
+                active: sess.status === "active",
+                present: (sess.summary?.totalPresent ?? 0) + (sess.summary?.totalLate ?? 0),
+                absent: sess.summary?.totalAbsent ?? 0,
+              }
+            : null,
+        };
+      })
+      .sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
+
+  // E'tibor: har guruhning oxirgi 2 yopilgan darsiga ham kelmaganlar
+  const lastTwo = new Map<string, mongoose.Types.ObjectId[]>();
+  for (const ss of recentSessions) {
+    const k = String(ss.groupId);
+    const list = lastTwo.get(k) ?? [];
+    if (list.length < 2) list.push(ss._id);
+    lastTwo.set(k, list);
+  }
+  const ids = [...lastTwo.values()].filter((l) => l.length === 2).flat();
+  const absentRows = ids.length
+    ? await AttendanceRecord.aggregate<{ _id: mongoose.Types.ObjectId; missed: number; groupId: mongoose.Types.ObjectId }>([
+        { $match: { sessionId: { $in: ids }, status: "absent" } },
+        { $group: { _id: "$studentId", missed: { $sum: 1 }, groupId: { $first: "$groupId" } } },
+        { $match: { missed: { $gte: 2 } } },
+        { $limit: 8 },
+      ])
+    : [];
+  const people = absentRows.length ? await User.find({ _id: { $in: absentRows.map((r) => r._id) }, role: "student" }).select("fullName").lean() : [];
+  const nameOf = new Map(people.map((u) => [u._id.toString(), u.fullName]));
+  const shortOf = new Map(groups.map((g) => [g._id.toString(), groupShortName(g)]));
+
+  const pctOf = (k: string) => {
+    const r = records.find((x) => x._id === k);
+    return r && r.total > 0 ? Math.round((r.came / r.total) * 100) : null;
+  };
+  return {
+    today: day(todayKey),
+    tomorrow: day(tomorrowKey),
+    queue: { homework: 0, exams, quests, orders: 0 },
+    week: {
+      attendancePct: pctOf("now"),
+      prevAttendancePct: pctOf("prev"),
+      homeworkSubmitted: hwWeek,
+      lessonsHeld: await AttendanceSession.countDocuments({ groupId: { $in: groupIds }, date: { $gte: weekAgo } }),
+    },
+    attention: absentRows
+      .filter((r) => nameOf.has(r._id.toString()))
+      .map((r) => ({ studentId: r._id.toString(), name: nameOf.get(r._id.toString())!, group: shortOf.get(String(r.groupId)) ?? "", missed: r.missed })),
   };
 }

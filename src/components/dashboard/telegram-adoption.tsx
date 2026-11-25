@@ -1,12 +1,14 @@
 import Link from "@/components/ui/link";
 import { CheckCircle2, Coins, Send } from "lucide-react";
-import type { MentorDashboard } from "@/actions/dashboard.actions";
+import type { getTelegramAdoption } from "@/actions/dashboard.actions";
+
+type Adoption = NonNullable<Awaited<ReturnType<typeof getTelegramAdoption>>>;
 import { DashCard } from "@/components/dashboard/dashboard-parts";
 import { TelegramAvatarStack } from "@/components/profile/telegram-community";
 import { TELEGRAM_LINK_REWARD } from "@/lib/telegram/reward";
 import { cn } from "@/lib/utils";
 
-// Mentor bosh sahifasi: nechta o'quvchi Telegram'ni ulagan — umumiy ulush va guruhlar bo'yicha
+// Hisobotlar sahifasi: nechta o'quvchi Telegram'ni ulagan — umumiy ulush va guruhlar bo'yicha
 
 const pct = (part: number, total: number) => (total > 0 ? Math.min(100, Math.round((part / total) * 100)) : 0);
 
@@ -37,7 +39,7 @@ function PercentRing({ percent }: { percent: number }) {
   );
 }
 
-export function TelegramAdoptionCard({ telegram, groups }: { telegram: NonNullable<MentorDashboard["telegram"]>; groups: MentorDashboard["groups"] }) {
+export function TelegramAdoptionCard({ telegram, groups }: Adoption) {
   const percent = pct(telegram.linked, telegram.total);
   const others = Math.max(0, telegram.linked - telegram.recent.length);
   const rows = groups.filter((g) => g.students > 0);
