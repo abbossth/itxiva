@@ -40,7 +40,7 @@ function cleanText(raw: unknown): string {
   return raw.replace(/\r\n?/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim().slice(0, MESSAGE_MAX);
 }
 
-export async function sendChatMessageAction(roomId: string, text: string, replyToId?: string | null): Promise<Result<ChatMessageItem>> {
+export async function sendChatMessageAction(roomId: string, text: string, replyToId?: string | null, mentionIds?: string[]): Promise<Result<ChatMessageItem>> {
   try {
     const v = await viewer();
     if (!v) return fail("Tizimga kiring");
@@ -49,7 +49,11 @@ export async function sendChatMessageAction(roomId: string, text: string, replyT
     if (!body) return fail("Xabar bo'sh");
     const rate = checkRateLimit(`chat_${v.userId}`, 20, 60_000);
     if (!rate.allowed) return fail(`Juda tez yozyapsiz. ${rate.resetInSeconds} soniyadan keyin`);
-    const r = await postChatMessage(roomId, v, { text: body, replyToId: validId(replyToId) ? replyToId : null });
+    const r = await postChatMessage(roomId, v, {
+      text: body,
+      replyToId: validId(replyToId) ? replyToId : null,
+      mentionIds: Array.isArray(mentionIds) ? mentionIds.filter((x): x is string => typeof x === "string").slice(0, 10) : [],
+    });
     if (!r.ok) return fail(r.error);
     return { success: true, data: r.item };
   } catch (err) {
@@ -118,6 +122,27 @@ export async function searchChatPeopleAction(query: string): Promise<Result<Chat
       success: true,
       data: users.map((u) => ({ id: String(u._id), name: u.fullName, role: u.role, group: u.groupId ? gname.get(String(u.groupId)) ?? null : null })),
     };
+  } catch (err) {
+    return errorOf(err, "Qidirib bo'lmadi");
+  }
+}
+
+/** @belgilash uchun: shu suhbatni ko'ra oladigan odamlar (ism bo'yicha) */
+export async function chatMentionCandidatesAction(roomId: string, query: string): Promise<Result<ChatPerson[]>> {
+  try {
+    const v = await viewer();
+    if (!v) return fail("Tizimga kiring");
+    if (!validId(roomId)) return fail("Suhbat topilmadi");
+    await connectToDatabase();
+    const room = await ChatRoom.findById(roomId).lean();
+    if (!room || !canRead(room, v)) return fail("Suhbat topilmadi");
+    const q = typeof query === "string" ? query.trim().slice(0, 40) : "";
+    const filter: Record<string, unknown> = { _id: { $ne: oid(v.userId) } };
+    if (q) filter.fullName = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+    if (room.kind === "dm" || room.kind === "custom") filter._id = { $in: room.members.filter((m) => String(m) !== v.userId) };
+    else if (room.kind === "group") filter.$or = [{ role: "mentor" }, { groupId: room.groupId }];
+    const users = await User.find(filter).select("fullName role groupId").sort({ role: 1, fullName: 1 }).limit(8).lean();
+    return { success: true, data: users.map((u) => ({ id: String(u._id), name: u.fullName, role: u.role, group: null })) };
   } catch (err) {
     return errorOf(err, "Qidirib bo'lmadi");
   }

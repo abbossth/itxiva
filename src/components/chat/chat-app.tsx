@@ -123,7 +123,9 @@ export function ChatApp({
     <div
       className={cn(
         "flex overflow-hidden bg-white dark:bg-slate-900",
-        compact ? "h-full" : "h-[calc(100dvh-180px)] min-h-[520px] rounded-3xl border border-slate-200 shadow-sm dark:border-slate-800"
+        compact
+          ? "h-full"
+          : "h-[calc(100dvh-12.25rem)] min-h-[420px] rounded-3xl border border-slate-200 shadow-sm dark:border-slate-800 md:h-[calc(100dvh-7.375rem)]"
       )}
     >
       {/* Suhbatlar ro'yxati */}

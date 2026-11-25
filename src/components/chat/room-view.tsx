@@ -36,6 +36,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import {
   addChatMembersAction,
+  chatMentionCandidatesAction,
   deleteChatGroupAction,
   deleteChatMessageAction,
   getChatBlockedAction,
@@ -142,6 +143,33 @@ function Linkified({ text }: { text: string }) {
   );
 }
 
+/** Matn: @belgilashlar ajratib ko'rsatiladi (o'zingiz belgilangan bo'lsangiz — yorqinroq), qolgani havolalar bilan */
+function MessageText({ text, mentions, me, mine }: { text: string; mentions: { id: string; name: string }[]; me: string; mine: boolean }) {
+  if (!mentions.length) return <Linkified text={text} />;
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const byName = new Map(mentions.map((m) => [`@${m.name}`, m]));
+  const parts = text.split(new RegExp(`(${[...byName.keys()].sort((a, b) => b.length - a.length).map(esc).join("|")})`, "g"));
+  return (
+    <>
+      {parts.map((part, i) => {
+        const m = byName.get(part);
+        if (!m) return <Linkified key={i} text={part} />;
+        return (
+          <span
+            key={i}
+            className={cn(
+              "rounded px-0.5 font-semibold",
+              m.id === me ? "bg-amber-300/40 text-amber-900 dark:text-amber-200" : mine ? "text-white underline decoration-white/50" : "text-teal-700 dark:text-teal-300"
+            )}
+          >
+            {part}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 // ---- Rasm: brauzerda kichraytiriladi (eng uzun tomoni 1600 px, WEBP/JPEG) — tez yuklanadi, trafik kam ----
 type PendingImage = { blob: Blob; url: string; width: number; height: number };
 async function prepareImage(file: File): Promise<PendingImage> {
@@ -210,6 +238,11 @@ export function RoomView({
   const [rec, setRec] = useState<{ seconds: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [muted, setMuted] = useState(room.muted);
+  // @belgilash: tanlanganlar va hozir yozilayotgan "@..." bo'lagi
+  const [mentions, setMentions] = useState<{ id: string; name: string }[]>([]);
+  const [mq, setMq] = useState<{ start: number; q: string } | null>(null);
+  const [cands, setCands] = useState<ChatPerson[]>([]);
+  const [candIdx, setCandIdx] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -285,6 +318,23 @@ export function RoomView({
     [room.id]
   );
 
+  // @ dan keyin yozilganiga mos odamlar (suhbatni ko'ra oladiganlar)
+  useEffect(() => {
+    if (!mq) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      void chatMentionCandidatesAction(room.id, mq.q).then((r) => {
+        if (!alive) return;
+        setCands(r.success ? r.data : []);
+        setCandIdx(0);
+      });
+    }, 150);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [mq, room.id]);
+
   // Javob tanlanganda yozish maydoniga o'tiladi
   useEffect(() => {
     if (reply) inputRef.current?.focus();
@@ -331,17 +381,62 @@ export function RoomView({
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
-    const r = await sendChatMessageAction(room.id, body, reply?.id ?? null);
+    const r = await sendChatMessageAction(
+      room.id,
+      body,
+      reply?.id ?? null,
+      mentions.filter((m) => body.includes(`@${m.name}`)).map((m) => m.id)
+    );
     setSending(false);
     if (!r.success) return toast.error(r.error);
     setText("");
+    setMentions([]);
+    setMq(null);
     if (inputRef.current) inputRef.current.style.height = "";
     lastPing.current = 0;
     append(r.data);
     inputRef.current?.focus();
   };
 
+  /** Kursor oldidagi "@so'z" — belgilash ro'yxatini ochadi */
+  const detectMention = (value: string, caret: number) => {
+    const before = value.slice(0, caret);
+    const at = before.lastIndexOf("@");
+    if (at < 0 || (at > 0 && !/\s/.test(before[at - 1]))) return setMq(null);
+    const q = before.slice(at + 1);
+    if (q.length > 30 || /[\n@]/.test(q) || /\s{2}/.test(q)) return setMq(null);
+    setMq({ start: at, q });
+  };
+
+  const pickMention = (p: ChatPerson) => {
+    if (!mq) return;
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? text.length;
+    const insert = `@${p.name} `;
+    const next = text.slice(0, mq.start) + insert + text.slice(caret);
+    setText(next);
+    setMentions((l) => (l.some((x) => x.id === p.id) ? l : [...l, { id: p.id, name: p.name }]));
+    setMq(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = mq.start + insert.length;
+      el?.setSelectionRange(pos, pos);
+    });
+  };
+
   const sendSticker = async (s: string) => {
+    // Matn yozilayotgan bo'lsa — stiker matnga qo'shiladi (xabar bilan birga ketadi)
+    if (text.trim()) {
+      const el = inputRef.current;
+      const a = el?.selectionStart ?? text.length;
+      const b = el?.selectionEnd ?? text.length;
+      setText(text.slice(0, a) + s + text.slice(b));
+      requestAnimationFrame(() => {
+        el?.focus();
+        el?.setSelectionRange(a + s.length, a + s.length);
+      });
+      return;
+    }
     setStickers(false);
     const r = await sendChatStickerAction(room.id, s, reply?.id ?? null);
     if (!r.success) return toast.error(r.error);
@@ -678,6 +773,28 @@ export function RoomView({
                 </button>
               </div>
             )}
+            {mq && cands.length > 0 && (
+              <ul role="listbox" aria-label="Kimni belgilash" className="mb-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                {cands.map((p, i) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={i === candIdx}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pickMention(p);
+                      }}
+                      className={cn("flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm", i === candIdx ? "bg-teal-50 dark:bg-teal-500/15" : "hover:bg-slate-100 dark:hover:bg-slate-800")}
+                    >
+                      <Initials name={p.name} mentor={p.role === "mentor"} size="xs" />
+                      <span className="flex-1 truncate font-semibold">{p.name}</span>
+                      {p.role === "mentor" && <span className="text-xs text-amber-600">Ustoz</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             {stickers && <StickerPanel onPick={(s) => void sendSticker(s)} onClose={() => setStickers(false)} />}
             {rec ? (
               <div className="flex items-center gap-2">
@@ -722,6 +839,7 @@ export function RoomView({
                   value={text}
                   onChange={(e) => {
                     setText(e.target.value);
+                    detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
                     ping(e.target.value.trim().length > 0);
                     const el = e.target;
                     el.style.height = "";
@@ -736,6 +854,23 @@ export function RoomView({
                   }}
                   onBlur={() => ping(false)}
                   onKeyDown={(e) => {
+                    if (mq && cands.length > 0) {
+                      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setCandIdx((i) => (i + (e.key === "ArrowDown" ? 1 : cands.length - 1)) % cands.length);
+                        return;
+                      }
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        e.preventDefault();
+                        pickMention(cands[candIdx] ?? cands[0]);
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setMq(null);
+                        return;
+                      }
+                    }
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void send();
@@ -744,7 +879,7 @@ export function RoomView({
                   }}
                   rows={1}
                   maxLength={2000}
-                  placeholder="Xabar…"
+                  placeholder="Xabar… (@ — kimnidir belgilash)"
                   aria-label="Xabar"
                   className="max-h-32 min-h-[40px] flex-1 resize-none rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-2 text-sm leading-6 outline-none transition-colors focus:border-teal-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:focus:bg-slate-900"
                 />
@@ -895,6 +1030,10 @@ export function RoomView({
     </div>
   );
 }
+
+/** Faqat 1–3 ta emoji (probellar bilan) — katta ko'rsatiladi */
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u;
+const onlyEmoji = (t: string) => t.length <= 24 && EMOJI_ONLY.test(t.trim());
 
 function preview(m: ChatMessageItem): string {
   if (m.sticker) return `${m.sticker} Stiker`;
@@ -1055,9 +1194,14 @@ const Bubble = memo(function Bubble({
               <VoicePlayer id={m.id} duration={m.voice.duration} mine={mine} />
               {stamp}
             </div>
+          ) : onlyEmoji(m.text) ? (
+            <div className="flex items-end gap-1">
+              <span className="chat-sticker text-5xl leading-tight">{m.text}</span>
+              {stamp}
+            </div>
           ) : (
             <p className="whitespace-pre-wrap break-words">
-              <Linkified text={m.text} />
+              <MessageText text={m.text} mentions={m.mentions} me={me} mine={mine} />
               {stamp}
             </p>
           )}

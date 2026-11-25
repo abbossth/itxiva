@@ -303,3 +303,38 @@ describe("chat: push va ovozsiz suhbat", () => {
     expect(push.sendPush).toHaveBeenCalledWith([String(ali._id)], expect.objectContaining({ body: "Men!" }));
   });
 });
+
+describe("chat: Telegram — shaxsiy xabar, belgilash, javob", () => {
+  it("guruh chatida @belgilangan o'quvchiga Telegram boradi; oddiy xabar bormaydi; boshqa guruhdagini belgilab bo'lmaydi", async () => {
+    const { ali, vali, guli, v } = await seed();
+    const g82 = (await core.listRooms(v(ali))).find((r) => r.kind === "group")!;
+    as(ali);
+    notify.notifyMany.mockClear();
+    await chat.sendChatMessageAction(g82.id, "Salom hammaga");
+    expect(notify.notifyMany).not.toHaveBeenCalled();
+
+    const m = await chat.sendChatMessageAction(g82.id, "@Vali Karimov uy vazifani tashla", null, [String(vali._id), String(guli._id)]);
+    expect(m.success && m.data.mentions).toEqual([{ id: String(vali._id), name: "Vali Karimov" }]); // Guli bu guruhda emas
+    expect(notify.notifyMany).toHaveBeenCalledWith([String(vali._id)], "chat_message", expect.objectContaining({ reason: "mention", roomTitle: "8.2 guruhi" }));
+
+    // Matnda "@Ism" yo'q bo'lsa — belgilash hisoblanmaydi
+    const n = await chat.sendChatMessageAction(g82.id, "yashirin belgilash", null, [String(vali._id)]);
+    expect(n.success && n.data.mentions).toEqual([]);
+  });
+
+  it("o'quvchilar guruhida oddiy xabar Telegramga bormaydi (faqat push), javob esa boradi", async () => {
+    const { ali, vali } = await seed();
+    as(ali);
+    const g = await chat.createChatGroupAction("Jamoa", [String(vali._id)]);
+    if (!g.success) throw new Error(g.error);
+    notify.notifyMany.mockClear();
+    push.sendPush.mockClear();
+    const q = await chat.sendChatMessageAction(g.data.roomId, "Ertaga uchrashamizmi?");
+    if (!q.success) throw new Error(q.error);
+    expect(notify.notifyMany).not.toHaveBeenCalled();
+    expect(push.sendPush).toHaveBeenCalledWith([String(vali._id)], expect.objectContaining({ title: "Ali Valiyev · Jamoa" }));
+    as(vali);
+    await chat.sendChatMessageAction(g.data.roomId, "Ha!", q.data.id);
+    expect(notify.notifyMany).toHaveBeenCalledWith([String(ali._id)], "chat_message", expect.objectContaining({ reason: "reply", roomTitle: "Jamoa" }));
+  });
+});

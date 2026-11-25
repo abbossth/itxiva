@@ -62,6 +62,8 @@ export interface IChatMessage {
   sticker?: string | null;
   /** Javob berilgan xabar (iqtibos) */
   replyTo?: { id: mongoose.Types.ObjectId; senderName: string; text: string } | null;
+  /** @belgilanganlar (id va ism — matnda "@Ism Familiya" ko'rinishida) */
+  mentions?: { id: mongoose.Types.ObjectId; name: string }[];
   /** Reaksiyalar: emoji va kim qo'ygani (bir odam — bitta reaksiya) */
   reactions?: { emoji: string; userId: mongoose.Types.ObjectId }[];
   /** Reaksiya yoki o'chirish bo'lgan vaqt: brauzer shundan keyingi o'zgarishlarni so'raydi */
@@ -83,6 +85,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     image: { type: new Schema({ key: String, mime: String, width: Number, height: Number, size: Number }, { _id: false }), default: null },
     sticker: { type: String, default: null },
     replyTo: { type: new Schema({ id: Schema.Types.ObjectId, senderName: String, text: String }, { _id: false }), default: null },
+    mentions: { type: [new Schema({ id: Schema.Types.ObjectId, name: String }, { _id: false })], default: [] },
     reactions: { type: [new Schema({ emoji: String, userId: Schema.Types.ObjectId }, { _id: false })], default: [] },
     changedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },

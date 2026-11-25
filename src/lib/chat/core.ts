@@ -205,6 +205,8 @@ export interface ChatMessageItem {
   sticker: string | null;
   /** Javob berilgan xabar */
   replyTo: { id: string; senderName: string; text: string } | null;
+  /** @belgilanganlar */
+  mentions: { id: string; name: string }[];
   /** Reaksiyalar: emoji va qo'yganlar id'si */
   reactions: { emoji: string; users: string[] }[];
   deleted: boolean;
@@ -222,6 +224,7 @@ export function toItem(m: {
   sticker?: string | null;
   replyTo?: { id: unknown; senderName: string; text: string } | null;
   reactions?: { emoji: string; userId: unknown }[];
+  mentions?: { id: unknown; name: string }[];
   deletedAt?: Date | null;
   createdAt?: Date;
 }): ChatMessageItem {
@@ -239,6 +242,7 @@ export function toItem(m: {
     sticker: m.sticker && !gone ? m.sticker : null,
     replyTo: m.replyTo && !gone ? { id: String(m.replyTo.id), senderName: m.replyTo.senderName, text: m.replyTo.text } : null,
     reactions: [...reactions].map(([emoji, users]) => ({ emoji, users })),
+    mentions: gone ? [] : (m.mentions ?? []).map((x) => ({ id: String(x.id), name: x.name })),
     deleted: gone,
     at: new Date(m.createdAt ?? Date.now()).toISOString(),
   };
@@ -249,7 +253,6 @@ export function toItem(m: {
 /** Suhbat ochiq turibdi deb hisoblanadigan vaqt (shu orada Telegram xabari yuborilmaydi) */
 const SEEN_FRESH_MS = 60_000;
 /** Bitta suhbatdan bitta odamga Telegram xabari — ko'pi bilan shuncha vaqtda bir marta */
-const NOTIFY_GAP_MS = 10 * 60_000;
 const seenWrites = new Map<string, number>();
 
 /** Foydalanuvchi suhbatni ochib turibdi (har so'rovda emas — 20 soniyada bir marta yoziladi) */
@@ -274,22 +277,32 @@ export async function markSeen(roomId: Id, userId: string) {
 /** Push uchun: suhbat shu vaqt ichida ochiq turgan bo'lsa — yuborilmaydi */
 const PUSH_SEEN_MS = 20_000;
 
+/** Telegram oralig'i: shaxsiy xabarda suhbat bo'yicha, belgilash/javobda — tezroq */
+const TG_DM_GAP_MS = 2 * 60_000;
+const TG_DIRECT_GAP_MS = 30_000;
+
+export type ChatNotifyReason = "dm" | "mention" | "reply";
+
 /**
  * Kimga xabar beriladi:
  * - push — shaxsiy xabar va guruhlarda hamma a'zolarga (har xabar; brauzer bir suhbatni bitta bildirishnomaga yig'adi),
- *   istalgan suhbatda esa xabariga javob berilgan odamga;
- * - Telegram — faqat shaxsiy xabar va guruhlarda, bir suhbat bo'yicha 10 daqiqada bir marta.
+ *   istalgan suhbatda esa belgilangan (@) va xabariga javob berilgan odamga;
+ * - Telegram — faqat shaxsiy xabar, belgilash va javobda (guruhdagi oddiy xabarlar Telegramga bormaydi).
  * Suhbatni ovozsiz qilganlar va hozir ochib turganlar chiqarib tashlanadi.
  */
 export async function chatNotifyTargets(
   room: Pick<IChatRoom, "_id" | "kind" | "members">,
   senderId: string,
-  opts: { now?: Date; replyToUserId?: string | null } = {}
-): Promise<{ telegram: string[]; push: string[] }> {
+  opts: { now?: Date; replyToUserId?: string | null; mentionIds?: string[] } = {}
+): Promise<{ telegram: { id: string; reason: ChatNotifyReason }[]; push: string[] }> {
   const now = opts.now ?? new Date();
   const members = room.kind === "dm" || room.kind === "custom" ? room.members.map(String) : [];
-  const reply = opts.replyToUserId && opts.replyToUserId !== senderId ? [opts.replyToUserId] : [];
-  const others = [...new Set([...members, ...reply])].filter((m) => m !== senderId);
+  const reason = new Map<string, ChatNotifyReason>();
+  if (room.kind === "dm") for (const m of members) reason.set(m, "dm");
+  if (opts.replyToUserId) reason.set(opts.replyToUserId, "reply");
+  for (const m of opts.mentionIds ?? []) reason.set(m, "mention");
+  reason.delete(senderId);
+  const others = [...new Set([...members, ...reason.keys()])].filter((m) => m !== senderId);
   if (others.length === 0) return { telegram: [], push: [] };
   const reads = await ChatRead.find({ roomId: room._id, userId: { $in: others.map(oid) } }).select("userId seenAt notifiedAt muted").lean();
   const byUser = new Map(reads.map((r) => [String(r.userId), r]));
@@ -298,25 +311,47 @@ export async function chatNotifyTargets(
     const r = byUser.get(u);
     return !r?.muted && ago(r?.seenAt) >= PUSH_SEEN_MS;
   });
-  const telegram = members
-    .filter((u) => u !== senderId)
-    .filter((u) => {
+  const telegram = [...reason]
+    .filter(([u, why]) => {
       const r = byUser.get(u);
-      return !r?.muted && ago(r?.seenAt) >= SEEN_FRESH_MS && ago(r?.notifiedAt) >= NOTIFY_GAP_MS;
-    });
+      return !r?.muted && ago(r?.seenAt) >= SEEN_FRESH_MS && ago(r?.notifiedAt) >= (why === "dm" ? TG_DM_GAP_MS : TG_DIRECT_GAP_MS);
+    })
+    .map(([id, why]) => ({ id, reason: why }));
   if (telegram.length > 0) {
-    // Yangi ChatRead yozuvi (hech qachon ochilmagan): o'qilgan joy — juda eski, ya'ni hamma xabar o'qilmagan
+    // ChatRead yo'q bo'lsa — o'qilgan joy "yangi" chegarada (oxirgi 3 kun o'qilmagan bo'lib ko'rinadi)
     await ChatRead.bulkWrite(
-      telegram.map((u) => ({
+      telegram.map((t) => ({
         updateOne: {
-          filter: { userId: oid(u), roomId: room._id },
-          update: { $set: { notifiedAt: now }, $setOnInsert: { lastReadId: objectIdAt(new Date(0)) } },
+          filter: { userId: oid(t.id), roomId: room._id },
+          update: { $set: { notifiedAt: now }, $setOnInsert: { lastReadId: objectIdAt(new Date(now.getTime() - FRESH_DAYS * 86_400_000)) } },
           upsert: true,
         },
       }))
     );
   }
   return { telegram, push };
+}
+
+/** Bildirishnomadagi suhbat nomi */
+async function roomTitleOf(room: Pick<IChatRoom, "kind" | "name" | "groupId">): Promise<string> {
+  if (room.kind === "custom") return room.name ?? "Guruh";
+  if (room.kind === "general") return "Umumiy chat";
+  if (room.kind === "group") {
+    const g = room.groupId ? await Group.findById(room.groupId).select("name shortName grade").lean() : null;
+    return g ? `${groupShortName(g)} guruhi` : "Guruh chati";
+  }
+  return "";
+}
+
+/** @belgilanganlar: bor foydalanuvchi, suhbatni ko'ra oladi, matnda "@Ism Familiya" bor; ko'pi bilan 10 ta */
+async function resolveMentions(room: Pick<IChatRoom, "kind" | "groupId" | "members">, senderId: string, text: string, ids: string[]) {
+  const want = [...new Set(ids.filter((i) => mongoose.isValidObjectId(i) && i !== senderId))].slice(0, 10);
+  if (want.length === 0 || !text.includes("@")) return [];
+  const users = await User.find({ _id: { $in: want.map(oid) } }).select("fullName role groupId").lean();
+  return users
+    .filter((u) => text.includes(`@${u.fullName}`))
+    .filter((u) => canRead(room, { userId: String(u._id), role: u.role, groupId: u.groupId ? String(u.groupId) : null, fullName: u.fullName }))
+    .map((u) => ({ id: u._id, name: u.fullName }));
 }
 
 /** Suhbatni ovozsiz qilish / qaytarish */
@@ -384,6 +419,8 @@ export async function postChatMessage(
     image?: { key: string; mime: string; width: number; height: number; size: number };
     sticker?: string;
     replyToId?: string | null;
+    /** @belgilanganlar (matnda "@Ism" bo'lishi shart) */
+    mentionIds?: string[];
   }
 ): Promise<PostResult> {
   await connectToDatabase();
@@ -411,6 +448,7 @@ export async function postChatMessage(
     }
   }
   const text = body.text ?? "";
+  const mentions = await resolveMentions(room, v.userId, text, body.mentionIds ?? []);
   const msg = await ChatMessage.create({
     roomId: room._id,
     senderId: v.userId,
@@ -421,6 +459,7 @@ export async function postChatMessage(
     image: body.image ?? null,
     sticker: body.sticker && isSticker(body.sticker) ? body.sticker : null,
     replyTo,
+    mentions,
   });
   const preview = previewOf(body).slice(0, 120);
   const first = v.fullName.split(" ")[0] || v.fullName;
@@ -429,20 +468,30 @@ export async function postChatMessage(
   await markRead(room._id, v.userId, String(msg._id));
   await ChatTyping.deleteOne({ roomId: room._id, userId: oid(v.userId) });
 
-  const targets = await chatNotifyTargets(room, v.userId, { replyToUserId }).catch(() => ({ telegram: [] as string[], push: [] as string[] }));
-  const roomTitle = room.kind === "custom" ? room.name ?? "" : "";
+  const targets = await chatNotifyTargets(room, v.userId, { replyToUserId, mentionIds: mentions.map((m) => String(m.id)) }).catch(() => ({
+    telegram: [] as { id: string; reason: ChatNotifyReason }[],
+    push: [] as string[],
+  }));
+  const roomTitle = await roomTitleOf(room);
   if (targets.telegram.length > 0) {
     const { notifyMany } = await import("@/lib/notifications/notify");
-    notifyMany(targets.telegram, "chat_message", { roomId: String(room._id), roomTitle, senderName: v.fullName, text: preview, voice: Boolean(body.voice) });
+    for (const why of ["dm", "mention", "reply"] as const) {
+      const ids = targets.telegram.filter((t) => t.reason === why).map((t) => t.id);
+      if (ids.length) notifyMany(ids, "chat_message", { roomId: String(room._id), roomTitle: why === "dm" ? "" : roomTitle, senderName: v.fullName, text: preview, voice: Boolean(body.voice), reason: why });
+    }
   }
   if (targets.push.length > 0) {
     const { sendPush } = await import("@/lib/push");
-    void sendPush(targets.push, {
-      title: roomTitle ? `${v.fullName} · ${roomTitle}` : v.fullName,
-      body: preview || "Yangi xabar",
-      url: `/chat?room=${room._id}`,
-      tag: `chat-${room._id}`,
-    });
+    const mentioned = new Set(mentions.map((m) => String(m.id)));
+    const head = (u: string) =>
+      mentioned.has(u) ? `📣 ${v.fullName} sizni belgiladi` : u === replyToUserId ? `↩️ ${v.fullName} javob berdi` : v.fullName;
+    // Sarlavhasi har xil bo'lganlar alohida yuboriladi
+    const groups = new Map<string, string[]>();
+    for (const u of targets.push) {
+      const t = `${head(u)}${roomTitle && room.kind !== "dm" ? ` · ${roomTitle}` : ""}`;
+      groups.set(t, [...(groups.get(t) ?? []), u]);
+    }
+    for (const [title, ids] of groups) void sendPush(ids, { title, body: preview || "Yangi xabar", url: `/chat?room=${room._id}`, tag: `chat-${room._id}` });
   }
   return { ok: true, item: toItem(msg.toObject()) };
 }

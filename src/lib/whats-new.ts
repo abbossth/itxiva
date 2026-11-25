@@ -29,6 +29,44 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-chat-mentions-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Chatda @belgilash va Telegram xabarlari",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📣",
+        title: "@ bilan belgilang",
+        text: "Xabarga @ yozing va ro'yxatdan odamni tanlang — u albatta ko'radi. Sizni belgilashsa, shaxsiy xabar yozishsa yoki xabaringizga javob berishsa — Telegram botga xabar keladi.",
+      },
+      {
+        art: "emoji",
+        emoji: "😀",
+        title: "Stiker matn bilan",
+        text: "Matn yozib turib 😀 dan stiker tanlasangiz — u xabarga qo'shiladi. Faqat stiker yoki 1–3 ta emoji yuborsangiz — katta bo'lib ko'rinadi.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
+    id: "mentor-chat-mentions-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Chatda @belgilash",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📣",
+        title: "O'quvchini @ bilan belgilang",
+        text: "Guruh yoki umumiy chatda @ yozib o'quvchini tanlang — unga Telegram va push orqali xabar boradi. Guruhdagi oddiy xabarlar Telegramga yuborilmaydi (faqat shaxsiy xabar, belgilash va javob). Chat sahifasi endi butun ekranni egallaydi.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
     id: "student-arena-zone-2026-11-25",
     date: "2026-11-25",
     audience: "student",

@@ -147,7 +147,7 @@ export function ChatDock({ me, role }: { me: string; role: "mentor" | "student" 
         <div
           className={cn(
             "chat-dock-in fixed z-[45] flex flex-col overflow-hidden bg-white shadow-2xl dark:bg-slate-900",
-            "inset-0 md:inset-auto md:bottom-6 md:right-6 md:h-[min(640px,calc(100dvh-96px))] md:w-[400px] md:rounded-3xl md:border md:border-slate-200 md:dark:border-slate-800"
+            "inset-0 md:inset-auto md:bottom-6 md:right-6 md:h-[min(820px,calc(100dvh-48px))] md:w-[460px] md:rounded-3xl md:border md:border-slate-200 md:dark:border-slate-800"
           )}
           role="dialog"
           aria-label="Xabarlar"
