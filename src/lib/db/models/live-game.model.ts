@@ -145,7 +145,7 @@ export interface ILiveArenaPickup {
 
 export interface ILiveArenaFeed {
   at: number;
-  kind: "kill" | "pickup";
+  kind: "kill" | "pickup" | "revive";
   a: string;
   b?: string | null;
   power?: string | null;

@@ -14,7 +14,15 @@ import {
   EMOTE_MS,
   HIT_GRACE_MS,
   mapOf,
-  MAX_LIVES,
+  MAX_HP,
+  MAX_REVIVES,
+  REVIVE_GRACE_MS,
+  REVIVE_HP,
+  REVIVE_MS,
+  REVIVE_R,
+  HEART_HP,
+  ZONE_DAMAGE,
+  hitDamage,
   MAX_PICKUPS,
   PICKUP_EVERY_MS,
   PICKUP_R,
@@ -193,6 +201,13 @@ export async function finishPvp(gameId: Id, factor = 1): Promise<{ winnerTeam: n
 export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string | null, now = Date.now()): PvpWorld {
   const a = game.arena!;
   const start = new Date(a.startedAt).getTime();
+  // Kimni hozir tiriltirishyapti (eng katta ulush)
+  const reviving = new Map<string, number>();
+  for (const p of players) {
+    const s = p.arena;
+    if (!s || s.out || !s.revTarget || !s.revSince || now - s.revSince > REVIVE_MS + 1500) continue;
+    reviving.set(s.revTarget, Math.max(reviving.get(s.revTarget) ?? 0, Math.min(99, Math.round(((now - s.revSince) / REVIVE_MS) * 100))));
+  }
   const peers: PvpPeer[] = players
     .filter((p) => p.arena)
     .map((p) => {
@@ -215,6 +230,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
         isMe,
         team: s.team ?? -1,
         emote: (s.emote ?? -1) >= 0 && now - (s.emoteAt ?? 0) < EMOTE_MS ? s.emote ?? -1 : -1,
+        revive: reviving.get(String(p._id)) ?? 0,
       };
     });
   return {
@@ -336,7 +352,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
             "arena.shieldUntil": { $lt: now },
             "arena.hitUntil": { $lt: now },
           },
-          { $inc: { "arena.lives": -1, "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS } },
+          { $inc: { "arena.lives": -hitDamage(before.arena!.weapon), "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS, "arena.revTarget": null } },
           { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
         ).lean();
         if (!hit) continue;
@@ -344,7 +360,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
         if ((hit.arena?.lives ?? 1) <= 0) {
           const out = await LiveGamePlayer.updateOne(
             { _id: hit._id, "arena.out": false },
-            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": meDoc.name } }
+            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": meDoc.name, "arena.lives": 0 } }
           );
           if (out.modifiedCount > 0) {
             kills++;
@@ -367,19 +383,48 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       if (z.damage) {
         const hurt = await LiveGamePlayer.findOneAndUpdate(
           { _id: meDoc._id, "arena.out": false, "arena.lives": { $gt: 0 } },
-          { $inc: { "arena.lives": -1, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since } },
+          { $inc: { "arena.lives": -ZONE_DAMAGE, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since, "arena.revTarget": null } },
           { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
         ).lean();
         if (hurt && (hurt.arena?.lives ?? 1) <= 0) {
           const out = await LiveGamePlayer.updateOne(
             { _id: hurt._id, "arena.out": false },
-            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": ZONE_KILLER } }
+            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": ZONE_KILLER, "arena.lives": 0 } }
           );
           if (out.modifiedCount > 0) feed.push({ at: now, kind: "kill", a: ZONE_KILLER, b: hurt.name });
         }
         zoneHurt = true;
       } else if (z.since !== (before.arena!.zoneSince ?? 0)) {
         await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.zoneSince": z.since } });
+      }
+    }
+
+    // ---- Tiriltirish (jamoaviy): yiqilgan jamoadosh yonida tugma bosib turiladi ----
+    {
+      const rvId = typeof input?.rv === "string" ? input.rv : null;
+      const t = rvId ? players.find((pl) => String(pl._id) === rvId) : null;
+      const ok =
+        t?.arena && t.arena.out && String(t._id) !== meId && sameTeam(before.arena!.team, t.arena.team) && (t.arena.revives ?? 0) < MAX_REVIVES && Math.hypot(t.arena.x - x, t.arena.y - y) <= REVIVE_R;
+      const cur = before.arena!.revTarget ?? null;
+      if (ok && t) {
+        if (cur !== rvId) {
+          await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.revTarget": rvId, "arena.revSince": now } });
+        } else if (now - (before.arena!.revSince ?? now) >= REVIVE_MS) {
+          const up = await LiveGamePlayer.updateOne(
+            { _id: t._id, "arena.out": true, "arena.revives": { $lt: MAX_REVIVES } },
+            {
+              $set: { "arena.out": false, "arena.outAt": null, "arena.killedBy": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0 },
+              $inc: { "arena.revives": 1 },
+            }
+          );
+          await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.revTarget": null } });
+          if (up.modifiedCount > 0) {
+            feed.push({ at: now, kind: "revive", a: meDoc.name, b: t.name });
+            zoneHurt = true; // ro'yxat qayta o'qilsin
+          }
+        }
+      } else if (cur) {
+        await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.revTarget": null } });
       }
     }
 
@@ -393,8 +438,9 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
           claimed = pick.kind;
           if (pick.kind === "heart") {
             await LiveGamePlayer.updateOne(
-              { _id: meDoc._id, "arena.lives": { $lt: MAX_LIVES }, "arena.out": false },
-              { $inc: { "arena.lives": 1 }, $max: { "arena.maxLives": Math.min(MAX_LIVES, before.arena!.lives + 1) } }
+              { _id: meDoc._id, "arena.lives": { $lt: MAX_HP }, "arena.out": false },
+              [{ $set: { "arena.lives": { $min: [MAX_HP, { $add: ["$arena.lives", HEART_HP] }] }, "arena.maxLives": { $max: ["$arena.maxLives", MAX_HP] } } }],
+              { updatePipeline: true }
             );
           } else {
             await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { [`arena.${POWER_FIELDS[pick.kind]}`]: now + POWERS[pick.kind].ms } });
@@ -506,8 +552,8 @@ export async function applyRoomResults(raw: string, sig: string | null): Promise
           filter: { _id: new mongoose.Types.ObjectId(p.id), gameId: game._id, arena: { $ne: null } },
           update: {
             $set: {
-              "arena.lives": n(p.lives, 0, MAX_LIVES),
-              "arena.maxLives": n(p.maxLives, 0, MAX_LIVES),
+              "arena.lives": n(p.lives, 0, MAX_HP),
+              "arena.maxLives": n(p.maxLives, 0, MAX_HP),
               "arena.kills": n(p.kills, 0, 200),
               "arena.hits": n(p.hits, 0, 2000),
               "arena.hitsTaken": n(p.hitsTaken, 0, 2000),
@@ -524,7 +570,7 @@ export async function applyRoomResults(raw: string, sig: string | null): Promise
   }
   const feed = (Array.isArray(body.feed) ? body.feed : []).slice(-20).map((f) => ({
     at: n(f.at, 0, Number.MAX_SAFE_INTEGER),
-    kind: f.kind === "kill" ? "kill" : "pickup",
+    kind: f.kind === "kill" ? "kill" : f.kind === "revive" ? "revive" : "pickup",
     a: String(f.a ?? "").slice(0, 80),
     b: f.b ? String(f.b).slice(0, 80) : null,
     power: f.power ? String(f.power).slice(0, 12) : null,

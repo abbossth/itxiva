@@ -97,7 +97,7 @@ export const skinOf = (id: string | null | undefined) => SKINS.find((s) => s.id 
 
 export type PowerKind = "heart" | "shield" | "speed" | "rapid" | "triple";
 export const POWERS: Record<PowerKind, { label: string; icon: string; color: string; ms: number }> = {
-  heart: { label: "+1 jon", icon: "❤", color: "#f43f5e", ms: 0 },
+  heart: { label: "+30 HP", icon: "❤", color: "#f43f5e", ms: 0 },
   shield: { label: "Qalqon", icon: "🛡", color: "#38bdf8", ms: 12000 },
   speed: { label: "Tezlik", icon: "⚡", color: "#facc15", ms: 8000 },
   rapid: { label: "Tez otish", icon: "🔥", color: "#fb923c", ms: 8000 },
@@ -106,8 +106,27 @@ export const POWERS: Record<PowerKind, { label: string; icon: string; color: str
 export const POWER_KINDS = Object.keys(POWERS) as PowerKind[];
 /** Xaritada bir vaqtda ko'pi bilan shuncha sovg'a */
 export const MAX_PICKUPS = 6;
-/** Yurak bilan ko'pi bilan shuncha jon */
-export const MAX_LIVES = 6;
+// ---- Sog'liq (HP): har o'yinchida 0–100. `lives` maydoni HP sifatida ishlatiladi ----
+export const MAX_HP = 100;
+/** Eski nom (yurak bilan to'ldirish chegarasi) */
+export const MAX_LIVES = MAX_HP;
+/** ❤ sovg'asi qancha HP qaytaradi */
+export const HEART_HP = 30;
+/** Zona har ZONE_DAMAGE_MS da shuncha HP oladi */
+export const ZONE_DAMAGE = 10;
+// ---- Jamoaviy jangda tiriltirish: yiqilgan jamoadosh yoniga borib tugmani bosib turish ----
+export const REVIVE_MS = 3000;
+export const REVIVE_R = 90;
+export const REVIVE_HP = 40;
+/** Bitta o'yinchini ko'pi bilan necha marta tiriltirish mumkin */
+export const MAX_REVIVES = 2;
+/** Tiriltirgandan keyin qisqa daxlsizlik */
+export const REVIVE_GRACE_MS = 1500;
+
+/** Bitta o'q zarari: qurolga qarab (ko'p to'g'ri javob — kuchliroq lazer) */
+export function hitDamage(weapon: string | null | undefined): number {
+  return weapon === "Lazer-3" ? 20 : weapon === "Lazer-2" ? 18 : 16;
+}
 /** O'q tekkandan keyin qisqa daxlsizlik (uchtalik o'q bir zumda 3 jon olmasin) */
 export const HIT_GRACE_MS = 450;
 export const PICKUP_EVERY_MS = 4000;
@@ -116,10 +135,10 @@ export const PICKUP_R = 22;
 /** Sovg'a paydo bo'ladigan joylar (klassik xarita) */
 export const PICKUP_SPOTS = DEFAULT_MAP.pickups;
 
-/** To'g'ri javoblar — ustunlik: 3+ to'g'ri → +1 jon; ko'p to'g'ri → tezroq otadigan qurol */
+/** To'g'ri javoblar — ustunlik: kuchliroq va tezroq otadigan lazer. Sog'liq hammada 100 */
 export function pvpLoadout(correct: number): { lives: number; cooldown: number; weapon: string } {
   const c = Math.max(0, Math.floor(correct));
-  const lives = c >= 3 ? 4 : 3;
+  const lives = MAX_HP;
   if (c >= 6) return { lives, cooldown: 0.22, weapon: "Lazer-3" };
   if (c >= 3) return { lives, cooldown: 0.28, weapon: "Lazer-2" };
   return { lives, cooldown: 0.36, weapon: "Lazer-1" };

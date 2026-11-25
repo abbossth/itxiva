@@ -19,7 +19,7 @@ const route = await import("@/app/api/live/pvp/route");
 const resultRoute = await import("@/app/api/live/pvp/result/route");
 const { hmacSign, verifyTicket } = await import("@/lib/live-game/arena-token");
 const { NextRequest } = await import("next/server");
-const { PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
+const { REVIVE_HP, REVIVE_MS, PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
 
 const NOW = new Date("2026-11-10T16:40:00+05:00");
 const tick = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
@@ -86,8 +86,8 @@ afterEach(() => vi.useRealTimers());
 
 describe("kiber jang qoidalari", () => {
   it("yuklama: 3+ to'g'ri — +1 jon va tezroq qurol", () => {
-    expect(pvpLoadout(0)).toMatchObject({ lives: 3, weapon: "Lazer-1" });
-    expect(pvpLoadout(3)).toMatchObject({ lives: 4, weapon: "Lazer-2" });
+    expect(pvpLoadout(0)).toMatchObject({ lives: 100, weapon: "Lazer-1" });
+    expect(pvpLoadout(3)).toMatchObject({ lives: 100, weapon: "Lazer-2" });
     expect(pvpLoadout(8).cooldown).toBeLessThan(pvpLoadout(3).cooldown);
   });
 
@@ -179,7 +179,15 @@ describe("jamoaviy arena", () => {
     await shoot(String(mate._id), 1);
     expect((await LiveGamePlayer.findById(mate._id).lean())?.arena?.lives).toBe(mate.arena!.lives);
     await shoot(String(foe._id), 2);
-    expect((await LiveGamePlayer.findById(foe._id).lean())?.arena?.lives).toBe(foe.arena!.lives - 1);
+    expect((await LiveGamePlayer.findById(foe._id).lean())?.arena?.lives).toBeLessThanOrEqual(foe.arena!.lives - 16);
+
+    // Tiriltirish (HTTP yo'li): yiqilgan jamoadosh yonida 3 s bosib turiladi
+    await LiveGamePlayer.updateOne({ _id: mate._id }, { $set: { "arena.out": true, "arena.lives": 0, "arena.x": 430, "arena.y": 400 } });
+    tick(1000);
+    await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
+    tick(REVIVE_MS + 10);
+    await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
+    expect((await LiveGamePlayer.findById(mate._id).lean())?.arena).toMatchObject({ out: false, lives: REVIVE_HP, revives: 1 });
 
     // 1-jamoa butunlay yiqildi — 0-jamoa g'olib
     await LiveGamePlayer.updateMany({ gameId: id, team: 1 }, { $set: { "arena.out": true, "arena.lives": 0 } });
@@ -246,7 +254,7 @@ describe("xarita uchun ovoz berish", () => {
     expect(g.arena!.pickups[0]).toMatchObject({ x: ARENA_MAPS.ice.pickups[0].x, y: ARENA_MAPS.ice.pickups[0].y });
     as(ali);
     const st = await live.getLivePlayerStateAction(id);
-    expect(st.success && st.data.arena).toMatchObject({ ready: true, vote: null, map: "ice", lives: 4 });
+    expect(st.success && st.data.arena).toMatchObject({ ready: true, vote: null, map: "ice", lives: 100 });
     // Ovoz yopildi
     expect((await live.voteArenaMapAction(id, round, "space")).success).toBe(false);
     // HTTP qadami: xarita chegarasi kattaroq, reaksiya boshqalarga ko'rinadi
@@ -299,8 +307,8 @@ describe("kiber jang (server)", () => {
     expect(r.success && r.data.finished).toBe(false);
     expect((await LiveGame.findById(id).lean())?.status).toBe("arena");
     await voteAndGo(id, mentor, [ali, vali]);
-    expect((await player(ali)).arena).toMatchObject({ lives: 4, weapon: "Lazer-2", out: false });
-    expect((await player(vali)).arena).toMatchObject({ lives: 3, weapon: "Lazer-1" });
+    expect((await player(ali)).arena).toMatchObject({ lives: 100, weapon: "Lazer-2", out: false });
+    expect((await player(vali)).arena).toMatchObject({ lives: 100, weapon: "Lazer-1" });
     const valiId = (await player(vali))._id.toString();
     const aliId = (await player(ali))._id.toString();
 
@@ -321,7 +329,7 @@ describe("kiber jang (server)", () => {
     as(ali);
     let t = await live.pvpTickAction(id, { x: 200, y: 150, shots: [{ id: 1, x: 230, y: 150, a: 0 }], hits: [{ target: valiId, shot: 1 }] });
     expect(t.success && t.data.accepted).toBe(0);
-    expect((await player(vali)).arena?.lives).toBe(3);
+    expect((await player(vali)).arena?.lives).toBe(100);
 
     tick(SPAWN_SHIELD_MS);
     // Otilmagan o'q bilan "tekkizish" qabul qilinmaydi
@@ -335,12 +343,14 @@ describe("kiber jang (server)", () => {
     // Daxlsizlik oralig'ida ikkinchi o'q o'tmaydi
     t = await live.pvpTickAction(id, { x: 200, y: 150, shots: [{ id: 3, x: 230, y: 150, a: 0 }], hits: [{ target: valiId, shot: 3 }] });
     expect(t.success && t.data.accepted).toBe(0);
-    expect((await player(vali)).arena?.lives).toBe(2);
+    expect((await player(vali)).arena?.lives).toBe(82); // Lazer-2: 18 HP
     // Juda uzoqdagi nishonga "tekkan" o'q qabul qilinmaydi
     tick(500);
     t = await live.pvpTickAction(id, { x: 2300, y: 1300, shots: [{ id: 4, x: 2300, y: 1300, a: 0 }], hits: [{ target: valiId, shot: 4 }] });
     expect(t.success && t.data.accepted).toBe(0);
 
+    // Qisqartirish: yana ikki o'q bilan yiqilsin
+    await LiveGamePlayer.updateOne({ _id: valiId }, { $set: { "arena.lives": 36 } });
     for (const shot of [5, 6]) {
       tick(500);
       await live.pvpTickAction(id, { x: 200, y: 150, shots: [{ id: shot, x: 230, y: 150, a: 0 }], hits: [{ target: valiId, shot }] });
@@ -444,7 +454,7 @@ describe("kiber jang (server)", () => {
       const ws = st.success ? st.data.arena?.ws : null;
       expect(ws).toMatch(/^wss:\/\/arena\.example\.dev\/room\/[a-f0-9]{24}\/2\?t=/);
       const ticket = await verifyTicket("test-secret", decodeURIComponent(new URL(ws!).searchParams.get("t")!));
-      expect(ticket).toMatchObject({ g: id, r: 2, role: "player", n: "ALI", lives: 4 });
+      expect(ticket).toMatchObject({ g: id, r: 2, role: "player", n: "ALI", lives: 100 });
       as(mentor);
       const host = await live.getLiveHostStateAction(id);
       const hostTicket = await verifyTicket("test-secret", decodeURIComponent(new URL((host.success && host.data.arena?.ws) || "x:/").searchParams.get("t") ?? ""));

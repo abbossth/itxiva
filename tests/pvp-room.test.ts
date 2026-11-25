@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { PvpRoom, decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
 import { signTicket, verifyTicket, hmacSign, hmacVerify, type ArenaTicket } from "@/lib/live-game/arena-token";
-import { HIT_GRACE_MS, PICKUP_EVERY_MS } from "@/lib/live-game/pvp";
+import { HIT_GRACE_MS, PICKUP_EVERY_MS, REVIVE_HP, REVIVE_MS } from "@/lib/live-game/pvp";
 
 const START = 1_000_000;
-const join = (room: PvpRoom, p: string, x: number, y: number, lives = 3) =>
+// 48 HP: Lazer-1 (16 zarar) bilan aynan 3 o'qda yiqiladi
+const join = (room: PvpRoom, p: string, x: number, y: number, lives = 48) =>
   room.join({ p, n: p.toUpperCase(), skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives, maxLives: lives, x, y, shieldUntil: START + 3000 });
 
 describe("real vaqt xonasi", () => {
@@ -15,17 +16,17 @@ describe("real vaqt xonasi", () => {
     const hit = (now: number, id: number, x = 230) => room.input("ali", { x: 200, y: 150, shots: [{ id, x, y: 150, a: 0 }], hits: [{ target: "vali", shot: id }] }, now);
     // Boshlanishdagi himoya
     hit(START + 1000, 1);
-    expect(room.players.get("vali")!.lives).toBe(3);
+    expect(room.players.get("vali")!.lives).toBe(48);
     hit(START + 3500, 2);
-    expect(room.players.get("vali")!.lives).toBe(2);
+    expect(room.players.get("vali")!.lives).toBe(32);
     // O'sha o'q qayta hisoblanmaydi, daxlsizlik ichida ham o'tmaydi
     room.input("ali", { hits: [{ target: "vali", shot: 2 }] }, START + 4100);
     hit(START + 3500 + HIT_GRACE_MS - 50, 3);
-    expect(room.players.get("vali")!.lives).toBe(2);
+    expect(room.players.get("vali")!.lives).toBe(32);
     // Otilmagan o'q va juda uzoqdagi nishon
     room.input("ali", { hits: [{ target: "vali", shot: 77 }] }, START + 5000);
     room.input("ali", { x: 2300, y: 1300, shots: [{ id: 4, x: 2300, y: 1300, a: 0 }], hits: [{ target: "vali", shot: 4 }] }, START + 5000);
-    expect(room.players.get("vali")!.lives).toBe(2);
+    expect(room.players.get("vali")!.lives).toBe(32);
     hit(START + 6000, 5);
     expect(room.killsDirty).toBe(false);
     hit(START + 7000, 6);
@@ -80,10 +81,10 @@ describe("real vaqt xonasi", () => {
       ["VALI", false],
     ]);
     const vali = d.world.peers.find((p) => p.name === "VALI")!;
-    expect(vali).toMatchObject({ x: 905, y: 301, a: 1.5, lives: 3 });
+    expect(vali).toMatchObject({ x: 905, y: 301, a: 1.5, lives: 48 });
     expect(vali.shots).toEqual([{ id: 9, x: 920, y: 301, a: 1.5, age: 20 }]);
     expect(d.world.pickups).toHaveLength(3);
-    expect(d.me).toMatchObject({ lives: 3, out: false, weapon: "Lazer-1" });
+    expect(d.me).toMatchObject({ lives: 48, out: false, weapon: "Lazer-1" });
     expect(d.world.remainingMs).toBe(120_000 - 4020);
     room.flush();
     const d2 = decodeRoomMessage(room.frame(now + 80, "ali", { pickups: room.pickupsVer, feed: room.feedVer }), st, "ali", null)!;
@@ -96,13 +97,13 @@ describe("real vaqt xonasi", () => {
 describe("jamoaviy xona", () => {
   it("jamoadoshga o'q tegmaydi, raqibga tegadi; ro'yxat jamoani brauzerga yetkazadi", () => {
     const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.5);
-    room.join({ p: "ali", n: "ALI", skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 200, y: 150, shieldUntil: 0, team: 0 });
-    room.join({ p: "olim", n: "OLIM", skin: "rex", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 400, y: 150, shieldUntil: 0, team: 0 });
-    room.join({ p: "vali", n: "VALI", skin: "nova", weapon: "Lazer-1", cooldown: 0.36, lives: 3, maxLives: 3, x: 600, y: 150, shieldUntil: 0, team: 1 });
+    room.join({ p: "ali", n: "ALI", skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives: 48, maxLives: 100, x: 200, y: 150, shieldUntil: 0, team: 0 });
+    room.join({ p: "olim", n: "OLIM", skin: "rex", weapon: "Lazer-1", cooldown: 0.36, lives: 48, maxLives: 100, x: 400, y: 150, shieldUntil: 0, team: 0 });
+    room.join({ p: "vali", n: "VALI", skin: "nova", weapon: "Lazer-1", cooldown: 0.36, lives: 48, maxLives: 100, x: 600, y: 150, shieldUntil: 0, team: 1 });
     room.input("ali", { x: 200, y: 150, shots: [{ id: 1, x: 230, y: 150, a: 0 }], hits: [{ target: "olim", shot: 1 }] }, START + 1000);
-    expect(room.players.get("olim")!.lives).toBe(3);
+    expect(room.players.get("olim")!.lives).toBe(48);
     room.input("ali", { x: 200, y: 150, shots: [{ id: 2, x: 230, y: 150, a: 0 }], hits: [{ target: "vali", shot: 2 }] }, START + 2000);
-    expect(room.players.get("vali")!.lives).toBe(2);
+    expect(room.players.get("vali")!.lives).toBe(32);
     const st = newClientState();
     decodeRoomMessage(room.rosterMessage(), st, "ali", null);
     const d = decodeRoomMessage(room.frame(START + 2100, "ali", { pickups: 0, feed: 0 }), st, "ali", { weapon: "Lazer-1", cooldown: 0.36, name: "ALI", skin: "bolt" })!;
@@ -179,5 +180,40 @@ describe("xaritalar va reaksiyalar", () => {
     // 2,5 s dan keyin reaksiya yo'qoladi
     const later = decodeRoomMessage(room.frame(START + 3000, "vali", { pickups: 0, feed: 0 }), st, "vali", { weapon: "Lazer-1", cooldown: 0.36, name: "VALI", skin: "bolt" })!;
     expect(later.world.peers.find((p) => p.id === "ali")?.emote).toBe(-1);
+  });
+});
+
+describe("jamoaviy xona: tiriltirish", () => {
+  it("yiqilgan jamoadosh yonida 3 s bosib turilsa tiriladi; uzoqlashsa yoki o'q tegsa — qaytadan; raqibni tiriltirib bo'lmaydi", () => {
+    const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.5);
+    const mk = (p: string, x: number, team: number, lives = 48) =>
+      room.join({ p, n: p.toUpperCase(), skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives, maxLives: 100, x, y: 300, shieldUntil: 0, team });
+    mk("ali", 300, 0);
+    mk("olim", 340, 0, 16);
+    mk("vali", 700, 1);
+    // Vali Olimni yiqitadi
+    room.input("vali", { x: 700, y: 300, shots: [{ id: 1, x: 360, y: 300, a: 3.14 }], hits: [{ target: "olim", shot: 1 }] }, START + 1000);
+    expect(room.players.get("olim")!.out).toBe(true);
+    // Raqib tiriltira olmaydi
+    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1100);
+    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1100 + REVIVE_MS);
+    expect(room.players.get("olim")!.out).toBe(true);
+    // Ali boshlaydi, o'q yeydi — qaytadan
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000);
+    room.input("vali", { x: 700, y: 300, shots: [{ id: 2, x: 330, y: 300, a: 3.14 }], hits: [{ target: "ali", shot: 2 }] }, START + 3000);
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000 + REVIVE_MS);
+    expect(room.players.get("olim")!.out).toBe(true);
+    // Yangidan 3 s
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 6000 + REVIVE_MS + 1);
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 6000 + REVIVE_MS * 2 + 2);
+    expect(room.players.get("olim")).toMatchObject({ out: false, lives: REVIVE_HP, revives: 1, killedBy: null });
+    expect(room.feed.at(-1)).toMatchObject({ kind: "revive", a: "ALI", b: "OLIM" });
+    // Kadrda tiriltirish jarayoni ko'rinadi
+    room.players.get("olim")!.out = true;
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 20_000);
+    const st = newClientState();
+    decodeRoomMessage(room.rosterMessage(), st, "olim", null);
+    const d = decodeRoomMessage(room.frame(START + 20_000 + REVIVE_MS / 2, "olim", { pickups: 0, feed: 0 }), st, "olim", null)!;
+    expect(d.world.peers.find((p) => p.id === "olim")!.revive).toBe(50);
   });
 });

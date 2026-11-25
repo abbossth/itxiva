@@ -330,7 +330,7 @@ describe("sarguzasht rejimlari (server)", () => {
     g = (await LiveGame.findById(id).lean())!;
     expect(g.arena?.map).toBeTruthy();
     expect(new Date(g.arena!.endsAt).getTime() - new Date(g.arena!.startedAt).getTime()).toBe(45_000);
-    expect((await player(ali)).arena?.lives).toBe(4);
+    expect((await player(ali)).arena?.lives).toBe(100);
     // Jangdan keyin "Keyingi" — 4-savol (oraliq jang bonusi yarim)
     const before = (await player(ali)).score;
     await live.startLiveQuestionAction(id);

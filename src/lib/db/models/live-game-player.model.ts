@@ -150,6 +150,10 @@ export interface ILiveArenaPlayer {
   hitUntil: number;
   /** Zonadan tashqarida bo'lish boshlanishi / oxirgi zona zarari (0 — ichkarida) */
   zoneSince?: number;
+  /** Tiriltirish: kimni va qachondan beri (tugma bosib turilgan); necha marta tiriltirilgan */
+  revTarget?: string | null;
+  revSince?: number;
+  revives?: number;
   /** Oxirgi otilgan o'qlar (boshqalar ko'rishi va tekkanini tekshirish uchun) */
   shots: ILiveArenaShot[];
   /** Tekkan deb hisoblangan o'qlar (ikki marta hisoblanmasin) */
@@ -305,6 +309,9 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           tripleUntil: { type: Number, default: 0 },
           hitUntil: { type: Number, default: 0 },
           zoneSince: { type: Number, default: 0 },
+          revTarget: { type: String, default: null },
+          revSince: { type: Number, default: 0 },
+          revives: { type: Number, default: 0 },
           shots: {
             type: [new Schema({ id: Number, x: Number, y: Number, a: Number, at: Number }, { _id: false })],
             default: [],

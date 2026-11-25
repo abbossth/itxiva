@@ -5,7 +5,7 @@ import { Scoreboard, byScore, type BoardRow } from "./arena-scoreboard";
 import { getGameLooksAction } from "@/actions/live-game.actions";
 import type { GameLook } from "@/lib/character/catalog";
 import { Crosshair, Eye, Skull, Users } from "lucide-react";
-import type { PvpFeedView, PvpMe, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-types";
+import type { PvpFeedView, PvpMe, PvpPeer, PvpTickInput, PvpTickResult, PvpWorld } from "@/lib/live-game/pvp-types";
 import { decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
 import { Smoother } from "./interp";
 import {
@@ -33,6 +33,9 @@ import {
   teamColor,
   teleportFrom,
   ZONE_DAMAGE_MS,
+  MAX_HP,
+  REVIVE_R,
+  REVIVE_HP,
   outsideZone,
   type PowerKind,
   type Shot,
@@ -99,6 +102,9 @@ interface Hud {
   spectating: string | null;
   /** Jamoaviy arena: har jamoaning tirik a'zolari */
   teams: { team: number; alive: number }[];
+  /** Tiriltirish: yonimdagi yiqilgan jamoadosh (ism va %), meni tiriltirishyaptimi (%) */
+  revive: { name: string; pct: number } | null;
+  myRevive: number;
   /** Toraluvchi zona: holati va keyingi o'zgarishgacha soniya; o'zi tashqaridami */
   zone: { shrinking: boolean; s: number; outside: boolean; final: boolean } | null;
   /** Statistika jadvali (Tab bosib turilganda / 📊 tugmasi) — yopiq bo'lsa null */
@@ -142,6 +148,8 @@ export function PvpGame({
     teams: [],
     board: null,
     zone: null,
+    revive: null,
+    myRevive: 0,
   });
   const myTeam = typeof init.team === "number" ? init.team : -1;
   const [phase, setPhase] = useState<"intro" | "play" | "done">(startsInMs > 0 ? "intro" : "play");
@@ -151,7 +159,7 @@ export function PvpGame({
 
   const timing = useRef<{ start: number; end: number } | null>(null);
   // Ekrandagi tugmalar (sakrash, emoji) o'yin siklidagi funksiyalarni chaqiradi
-  const controls = useRef<{ dash: () => void; emote: (i: number) => void; board: (open: boolean) => void } | null>(null);
+  const controls = useRef<{ dash: () => void; emote: (i: number) => void; board: (open: boolean) => void; revive: (on: boolean) => void } | null>(null);
   // Statistika jadvali: kompyuterda Tab bosib turilganda, telefonda 📊 tugmasi bilan
   const [boardOpen, setBoardOpen] = useState(false);
   useEffect(() => {
@@ -267,6 +275,11 @@ export function PvpGame({
         dashReq = true;
         return;
       }
+      if (k === "f") {
+        e.preventDefault();
+        reviveHeld = down;
+        return;
+      }
       if (down && /^[1-4]$/.test(k)) {
         emote(Number(k) - 1);
         return;
@@ -279,6 +292,8 @@ export function PvpGame({
     };
     // Tugmalar (telefon) va klavish bir xil yo'l bilan: sakrash so'rovi va emoji
     let dashReq = false;
+    // Tiriltirish tugmasi (F yoki 🩹) bosib turilgan
+    let reviveHeld = false;
     function emote(i: number) {
       if (i < 0 || i >= EMOTES.length || (myEmote && performance.now() - myEmote.at < 800)) return;
       pendingEmote = i;
@@ -300,6 +315,24 @@ export function PvpGame({
       },
       emote,
       board: showBoard,
+      revive: (on: boolean) => {
+        reviveHeld = on;
+      },
+    };
+    /** Yonimdagi yiqilgan jamoadosh (tiriltirish mumkin bo'lgan) */
+    const downedNear = () => {
+      if (myTeam < 0 || !me || me.out || !pos.ready || !world) return null;
+      let best: PvpPeer | null = null;
+      let bd = REVIVE_R * REVIVE_R;
+      for (const p of world.peers) {
+        if (p.isMe || !p.out || !sameTeam(myTeam, p.team)) continue;
+        const d = (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2;
+        if (d <= bd) {
+          bd = d;
+          best = p;
+        }
+      }
+      return best;
     };
     const kd = (e: KeyboardEvent) => onKey(e, true);
     const ku = (e: KeyboardEvent) => onKey(e, false);
@@ -415,7 +448,17 @@ export function PvpGame({
           burst(sparks, pos.x, pos.y, "#f87171", 12);
           if (sound) playHurt();
           haptic([70]);
-          if (!me.out) say(`-1 jon · ${me.lives} qoldi`, "hurt");
+          if (!me.out) say(`−${prev.lives - me.lives} HP`, "hurt");
+        }
+        if (prev.out && !me.out) {
+          // Jamoadosh tiriltirdi: yiqilgan joydan davom etadi
+          const mine = world.peers.find((p) => p.isMe);
+          pos.x = mine?.x ?? me.x;
+          pos.y = mine?.y ?? me.y;
+          say(`🩹 Tiriltirildingiz! ${me.lives} HP`, "power");
+          burst(sparks, pos.x, pos.y, "#4ade80", 30);
+          if (sound) playCorrectSound();
+          haptic([20, 40, 20]);
         }
         if (me.kills > prev.kills) {
           if (sound) playBoom();
@@ -544,7 +587,8 @@ export function PvpGame({
         if (sendClaim !== null) claimSentAt = performance.now();
         const em = pendingEmote;
         pendingEmote = null;
-        socket.send(JSON.stringify({ t: "in", x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sendClaim, ...(em !== null ? { em } : {}) }));
+        const rv = reviveHeld ? downedNear()?.id ?? null : null;
+        socket.send(JSON.stringify({ t: "in", x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sendClaim, ...(em !== null ? { em } : {}), ...(rv ? { rv } : {}) }));
         if (claim === null) claimSentAt = 0;
         return;
       }
@@ -555,7 +599,8 @@ export function PvpGame({
       const sentClaim = claim;
       const em = pendingEmote;
       pendingEmote = null;
-      void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim, ...(em !== null ? { em } : {}) })
+      const rv = reviveHeld ? downedNear()?.id ?? null : null;
+      void sendTick(gameId, { x: Math.round(pos.x), y: Math.round(pos.y), a: Number(pos.a.toFixed(2)), shots, hits, claim: sentClaim, ...(em !== null ? { em } : {}), ...(rv ? { rv } : {}) })
         .then((r) => {
           if (r.success) apply(r.data, sentClaim);
         })
@@ -622,6 +667,34 @@ export function PvpGame({
           t
         );
       }
+      // Yiqilgan jamoadoshlar: 🩹 belgisi va tiriltirish halqasi
+      if (myTeam >= 0) {
+        for (const p of world?.peers ?? []) {
+          if (!p.out || !sameTeam(myTeam, p.team)) continue;
+          const s = p.isMe ? { x: pos.x, y: pos.y } : shown.get(p.id) ?? p;
+          ctx.save();
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = "rgba(74,222,128,0.25)";
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, PLAYER_R + 16, 0, Math.PI * 2);
+          ctx.stroke();
+          if ((p.revive ?? 0) > 0) {
+            ctx.strokeStyle = "#4ade80";
+            ctx.shadowColor = "#4ade80";
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, PLAYER_R + 16, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (p.revive ?? 0)) / 100);
+            ctx.stroke();
+          }
+          ctx.shadowBlur = 0;
+          ctx.font = "22px system-ui";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.globalAlpha = 0.7 + Math.sin(t * 5) * 0.3;
+          ctx.fillText("🩹", s.x, s.y - PLAYER_R - 30);
+          ctx.restore();
+        }
+      }
       // O'qlar
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
       for (const s of myShots) drawShot(ctx, s, "#fde047");
@@ -674,9 +747,9 @@ export function PvpGame({
       for (const p of world?.peers ?? []) {
         if (p.isMe || (!p.out && !vis.has(p.id))) continue;
         const s = shown.get(p.id) ?? p;
-        nameTag(ctx, `${p.out ? "💀 " : ""}${sameTeam(myTeam, p.team) ? "🤝 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives);
+        nameTag(ctx, `${p.out ? "💀 " : ""}${sameTeam(myTeam, p.team) ? "🤝 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), 0, 0);
       }
-      if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", me.lives, me.maxLives);
+      if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", 0, 0);
       // Emoji-reaksiyalar
       for (const p of world?.peers ?? []) {
         if (p.isMe || p.out || p.emote < 0 || !vis.has(p.id)) continue;
@@ -918,6 +991,11 @@ export function PvpGame({
                   .sort((a, b) => a - b)
                   .map((team) => ({ team, alive: (world?.peers ?? []).filter((p) => p.team === team && !p.out).length }))
               : [],
+          revive: (() => {
+            const d = downedNear();
+            return d ? { name: d.name, pct: d.revive ?? 0 } : null;
+          })(),
+          myRevive: me?.out ? world?.peers.find((p) => p.isMe)?.revive ?? 0 : 0,
           zone: (() => {
             const z = zoneNow(now);
             if (!z) return null;
@@ -941,7 +1019,7 @@ export function PvpGame({
                     id: p.id,
                     name: p.isMe ? myName : p.name,
                     kills: mine ? me!.kills : p.kills,
-                    deaths: out ? maxLives : Math.max(0, maxLives - lives),
+                    deaths: out ? 1 : 0,
                     lives: out ? 0 : lives,
                     maxLives,
                     out,
@@ -991,13 +1069,7 @@ export function PvpGame({
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-2 text-white sm:p-3">
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1 rounded-xl bg-black/55 px-3 py-1.5 text-lg backdrop-blur">
-            {Array.from({ length: Math.max(hud.maxLives, hud.lives) }, (_, i) => (
-              <span key={i} className={cn("transition-all", i < hud.lives ? "text-rose-500" : "scale-75 opacity-25 grayscale")}>
-                ❤
-              </span>
-            ))}
-          </div>
+          <HpBar hp={hud.out ? 0 : hud.lives} max={Math.max(MAX_HP, hud.maxLives)} />
           {hud.powers.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {hud.powers.map((p) => (
@@ -1101,7 +1173,11 @@ export function PvpGame({
       <div className="pointer-events-none absolute left-2 top-24 flex max-w-[60%] flex-col gap-1 sm:left-3">
         {hud.feed.map((f) => (
           <span key={f.key} className="live-pop truncate rounded-lg bg-black/55 px-2 py-1 text-xs font-bold text-white backdrop-blur">
-            {f.kind === "kill" ? (
+            {f.kind === "revive" ? (
+              <>
+                <b className="text-emerald-300">{f.a}</b> 🩹 <b className="text-emerald-200">{f.b}</b>
+              </>
+            ) : f.kind === "kill" ? (
               <>
                 <b className="text-amber-300">{f.a}</b> 💥 <b className="text-rose-300">{f.b}</b>
               </>
@@ -1128,7 +1204,7 @@ export function PvpGame({
             {Math.max(1, intro)}
           </span>
           <p className="text-lg font-black">
-            Qahramoningiz: <span style={{ color: skin.body }}>{skin.name}</span> · {init.lives} ❤ · {init.weapon}
+            Qahramoningiz: <span style={{ color: skin.body }}>{skin.name}</span> · {MAX_HP} HP · {init.weapon}
           </p>
           <p className="max-w-md text-sm text-slate-200">
             {touch
@@ -1136,7 +1212,7 @@ export function PvpGame({
               : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya, Tab — statistika"}
           </p>
           <p className="max-w-md text-xs text-slate-300">
-            3 marta o&apos;q yegan o&apos;yindan chiqadi. Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
+            Sog&apos;lig&apos;ingiz 100 HP — har o&apos;q 16–20 HP oladi (faqat o&apos;zingiz ko&apos;rasiz).{myTeam >= 0 ? " Yiqilgan jamoadosh yonida F (🩹) ni 3 soniya bosib turing — tiriltirasiz!" : ""} Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
             <br />
             🌀 Vaqt o&apos;tgan sari xavfsiz doira torayadi — tashqarida qolsangiz jon ketadi. Oq punktir — keyingi doira.
           </p>
@@ -1163,6 +1239,34 @@ export function PvpGame({
           </div>
         </div>
       )}
+      {hud.revive && phase === "play" && !hud.out && (
+        <button
+          type="button"
+          onPointerDown={(ev) => {
+            ev.stopPropagation();
+            controls.current?.revive(true);
+          }}
+          onPointerUp={() => controls.current?.revive(false)}
+          onPointerLeave={() => controls.current?.revive(false)}
+          onPointerCancel={() => controls.current?.revive(false)}
+          aria-label={`${hud.revive.name}ni tiriltirish`}
+          className="absolute bottom-[230px] left-1/2 z-20 flex -translate-x-1/2 cursor-pointer select-none flex-col items-center gap-1 rounded-2xl bg-emerald-600/85 px-5 py-2.5 font-black text-white shadow-xl ring-2 ring-emerald-300/70 backdrop-blur active:scale-95 sm:bottom-24"
+        >
+          <span className="text-sm">
+            🩹 {hud.revive.name} — {touch ? "bosib turing" : "F ni bosib turing"}
+          </span>
+          <span className="h-2 w-44 overflow-hidden rounded-full bg-white/25">
+            <span className="block h-full rounded-full bg-white transition-[width] duration-150" style={{ width: `${hud.revive.pct}%` }} />
+          </span>
+        </button>
+      )}
+      {hud.out && phase !== "done" && myTeam >= 0 && (
+        <div className="pointer-events-none absolute inset-x-0 top-[38%] flex justify-center">
+          <span className="rounded-2xl bg-emerald-700/85 px-4 py-2 text-sm font-black text-white">
+            {hud.myRevive > 0 ? `🩹 Sizni tiriltirishyapti… ${hud.myRevive}%` : `🩹 Jamoadoshingiz yoningizga kelsa — tiriltira oladi (${REVIVE_HP} HP bilan)`}
+          </span>
+        </div>
+      )}
       {hud.out && phase !== "done" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-1 text-center text-white">
           <span className="rounded-2xl bg-rose-600/90 px-5 py-2 text-lg font-black">
@@ -1186,3 +1290,25 @@ export function PvpGame({
 }
 
 
+
+/** Sog'liq polosasi (faqat o'yinchining o'zi ko'radi): yashil → sariq → qizil, zarar izi bilan */
+function HpBar({ hp, max }: { hp: number; max: number }) {
+  const pct = Math.max(0, Math.min(100, (hp / Math.max(1, max)) * 100));
+  const color = pct > 60 ? "from-emerald-400 to-lime-300" : pct > 30 ? "from-amber-400 to-yellow-300" : "from-rose-600 to-rose-400";
+  return (
+    <div className="w-44 rounded-xl bg-black/60 px-2.5 py-1.5 backdrop-blur sm:w-56" role="meter" aria-label="Sog'liq" aria-valuemin={0} aria-valuemax={max} aria-valuenow={hp}>
+      <div className="mb-1 flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-white/80">
+        <span>❤ HP</span>
+        <span className={cn("font-mono text-sm", pct <= 30 ? "text-rose-300" : "text-white")}>
+          {Math.round(hp)}
+          <span className="text-white/50">/{max}</span>
+        </span>
+      </div>
+      <div className="relative h-3 overflow-hidden rounded-full bg-white/15">
+        {/* Zarar izi: oq qism sekinroq qisqaradi */}
+        <span className="absolute inset-y-0 left-0 rounded-full bg-white/70 transition-[width] delay-200 duration-700" style={{ width: `${pct}%` }} />
+        <span className={cn("absolute inset-y-0 left-0 rounded-full bg-gradient-to-r transition-[width] duration-150", color, pct <= 30 && "animate-pulse")} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}

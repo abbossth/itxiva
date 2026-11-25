@@ -339,7 +339,7 @@ function ArenaFight({
                     {r.killedBy ?? ""}
                   </span>
                 ) : (
-                  <span className="text-sm tracking-tighter text-rose-500">{"❤".repeat(Math.max(0, r.lives))}</span>
+                  <span className="w-16 text-right font-mono text-xs font-black text-rose-300">{r.maxLives > 10 ? `${r.lives} HP` : "❤".repeat(Math.max(0, r.lives))}</span>
                 )}
                 <span className="w-10 text-right text-sm font-black text-amber-300">💥{r.kills}</span>
                 {arena.ended && <span className="live-pop w-16 text-right font-mono text-sm font-black text-emerald-300">+{formatNumberUz(r.points)}</span>}

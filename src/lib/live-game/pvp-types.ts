@@ -39,11 +39,13 @@ export interface PvpPeer {
   team: number;
   /** Ko'rsatilayotgan emoji-reaksiya (EMOTES indeksi); -1 — yo'q */
   emote: number;
+  /** Yiqilgan o'yinchini hozir tiriltirishyapti: 0–100 (%) */
+  revive?: number;
 }
 
 export interface PvpFeedView {
   key: string;
-  kind: "kill" | "pickup";
+  kind: "kill" | "pickup" | "revive";
   a: string;
   b: string | null;
   power: PowerKind | null;
@@ -94,6 +96,8 @@ export interface PvpTickInput {
   claim?: number | null;
   /** Emoji-reaksiya (EMOTES indeksi) */
   em?: number | null;
+  /** Tiriltirish tugmasi bosib turilgan: yiqilgan jamoadosh id'si */
+  rv?: string | null;
 }
 
 export interface PvpTickResult {

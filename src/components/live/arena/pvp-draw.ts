@@ -621,7 +621,21 @@ export function nameTag(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, x, y - 17);
-  // Yuraklar
+  // Sog'liq: 0 — ko'rsatilmaydi; HP (katta ekran) — ingichka polosa; eski janglar — yuraklar
+  if (maxLives <= 0) {
+    ctx.restore();
+    return;
+  }
+  if (maxLives > 10) {
+    const bw = 64;
+    const k = Math.max(0, Math.min(1, lives / maxLives));
+    ctx.fillStyle = "rgba(2,6,23,0.7)";
+    ctx.fillRect(x - bw / 2 - 1, y + 1, bw + 2, 7);
+    ctx.fillStyle = k > 0.6 ? "#4ade80" : k > 0.3 ? "#facc15" : "#f43f5e";
+    ctx.fillRect(x - bw / 2, y + 2, bw * k, 5);
+    ctx.restore();
+    return;
+  }
   const n = Math.max(maxLives, lives);
   const gap = 15;
   const start = x - ((n - 1) * gap) / 2;

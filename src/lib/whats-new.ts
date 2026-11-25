@@ -29,6 +29,42 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-hp-revive-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kiber jang: 100 HP va tiriltirish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💚",
+        title: "Endi jon emas — 100 HP",
+        text: "Chap yuqorida sog'liq polosasi: 0 dan 100 gacha. Har o'q 16–20 HP oladi (ko'p to'g'ri javob — kuchliroq lazer), ❤ sovg'asi +30 HP. HP'ingizni faqat o'zingiz ko'rasiz!",
+      },
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "Jamoadoshni tiriltiring",
+        text: "Jamoaviy jangda yiqilgan jamoadosh yoniga boring va F ni (telefonda 🩹 tugmasini) 3 soniya bosib turing — u 40 HP bilan turadi. O'q tegsa, qaytadan boshlanadi. Har kimni ko'pi bilan 2 marta.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-hp-revive-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Kiber jang: 100 HP va tiriltirish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💚",
+        title: "HP va tiriltirish",
+        text: "O'yinchilarda endi 100 HP (o'q 16–20, zona 10, ❤ +30). Har o'quvchi faqat o'z HP'ini ko'radi; katta ekranda hammaniki ko'rinadi. Jamoaviy jangda yiqilgan jamoadoshni 3 soniyada tiriltirish mumkin (40 HP, ko'pi bilan 2 marta).",
+      },
+    ],
+  },
+  {
     id: "student-chat-mentions-2026-11-25",
     date: "2026-11-25",
     audience: "student",

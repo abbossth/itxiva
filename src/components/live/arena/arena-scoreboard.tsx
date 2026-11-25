@@ -109,7 +109,7 @@ export function Scoreboard({ rows, myTeam, left }: { rows: BoardRow[]; myTeam: n
                     {r.out ? (
                       <span className="font-black text-white/45">💀 chiqdi</span>
                     ) : (
-                      <span className="tracking-tighter text-rose-400">{"♥".repeat(Math.max(0, r.lives))}<span style={{ color: "rgba(255,255,255,0.18)" }}>{"♥".repeat(Math.max(0, r.maxLives - r.lives))}</span></span>
+                      <span className="font-black text-emerald-300">tirik</span>
                     )}
                   </span>
                 </div>
