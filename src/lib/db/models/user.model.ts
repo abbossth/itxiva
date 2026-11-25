@@ -21,6 +21,8 @@ export interface IUserData {
   celebrationsEnabled?: boolean;
   /** Mentor chatda yozishni shu vaqtgacha taqiqlagan (o'qish mumkin) */
   chatMutedUntil?: Date | string | null;
+  /** Chatda bloklagan odamlari: ular shaxsiy xabar yoza olmaydi va bu foydalanuvchini guruhga qo'sha olmaydi */
+  chatBlocked?: (string | mongoose.Types.ObjectId)[];
   /** Mukofot tabrigi ko'rsatilgan oxirgi coin/XP yozuvi vaqti; null — hali boshlanmagan */
   rewardsSeenAt?: Date | null;
   /** Tajriba: hech qachon sarflanmaydi; daraja va reyting shu bo'yicha (gamifikatsiya) */
@@ -127,6 +129,7 @@ const UserSchema = new Schema<IUser>(
     notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
     celebrationsEnabled: { type: Boolean, default: true },
     chatMutedUntil: { type: Date, default: null },
+    chatBlocked: { type: [{ type: Schema.Types.ObjectId, ref: "User" }], default: [] },
     rewardsSeenAt: { type: Date, default: null },
     xp: { type: Number, default: 0, min: 0 },
     level: { type: Number, default: 1, min: 1 },

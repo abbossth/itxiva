@@ -6,6 +6,8 @@ import { retryFailedAiWork } from "@/lib/ai/retry";
 import { applyMissedHomeworkPenalties } from "@/lib/homework-penalties";
 import { awardQuizPlaces } from "@/lib/quiz-places";
 import { rollForwardLessons } from "@/lib/lesson-plan";
+import { deleteObjectsOlderThan } from "@/lib/storage/r2";
+import { CHAT_MESSAGE_TTL_DAYS } from "@/lib/db/models/chat.model";
 
 // Vercel Cron kuniga bir marta chaqiradi (vercel.json). Vercel so'rovga
 // `Authorization: Bearer <CRON_SECRET>` sarlavhasini o'zi qo'shadi.
@@ -44,7 +46,15 @@ export async function GET(req: NextRequest) {
       console.error("Lesson roll-forward error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties, quizPlaces, lessonDates });
+    // Chat ovozli xabarlari va rasmlari: xabarlarning o'zi 7 kunda bazadan o'chadi (TTL), fayllari shu yerda
+    const chatCutoff = new Date(Date.now() - CHAT_MESSAGE_TTL_DAYS * 86_400_000);
+    const chatVoiceDeleted = await Promise.all([deleteObjectsOlderThan("chat/voice/", chatCutoff), deleteObjectsOlderThan("chat/img/", chatCutoff)])
+      .then(([a, b]) => a + b)
+      .catch((error) => {
+        console.error("Chat media cleanup error:", error);
+        return null;
+      });
+    return NextResponse.json({ ok: true, homework, examsNotified: exams, gamification, aiRetry, homeworkPenalties, quizPlaces, lessonDates, chatVoiceDeleted });
   } catch (error) {
     console.error("Daily cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

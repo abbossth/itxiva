@@ -25,6 +25,7 @@ import { resolveAmbience } from "@/lib/ambience";
 import { toDateKey } from "@/lib/schedule";
 import { LevelBackdrop } from "@/components/layout/level-ambience";
 import { AnnouncementModal } from "@/components/announcements/announcement-modal";
+import { ChatDock } from "@/components/chat/chat-dock";
 
 export default async function DashboardLayout({
   children,
@@ -111,6 +112,7 @@ export default async function DashboardLayout({
       {/* Jarima (sababsiz qoldirish, topshirilmagan vazifa): qancha coin olingani va sababi — tabrikdan oldin */}
       {/* Guruhda jonli o'yin ochilganda: ekran o'rtasida "Qo'shilish" (header tugmasi ham shu holatdan) */}
       {session.role === "student" && <LiveGameNotice />}
+      <ChatDock me={session.userId} role={session.role} />
       {session.role === "student" && <PenaltyNotice waitForLevelUp={Boolean(levelState?.levelUp)} />}
       {session.role === "student" && <RewardCelebration waitForLevelUp={Boolean(levelState?.levelUp)} />}
 

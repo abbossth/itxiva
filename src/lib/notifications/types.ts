@@ -15,6 +15,8 @@ export type NotificationType =
   | "quest_result"
   | "weekly_result"
   | "live_game"
+  // Ikkala rol: chat (shaxsiy xabar va o'z guruhlari)
+  | "chat_message"
   // Mentor
   | "quest_submitted"
   | "homework_submitted"
@@ -32,6 +34,7 @@ export interface NotificationOption {
 
 export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
   { type: "lesson_reminder", label: "Dars eslatmasi", description: "Dars boshlanishiga bir soat qolganda" },
+  { type: "chat_message", label: "Chat xabarlari", description: "Shaxsiy xabar yoki guruhingizda yangi xabar kelganda (bitta suhbatdan 10 daqiqada ko'pi bilan bittasi)" },
   { type: "live_game", label: "Jonli o'yin", description: "Ustoz yoki o'quvchi guruhingiz/sinfingiz uchun jonli o'yin ochganda — sovrinlar va \"Qo'shilish\" tugmasi bilan" },
   { type: "homework_graded", label: "Vazifa tekshirildi", description: "Baho, izoh yoki qayta ishlashga qaytarilgani" },
   { type: "lesson_new", label: "Yangi dars", description: "Guruhingizga yangi dars nashr etilganda" },
@@ -49,6 +52,7 @@ export const STUDENT_NOTIFICATIONS: NotificationOption[] = [
 
 export const MENTOR_NOTIFICATIONS: NotificationOption[] = [
   { type: "lesson_reminder", label: "Dars eslatmasi", description: "Har bir guruh darsi boshlanishiga bir soat qolganda" },
+  { type: "chat_message", label: "Chat xabarlari", description: "Shaxsiy xabar yoki siz a'zo guruhda yangi xabar kelganda" },
   { type: "homework_submitted", label: "Yangi vazifa javobi", description: "O'quvchi uyga vazifa topshirganda" },
   { type: "order_new", label: "Do'kon so'rovi", description: "O'quvchi do'kondan buyurtma berganda" },
   { type: "exam_finished", label: "Imtihon yakunlandi", description: "Imtihon vaqti tugaganda qisqa statistika" },

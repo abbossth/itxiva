@@ -34,6 +34,7 @@
     "react-dom": "19.2.8",
     "tailwind-merge": "^3.7.0",
     "three": "^0.187.0",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -45,6 +46,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.187.0",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "mongodb-memory-server": "^11.3.0",

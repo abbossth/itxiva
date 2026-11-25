@@ -94,7 +94,37 @@ export function PeoplePicker({
   );
 }
 
-export function Initials({ name, mentor = false, size = "md" }: { name: string; mentor?: boolean; size?: "sm" | "md" }) {
+const PALETTE = [
+  "from-teal-500 to-emerald-500",
+  "from-indigo-500 to-violet-500",
+  "from-sky-500 to-blue-600",
+  "from-rose-500 to-pink-500",
+  "from-amber-500 to-orange-500",
+  "from-fuchsia-500 to-purple-600",
+  "from-cyan-500 to-teal-600",
+  "from-lime-500 to-green-600",
+];
+
+/** Ismdan barqaror rang (bir odam — doim bir xil rang) */
+function colorOf(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
+export function Initials({
+  name,
+  mentor = false,
+  size = "md",
+  icon: Icon,
+  className,
+}: {
+  name: string;
+  mentor?: boolean;
+  size?: "xs" | "sm" | "md";
+  icon?: React.ComponentType<{ className?: string }>;
+  className?: string;
+}) {
   const letters = name
     .split(" ")
     .filter(Boolean)
@@ -105,12 +135,13 @@ export function Initials({ name, mentor = false, size = "md" }: { name: string; 
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-bold text-white",
-        size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm",
-        mentor ? "bg-amber-500" : "bg-gradient-to-br from-teal-500 to-indigo-500"
+        "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white",
+        size === "xs" ? "h-7 w-7 text-[10px]" : size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-sm",
+        mentor ? "from-amber-400 to-orange-500" : colorOf(name),
+        className
       )}
     >
-      {letters || "?"}
+      {Icon ? <Icon className={size === "md" ? "h-5 w-5" : "h-4 w-4"} /> : letters || "?"}
     </span>
   );
 }

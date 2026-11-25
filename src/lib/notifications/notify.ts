@@ -55,6 +55,7 @@ export interface NotificationPayloads {
     };
   };
   student_game_new: { gameId: string; creatorName: string; groupName?: string; modeTitle: string; audience: string; questions: number; price: number; paid: number; recipients: number; /** Botni ulamaganlar (ularga xabar bormaydi) */ noTelegram?: number };
+  chat_message: { roomId: string; roomTitle: string; senderName: string; text: string; voice?: boolean };
   quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
   homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
   order_new: { productTitle: string; price: number; studentName: string };
@@ -167,6 +168,10 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
       `📨 Telegram e'loni: ${b(p.recipients)} ta o'quvchiga${p.noTelegram ? ` (yana ${p.noTelegram} tasi botni ulamagan — ularga bormadi)` : ""}`,
     ].join("\n"),
     button: link("Kuzatish", `/mentor/live/${p.gameId}`),
+  }),
+  chat_message: (p) => ({
+    text: [`💬 ${b(p.senderName)}${p.roomTitle ? ` · ${escapeHtml(p.roomTitle)}` : ""}`, p.voice ? "🎤 Ovozli xabar" : escapeHtml(clip(p.text, 500))].join("\n"),
+    button: link("Javob berish", `/chat?room=${p.roomId}`),
   }),
   quest_submitted: (p) => ({
     text: [

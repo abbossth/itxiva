@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "5f9109839719d5cf37ba7f8c35a7f19c";
@@ -127,4 +127,25 @@ export async function downloadBuffer(key: string): Promise<Buffer> {
   const res = await getS3Client().send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }));
   if (!res.Body) throw new Error("Fayl bo'sh");
   return Buffer.from(await res.Body.transformToByteArray());
+}
+
+/**
+ * `prefix` ostidagi `olderThan` dan eski fayllarni o'chiradi (masalan, 7 kunlik chat ovozli xabarlari).
+ * O'chirilgan fayllar sonini qaytaradi.
+ */
+export async function deleteObjectsOlderThan(prefix: string, olderThan: Date): Promise<number> {
+  if (!process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) return 0;
+  const client = getS3Client();
+  let token: string | undefined;
+  let deleted = 0;
+  do {
+    const page = await client.send(new ListObjectsV2Command({ Bucket: R2_BUCKET, Prefix: prefix, ContinuationToken: token, MaxKeys: 1000 }));
+    const old = (page.Contents ?? []).filter((o) => o.Key && o.LastModified && o.LastModified.getTime() < olderThan.getTime());
+    if (old.length > 0) {
+      await client.send(new DeleteObjectsCommand({ Bucket: R2_BUCKET, Delete: { Objects: old.map((o) => ({ Key: o.Key! })), Quiet: true } }));
+      deleted += old.length;
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return deleted;
 }

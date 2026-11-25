@@ -29,6 +29,74 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-chat-plus-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Chat yangilandi: ovoz, rasm, stiker va bildirishnomalar",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📨",
+        title: "Xabarlar endi pastda",
+        text: "O'ng pastdagi \"Xabarlar\" tugmasini bosing — chat istalgan sahifada ochiladi, keyin yana yig'ib qo'yasiz. O'qilmaganlar soni tugmada ko'rinadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🎤",
+        title: "Ovozli xabar, rasm va stikerlar",
+        text: "Mikrofon tugmasi — 2 daqiqagacha ovozli xabar. 🖼 tugmasi yoki rasmni tashlash — rasm yuborish. 😀 — stikerlar. Havolalar bosiladigan bo'ladi.",
+      },
+      {
+        art: "emoji",
+        emoji: "❤️",
+        title: "Javob va reaksiya",
+        text: "Xabarni ikki marta bosing — ❤️. O'ng tugma (telefonda uzoq bosish): javob berish, reaksiya, nusxa olish, kim o'qiganini ko'rish. ✓ — yuborildi, ✓✓ — o'qildi. Kim yozayotgani ham ko'rinadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔔",
+        title: "Bildirishnomalar",
+        text: "Chatdagi \"yoqish\" tugmasini bosing — sayt yopiq bo'lsa ham yangi xabar telefoningizga keladi. Kerak bo'lmasa, suhbat tepasidagi 🔔 bilan ovozsiz qiling.",
+      },
+      {
+        art: "emoji",
+        emoji: "🛡️",
+        title: "Xavfsizlik",
+        text: "Guruhingizga admin tayinlang yoki \"faqat adminlar yozadi\" rejimini yoqing. Bezovta qilgan odamni bloklang, yomon xabar ustidan ustozga shikoyat qiling.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
+    id: "mentor-chat-plus-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Chat: ovoz, rasm, push-bildirishnoma va shikoyatlar",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📨",
+        title: "Pastki \"Xabarlar\" paneli",
+        text: "Chat istalgan sahifada o'ng pastdan ochiladi va yig'iladi. Ovozli xabar, rasm (avtomatik kichraytiriladi), stiker, javob, reaksiya, ✓/✓✓ va \"yozmoqda\" qo'shildi. Ovoz va rasmlar ham 7 kunda o'chadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🚩",
+        title: "Shikoyatlar va moderatsiya",
+        text: "O'quvchi xabar ustidan shikoyat qilsa — Telegramga keladi va amallar tarixiga yoziladi. O'ng tugma menyusidan xabarni o'chirish yoki o'quvchiga 1 soat/1 kun yozishni taqiqlash mumkin; istalgan o'quvchilar guruhini o'chira olasiz.",
+      },
+      {
+        art: "emoji",
+        emoji: "🔔",
+        title: "Push-bildirishnomalar",
+        text: "Shaxsiy xabar, guruh xabari yoki sizga berilgan javob sayt yopiq bo'lsa ham telefonga keladi (chatdagi \"yoqish\" tugmasi). Keraksiz suhbatni 🔔 bilan ovozsiz qiling.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
     id: "student-chat-2026-11-25",
     date: "2026-11-25",
     audience: "student",
