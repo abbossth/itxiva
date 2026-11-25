@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "@/components/ui/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { SIDEBAR_COOKIE, isLinkActive, navLinksFor, type NavBadges } from "./nav-links";
 import { NavPending } from "./nav-pending";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { LevelBadge, XpBar, levelColor } from "@/components/gamification/level-badge";
 import type { LevelSummary } from "@/actions/gamification.actions";
 import { formatNumberUz } from "@/lib/utils";
+
+const MORE_KEY = "itxiva_nav_more";
 
 interface DesktopNavProps {
   user: {
@@ -37,40 +39,7 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level 
 
   const links = navLinksFor(role, gamification).filter((l) => l.sidebar !== false);
 
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    document.cookie = `${SIDEBAR_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
-  };
-
-  return (
-    <aside
-      data-collapsed={collapsed}
-      className={cn(
-        "hidden md:flex flex-col shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto overflow-x-hidden justify-between bg-white/40 dark:bg-bg/40 backdrop-blur-xs select-none transition-[width] duration-200",
-        collapsed ? "w-[76px] p-3" : "w-64 p-4"
-      )}
-    >
-      <nav aria-label="Asosiy menyu" className="space-y-0.5">
-        <div className={cn("flex items-center mb-1", collapsed ? "justify-center" : "justify-between pl-3")}>
-          {!collapsed && (
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Asosiy menyu
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={collapsed ? "Menyuni yoyish" : "Menyuni yig'ish"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "Menyuni yoyish" : "Menyuni yig'ish"}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
-          >
-            {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
-        </div>
-
-        {links.map((link) => {
+  const renderLink = (link: (typeof links)[number]) => {
           const Icon = link.icon;
           const isActive = isLinkActive(link, pathname);
           const count = link.badge ? badges[link.badge] ?? 0 : 0;
@@ -134,7 +103,93 @@ export function DesktopNav({ user, badges = {}, defaultCollapsed = false, level 
             )}
             </div>
           );
-        })}
+        };
+
+  // Kam ishlatiladiganlar: yig'iladi (holati eslab qolinadi); ichidagi sahifa ochiq bo'lsa — doim yoyiq
+  const main = links.filter((l) => !l.more && l.href !== "/profile");
+  const more = links.filter((l) => l.more);
+  const bottom = links.filter((l) => !l.more && l.href === "/profile");
+  const [moreOpen, setMoreOpenState] = useState(false);
+  // Saqlangan holat sahifa ochilgach o'qiladi (server bilan bir xil boshlansin)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        if (window.localStorage.getItem(MORE_KEY) === "1") setMoreOpenState(true);
+      } catch {}
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const setMoreOpen = (v: boolean) => {
+    setMoreOpenState(v);
+    try {
+      window.localStorage.setItem(MORE_KEY, v ? "1" : "0");
+    } catch {}
+  };
+  const showMore = moreOpen || more.some((l) => isLinkActive(l, pathname));
+  const moreCount = more.reduce((n, l) => n + (l.badge ? badges[l.badge] ?? 0 : 0), 0);
+
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.cookie = `${SIDEBAR_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  };
+
+  return (
+    <aside
+      data-collapsed={collapsed}
+      className={cn(
+        "hidden md:flex flex-col shrink-0 border-r border-slate-200/80 dark:border-slate-800/80 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto overflow-x-hidden justify-between bg-white/40 dark:bg-bg/40 backdrop-blur-xs select-none transition-[width] duration-200",
+        collapsed ? "w-[76px] p-3" : "w-64 p-4"
+      )}
+    >
+      <nav aria-label="Asosiy menyu" className="space-y-0.5">
+        <div className={cn("flex items-center mb-1", collapsed ? "justify-center" : "justify-between pl-3")}>
+          {!collapsed && (
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Asosiy menyu
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? "Menyuni yoyish" : "Menyuni yig'ish"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Menyuni yoyish" : "Menyuni yig'ish"}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer"
+          >
+            {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {main.map(renderLink)}
+
+        {more.length > 0 &&
+          (collapsed ? (
+            <>
+              <div aria-hidden className="mx-3 my-2 border-t border-slate-200/80 dark:border-slate-800/80" />
+              {more.map(renderLink)}
+            </>
+          ) : (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setMoreOpen(!showMore)}
+                aria-expanded={showMore}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              >
+                <span className="flex-1 text-left">Boshqalar</span>
+                {!showMore && moreCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 font-mono text-[10px] text-slate-950">{moreCount}</span>
+                )}
+                <ChevronDown className={cn("h-4 w-4 transition-transform", showMore && "rotate-180")} />
+              </button>
+              {showMore && <div className="mt-0.5 space-y-0.5">{more.map(renderLink)}</div>}
+            </div>
+          ))}
+
+        {bottom.length > 0 && (
+          <div className="mt-2 border-t border-slate-200/80 pt-2 dark:border-slate-800/80">{bottom.map(renderLink)}</div>
+        )}
       </nav>
 
       {level && (

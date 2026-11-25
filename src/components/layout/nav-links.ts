@@ -48,6 +48,8 @@ export interface NavLink {
   primaryWithGamification?: boolean;
   /** false — kompyuter yon menyusida ko'rinmaydi (u yerda boshqa joydan ochiladi, masalan profil kartasi) */
   sidebar?: false;
+  /** Kamroq ishlatiladigan: yon menyuda yig'iladigan "Boshqalar" bo'limida */
+  more?: true;
 }
 
 export type NavBadgeKind = "orders" | "homework" | "quests" | "chat";
@@ -62,11 +64,11 @@ export const MENTOR_LINKS: NavLink[] = [
   { href: "/mentor/exams", label: "Imtihonlar", shortLabel: "Imtihon", icon: GraduationCap, primary: true },
   { href: "/mentor/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2 },
   { href: "/chat", label: "Chat", shortLabel: "Chat", icon: MessagesSquare, badge: "chat" },
-  { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true },
-  { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3 },
-  { href: "/mentor/announcements", label: "E'lonlar", shortLabel: "E'lon", icon: Megaphone },
-  { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy },
-  { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"] },
+  { href: "/mentor/quests", label: "Topshiriqlar", shortLabel: "Topshiriq", icon: Target, badge: "quests", badgeHref: "/mentor/quests/review", gamification: true, more: true },
+  { href: "/leaderboard", label: "Reyting", shortLabel: "Reyting", icon: Trophy, more: true },
+  { href: "/mentor/shop", label: "Do'kon", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders", match: ["/mentor/orders"], more: true },
+  { href: "/mentor/announcements", label: "E'lonlar", shortLabel: "E'lon", icon: Megaphone, more: true },
+  { href: "/mentor/reports", label: "Hisobotlar", shortLabel: "Hisobot", icon: BarChart3, more: true },
   { href: "/profile", label: "Sozlamalar", shortLabel: "Sozlama", icon: Settings, match: ["/mentor/settings", "/mentor/import", "/mentor/audit"] },
 ];
 
