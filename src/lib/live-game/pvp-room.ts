@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, EMOTES, EMOTE_MS, HIT_GRACE_MS, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, freeSpot, mapOf, rollPower, sameTeam, type ArenaMap, type MapId, type PowerKind } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, HIT_GRACE_MS, MAX_LIVES, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -49,6 +49,8 @@ export interface RoomPlayer {
   a: number;
   until: Record<Timed, number>;
   hitUntil: number;
+  /** Zonadan tashqarida bo'lish boshlanishi / oxirgi zona zarari (0 — ichkarida) */
+  zoneSince: number;
   shots: Map<number, { x: number; y: number; a: number; at: number }>;
   used: Set<number>;
   /** Hali boshqalarga yuborilmagan o'qlar */
@@ -150,6 +152,7 @@ export class PvpRoom {
       a: Math.atan2(this.map.h / 2 - t.y, this.map.w / 2 - t.x),
       until: { shield: t.shieldUntil, speed: 0, rapid: 0, triple: 0 },
       hitUntil: 0,
+      zoneSince: 0,
       shots: new Map(),
       used: new Set(),
       fresh: [],
@@ -231,9 +234,25 @@ export class PvpRoom {
     }
   }
 
-  /** Vaqt o'tishi: yangi sovg'alar */
+  /** Vaqt o'tishi: yangi sovg'alar, toraluvchi zona zarari */
   step(now: number): void {
     if (now < this.startedAt || now > this.endsAt) return;
+    const zone = zoneAt(this.map, this.startedAt, this.endsAt, now);
+    for (const p of this.players.values()) {
+      if (p.out) continue;
+      const z = zoneStep(p.zoneSince, outsideZone(zone, p.x, p.y), now);
+      p.zoneSince = z.since;
+      if (!z.damage || p.lives <= 0) continue;
+      p.lives -= 1;
+      p.hitsTaken += 1;
+      if (p.lives <= 0) {
+        p.out = true;
+        p.outAt = now;
+        p.killedBy = ZONE_KILLER;
+        this.killsDirty = true;
+        this.pushFeed({ at: now, kind: "kill", a: ZONE_KILLER, b: p.name });
+      }
+    }
     if (now >= this.nextPickupAt && this.pickups.length < MAX_PICKUPS) {
       const spot = freeSpot(this.pickups, this.rng, this.map);
       if (spot) {
@@ -300,6 +319,10 @@ export class PvpRoom {
       e: Math.max(0, this.endsAt - now),
       p: peers,
     };
+    if (now >= this.startedAt) {
+      const z = zoneAt(this.map, this.startedAt, this.endsAt, now);
+      msg.z = [Math.round(z.x), Math.round(z.y), Math.round(z.r), Math.round(z.tx), Math.round(z.ty), Math.round(z.tr), z.shrinking ? 1 : 0, z.nextMs];
+    }
     if (shots.length > 0) msg.h = shots;
     if (sent.pickups !== this.pickupsVer) msg.k = this.pickups.map((k) => [k.id, POWER_LIST.indexOf(k.kind), k.x, k.y]);
     if (sent.feed !== this.feedVer) msg.f = this.feed.slice(-8).map((f) => [f.at, f.kind === "kill" ? 0 : 1, f.a, f.b ?? null, f.power ? POWER_LIST.indexOf(f.power) : -1]);
@@ -407,6 +430,7 @@ export function decodeRoomMessage(
     alive: peers.filter((p) => !p.out).length,
     total: peers.length,
     map: (typeof m.mp === "string" ? m.mp : "neon") as MapId,
+    zone: zoneOfMsg(m.z),
   };
   let me: PvpMe | null = null;
   const mm = m.m as (number | string | null)[] | undefined;
@@ -433,4 +457,10 @@ export function decodeRoomMessage(
     };
   }
   return { world, me, accepted: Number(m.ac) || 0, claimed: typeof m.cl === "number" ? POWER_LIST[m.cl] ?? null : null };
+}
+
+function zoneOfMsg(z: unknown): ZoneState | null {
+  if (!Array.isArray(z) || z.length < 8) return null;
+  const [x, y, r, tx, ty, tr, sh, nextMs] = z.map(Number);
+  return { x, y, r, tx, ty, tr, shrinking: sh === 1, nextMs };
 }

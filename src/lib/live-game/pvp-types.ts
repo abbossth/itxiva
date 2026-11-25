@@ -1,7 +1,7 @@
 // "Kiber jang" ko'rinish turlari: server (Vercel), real vaqt xonasi (Cloudflare) va brauzer uchun umumiy.
 // Mongoose'ga bog'liq emas.
 
-import type { MapId, PowerKind } from "./pvp";
+import type { MapId, PowerKind, ZoneState } from "./pvp";
 
 export interface PvpPickup {
   id: number;
@@ -61,6 +61,8 @@ export interface PvpWorld {
   total: number;
   /** Jang xaritasi */
   map: MapId;
+  /** Toraluvchi xavfsiz doira (jang boshlanmaguncha — null) */
+  zone: ZoneState | null;
 }
 
 export interface PvpMe {

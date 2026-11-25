@@ -29,6 +29,42 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-zone-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kiber jang: toraluvchi zona",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🌀",
+        title: "Xavfsiz doira torayadi",
+        text: "Jang davomida binafsha \"bo'ron\" chekkadan yaqinlashadi va xavfsiz doira bosqichma-bosqich kichrayadi. Oq punktir — keyingi doira: oldindan o'sha tomonga yuring!",
+      },
+      {
+        art: "emoji",
+        emoji: "⚠️",
+        title: "Tashqarida qolmang",
+        text: "Doiradan tashqarida har 2,5 soniyada 1 ❤ ketadi — qalqon ham himoya qilmaydi. Ko'rsatkich xavfsiz tomonni ko'rsatadi. Endi chekkada yashirinib vaqt o'tkazib bo'lmaydi!",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-zone-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Kiber jang: toraluvchi zona",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🌀",
+        title: "O'yinchilar oxirida bir joyda to'planadi",
+        text: "Jangning 20% dan keyin xavfsiz doira 3 bosqichda torayadi (oxirgi ~10% da kichik doira). Tashqarida har 2,5 s da 1 jon ketadi; zona yiqitganlar lentada \"⚡ Zona\" deb ko'rinadi. Katta ekranda ham zona chiziladi.",
+      },
+    ],
+  },
+  {
     id: "student-chat-plus-2026-11-25",
     date: "2026-11-25",
     audience: "student",

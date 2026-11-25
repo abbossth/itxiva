@@ -698,3 +698,28 @@ export function spawnForeignShots(
   }
   if (seen.size > 600) for (const [k, at] of seen) if (now - at > 3000) seen.delete(k);
 }
+
+/** Toraluvchi zona (katta ekran uchun): tashqarisi binafsha, chegara va keyingi doira */
+export function drawZone(ctx: CanvasRenderingContext2D, zone: { x: number; y: number; r: number; tx: number; ty: number; tr: number }, t: number, map: { w: number; h: number }) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-600, -600, map.w + 1200, map.h + 1200);
+  ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2, true);
+  ctx.fillStyle = `rgba(147,51,234,${0.2 + Math.sin(t * 2) * 0.04})`;
+  ctx.fill("evenodd");
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = `rgba(216,180,254,${0.75 + Math.sin(t * 6) * 0.2})`;
+  ctx.beginPath();
+  ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
+  ctx.stroke();
+  if (zone.tr < zone.r - 2) {
+    ctx.setLineDash([18, 14]);
+    ctx.lineDashOffset = -t * 30;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath();
+    ctx.arc(zone.tx, zone.ty, zone.tr, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}

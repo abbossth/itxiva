@@ -28,6 +28,7 @@ import {
   spawnForeignShots,
   stepSparks,
   type Spark,
+  drawZone,
 } from "./pvp-draw";
 import { cn, formatNumberUz } from "@/lib/utils";
 
@@ -486,6 +487,7 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
       stepSparks(sparks, dt);
       drawSparks(ctx, sparks);
       drawTop(ctx, t, layers);
+      if (world?.zone) drawZone(ctx, world.zone, t, map);
       for (const p of peers) {
         const s = shown.get(p.id) ?? p;
         nameTag(ctx, `${p.out ? "💀 " : ""}${p.name} · ${p.kills}`, s.x, s.y - PLAYER_R * big - 14, teamColor(p.team) ?? colorFor(p.id), p.lives, p.maxLives, big);

@@ -32,8 +32,11 @@ import {
   stepShots,
   teamColor,
   teleportFrom,
+  ZONE_DAMAGE_MS,
+  outsideZone,
   type PowerKind,
   type Shot,
+  type ZoneState,
 } from "@/lib/live-game/pvp";
 import { playBoom, playCorrectSound, playHurt, playShot, unlockSound } from "@/lib/sound";
 import { haptic } from "@/lib/haptics";
@@ -96,6 +99,8 @@ interface Hud {
   spectating: string | null;
   /** Jamoaviy arena: har jamoaning tirik a'zolari */
   teams: { team: number; alive: number }[];
+  /** Toraluvchi zona: holati va keyingi o'zgarishgacha soniya; o'zi tashqaridami */
+  zone: { shrinking: boolean; s: number; outside: boolean; final: boolean } | null;
   /** Statistika jadvali (Tab bosib turilganda / 📊 tugmasi) — yopiq bo'lsa null */
   board: BoardRow[] | null;
 }
@@ -136,6 +141,7 @@ export function PvpGame({
     spectating: null,
     teams: [],
     board: null,
+    zone: null,
   });
   const myTeam = typeof init.team === "number" ? init.team : -1;
   const [phase, setPhase] = useState<"intro" | "play" | "done">(startsInMs > 0 ? "intro" : "play");
@@ -170,6 +176,16 @@ export function PvpGame({
     let powersAt = performance.now();
     const pos = { x: 0, y: 0, a: 0, ready: false };
     let world: PvpWorld | null = null;
+    // Zona: oxirgi kelgan holat va qachon kelgani — oraliqda torayish brauzerda davom ettiriladi (silliq)
+    let zoneMsg: { z: ZoneState; at: number } | null = null;
+    const zoneNow = (now: number): ZoneState | null => {
+      if (!zoneMsg) return null;
+      const { z, at } = zoneMsg;
+      if (!z.shrinking || z.nextMs <= 0) return z;
+      const u = Math.min(1, (now - at) / z.nextMs);
+      return { ...z, x: z.x + (z.tx - z.x) * u, y: z.y + (z.ty - z.y) * u, r: z.r + (z.tr - z.r) * u, nextMs: Math.max(0, z.nextMs - (now - at)) };
+    };
+    let zoneWarnAt = 0;
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
     const myShots: Shot[] = [];
     const foreign: Shot[] = [];
@@ -368,6 +384,7 @@ export function PvpGame({
       powersAt = performance.now();
       world = data.world;
       const at = performance.now();
+      if (world.zone) zoneMsg = { z: world.zone, at };
       for (const p of world.peers) if (!p.isMe && p.shots.some((sh) => sh.age < 160)) peerFired.set(p.id, at);
       for (const p of world.peers) if (!p.isMe) smooth.push(p.id, at, p.x, p.y, p.a);
       smooth.keep(new Set(world.peers.map((p) => p.id)));
@@ -610,6 +627,49 @@ export function PvpGame({
       for (const s of myShots) drawShot(ctx, s, "#fde047");
       drawSparks(ctx, sparks);
       drawTop(ctx, t, layers);
+      // Toraluvchi zona: tashqarisi binafsha "bo'ron", chegara yonib turadi, keyingi doira — oq punktir
+      const zone = zoneNow(now);
+      if (zone) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-600, -600, map.w + 1200, map.h + 1200);
+        ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2, true);
+        ctx.fillStyle = `rgba(147,51,234,${0.2 + Math.sin(t * 2) * 0.04})`;
+        ctx.fill("evenodd");
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = `rgba(216,180,254,${0.75 + Math.sin(t * 6) * 0.2})`;
+        ctx.shadowColor = "#c084fc";
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        if (zone.tr < zone.r - 2) {
+          ctx.setLineDash([18, 14]);
+          ctx.lineDashOffset = -t * 30;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(255,255,255,0.7)";
+          ctx.beginPath();
+          ctx.arc(zone.tx, zone.ty, zone.tr, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        // Tashqarida bo'lsa — o'zining yonida xavfsiz tomonga ko'rsatkich
+        if (me && pos.ready && !me.out && outsideZone(zone, pos.x, pos.y)) {
+          const ang = Math.atan2(zone.y - pos.y, zone.x - pos.x);
+          ctx.translate(pos.x + Math.cos(ang) * (PLAYER_R + 34), pos.y + Math.sin(ang) * (PLAYER_R + 34));
+          ctx.rotate(ang);
+          ctx.fillStyle = "#f5d0fe";
+          ctx.beginPath();
+          ctx.moveTo(16, 0);
+          ctx.lineTo(-10, -11);
+          ctx.lineTo(-4, 0);
+          ctx.lineTo(-10, 11);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
       // Ismlar — butalar ustida
       for (const p of world?.peers ?? []) {
         if (p.isMe || (!p.out && !vis.has(p.id))) continue;
@@ -658,6 +718,27 @@ export function PvpGame({
         ctx.beginPath();
         ctx.arc(mx0 + pos.x * k, my0 + pos.y * k, 4, 0, Math.PI * 2);
         ctx.fill();
+      }
+      if (zone) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(mx0, my0, mmW, mmH);
+        ctx.clip();
+        ctx.strokeStyle = "#d8b4fe";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mx0 + zone.x * k, my0 + zone.y * k, zone.r * k, 0, Math.PI * 2);
+        ctx.stroke();
+        if (zone.tr < zone.r - 2) {
+          ctx.setLineDash([4, 3]);
+          ctx.strokeStyle = "rgba(255,255,255,0.8)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(mx0 + zone.tx * k, my0 + zone.ty * k, zone.tr * k, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
       }
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.strokeRect(mx0 + (view.cx - halfW) * k, my0 + (view.cy - halfH) * k, halfW * 2 * k, halfH * 2 * k);
@@ -837,6 +918,17 @@ export function PvpGame({
                   .sort((a, b) => a - b)
                   .map((team) => ({ team, alive: (world?.peers ?? []).filter((p) => p.team === team && !p.out).length }))
               : [],
+          zone: (() => {
+            const z = zoneNow(now);
+            if (!z) return null;
+            const outside = Boolean(me && pos.ready && !me.out && outsideZone(z, pos.x, pos.y));
+            // Tashqarida: ogohlantirish (titrash/ovoz bilan) — har zarar oralig'ida bir marta
+            if (outside && now - zoneWarnAt > ZONE_DAMAGE_MS) {
+              zoneWarnAt = now;
+              haptic([30, 40, 30]);
+            }
+            return { shrinking: z.shrinking, s: Math.ceil(z.nextMs / 1000), outside, final: z.nextMs <= 0 };
+          })(),
           board: boardShown
             ? (world?.peers ?? [])
                 .map((p): BoardRow => {
@@ -925,6 +1017,18 @@ export function PvpGame({
           </span>
           <span className={cn("rounded-xl bg-black/55 px-3 py-1.5 font-mono backdrop-blur", hud.left <= 10 && "text-rose-300 quiz-shake")}>{hud.left}s</span>
         </div>
+        {hud.zone && !hud.zone.final && phase === "play" && (
+          <div className="flex w-full justify-center sm:w-auto">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-black backdrop-blur",
+                hud.zone.shrinking ? "bg-fuchsia-600/80 text-white" : "bg-black/55 text-fuchsia-200"
+              )}
+            >
+              🌀 {hud.zone.shrinking ? `Zona torayapti · ${hud.zone.s}s` : `Zona ${hud.zone.s}s dan keyin torayadi`}
+            </span>
+          </div>
+        )}
         {hud.teams.length > 0 && (
           <div className="flex w-full flex-wrap justify-center gap-1.5 text-xs font-black sm:w-auto">
             {hud.teams.map((t) => (
@@ -1033,6 +1137,8 @@ export function PvpGame({
           </p>
           <p className="max-w-md text-xs text-slate-300">
             3 marta o&apos;q yegan o&apos;yindan chiqadi. Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
+            <br />
+            🌀 Vaqt o&apos;tgan sari xavfsiz doira torayadi — tashqarida qolsangiz jon ketadi. Oq punktir — keyingi doira.
           </p>
         </div>
       )}
@@ -1046,6 +1152,15 @@ export function PvpGame({
           >
             {banner.text}
           </span>
+        </div>
+      )}
+      {hud.zone?.outside && phase === "play" && !hud.out && (
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_80px_20px_rgba(168,85,247,0.55)]">
+          <div className="absolute inset-x-0 top-[22%] flex justify-center">
+            <span className="quiz-shake rounded-2xl bg-fuchsia-700/90 px-5 py-2 text-base font-black text-white sm:text-lg">
+              ⚠️ Zonadan tashqaridasiz — doiraga kiring! (har {ZONE_DAMAGE_MS / 1000}s da −1 ❤)
+            </span>
+          </div>
         </div>
       )}
       {hud.out && phase !== "done" && (

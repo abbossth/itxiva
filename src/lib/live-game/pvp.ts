@@ -306,3 +306,106 @@ export function pvpStandings<T extends { lives: number; out: boolean; outAt?: nu
       b.kills - a.kills
   );
 }
+
+// ---- Toraluvchi zona (PUBG uslubida): xarita o'zgarmaydi, XAVFSIZ DOIRA bosqichma-bosqich torayadi ----
+// Doiradan tashqarida har ZONE_DAMAGE_MS da 1 jon ketadi (qalqon himoya qilmaydi) — o'yinchilar chekkada yashirinib
+// vaqt cho'za olmaydi. Doira va keyingi doira jang boshlangan vaqtdan aniq hisoblanadi: server, real vaqt xonasi va
+// brauzer bir xil natija oladi.
+
+export const ZONE_DAMAGE_MS = 2500;
+export const ZONE_FINAL_R = 170;
+/** Bosqichlar (jang davomiyligining ulushi): kutish → torayish; k — boshlang'ich radiusning qancha qismi qoladi */
+export const ZONE_PHASES = [
+  { from: 0.2, to: 0.38, k: 0.62 },
+  { from: 0.5, to: 0.66, k: 0.32 },
+  { from: 0.76, to: 0.9, k: 0 },
+] as const;
+
+export interface ZoneState {
+  /** Hozirgi xavfsiz doira */
+  x: number;
+  y: number;
+  r: number;
+  /** Keyingi doira (torayish shu yerga boradi); oxirgi bosqichdan keyin — hozirgisi bilan bir xil */
+  tx: number;
+  ty: number;
+  tr: number;
+  /** Doira hozir torayapti */
+  shrinking: boolean;
+  /** Keyingi o'zgarishgacha (torayish boshlanishi yoki tugashi), ms; 0 — boshqa o'zgarmaydi */
+  nextMs: number;
+}
+
+/** Oddiy aralashtirish (seed → [0,1)) */
+function seeded(seed: number): number {
+  let h = Math.floor(Math.abs(seed)) % 2147483647 || 1;
+  h = (h * 48271) % 2147483647;
+  h = (h * 48271) % 2147483647;
+  return h / 2147483647;
+}
+
+/** Zonaning boshlang'ich (butun xarita) va oxirgi doirasi */
+export function zonePlan(map: ArenaMap, seed: number) {
+  const cx = map.w / 2;
+  const cy = map.h / 2;
+  const r0 = Math.hypot(map.w, map.h) / 2 + PLAYER_R * 2;
+  // Oxirgi doira markazi — ochiq joylardan biri (sovg'a nuqtalari devorlarda emas)
+  const spots = map.pickups.length ? map.pickups : [{ x: cx, y: cy }];
+  const spot = spots[Math.floor(seeded(seed) * spots.length) % spots.length];
+  // Doiralar bir-birining ichida bo'lsin: oxirgi markaz boshlang'ich markazdan juda uzoq bo'lmasin
+  const maxD = r0 - ZONE_FINAL_R - 40;
+  let fx = spot.x;
+  let fy = spot.y;
+  const d = Math.hypot(fx - cx, fy - cy);
+  if (d > maxD) {
+    fx = cx + ((fx - cx) / d) * maxD;
+    fy = cy + ((fy - cy) / d) * maxD;
+  }
+  return { cx, cy, r0, fx, fy };
+}
+
+function circleOf(plan: ReturnType<typeof zonePlan>, k: number) {
+  // k = 1 — butun xarita, k = 0 — oxirgi doira; markaz radius bilan birga oxirgi nuqtaga siljiydi
+  const t = 1 - k;
+  return { x: plan.cx + (plan.fx - plan.cx) * t, y: plan.cy + (plan.fy - plan.cy) * t, r: ZONE_FINAL_R + (plan.r0 - ZONE_FINAL_R) * k };
+}
+
+export function zoneAt(map: ArenaMap, startedAt: number, endsAt: number, now: number): ZoneState {
+  const plan = zonePlan(map, startedAt);
+  const dur = Math.max(1, endsAt - startedAt);
+  const f = Math.max(0, (now - startedAt) / dur);
+  let k = 1;
+  for (const ph of ZONE_PHASES) {
+    const prevK = k;
+    if (f < ph.from) {
+      const cur = circleOf(plan, prevK);
+      const next = circleOf(plan, ph.k);
+      return { ...cur, tx: next.x, ty: next.y, tr: next.r, shrinking: false, nextMs: Math.round((ph.from - f) * dur) };
+    }
+    if (f < ph.to) {
+      const u = (f - ph.from) / (ph.to - ph.from);
+      const cur = circleOf(plan, prevK + (ph.k - prevK) * u);
+      const next = circleOf(plan, ph.k);
+      return { ...cur, tx: next.x, ty: next.y, tr: next.r, shrinking: true, nextMs: Math.round((ph.to - f) * dur) };
+    }
+    k = ph.k;
+  }
+  const last = circleOf(plan, k);
+  return { ...last, tx: last.x, ty: last.y, tr: last.r, shrinking: false, nextMs: 0 };
+}
+
+export const outsideZone = (z: Pick<ZoneState, "x" | "y" | "r">, x: number, y: number) => (x - z.x) ** 2 + (y - z.y) ** 2 > z.r * z.r;
+
+/**
+ * Zona zarari: tashqarida birinchi marta — hisob boshlanadi, keyin har ZONE_DAMAGE_MS da 1 jon.
+ * `since` — tashqarida bo'lishning boshlanishi yoki oxirgi zarar vaqti (0 — ichkarida).
+ */
+export function zoneStep(since: number, outside: boolean, now: number): { since: number; damage: boolean } {
+  if (!outside) return { since: 0, damage: false };
+  if (!since) return { since: now, damage: false };
+  if (now - since >= ZONE_DAMAGE_MS) return { since: now, damage: true };
+  return { since, damage: false };
+}
+
+/** Lentada zona yiqitganda "kim" o'rnida */
+export const ZONE_KILLER = "⚡ Zona";

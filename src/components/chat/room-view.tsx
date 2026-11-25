@@ -598,7 +598,7 @@ export function RoomView({
           if (el.scrollTop < 80) void loadOlder();
           if (menu) setMenu(null);
         }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-3 py-3 dark:bg-slate-950/40"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-slate-50 px-3 py-3 dark:bg-slate-950/40"
       >
         {messages && hasMore && messages.length >= PAGE && <p className="mb-2 text-center text-[11px] text-slate-400">Oldingi xabarlar uchun tepaga aylantiring</p>}
         {messages === null && (
@@ -974,18 +974,18 @@ const Bubble = memo(function Bubble({
   );
 
   return (
-    <div id={`msg-${m.id}`} className={cn("group flex items-end gap-1 rounded-2xl transition-shadow", mine ? "justify-end" : "justify-start", gapTop ? "mt-2.5" : "mt-0.5")}>
+    <div id={`msg-${m.id}`} className={cn("group flex min-w-0 items-end gap-1 rounded-2xl transition-shadow", mine ? "justify-end" : "justify-start", gapTop ? "mt-2.5" : "mt-0.5")}>
       {mine && !m.deleted && (
         <>
           <MenuButton onOpen={(x, y) => onAction({ t: "menu", m, x, y })} />
           <ReplyButton onReply={() => onAction({ t: "reply", m })} />
         </>
       )}
-      <div className={cn("flex max-w-[78%] flex-col", mine ? "items-end" : "items-start")}>
+      <div className={cn("flex min-w-0 max-w-[78%] flex-col", mine ? "items-end" : "items-start")}>
         <div
           {...handlers}
           className={cn(
-            "relative select-text text-sm",
+            "relative min-w-0 max-w-full select-text text-sm [overflow-wrap:anywhere]",
             bare
               ? "px-1"
               : cn(
@@ -1107,7 +1107,7 @@ function VoicePlayer({ id, duration, mine }: { id: string; duration: number; min
   };
   const total = Math.max(1, duration);
   return (
-    <div className="flex min-w-[190px] items-center gap-2 py-0.5">
+    <div className="flex w-[min(220px,60vw)] items-center gap-2 py-0.5">
       <audio
         ref={ref}
         data-chat-voice

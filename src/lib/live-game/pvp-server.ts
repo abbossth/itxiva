@@ -32,6 +32,10 @@ import {
   spawnPoint,
   teamArenaStandings,
   teamSpawn,
+  outsideZone,
+  zoneAt,
+  zoneStep,
+  ZONE_KILLER,
   type PowerKind,
 } from "./pvp";
 import { isFresh } from "@/lib/utils";
@@ -226,6 +230,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
     alive: peers.filter((p) => !p.out).length,
     total: peers.length,
     map: mapOf(a.map).id,
+    zone: now >= start ? zoneAt(mapOf(a.map), start, new Date(a.endsAt).getTime(), now) : null,
   };
 }
 
@@ -298,6 +303,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
   let kills = 0;
   let claimed: PowerKind | null = null;
   let changed = false;
+  let zoneHurt = false;
   const feed: ILiveArenaFeed[] = [];
 
   if (before) {
@@ -354,6 +360,29 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       }
     }
 
+    // ---- Toraluvchi zona: tashqarida har 2,5 s da 1 jon (qalqon himoya qilmaydi) ----
+    {
+      const zone = zoneAt(map, start, end, now);
+      const z = zoneStep(before.arena!.zoneSince ?? 0, outsideZone(zone, x, y), now);
+      if (z.damage) {
+        const hurt = await LiveGamePlayer.findOneAndUpdate(
+          { _id: meDoc._id, "arena.out": false, "arena.lives": { $gt: 0 } },
+          { $inc: { "arena.lives": -1, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since } },
+          { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
+        ).lean();
+        if (hurt && (hurt.arena?.lives ?? 1) <= 0) {
+          const out = await LiveGamePlayer.updateOne(
+            { _id: hurt._id, "arena.out": false },
+            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": ZONE_KILLER } }
+          );
+          if (out.modifiedCount > 0) feed.push({ at: now, kind: "kill", a: ZONE_KILLER, b: hurt.name });
+        }
+        zoneHurt = true;
+      } else if (z.since !== (before.arena!.zoneSince ?? 0)) {
+        await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.zoneSince": z.since } });
+      }
+    }
+
     // ---- Sovg'ani olish: birinchi yetib kelgan ----
     const claimId = Number(input?.claim);
     if (Number.isInteger(claimId)) {
@@ -391,10 +420,10 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       }
     }
     if (feed.length > 0) await LiveGame.updateOne({ _id: game._id }, { $push: { "arena.feed": { $each: feed, $slice: -20 } } });
-    if (accepted > 0 || claimed || feed.length > 0) invalidatePvp(game._id);
+    if (accepted > 0 || claimed || feed.length > 0 || zoneHurt) invalidatePvp(game._id);
   }
 
-  const fresh = changed && (accepted > 0 || claimed)
+  const fresh = changed && (accepted > 0 || claimed || zoneHurt)
     ? ((await LiveGamePlayer.findById(meDoc._id).select("name studentId arena").lean()) as CachedPlayer | null) ?? meDoc
     : before
     ? { ...meDoc, arena: { ...meDoc.arena!, x: Math.round(x), y: Math.round(y), a: ang, ...(emote !== null ? { emote, emoteAt: now } : {}) } }
