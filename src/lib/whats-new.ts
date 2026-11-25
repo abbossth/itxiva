@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-auto-publish-2026-11-25",
+    date: "2026-11-25",
+    audience: "mentor",
+    badge: "Darslar",
+    title: "Kun darsi o'zi nashr bo'ladi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📅",
+        title: "Dars boshlanishida — vazifa va testi bilan",
+        text: "Dars sanasi bugun bo'lgan qoralama dars guruh jadvalidagi dars boshlanish vaqtida o'zi nashr bo'ladi: uyga vazifasi (muddati kamida bir hafta) va testi ham ochiladi, o'quvchilarga Telegram xabar boradi. Har bir dars bir marta — keyin qoralamaga olsangiz, qayta ochilmaydi. Jonli o'yin yaratishda endi sukut bo'yicha \"Barcha testlardan aralash\" tanlangan (faqat nashr qilingan darslar testlari).",
+      },
+    ],
+  },
+  {
+    id: "student-auto-publish-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Darslar",
+    title: "Dars o'z vaqtida ochiladi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📚",
+        title: "Konspekt, vazifa va test — dars boshlanishida",
+        text: "Har bir dars o'z kunida, dars boshlanishi bilan ochiladi: konspekt (PDF), uyga vazifa va 20 savollik test. Telegram botga ham xabar keladi. Konspektni darsdan keyin qayta o'qib, keyin vazifani bajaring.",
+      },
+    ],
+  },
+  {
     id: "mentor-live-sound-menu-2026-11-23",
     date: "2026-11-23",
     audience: "mentor",

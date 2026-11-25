@@ -40,6 +40,8 @@ export interface ILessonData {
   linkId?: string | mongoose.Types.ObjectId | null;
   /** Topshirilmagan vazifa jarimalari qaysi muddat (`homework.dueAt`) uchun qo'llangan; muddat o'zgarsa qayta tekshiriladi */
   homeworkPenaltyDueAt?: Date | string | null;
+  /** Dars kuni avtomatik nashr qilingan vaqt (bir marta; keyin mentor qoralamaga olsa qayta ochilmaydi) */
+  autoPublishedAt?: Date | string | null;
   isNew?: boolean;
   createdAt?: Date | string;
   updatedAt?: Date | string;
@@ -138,6 +140,7 @@ const LessonSchema = new Schema<ILesson>(
     homework: { type: HomeworkSchema, default: null },
     linkId: { type: Schema.Types.ObjectId, default: null, index: true },
     homeworkPenaltyDueAt: { type: Date, default: null },
+    autoPublishedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

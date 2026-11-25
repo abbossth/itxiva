@@ -8,6 +8,7 @@ import { expireStudentLobbies } from "@/lib/live-game/student-games";
 import { applyGamificationFixes } from "@/lib/gamification-fixes";
 import { connectToDatabase } from "@/lib/db/connect";
 import { applyLessonDateFixes } from "@/lib/lesson-plan-fixes";
+import { autoPublishTodayLessons } from "@/lib/auto-publish";
 
 // Har 5 daqiqada GitHub Actions chaqiradi (.github/workflows/lesson-reminders.yml):
 // Vercel'ning bepul tarifida cron kuniga bir martadan ortiq ishlamaydi.
@@ -48,7 +49,12 @@ export async function GET(req: NextRequest) {
       console.error("Lesson date fix error:", error);
       return null;
     });
-    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames, studentLobbies, gamificationFixes, lessonDateFix });
+    // Kun darsi dars boshlanishida o'quvchilarga ochiladi (vazifasi va testi bilan)
+    const autoPublished = await autoPublishTodayLessons().catch((error) => {
+      console.error("Auto publish error:", error);
+      return null;
+    });
+    return NextResponse.json({ ok: true, lessons, closedSessions, homeworkPenalties, liveGames, studentLobbies, gamificationFixes, lessonDateFix, autoPublished });
   } catch (error) {
     console.error("Reminder cron error:", error);
     return NextResponse.json({ ok: false }, { status: 500 });

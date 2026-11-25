@@ -153,7 +153,8 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [groups, setGroups] = useState<LiveGroupOption[] | null>(null);
   const [groupId, setGroupId] = useState("");
   const [mode, setMode] = useState<LiveGameMode>("classic");
-  const [source, setSource] = useState<LiveGameSource>("today");
+  // Sukutda — barcha (nashr qilingan) dars testlaridan aralash; bugungi dars testi ixtiyoriy
+  const [source, setSource] = useState<LiveGameSource>("all");
   const [count, setCount] = useState(10);
   const [teams, setTeams] = useState(2);
   const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
@@ -174,10 +175,10 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
       }
       setGroups(res.data.groups);
       const first =
-        res.data.groups.find((g) => g.suggested) ?? res.data.groups.find((g) => g.today > 0) ?? res.data.groups.find((g) => g.all > 0) ?? res.data.groups[0];
+        res.data.groups.find((g) => g.suggested) ?? res.data.groups.find((g) => g.all > 0) ?? res.data.groups[0];
       if (first) {
         setGroupId(first.id);
-        setSource(first.today > 0 ? "today" : "all");
+        setSource(first.all > 0 ? "all" : "today");
       }
     });
     return () => {
