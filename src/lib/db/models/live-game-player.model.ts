@@ -154,6 +154,11 @@ export interface ILiveArenaPlayer {
   revTarget?: string | null;
   revSince?: number;
   revives?: number;
+  /** Yiqilgan (jamoaviy jang): HP har BLEED_MS da 1 kamayadi; kim yiqitgani (chiqsa — kill unga) */
+  downed?: boolean;
+  bleedAt?: number;
+  downedBy?: string | null;
+  downedById?: string | null;
   /** Oxirgi otilgan o'qlar (boshqalar ko'rishi va tekkanini tekshirish uchun) */
   shots: ILiveArenaShot[];
   /** Tekkan deb hisoblangan o'qlar (ikki marta hisoblanmasin) */
@@ -312,6 +317,10 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           revTarget: { type: String, default: null },
           revSince: { type: Number, default: 0 },
           revives: { type: Number, default: 0 },
+          downed: { type: Boolean, default: false },
+          bleedAt: { type: Number, default: 0 },
+          downedBy: { type: String, default: null },
+          downedById: { type: String, default: null },
           shots: {
             type: [new Schema({ id: Number, x: Number, y: Number, a: Number, at: Number }, { _id: false })],
             default: [],

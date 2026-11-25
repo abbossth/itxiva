@@ -16,6 +16,8 @@ import {
   mapOf,
   MAX_HP,
   MAX_REVIVES,
+  BLEED_MS,
+  DOWN_HP,
   REVIVE_GRACE_MS,
   REVIVE_HP,
   REVIVE_MS,
@@ -231,6 +233,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
         team: s.team ?? -1,
         emote: (s.emote ?? -1) >= 0 && now - (s.emoteAt ?? 0) < EMOTE_MS ? s.emote ?? -1 : -1,
         revive: reviving.get(String(p._id)) ?? 0,
+        downed: Boolean(s.downed) && !s.out,
       };
     });
   return {
@@ -262,6 +265,7 @@ export function pvpMeOf(p: CachedPlayer, now = Date.now()): PvpMe {
     lives: s.lives,
     maxLives: s.maxLives,
     out: s.out,
+    downed: Boolean(s.downed) && !s.out,
     killedBy: s.killedBy ?? null,
     kills: s.kills,
     hits: s.hits,
@@ -281,6 +285,74 @@ export async function watchPvp(gameId: Id): Promise<PvpWorld | null> {
 }
 
 // ---- Bir qadam ----
+
+// ---- Jamoaviy jang: yiqilish (HTTP yo'li; real vaqt xonasidagi qoidalar bilan bir xil) ----
+
+const VICTIM_FIELDS = { name: 1, "arena.lives": 1, "arena.downed": 1, "arena.team": 1, "arena.revives": 1, "arena.downedBy": 1, "arena.downedById": 1, "arena.out": 1 } as const;
+type Victim = { _id: mongoose.Types.ObjectId; name: string; arena?: { lives: number; downed?: boolean; team?: number; revives?: number; downedBy?: string | null; downedById?: string | null; out?: boolean } | null };
+
+/** Jamoasida tik turgan (yiqilmagan, chiqmagan) boshqa o'yinchi bormi */
+const teamStanding = (players: CachedPlayer[], id: string, team: number) =>
+  players.some((p) => String(p._id) !== id && p.arena && (p.arena.team ?? -1) === team && !p.arena.out && !p.arena.downed);
+
+/** Chiqarish: kill yiqitganga (bo'lsa), aks holda oxirgi zarar berganga */
+async function eliminate(v: Victim, now: number, by: { id: string | null; name: string }): Promise<{ feed: ILiveArenaFeed[]; creditId: string | null }> {
+  const killerName = v.arena?.downedBy ?? by.name;
+  const creditId = v.arena?.downedById ?? by.id;
+  const out = await LiveGamePlayer.updateOne(
+    { _id: v._id, "arena.out": false },
+    { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": killerName, "arena.lives": 0, "arena.downed": false, "arena.revTarget": null } }
+  );
+  if (out.modifiedCount === 0) return { feed: [], creditId: null };
+  return { feed: [{ at: now, kind: "kill", a: killerName, b: v.name }], creditId };
+}
+
+/** Zarardan keyin: yiqiladi (jamoaviy, HP ≤ 10) yoki chiqadi (HP 0) */
+async function afterDamage(players: CachedPlayer[], v: Victim, now: number, by: { id: string | null; name: string }): Promise<{ feed: ILiveArenaFeed[]; killedByMe: boolean }> {
+  const s = v.arena;
+  if (!s || s.out) return { feed: [], killedByMe: false };
+  const team = s.team ?? -1;
+  if (!s.downed && team >= 0 && s.lives <= DOWN_HP && (s.revives ?? 0) < MAX_REVIVES && teamStanding(players, String(v._id), team)) {
+    await LiveGamePlayer.updateOne(
+      { _id: v._id, "arena.out": false, "arena.downed": { $ne: true } },
+      { $set: { "arena.downed": true, "arena.lives": DOWN_HP, "arena.bleedAt": now, "arena.downedBy": by.name, "arena.downedById": by.id, "arena.revTarget": null } }
+    );
+    return { feed: [{ at: now, kind: "down", a: by.name, b: v.name }], killedByMe: false };
+  }
+  if (s.lives > 0) return { feed: [], killedByMe: false };
+  const r = await eliminate(v, now, by);
+  // Kill boshqa o'yinchiga (uni yiqitganga) yoziladigan bo'lsa — o'sha yerda qo'shiladi
+  if (r.creditId && r.creditId !== by.id) await LiveGamePlayer.updateOne({ _id: r.creditId }, { $inc: { "arena.kills": 1 } });
+  return { feed: r.feed, killedByMe: Boolean(r.creditId) && r.creditId === by.id };
+}
+
+/** Yiqilganlar: HP har soniyada 1 kamayadi; jamoasida tik turgan qolmasa — darhol chiqadi */
+async function processDowned(players: CachedPlayer[], now: number): Promise<ILiveArenaFeed[]> {
+  const feed: ILiveArenaFeed[] = [];
+  for (const p of players) {
+    const s = p.arena;
+    if (!s || s.out || !s.downed) continue;
+    const v = { _id: p._id, name: p.name, arena: s } as Victim;
+    if (!teamStanding(players, String(p._id), s.team ?? -1)) {
+      const r = await eliminate(v, now, { id: null, name: s.downedBy ?? "?" });
+      if (r.creditId) await LiveGamePlayer.updateOne({ _id: r.creditId }, { $inc: { "arena.kills": 1 } });
+      feed.push(...r.feed);
+      continue;
+    }
+    const steps = Math.floor((now - (s.bleedAt ?? now)) / BLEED_MS);
+    if (steps <= 0) continue;
+    const lives = s.lives - steps;
+    if (lives <= 0) {
+      const r = await eliminate(v, now, { id: null, name: s.downedBy ?? "?" });
+      if (r.creditId) await LiveGamePlayer.updateOne({ _id: r.creditId }, { $inc: { "arena.kills": 1 } });
+      feed.push(...r.feed);
+    } else {
+      // Shartli: bir vaqtdagi ikki so'rov HP ni ikki marta kamaytirmasin
+      await LiveGamePlayer.updateOne({ _id: p._id, "arena.bleedAt": s.bleedAt, "arena.downed": true }, { $set: { "arena.lives": lives, "arena.bleedAt": (s.bleedAt ?? now) + steps * BLEED_MS } });
+    }
+  }
+  return feed;
+}
 
 export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInput): Promise<PvpTickResult | null> {
   const a = game.arena!;
@@ -325,8 +397,13 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
   if (before) {
     changed = true;
     const players = await loadPlayers(game._id);
+    // ---- Yiqilganlar: HP kamayishi, jamoasi qolmasa — chiqish ----
+    feed.push(...(await processDowned(players, now)));
+    // Yiqilgan o'zi: ota olmaydi, sovg'a ololmaydi, qutqara olmaydi
+    const iAmDown = Boolean(before.arena!.downed);
+
     // ---- Tekkizishlar ----
-    const hits = (Array.isArray(input?.hits) ? input.hits : []).slice(0, 8);
+    const hits = iAmDown ? [] : (Array.isArray(input?.hits) ? input.hits : []).slice(0, 8);
     if (hits.length > 0) {
       const recent = new Map<number, { x: number; y: number }>();
       // Sekin internetda tekkani kechroq keladi — shuning uchun 3 soniyalik oyna
@@ -353,20 +430,13 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
             "arena.hitUntil": { $lt: now },
           },
           { $inc: { "arena.lives": -hitDamage(before.arena!.weapon), "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS, "arena.revTarget": null } },
-          { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
+          { returnDocument: "after", projection: VICTIM_FIELDS }
         ).lean();
         if (!hit) continue;
         accepted++;
-        if ((hit.arena?.lives ?? 1) <= 0) {
-          const out = await LiveGamePlayer.updateOne(
-            { _id: hit._id, "arena.out": false },
-            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": meDoc.name, "arena.lives": 0 } }
-          );
-          if (out.modifiedCount > 0) {
-            kills++;
-            feed.push({ at: now, kind: "kill", a: meDoc.name, b: hit.name });
-          }
-        }
+        const res = await afterDamage(players, hit as Victim, now, { id: meId, name: meDoc.name });
+        if (res.killedByMe) kills++;
+        feed.push(...res.feed);
       }
       if (spent.length > 0) {
         await LiveGamePlayer.updateOne(
@@ -384,15 +454,9 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
         const hurt = await LiveGamePlayer.findOneAndUpdate(
           { _id: meDoc._id, "arena.out": false, "arena.lives": { $gt: 0 } },
           { $inc: { "arena.lives": -ZONE_DAMAGE, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since, "arena.revTarget": null } },
-          { returnDocument: "after", projection: { name: 1, "arena.lives": 1 } }
+          { returnDocument: "after", projection: VICTIM_FIELDS }
         ).lean();
-        if (hurt && (hurt.arena?.lives ?? 1) <= 0) {
-          const out = await LiveGamePlayer.updateOne(
-            { _id: hurt._id, "arena.out": false },
-            { $set: { "arena.out": true, "arena.outAt": now, "arena.killedBy": ZONE_KILLER, "arena.lives": 0 } }
-          );
-          if (out.modifiedCount > 0) feed.push({ at: now, kind: "kill", a: ZONE_KILLER, b: hurt.name });
-        }
+        if (hurt) feed.push(...(await afterDamage(players, hurt as Victim, now, { id: null, name: ZONE_KILLER })).feed);
         zoneHurt = true;
       } else if (z.since !== (before.arena!.zoneSince ?? 0)) {
         await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.zoneSince": z.since } });
@@ -401,19 +465,19 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
 
     // ---- Tiriltirish (jamoaviy): yiqilgan jamoadosh yonida tugma bosib turiladi ----
     {
-      const rvId = typeof input?.rv === "string" ? input.rv : null;
+      const rvId = !iAmDown && typeof input?.rv === "string" ? input.rv : null;
       const t = rvId ? players.find((pl) => String(pl._id) === rvId) : null;
       const ok =
-        t?.arena && t.arena.out && String(t._id) !== meId && sameTeam(before.arena!.team, t.arena.team) && (t.arena.revives ?? 0) < MAX_REVIVES && Math.hypot(t.arena.x - x, t.arena.y - y) <= REVIVE_R;
+        !before.arena!.downed && t?.arena && t.arena.downed && !t.arena.out && String(t._id) !== meId && sameTeam(before.arena!.team, t.arena.team) && Math.hypot(t.arena.x - x, t.arena.y - y) <= REVIVE_R;
       const cur = before.arena!.revTarget ?? null;
       if (ok && t) {
         if (cur !== rvId) {
           await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.revTarget": rvId, "arena.revSince": now } });
         } else if (now - (before.arena!.revSince ?? now) >= REVIVE_MS) {
           const up = await LiveGamePlayer.updateOne(
-            { _id: t._id, "arena.out": true, "arena.revives": { $lt: MAX_REVIVES } },
+            { _id: t._id, "arena.out": false, "arena.downed": true },
             {
-              $set: { "arena.out": false, "arena.outAt": null, "arena.killedBy": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0 },
+              $set: { "arena.downed": false, "arena.downedBy": null, "arena.downedById": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0 },
               $inc: { "arena.revives": 1 },
             }
           );
@@ -429,7 +493,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
     }
 
     // ---- Sovg'ani olish: birinchi yetib kelgan ----
-    const claimId = Number(input?.claim);
+    const claimId = iAmDown ? NaN : Number(input?.claim);
     if (Number.isInteger(claimId)) {
       const pick = (a.pickups ?? []).find((p) => p.id === claimId);
       if (pick && Math.hypot(pick.x - x, pick.y - y) <= PICKUP_R + PLAYER_R + 50) {
@@ -570,7 +634,7 @@ export async function applyRoomResults(raw: string, sig: string | null): Promise
   }
   const feed = (Array.isArray(body.feed) ? body.feed : []).slice(-20).map((f) => ({
     at: n(f.at, 0, Number.MAX_SAFE_INTEGER),
-    kind: f.kind === "kill" ? "kill" : f.kind === "revive" ? "revive" : "pickup",
+    kind: f.kind === "kill" ? "kill" : f.kind === "revive" ? "revive" : f.kind === "down" ? "down" : "pickup",
     a: String(f.a ?? "").slice(0, 80),
     b: f.b ? String(f.b).slice(0, 80) : null,
     power: f.power ? String(f.power).slice(0, 12) : null,

@@ -182,12 +182,12 @@ describe("jamoaviy arena", () => {
     expect((await LiveGamePlayer.findById(foe._id).lean())?.arena?.lives).toBeLessThanOrEqual(foe.arena!.lives - 16);
 
     // Tiriltirish (HTTP yo'li): yiqilgan jamoadosh yonida 3 s bosib turiladi
-    await LiveGamePlayer.updateOne({ _id: mate._id }, { $set: { "arena.out": true, "arena.lives": 0, "arena.x": 430, "arena.y": 400 } });
+    await LiveGamePlayer.updateOne({ _id: mate._id }, { $set: { "arena.downed": true, "arena.bleedAt": Date.now() + 60_000, "arena.lives": 10, "arena.x": 430, "arena.y": 400 } });
     tick(1000);
     await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
     tick(REVIVE_MS + 10);
     await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
-    expect((await LiveGamePlayer.findById(mate._id).lean())?.arena).toMatchObject({ out: false, lives: REVIVE_HP, revives: 1 });
+    expect((await LiveGamePlayer.findById(mate._id).lean())?.arena).toMatchObject({ out: false, downed: false, lives: REVIVE_HP, revives: 1 });
 
     // 1-jamoa butunlay yiqildi — 0-jamoa g'olib
     await LiveGamePlayer.updateMany({ gameId: id, team: 1 }, { $set: { "arena.out": true, "arena.lives": 0 } });

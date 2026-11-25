@@ -29,6 +29,27 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-knockdown-2026-11-25",
+    date: "2026-11-25",
+    audience: "student",
+    badge: "Yangi",
+    title: "Jamoaviy jang: yiqilish va qutqarish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🩸",
+        title: "HP 10 da yiqilasiz",
+        text: "Jamoaviy jangda HP 10 ga tushsa — o'lmaysiz, yiqilasiz: sekin sudralasiz, ota olmaysiz, HP har soniyada kamayadi. 10 soniyada qutqarilmasangiz — chiqasiz.",
+      },
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "Jamoadoshni qutqaring",
+        text: "Yiqilgan jamoadosh yoniga boring va F ni (telefonda 🩹) 3 soniya bosib turing — u 50 HP bilan turadi. Butun jamoa yiqilsa — hammasi chiqadi, shuning uchun bir-biringizni himoya qiling!",
+      },
+    ],
+  },
+  {
     id: "student-arena-hp-revive-2026-11-25",
     date: "2026-11-25",
     audience: "student",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PvpRoom, decodeRoomMessage, newClientState } from "@/lib/live-game/pvp-room";
 import { signTicket, verifyTicket, hmacSign, hmacVerify, type ArenaTicket } from "@/lib/live-game/arena-token";
-import { HIT_GRACE_MS, PICKUP_EVERY_MS, REVIVE_HP, REVIVE_MS } from "@/lib/live-game/pvp";
+import { BLEED_MS, DOWN_HP, HIT_GRACE_MS, PICKUP_EVERY_MS, REVIVE_HP, REVIVE_MS } from "@/lib/live-game/pvp";
 
 const START = 1_000_000;
 // 48 HP: Lazer-1 (16 zarar) bilan aynan 3 o'qda yiqiladi
@@ -183,37 +183,71 @@ describe("xaritalar va reaksiyalar", () => {
   });
 });
 
-describe("jamoaviy xona: tiriltirish", () => {
-  it("yiqilgan jamoadosh yonida 3 s bosib turilsa tiriladi; uzoqlashsa yoki o'q tegsa — qaytadan; raqibni tiriltirib bo'lmaydi", () => {
+describe("jamoaviy xona: yiqilish va qutqarish", () => {
+  const setup = () => {
     const room = new PvpRoom("g", 4, START, START + 120_000, () => 0.5);
     const mk = (p: string, x: number, team: number, lives = 48) =>
       room.join({ p, n: p.toUpperCase(), skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives, maxLives: 100, x, y: 300, shieldUntil: 0, team });
     mk("ali", 300, 0);
-    mk("olim", 340, 0, 16);
+    mk("olim", 340, 0, 20);
     mk("vali", 700, 1);
-    // Vali Olimni yiqitadi
-    room.input("vali", { x: 700, y: 300, shots: [{ id: 1, x: 360, y: 300, a: 3.14 }], hits: [{ target: "olim", shot: 1 }] }, START + 1000);
-    expect(room.players.get("olim")!.out).toBe(true);
-    // Raqib tiriltira olmaydi
-    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1100);
-    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1100 + REVIVE_MS);
-    expect(room.players.get("olim")!.out).toBe(true);
+    let sid = 1;
+    const shoot = (from: string, to: string, now: number) => {
+      const f = room.players.get(from)!;
+      room.input(from, { x: f.x, y: f.y, shots: [{ id: sid, x: f.x, y: 300, a: 0 }], hits: [{ target: to, shot: sid }] }, now);
+      sid++;
+    };
+    return { room, shoot };
+  };
+
+  it("HP 10 ga tushsa yiqiladi: ota olmaydi; raqib qutqara olmaydi; jamoadosh 3 s bosib tursa 50 HP bilan turadi, o'q tegsa — qaytadan", () => {
+    const { room, shoot } = setup();
+    shoot("vali", "olim", START + 1000);
+    const olim = room.players.get("olim")!;
+    expect(olim).toMatchObject({ downed: true, out: false, lives: DOWN_HP });
+    expect(room.feed.at(-1)).toMatchObject({ kind: "down", a: "VALI", b: "OLIM" });
+    // Yiqilgan ota olmaydi
+    shoot("olim", "vali", START + 1100);
+    expect(room.players.get("vali")!.lives).toBe(48);
+    // Raqib qutqara olmaydi
+    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1200);
+    room.input("vali", { x: 360, y: 300, rv: "olim" }, START + 1200 + REVIVE_MS);
+    expect(olim.downed).toBe(true);
     // Ali boshlaydi, o'q yeydi — qaytadan
     room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000);
-    room.input("vali", { x: 700, y: 300, shots: [{ id: 2, x: 330, y: 300, a: 3.14 }], hits: [{ target: "ali", shot: 2 }] }, START + 3000);
+    shoot("vali", "ali", START + 3000);
     room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000 + REVIVE_MS);
-    expect(room.players.get("olim")!.out).toBe(true);
-    // Yangidan 3 s
-    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 6000 + REVIVE_MS + 1);
-    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 6000 + REVIVE_MS * 2 + 2);
-    expect(room.players.get("olim")).toMatchObject({ out: false, lives: REVIVE_HP, revives: 1, killedBy: null });
+    expect(olim.downed).toBe(true);
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 5000 + REVIVE_MS + 1);
+    expect(olim).toMatchObject({ downed: false, out: false, lives: REVIVE_HP, revives: 1 });
     expect(room.feed.at(-1)).toMatchObject({ kind: "revive", a: "ALI", b: "OLIM" });
-    // Kadrda tiriltirish jarayoni ko'rinadi
-    room.players.get("olim")!.out = true;
-    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 20_000);
+  });
+
+  it("qutqarilmasa HP har soniyada kamayadi va chiqadi — kill yiqitganga; kadrda yiqilgani va qutqarish % ko'rinadi", () => {
+    const { room, shoot } = setup();
+    shoot("vali", "olim", START + 1000);
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 1100);
     const st = newClientState();
     decodeRoomMessage(room.rosterMessage(), st, "olim", null);
-    const d = decodeRoomMessage(room.frame(START + 20_000 + REVIVE_MS / 2, "olim", { pickups: 0, feed: 0 }), st, "olim", null)!;
-    expect(d.world.peers.find((p) => p.id === "olim")!.revive).toBe(50);
+    const d = decodeRoomMessage(room.frame(START + 1100 + REVIVE_MS / 2, "olim", { pickups: 0, feed: 0 }), st, "olim", { weapon: "Lazer-1", cooldown: 0.36, name: "OLIM", skin: "bolt" })!;
+    expect(d.world.peers.find((p) => p.id === "olim")).toMatchObject({ downed: true, revive: 50 });
+    expect(d.me).toMatchObject({ downed: true, lives: DOWN_HP });
+    room.input("ali", { x: 900, y: 300 }, START + 1200); // ketib qoldi
+    room.step(START + 1000 + BLEED_MS * 5);
+    expect(room.players.get("olim")!.lives).toBe(DOWN_HP - 5);
+    room.step(START + 1000 + BLEED_MS * DOWN_HP);
+    expect(room.players.get("olim")).toMatchObject({ out: true, downed: false, killedBy: "VALI" });
+    expect(room.players.get("vali")!.kills).toBe(1);
+  });
+
+  it("jamoasida tik turgan qolmasa — yiqilmaydi, chiqadi; yiqilganlar ham chiqadi", () => {
+    const { room, shoot } = setup();
+    shoot("vali", "olim", START + 1000); // olim yiqildi (ali tik)
+    room.players.get("ali")!.lives = 10;
+    shoot("vali", "ali", START + 2000); // ali: jamoada tik turgan yo'q — darhol chiqadi
+    expect(room.players.get("ali")).toMatchObject({ out: true, killedBy: "VALI" });
+    room.step(START + 2100);
+    expect(room.players.get("olim")).toMatchObject({ out: true, killedBy: "VALI" });
+    expect(room.players.get("vali")!.kills).toBe(2);
   });
 });

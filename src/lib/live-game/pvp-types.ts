@@ -41,11 +41,13 @@ export interface PvpPeer {
   emote: number;
   /** Yiqilgan o'yinchini hozir tiriltirishyapti: 0–100 (%) */
   revive?: number;
+  /** Jamoaviy jang: yiqilgan (sekin, ota olmaydi, HP kamayib boradi) */
+  downed?: boolean;
 }
 
 export interface PvpFeedView {
   key: string;
-  kind: "kill" | "pickup" | "revive";
+  kind: "kill" | "pickup" | "revive" | "down";
   a: string;
   b: string | null;
   power: PowerKind | null;
@@ -76,6 +78,8 @@ export interface PvpMe {
   lives: number;
   maxLives: number;
   out: boolean;
+  /** Yiqilgan (jamoaviy jang) */
+  downed?: boolean;
   killedBy: string | null;
   kills: number;
   hits: number;

@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, EMOTES, EMOTE_MS, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -55,6 +55,10 @@ export interface RoomPlayer {
   rev: { target: string; since: number } | null;
   /** Necha marta tiriltirilgan */
   revives: number;
+  /** Yiqilgan: HP kamayib boradi; kim yiqitgan (chiqsa — kill unga) */
+  downed: boolean;
+  bleedAt: number;
+  downedBy: string | null;
   shots: Map<number, { x: number; y: number; a: number; at: number }>;
   used: Set<number>;
   /** Hali boshqalarga yuborilmagan o'qlar */
@@ -66,7 +70,7 @@ export interface RoomPlayer {
 
 export interface RoomFeed {
   at: number;
-  kind: "kill" | "pickup" | "revive";
+  kind: "kill" | "pickup" | "revive" | "down";
   a: string;
   b?: string | null;
   power?: PowerKind | null;
@@ -159,6 +163,9 @@ export class PvpRoom {
       zoneSince: 0,
       rev: null,
       revives: 0,
+      downed: false,
+      bleedAt: 0,
+      downedBy: null,
       shots: new Map(),
       used: new Set(),
       fresh: [],
@@ -176,6 +183,51 @@ export class PvpRoom {
     this.feedVer++;
   }
 
+  /** Jamoasida tik turgan (yiqilmagan, chiqmagan) boshqa o'yinchi bormi */
+  private teamStanding(p: RoomPlayer): boolean {
+    for (const o of this.players.values()) if (o !== p && o.team === p.team && !o.out && !o.downed) return true;
+    return false;
+  }
+
+  /** O'yinchini chiqaradi; yiqitgan bo'lsa — kill o'shanga */
+  private eliminate(t: RoomPlayer, now: number, killer: RoomPlayer | null, killerName: string | null) {
+    t.out = true;
+    t.downed = false;
+    t.lives = 0;
+    t.outAt = now;
+    t.rev = null;
+    const byName = killerName ?? killer?.name ?? t.downedBy;
+    t.killedBy = byName ?? null;
+    // Yiqilgan holda chiqsa — kill uni yiqitganga
+    const k = t.downedBy ? [...this.players.values()].find((o) => o.name === t.downedBy && o.id !== t.id) ?? killer : killer;
+    if (k) k.kills += 1;
+    t.downedBy = null;
+    this.killsDirty = true;
+    this.pushFeed({ at: now, kind: "kill", a: byName ?? "?", b: t.name });
+  }
+
+  /** Zarar: jamoaviy jangda HP 10 ga tushsa — yiqiladi (jamoasida tik turgan bo'lsa va qutqarishlar tugamagan bo'lsa) */
+  private damage(t: RoomPlayer, dmg: number, now: number, by: RoomPlayer | null, byName: string | null) {
+    t.rev = null;
+    if (t.downed) {
+      t.lives = Math.max(0, t.lives - dmg);
+      if (t.lives <= 0) this.eliminate(t, now, by, byName);
+      return;
+    }
+    const left = t.lives - dmg;
+    if (t.team >= 0 && left <= DOWN_HP && t.revives < MAX_REVIVES && this.teamStanding(t)) {
+      t.lives = DOWN_HP;
+      t.downed = true;
+      t.bleedAt = now;
+      t.downedBy = byName ?? by?.name ?? null;
+      for (const o of this.players.values()) if (o.rev?.target === t.id) o.rev = null;
+      this.pushFeed({ at: now, kind: "down", a: t.downedBy ?? "?", b: t.name });
+      return;
+    }
+    t.lives = Math.max(0, left);
+    if (t.lives <= 0) this.eliminate(t, now, by, byName);
+  }
+
   /** O'yinchidan kelgan holat: joy, otilgan o'qlar, tekkizishlar, sovg'a */
   input(id: string, inp: PvpTickInput, now: number): void {
     const p = this.players.get(id);
@@ -190,6 +242,11 @@ export class PvpRoom {
       p.emoteAt = now;
     }
 
+    // Yiqilgan: faqat sudraladi — ota olmaydi, sovg'a ololmaydi, qutqara olmaydi
+    if (p.downed) {
+      p.rev = null;
+      return;
+    }
     for (const s of (Array.isArray(inp?.shots) ? inp.shots : []).slice(0, 10)) {
       if (!Number.isInteger(s?.id) || p.shots.has(s.id)) continue;
       const shot = { id: s.id, x: num(s.x, 0, this.map.w, p.x), y: num(s.y, 0, this.map.h, p.y), a: num(s.a, -7, 7, 0), at: now };
@@ -208,30 +265,20 @@ export class PvpRoom {
       p.used.add(sid);
       if (p.used.size > 500) p.used = new Set([...p.used].slice(-200));
       if (t.lives <= 0 || t.until.shield >= now || t.hitUntil >= now) continue;
-      t.lives = Math.max(0, t.lives - hitDamage(p.weapon));
-      t.rev = null;
       t.hitsTaken += 1;
       t.hitUntil = now + HIT_GRACE_MS;
       p.hits += 1;
       p.accepted += 1;
-      if (t.lives <= 0) {
-        t.out = true;
-        t.outAt = now;
-        t.killedBy = p.name;
-        p.kills += 1;
-        this.killsDirty = true;
-        this.pushFeed({ at: now, kind: "kill", a: p.name, b: t.name });
-      }
+      this.damage(t, hitDamage(p.weapon), now, p, p.name);
     }
 
     // ---- Tiriltirish: yiqilgan jamoadosh yonida tugma bosib turiladi ----
     const rv = typeof inp?.rv === "string" ? this.players.get(inp.rv) : null;
-    if (rv && rv.out && rv.id !== p.id && sameTeam(p.team, rv.team) && rv.revives < MAX_REVIVES && Math.hypot(rv.x - p.x, rv.y - p.y) <= REVIVE_R) {
+    if (!p.downed && rv && rv.downed && !rv.out && rv.id !== p.id && sameTeam(p.team, rv.team) && Math.hypot(rv.x - p.x, rv.y - p.y) <= REVIVE_R) {
       if (p.rev?.target !== rv.id) p.rev = { target: rv.id, since: now };
       else if (now - p.rev.since >= REVIVE_MS) {
-        rv.out = false;
-        rv.outAt = null;
-        rv.killedBy = null;
+        rv.downed = false;
+        rv.downedBy = null;
         rv.lives = REVIVE_HP;
         rv.revives += 1;
         rv.hitUntil = now + REVIVE_GRACE_MS;
@@ -267,16 +314,22 @@ export class PvpRoom {
       if (p.out) continue;
       const z = zoneStep(p.zoneSince, outsideZone(zone, p.x, p.y), now);
       p.zoneSince = z.since;
-      if (!z.damage || p.lives <= 0) continue;
-      p.lives = Math.max(0, p.lives - ZONE_DAMAGE);
-      p.rev = null;
-      p.hitsTaken += 1;
-      if (p.lives <= 0) {
-        p.out = true;
-        p.outAt = now;
-        p.killedBy = ZONE_KILLER;
-        this.killsDirty = true;
-        this.pushFeed({ at: now, kind: "kill", a: ZONE_KILLER, b: p.name });
+      if (z.damage && p.lives > 0) {
+        p.hitsTaken += 1;
+        this.damage(p, ZONE_DAMAGE, now, null, ZONE_KILLER);
+      }
+    }
+    // Yiqilganlar: HP har soniyada 1 kamayadi; jamoasida tik turgan qolmasa — darhol chiqadi
+    for (const p of this.players.values()) {
+      if (p.out || !p.downed) continue;
+      if (!this.teamStanding(p)) {
+        this.eliminate(p, now, null, null);
+        continue;
+      }
+      while (p.downed && !p.out && now - p.bleedAt >= BLEED_MS) {
+        p.bleedAt += BLEED_MS;
+        p.lives -= 1;
+        if (p.lives <= 0) this.eliminate(p, now, null, null);
       }
     }
     if (now >= this.nextPickupAt && this.pickups.length < MAX_PICKUPS) {
@@ -335,7 +388,7 @@ export class PvpRoom {
       reviving.set(p.rev.target, Math.max(reviving.get(p.rev.target) ?? 0, pct));
     }
     const peers = [...this.players.values()].map((p) => {
-      let flags = (p.out ? 1 : 0) | (p.until.shield > now ? 2 : 0);
+      let flags = (p.out ? 1 : 0) | (p.until.shield > now ? 2 : 0) | (p.downed ? 128 : 0);
       TIMED.forEach((k, j) => {
         if (k !== "shield" && p.until[k] > now) flags |= 4 << j;
       });
@@ -358,10 +411,10 @@ export class PvpRoom {
     }
     if (shots.length > 0) msg.h = shots;
     if (sent.pickups !== this.pickupsVer) msg.k = this.pickups.map((k) => [k.id, POWER_LIST.indexOf(k.kind), k.x, k.y]);
-    if (sent.feed !== this.feedVer) msg.f = this.feed.slice(-8).map((f) => [f.at, f.kind === "kill" ? 0 : f.kind === "revive" ? 2 : 1, f.a, f.b ?? null, f.power ? POWER_LIST.indexOf(f.power) : -1]);
+    if (sent.feed !== this.feedVer) msg.f = this.feed.slice(-8).map((f) => [f.at, f.kind === "kill" ? 0 : f.kind === "revive" ? 2 : f.kind === "down" ? 3 : 1, f.a, f.b ?? null, f.power ? POWER_LIST.indexOf(f.power) : -1]);
     const me = forId ? this.players.get(forId) : null;
     if (me) {
-      msg.m = [me.lives, me.maxLives, me.out ? 1 : 0, me.kills, me.hits, ...TIMED.map((k) => Math.max(0, me.until[k] - now)), me.killedBy];
+      msg.m = [me.lives, me.maxLives, me.out ? 1 : 0, me.kills, me.hits, ...TIMED.map((k) => Math.max(0, me.until[k] - now)), me.killedBy, me.downed ? 1 : 0];
       if (me.accepted) msg.ac = me.accepted;
       if (me.claimed) msg.cl = POWER_LIST.indexOf(me.claimed);
     }
@@ -419,7 +472,7 @@ export function decodeRoomMessage(
   if (m.f) st.feedRaw = m.f as RoomClientState["feedRaw"];
   st.feed = [...st.feedRaw]
     .reverse()
-    .map(([at, kind, a, b, power]) => ({ key: `${at}:${kind}:${a}:${b ?? power}`, kind: kind === 0 ? ("kill" as const) : kind === 2 ? ("revive" as const) : ("pickup" as const), a, b, power: power >= 0 ? POWER_LIST[power] : null, ago: now - at }));
+    .map(([at, kind, a, b, power]) => ({ key: `${at}:${kind}:${a}:${b ?? power}`, kind: kind === 0 ? ("kill" as const) : kind === 2 ? ("revive" as const) : kind === 3 ? ("down" as const) : ("pickup" as const), a, b, power: power >= 0 ? POWER_LIST[power] : null, ago: now - at }));
   const shotsBy = new Map<number, PvpPeer["shots"]>();
   for (const [i, id, x, y, a, age] of (m.h as number[][] | undefined) ?? []) {
     const list = shotsBy.get(i) ?? [];
@@ -452,6 +505,7 @@ export function decodeRoomMessage(
       team: r.team,
       emote: typeof emote === "number" ? emote : -1,
       revive: typeof revive === "number" ? revive : 0,
+      downed: Boolean(flags & 128),
     });
   }
   const world: PvpWorld = {
@@ -470,7 +524,7 @@ export function decodeRoomMessage(
   const mm = m.m as (number | string | null)[] | undefined;
   const mine = peers.find((p) => p.isMe);
   if (mm && meId && meBase) {
-    const [lives, maxLives, out, kills, hits, shield, speed, rapid, triple, killedBy] = mm;
+    const [lives, maxLives, out, kills, hits, shield, speed, rapid, triple, killedBy, downed] = mm;
     me = {
       id: meId,
       name: meBase.name,
@@ -480,6 +534,7 @@ export function decodeRoomMessage(
       lives: Number(lives),
       maxLives: Number(maxLives),
       out: Boolean(out),
+      downed: downed === 1,
       killedBy: (killedBy as string | null) ?? null,
       kills: Number(kills),
       hits: Number(hits),
