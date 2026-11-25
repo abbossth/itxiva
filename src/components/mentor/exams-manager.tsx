@@ -113,7 +113,7 @@ export function ExamsManager({ initialExams, activeQuarter }: ExamsManagerProps)
     <div className="space-y-6">
       {/* Quarter filter buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 max-w-full flex-wrap">
           {([1, 2, 3, 4] as const).map((q) => (
             <button
               key={q}

@@ -98,7 +98,7 @@ export function AuditLogView({ rows, limit }: { rows: AuditRow[]; limit: number 
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {chip("all", "Hammasi", rows.length)}
         {importantCount > 0 && chip("important", "Muhim (o'chirish, parol)", importantCount)}
         {(Object.keys(AUDIT_CATEGORY_LABELS) as AuditCategory[])

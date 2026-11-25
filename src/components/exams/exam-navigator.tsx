@@ -37,7 +37,7 @@ export function QuestionNavigator({
       className={cn(
         variant === "grid"
           ? "grid grid-cols-5 gap-1.5"
-          : "flex gap-1.5 overflow-x-auto -mx-1 px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          : "flex flex-wrap gap-1.5 py-1"
       )}
     >
       {Array.from({ length: count }, (_, idx) => {

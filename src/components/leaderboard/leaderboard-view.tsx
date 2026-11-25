@@ -221,7 +221,7 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
               </span>
             )}
             {type === "group" && (
-              <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {groups.map((g) => (
                   <Link
                     key={g._id.toString()}
@@ -235,7 +235,7 @@ export function LeaderboardView({ data, groups, type, groupId, grade, metric, ro
               </div>
             )}
             {type === "grade" && (
-              <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {grades.map((gr) => (
                   <Link key={gr} href={withMetric(`/leaderboard?type=grade&grade=${gr}`)} className={chipClass(grade === gr)}>
                     {gr}-sinflar

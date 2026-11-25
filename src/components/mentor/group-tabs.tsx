@@ -18,9 +18,9 @@ export function GroupTabs({ groupId, activeSessionId }: { groupId: string; activ
   return (
     <nav
       aria-label="Guruh bo'limlari"
-      className="-mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-slate-200/80 dark:border-slate-800/80"
+      className="sm:border-b border-slate-200/80 dark:border-slate-800/80"
     >
-      <div className="flex items-center gap-1 min-w-max">
+      <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
@@ -29,11 +29,11 @@ export function GroupTabs({ groupId, activeSessionId }: { groupId: string; activ
               href={tab.href}
               aria-current={tab.isActive ? "page" : undefined}
               className={cn(
-                "relative flex items-center gap-2 px-3 sm:px-4 min-h-[40px] -mb-px border-b-2 text-sm font-semibold whitespace-nowrap rounded-t-lg transition-colors",
+                "relative flex items-center gap-2 px-3 sm:px-4 min-h-[40px] text-sm font-semibold whitespace-nowrap rounded-xl transition-colors sm:-mb-px sm:border-b-2 sm:rounded-b-none sm:rounded-t-lg",
                 "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
                 tab.isActive
-                  ? "border-teal-600 dark:border-teal-400 text-teal-700 dark:text-teal-300"
-                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                  ? "bg-teal-500/15 sm:bg-transparent border-teal-600 dark:border-teal-400 text-teal-700 dark:text-teal-300"
+                  : "bg-slate-100 dark:bg-slate-800/60 sm:bg-transparent sm:dark:bg-transparent border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60"
               )}
             >
               <Icon className={cn("w-4 h-4 shrink-0", tab.isActive ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400")} />

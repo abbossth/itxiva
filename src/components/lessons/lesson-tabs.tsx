@@ -130,7 +130,7 @@ export function LessonTabs({
               role="tablist"
               aria-label={ariaLabel}
               onKeyDown={onKeyDown}
-              className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex flex-wrap items-center gap-1"
             >
               {tabs.map((tab) => {
                 const Icon = ICONS[tab.icon];

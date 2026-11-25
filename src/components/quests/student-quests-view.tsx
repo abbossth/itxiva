@@ -276,7 +276,7 @@ export function StudentQuestsView({ data }: { data: StudentQuestsData }) {
           <h1 className="font-mono text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Topshiriqlar</h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">Bajaring — coin va tajriba (XP) yig&apos;ing</p>
         </div>
-        <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-slate-100 dark:bg-slate-800/60 p-1 [scrollbar-width:none]">
+        <div role="tablist" className="flex flex-wrap gap-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 p-1 [scrollbar-width:none]">
           {tabs.map((t) => (
             <button
               key={t.id}

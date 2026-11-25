@@ -70,7 +70,7 @@ export function ReportsView({ data, groups, period, groupId, academicYear }: Rep
       {/* Filtrlar: barcha bo'limlarga bir xil ta'sir qiladi */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div role="group" aria-label="Davr" className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 overflow-x-auto">
+          <div role="group" aria-label="Davr" className="inline-flex flex-wrap p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60">
             {PERIODS.map((p) => (
               <button
                 key={p.id}

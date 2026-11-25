@@ -19,7 +19,7 @@ export function ExamsListClient({ active, upcoming, past }: ExamsListClientProps
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 sm:gap-4 overflow-x-auto">
+      <div className="flex flex-wrap border-b border-slate-200 dark:border-slate-800 gap-2 sm:gap-4">
         <button
           type="button"
           onClick={() => setCurrentTab("active")}

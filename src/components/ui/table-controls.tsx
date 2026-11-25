@@ -411,7 +411,8 @@ export function SortableTable({
   return (
     <>
       <TableFilterBar table={table} className={filterBarClassName} />
-      <table className={tableClassName}>
+      {/* Telefonda jadval kartochkalarga aylanadi (har katak — "nomi: qiymati"), yon tomonga surilmaydi */}
+      <table className={cn("stack-table", tableClassName)}>
         <thead className={theadClassName}>
           <tr className={headRowClassName}>
             {columns.map((c) => (
@@ -436,7 +437,7 @@ export function SortableTable({
             table.rows.map((r) => (
               <tr key={r.key} className={r.className}>
                 {r.cells.map((cell, i) => (
-                  <td key={columns[i]?.key ?? i} className={columns[i]?.tdClassName}>
+                  <td key={columns[i]?.key ?? i} className={columns[i]?.tdClassName} data-label={i === 0 ? "" : columns[i]?.label ?? ""}>
                     {cell}
                   </td>
                 ))}

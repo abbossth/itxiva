@@ -67,7 +67,7 @@ export function AnnouncementCard({
               <img src={image.url} alt={image.name} className="max-h-80 w-full object-contain" />
             </button>
             {data.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex flex-wrap gap-2 pb-1">
                 {data.images.map((img, i) => (
                   <button
                     key={i}

@@ -91,7 +91,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: ShopOrder[] })
         subtitle="O'quvchilar coin evaziga bergan buyurtmalarni qabul qiling va topshiring"
       />
 
-      <div role="tablist" className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      <div role="tablist" className="flex flex-wrap gap-2 pb-1">
         {TABS.map((t) => (
           <button
             key={t.id}

@@ -139,11 +139,30 @@
   }
 }
 
+html,
+body {
+  /* Hech bir sahifa yon tomonga surilmasin (clip — sticky header'ni buzmaydi) */
+  overflow-x: clip;
+}
+
 body {
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
   font-feature-settings: "rlig" 1, "calt" 1;
+  /* Uzun so'z/havola konteynerdan chiqib ketmasin */
+  overflow-wrap: break-word;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iPhone: 16px dan kichik maydonga bosilganda Safari sahifani kattalashtirib yuboradi — telefonda 16px */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
 }
 
 /* Sarlavhalar, raqamlar va kod — mono shriftda; raqamlar bir xil kenglikda */
@@ -1142,4 +1161,31 @@ h1,
 .chat-dock-in { animation: chat-dock-in 0.18s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .chat-sticker, .chat-sticker:hover, .chat-dock-in { animation: none; }
+}
+
+/* Jadval telefonda — kartochkalar (SortableTable): sarlavha yashiriladi, har katak "nomi … qiymati" qatori */
+@media (max-width: 639px) {
+  .stack-table thead { display: none; }
+  .stack-table, .stack-table tbody, .stack-table tr { display: block; width: 100%; }
+  .stack-table tr { padding: 0.5rem 0; }
+  .stack-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    text-align: right;
+    padding: 0.3rem 1rem !important;
+  }
+  .stack-table td > * { min-width: 0; }
+  .stack-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(100 116 139);
+    text-align: left;
+  }
+  .stack-table td[data-label=""] { display: block; text-align: left; }
+  .stack-table td[data-label=""]::before { display: none; }
 }

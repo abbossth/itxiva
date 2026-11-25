@@ -53,7 +53,7 @@ export function TabsList({
       <div
         className={cn(
           "flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50",
-          "overflow-x-auto scrollbar-none snap-x snap-mandatory scroll-smooth touch-pan-x",
+          "flex-wrap",
           className
         )}
       >
@@ -84,7 +84,7 @@ export function TabsTrigger({
       aria-selected={isActive}
       onClick={() => ctx.setActiveTab(value)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-xs sm:text-sm font-medium transition-all select-none cursor-pointer min-h-[38px] snap-start shrink-0",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-4 py-2 text-xs sm:text-sm font-medium transition-all select-none cursor-pointer min-h-[38px] grow sm:grow-0",
         "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500",
         isActive
           ? "bg-white dark:bg-surface text-teal-700 dark:text-teal-300 font-semibold shadow-xs"

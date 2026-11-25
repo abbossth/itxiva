@@ -227,7 +227,7 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
 
         {/* Qismlar */}
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800/80 dark:bg-surface">
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-2">
+          <div className="flex flex-wrap gap-1.5 pb-2">
             {CHAR_SLOTS.map((s) => (
               <button
                 key={s}

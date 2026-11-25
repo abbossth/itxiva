@@ -190,7 +190,7 @@ export function QuestsManager({ data }: { data: MentorQuestsData }) {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Topshiriq qidirish..." className="pl-9" aria-label="Topshiriq qidirish" />
         </div>
         {/* Tor ekranda filtr tugmalari siqilmaydi — gorizontal aylanadi */}
-        <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] lg:mx-0 lg:shrink-0 lg:px-0">
+        <div className="lg:shrink-0">
           <SegmentedControl
             ariaLabel="Turi bo'yicha"
             value={filter}

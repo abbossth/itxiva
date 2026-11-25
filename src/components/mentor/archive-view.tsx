@@ -99,7 +99,7 @@ export function ArchiveView({ items }: { items: ArchiveItem[] }) {
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nomi bo'yicha qidirish" aria-label="Arxivdan qidirish" className="pl-9" />
       </div>
 
-      <div className="flex gap-2 overflow-x-auto scrollbar-none -mx-1 px-1 pb-1">
+      <div className="flex flex-wrap gap-2 pb-1">
         {chip("all", "Hammasi", items.length)}
         {(Object.keys(KINDS) as ArchiveKind[]).filter((k) => kindCounts.has(k)).map((k) => chip(k, KINDS[k].plural, kindCounts.get(k) ?? 0))}
       </div>

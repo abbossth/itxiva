@@ -152,7 +152,7 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
               Ochish <ChevronRight className="h-3.5 w-3.5" />
             </span>
           </Link>
-          <div className="live-noscroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="flex flex-wrap gap-2 pb-1">
             {locked.slice(0, 12).map((e) => (
               <Link
                 key={e.id}

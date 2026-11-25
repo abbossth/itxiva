@@ -166,7 +166,7 @@ export function LessonsManager({
 
       {/* Filtrlar: guruh, chorak, ko'rinish */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0 pb-1 lg:pb-0">
+        <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0 pb-1 lg:pb-0">
           {groups.map((g) => {
             const id = g._id.toString();
             const isSelected = currentGroupId === id;
