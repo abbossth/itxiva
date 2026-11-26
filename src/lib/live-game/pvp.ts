@@ -137,6 +137,14 @@ export const REVIVE_R = 90;
 export const REVIVE_HP = 50;
 /** Bitta o'yinchi ko'pi bilan necha marta qutqariladi (keyingi safar to'g'ridan-to'g'ri chiqadi) */
 export const MAX_REVIVES = 2;
+/** O'lgan (chiqqan) jamoadoshni ham tiriltirish mumkin: o'lganidan keyin shu vaqt ichida, sekinroq va kamroq HP bilan */
+export const REVIVE_DEAD_WINDOW_MS = 30_000;
+export const REVIVE_DEAD_MS = 5000;
+export const REVIVE_DEAD_HP = 30;
+/** O'lgan jamoadoshni hali tiriltirsa bo'ladimi */
+export function revivableDead(p: { out: boolean; outAt?: number | null; revives?: number; team?: number }, now: number): boolean {
+  return p.out && (p.team ?? -1) >= 0 && (p.revives ?? 0) < MAX_REVIVES && typeof p.outAt === "number" && p.outAt > 0 && now - p.outAt < REVIVE_DEAD_WINDOW_MS;
+}
 /** Tiriltirgandan keyin qisqa daxlsizlik */
 export const REVIVE_GRACE_MS = 1500;
 

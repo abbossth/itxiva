@@ -43,6 +43,8 @@ export interface PvpPeer {
   revive?: number;
   /** Jamoaviy jang: yiqilgan (sekin, ota olmaydi, HP kamayib boradi) */
   downed?: boolean;
+  /** O'lgan, lekin jamoadosh hali tiriltira oladi (o'lganidan keyin 30 s ichida) */
+  revivable?: boolean;
 }
 
 export interface PvpFeedView {

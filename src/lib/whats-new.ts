@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-revive-dead-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "O'lgan jamoadoshni ham tiriltiring",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "30 soniya ichida — F",
+        text: "Jamoadosh o'lib qolsa ham, 30 soniya ichida yoniga borib F ni (telefonda 🩹 tugmasini) 5 soniya bosib tursangiz — 30 HP bilan qaytadi. Yiqilgan jamoadosh esa avvalgidek 3 soniyada 50 HP bilan turadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-regen-2026-11-26",
     date: "2026-11-26",
     audience: "student",

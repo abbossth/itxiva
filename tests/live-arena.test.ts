@@ -19,7 +19,7 @@ const route = await import("@/app/api/live/pvp/route");
 const resultRoute = await import("@/app/api/live/pvp/result/route");
 const { hmacSign, verifyTicket } = await import("@/lib/live-game/arena-token");
 const { NextRequest } = await import("next/server");
-const { REVIVE_HP, REVIVE_MS, PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
+const { REVIVE_DEAD_HP, REVIVE_DEAD_MS, REVIVE_HP, REVIVE_MS, PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
 
 const NOW = new Date("2026-11-10T16:40:00+05:00");
 const tick = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
@@ -188,6 +188,13 @@ describe("jamoaviy arena", () => {
     tick(REVIVE_MS + 10);
     await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
     expect((await LiveGamePlayer.findById(mate._id).lean())?.arena).toMatchObject({ out: false, downed: false, lives: REVIVE_HP, revives: 1 });
+    // O'lgan jamoadosh (30 s ichida): 5 s bosib turilsa 30 HP bilan qaytadi
+    await LiveGamePlayer.updateOne({ _id: mate._id }, { $set: { "arena.out": true, "arena.outAt": Date.now(), "arena.lives": 0, "arena.x": 430, "arena.y": 400 } });
+    tick(500);
+    await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
+    tick(REVIVE_DEAD_MS + 10);
+    await live.pvpTickAction(id, { x: 400, y: 400, rv: String(mate._id) });
+    expect((await LiveGamePlayer.findById(mate._id).lean())?.arena).toMatchObject({ out: false, lives: REVIVE_DEAD_HP, revives: 2 });
 
     // 1-jamoa butunlay yiqildi — 0-jamoa g'olib
     await LiveGamePlayer.updateMany({ gameId: id, team: 1 }, { $set: { "arena.out": true, "arena.lives": 0 } });

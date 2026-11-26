@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, regenStep, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, regenStep, REVIVE_DEAD_HP, REVIVE_DEAD_MS, revivableDead, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -280,12 +280,18 @@ export class PvpRoom {
 
     // ---- Tiriltirish: yiqilgan jamoadosh yonida tugma bosib turiladi ----
     const rv = typeof inp?.rv === "string" ? this.players.get(inp.rv) : null;
-    if (!p.downed && rv && rv.downed && !rv.out && rv.id !== p.id && sameTeam(p.team, rv.team) && Math.hypot(rv.x - p.x, rv.y - p.y) <= REVIVE_R) {
+    const dead = Boolean(rv && revivableDead(rv, now));
+    if (!p.downed && rv && ((rv.downed && !rv.out) || dead) && rv.id !== p.id && sameTeam(p.team, rv.team) && Math.hypot(rv.x - p.x, rv.y - p.y) <= REVIVE_R) {
       if (p.rev?.target !== rv.id) p.rev = { target: rv.id, since: now };
-      else if (now - p.rev.since >= REVIVE_MS) {
+      else if (now - p.rev.since >= (dead ? REVIVE_DEAD_MS : REVIVE_MS)) {
+        // Yiqilgan — 50 HP bilan turadi; o'lgan (30 s ichida) — 30 HP bilan qaytadi
         rv.downed = false;
         rv.downedBy = null;
-        rv.lives = REVIVE_HP;
+        rv.out = false;
+        rv.outAt = null;
+        rv.killedBy = null;
+        rv.bleedAt = 0;
+        rv.lives = dead ? REVIVE_DEAD_HP : REVIVE_HP;
         rv.lastHurt = now;
         rv.revives += 1;
         rv.hitUntil = now + REVIVE_GRACE_MS;
@@ -398,11 +404,13 @@ export class PvpRoom {
     const reviving = new Map<string, number>();
     for (const p of this.players.values()) {
       if (!p.rev || p.out) continue;
-      const pct = Math.min(99, Math.round(((now - p.rev.since) / REVIVE_MS) * 100));
+      const target = this.players.get(p.rev.target);
+      const need = target?.out ? REVIVE_DEAD_MS : REVIVE_MS;
+      const pct = Math.min(99, Math.round(((now - p.rev.since) / need) * 100));
       reviving.set(p.rev.target, Math.max(reviving.get(p.rev.target) ?? 0, pct));
     }
     const peers = [...this.players.values()].map((p) => {
-      let flags = (p.out ? 1 : 0) | (p.until.shield > now ? 2 : 0) | (p.downed ? 128 : 0);
+      let flags = (p.out ? 1 : 0) | (p.until.shield > now ? 2 : 0) | (p.downed ? 128 : 0) | (revivableDead(p, now) ? 256 : 0);
       TIMED.forEach((k, j) => {
         if (k !== "shield" && p.until[k] > now) flags |= 4 << j;
       });
@@ -520,6 +528,7 @@ export function decodeRoomMessage(
       emote: typeof emote === "number" ? emote : -1,
       revive: typeof revive === "number" ? revive : 0,
       downed: Boolean(flags & 128),
+      revivable: Boolean(flags & 256),
     });
   }
   const world: PvpWorld = {

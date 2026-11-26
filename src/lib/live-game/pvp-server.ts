@@ -22,6 +22,9 @@ import {
   REVIVE_GRACE_MS,
   REVIVE_HP,
   REVIVE_MS,
+  REVIVE_DEAD_HP,
+  REVIVE_DEAD_MS,
+  revivableDead,
   REVIVE_R,
   HEART_HP,
   ZONE_DAMAGE,
@@ -218,8 +221,10 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
   const reviving = new Map<string, number>();
   for (const p of players) {
     const s = p.arena;
-    if (!s || s.out || !s.revTarget || !s.revSince || now - s.revSince > REVIVE_MS + 1500) continue;
-    reviving.set(s.revTarget, Math.max(reviving.get(s.revTarget) ?? 0, Math.min(99, Math.round(((now - s.revSince) / REVIVE_MS) * 100))));
+    if (!s || s.out || !s.revTarget || !s.revSince || now - s.revSince > REVIVE_DEAD_MS + 1500) continue;
+    const target = players.find((x) => String(x._id) === s.revTarget);
+    const need = target?.arena?.out ? REVIVE_DEAD_MS : REVIVE_MS;
+    reviving.set(s.revTarget, Math.max(reviving.get(s.revTarget) ?? 0, Math.min(99, Math.round(((now - s.revSince) / need) * 100))));
   }
   const peers: PvpPeer[] = players
     .filter((p) => p.arena)
@@ -245,6 +250,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
         emote: (s.emote ?? -1) >= 0 && now - (s.emoteAt ?? 0) < EMOTE_MS ? s.emote ?? -1 : -1,
         revive: reviving.get(String(p._id)) ?? 0,
         downed: Boolean(s.downed) && !s.out,
+        revivable: revivableDead({ out: s.out, outAt: s.outAt, revives: s.revives, team: s.team }, now),
       };
     });
   return {
@@ -492,17 +498,34 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
     {
       const rvId = !iAmDown && typeof input?.rv === "string" ? input.rv : null;
       const t = rvId ? players.find((pl) => String(pl._id) === rvId) : null;
+      const dead = Boolean(t?.arena && revivableDead({ out: t.arena.out, outAt: t.arena.outAt, revives: t.arena.revives, team: t.arena.team }, now));
       const ok =
-        !before.arena!.downed && t?.arena && t.arena.downed && !t.arena.out && String(t._id) !== meId && sameTeam(before.arena!.team, t.arena.team) && Math.hypot(t.arena.x - x, t.arena.y - y) <= REVIVE_R;
+        !before.arena!.downed &&
+        t?.arena &&
+        ((t.arena.downed && !t.arena.out) || dead) &&
+        String(t._id) !== meId &&
+        sameTeam(before.arena!.team, t.arena.team) &&
+        Math.hypot(t.arena.x - x, t.arena.y - y) <= REVIVE_R;
       const cur = before.arena!.revTarget ?? null;
       if (ok && t) {
         if (cur !== rvId) {
           await LiveGamePlayer.updateOne({ _id: meDoc._id }, { $set: { "arena.revTarget": rvId, "arena.revSince": now } });
-        } else if (now - (before.arena!.revSince ?? now) >= REVIVE_MS) {
+        } else if (now - (before.arena!.revSince ?? now) >= (dead ? REVIVE_DEAD_MS : REVIVE_MS)) {
           const up = await LiveGamePlayer.updateOne(
-            { _id: t._id, "arena.out": false, "arena.downed": true },
+            dead ? { _id: t._id, "arena.out": true, "arena.revives": { $lt: MAX_REVIVES } } : { _id: t._id, "arena.out": false, "arena.downed": true },
             {
-              $set: { "arena.downed": false, "arena.downedBy": null, "arena.downedById": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0, "arena.lastHurt": now },
+              $set: {
+                "arena.downed": false,
+                "arena.downedBy": null,
+                "arena.downedById": null,
+                "arena.out": false,
+                "arena.outAt": null,
+                "arena.killedBy": null,
+                "arena.lives": dead ? REVIVE_DEAD_HP : REVIVE_HP,
+                "arena.hitUntil": now + REVIVE_GRACE_MS,
+                "arena.zoneSince": 0,
+                "arena.lastHurt": now,
+              },
               $inc: { "arena.revives": 1 },
             }
           );

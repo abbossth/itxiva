@@ -104,7 +104,9 @@ interface Hud {
   /** Jamoaviy arena: har jamoaning tirik a'zolari */
   teams: { team: number; alive: number }[];
   /** Tiriltirish: yonimdagi yiqilgan jamoadosh (ism va %), meni tiriltirishyaptimi (%) */
-  revive: { name: string; pct: number } | null;
+  revive: { name: string; pct: number; dead: boolean } | null;
+  /** O'zi o'lgan, lekin jamoadosh hali tiriltira oladi */
+  revivable: boolean;
   myRevive: number;
   /** O'zi yiqilgan (jamoaviy jang) */
   downed: boolean;
@@ -152,6 +154,7 @@ export function PvpGame({
     board: null,
     zone: null,
     revive: null,
+    revivable: false,
     myRevive: 0,
     downed: false,
   });
@@ -329,7 +332,7 @@ export function PvpGame({
       let best: PvpPeer | null = null;
       let bd = REVIVE_R * REVIVE_R;
       for (const p of world.peers) {
-        if (p.isMe || !p.downed || p.out || !sameTeam(myTeam, p.team)) continue;
+        if (p.isMe || !((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
         const d = (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2;
         if (d <= bd) {
           bd = d;
@@ -691,7 +694,7 @@ export function PvpGame({
       // Yiqilgan jamoadoshlar: 🩹 belgisi va tiriltirish halqasi
       if (myTeam >= 0) {
         for (const p of world?.peers ?? []) {
-          if (!p.downed || p.out || !sameTeam(myTeam, p.team)) continue;
+          if (!((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
           const s = p.isMe ? { x: pos.x, y: pos.y } : shown.get(p.id) ?? p;
           ctx.save();
           ctx.lineWidth = 5;
@@ -784,7 +787,7 @@ export function PvpGame({
       // Ekrandan tashqaridagi yiqilgan jamoadosh: chetda yashil ko'rsatkich
       if (myTeam >= 0 && me && !me.out && !me.downed) {
         for (const p of world?.peers ?? []) {
-          if (p.isMe || !p.downed || p.out || !sameTeam(myTeam, p.team)) continue;
+          if (p.isMe || !((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
           const s = shown.get(p.id) ?? p;
           const px = (s.x - view.cx) * scale + w / 2;
           const py = (s.y - view.cy) * scale + h / 2;
@@ -1048,9 +1051,10 @@ export function PvpGame({
               : [],
           revive: (() => {
             const d = downedNear();
-            return d ? { name: d.name, pct: d.revive ?? 0 } : null;
+            return d ? { name: d.name, pct: d.revive ?? 0, dead: Boolean(d.out) } : null;
           })(),
-          myRevive: me?.downed ? world?.peers.find((p) => p.isMe)?.revive ?? 0 : 0,
+          myRevive: me?.downed || me?.out ? world?.peers.find((p) => p.isMe)?.revive ?? 0 : 0,
+          revivable: Boolean(me?.out && world?.peers.find((p) => p.isMe)?.revivable),
           downed: Boolean(me?.downed && !me.out),
           zone: (() => {
             const z = zoneNow(now);
@@ -1272,7 +1276,7 @@ export function PvpGame({
               : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya, Tab — statistika"}
           </p>
           <p className="max-w-md text-xs text-slate-300">
-            Sog&apos;lig&apos;ingiz 100 HP — har o&apos;q 16–20 HP oladi (faqat o&apos;zingiz ko&apos;rasiz).{myTeam >= 0 ? " HP 10 ga tushsa yiqilasiz — jamoadosh yoningizga kelib F (🩹) ni 3 soniya bosib tursa, 50 HP bilan turasiz!" : ""} Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
+            Sog&apos;lig&apos;ingiz 100 HP — har o&apos;q 16–20 HP oladi (faqat o&apos;zingiz ko&apos;rasiz).{myTeam >= 0 ? " HP 10 ga tushsa yiqilasiz — jamoadosh yoningizga kelib F (🩹) ni 3 soniya bosib tursa, 50 HP bilan turasiz. O'lsangiz ham 30 soniya ichida tiriltirishi mumkin (5 soniya, 30 HP)!" : ""} Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
             <br />
             🌀 Vaqt o&apos;tgan sari xavfsiz doira torayadi — tashqarida qolsangiz jon ketadi. Oq punktir — keyingi doira.
           </p>
@@ -1313,7 +1317,7 @@ export function PvpGame({
           className="absolute bottom-[230px] left-1/2 z-20 flex -translate-x-1/2 cursor-pointer select-none flex-col items-center gap-1 rounded-2xl bg-emerald-600/85 px-5 py-2.5 font-black text-white shadow-xl ring-2 ring-emerald-300/70 backdrop-blur active:scale-95 sm:bottom-24"
         >
           <span className="text-sm">
-            🩹 {hud.revive.name} — {touch ? "bosib turing" : "F ni bosib turing"}
+            🩹 {hud.revive.name} {hud.revive.dead ? "(tiriltirish, 5 s)" : ""} — {touch ? "bosib turing" : "F ni bosib turing"}
           </span>
           <span className="h-2 w-44 overflow-hidden rounded-full bg-white/25">
             <span className="block h-full rounded-full bg-white transition-[width] duration-150" style={{ width: `${hud.revive.pct}%` }} />
@@ -1330,6 +1334,13 @@ export function PvpGame({
                 : `Ota olmaysiz, HP kamaymoqda. Jamoadoshingiz yoningizga kelib qutqarsa — ${REVIVE_HP} HP bilan turasiz`}
             </span>
           </div>
+        </div>
+      )}
+      {hud.out && hud.revivable && phase !== "done" && (
+        <div className="pointer-events-none absolute inset-x-0 top-[36%] flex justify-center px-4">
+          <span className="rounded-2xl bg-emerald-700/90 px-4 py-2 text-center text-sm font-black text-white">
+            {hud.myRevive > 0 ? `🩹 Sizni tiriltirishyapti… ${hud.myRevive}%` : "🩹 Jamoadoshingiz 30 soniya ichida yoningizga kelib sizni tiriltira oladi"}
+          </span>
         </div>
       )}
       {hud.out && phase !== "done" && (
