@@ -137,8 +137,11 @@ describe("bilet va imzo", () => {
 
 describe("xaritalar va reaksiyalar", () => {
   it("har xaritada paydo bo'lish, sovg'a, teleport va baza joylari devor ichida emas va xarita ichida", async () => {
-    const { ARENA_MAPS, MAP_IDS, inWall } = await import("@/lib/live-game/pvp");
-    expect(MAP_IDS).toHaveLength(4);
+    const { ARENA_MAPS, MAP_IDS, MAP_PACKS, inWall, resolve, PLAYER_R } = await import("@/lib/live-game/pvp");
+    expect(MAP_IDS).toHaveLength(8);
+    // Har xarita bitta to'plamda, to'plamda 4 tadan
+    expect(MAP_PACKS.flatMap((p) => p.maps).sort()).toEqual([...MAP_IDS].sort());
+    for (const p of MAP_PACKS) expect(p.maps).toHaveLength(4);
     for (const id of MAP_IDS) {
       const m = ARENA_MAPS[id];
       expect(m.w).toBeGreaterThanOrEqual(3000);
@@ -149,6 +152,11 @@ describe("xaritalar va reaksiyalar", () => {
       }
       expect(m.pickups.length).toBeGreaterThanOrEqual(3);
       expect(m.spawns.length).toBe(16);
+      // Paydo bo'lish joyida qahramon devorga tiqilmaydi (resolve uni siljitmaydi)
+      for (const sp of m.spawns) {
+        const r = resolve(sp.x, sp.y, PLAYER_R, m);
+        expect(Math.hypot(r.x - sp.x, r.y - sp.y), `${id} spawn ${sp.x},${sp.y}`).toBeLessThan(1);
+      }
     }
   });
 

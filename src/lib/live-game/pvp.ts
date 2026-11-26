@@ -3,7 +3,7 @@
 // Bu fayl sof: server va brauzer, testlar shu yerdan foydalanadi.
 
 import { DEFAULT_MAP, type ArenaMap } from "./pvp-maps";
-export { ARENA_MAPS, DEFAULT_MAP, MAP_IDS, PAD_BOOST, isMapId, mapOf, pickMap, type ArenaMap, type MapId } from "./pvp-maps";
+export { ARENA_MAPS, DEFAULT_MAP, MAP_IDS, MAP_PACKS, PAD_BOOST, isMapId, mapOf, packOf, pickMap, type ArenaMap, type MapId, type MapPack } from "./pvp-maps";
 
 /** Klassik xarita o'lchami (eski chaqiruvlar uchun). Har jang o'z xaritasidan foydalanadi: `map.w`, `map.h` */
 export const MAP_W = DEFAULT_MAP.w;
@@ -73,7 +73,7 @@ export const DASH_MS = 170;
 export const DASH_SPEED = 3.2;
 export const DASH_COOLDOWN_MS = 2500;
 /** Jang oldidan xarita uchun ovoz berish (soniya) */
-export const MAP_VOTE_S = 12;
+export const MAP_VOTE_S = 15;
 
 /** G'olib jamoaning har a'zosiga */
 export const TEAM_WIN_BONUS = 400;

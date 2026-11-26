@@ -28,18 +28,21 @@ function drawFloorStatic(ctx: CanvasRenderingContext2D, map: ArenaMap) {
     ctx.fillStyle = g;
     ctx.fillRect(b.x - 460, b.y - 460, 920, 920);
   });
-  ctx.strokeStyle = theme.grid;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let x = 0; x <= W; x += 80) {
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
+  if (theme.pattern) drawPattern(ctx, map);
+  else {
+    ctx.strokeStyle = theme.grid;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 80) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+    }
+    for (let y = 0; y <= H; y += 80) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+    }
+    ctx.stroke();
   }
-  for (let y = 0; y <= H; y += 80) {
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-  }
-  ctx.stroke();
   // Asosiy yo'laklar (markazdan o'tuvchi xoch)
   ctx.strokeStyle = `rgba(${theme.wallEdge},0.08)`;
   ctx.lineWidth = 30;
@@ -78,6 +81,107 @@ function drawFloorStatic(ctx: CanvasRenderingContext2D, map: ArenaMap) {
   ctx.strokeStyle = `rgba(${theme.edge},0.95)`;
   ctx.lineWidth = 8;
   ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.restore();
+}
+
+/** Barqaror "tasodif" (naqshlar har safar bir xil chizilsin) */
+const hash = (i: number) => {
+  const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+/** Yangi xaritalar poli: lava yoriqlari, qum to'lqinlari, suv to'lqinlari, olti burchakli plitalar (bir marta chiziladi) */
+function drawPattern(ctx: CanvasRenderingContext2D, map: ArenaMap) {
+  const { w: W, h: H, theme } = map;
+  ctx.save();
+  if (theme.pattern === "lava") {
+    // Porlovchi yoriqlar va issiq dog'lar
+    for (let i = 0; i < 46; i++) {
+      const cx = hash(i) * W;
+      const cy = hash(i + 100) * H;
+      const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 90 + hash(i + 7) * 80);
+      g.addColorStop(0, "rgba(251,146,60,0.16)");
+      g.addColorStop(1, "rgba(251,146,60,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - 180, cy - 180, 360, 360);
+    }
+    ctx.lineCap = "round";
+    for (let i = 0; i < 34; i++) {
+      let x = hash(i + 200) * W;
+      let y = hash(i + 300) * H;
+      ctx.strokeStyle = `rgba(249,115,22,${0.22 + hash(i + 9) * 0.2})`;
+      ctx.lineWidth = 3 + hash(i + 11) * 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 6; k++) {
+        x += (hash(i * 13 + k) - 0.5) * 140;
+        y += (hash(i * 17 + k + 50) - 0.5) * 140;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  } else if (theme.pattern === "sand" || theme.pattern === "waves") {
+    const sand = theme.pattern === "sand";
+    ctx.strokeStyle = sand ? "rgba(253,230,138,0.07)" : "rgba(125,211,252,0.08)";
+    ctx.lineWidth = sand ? 3 : 2;
+    const step = sand ? 70 : 56;
+    const amp = sand ? 16 : 10;
+    const period = sand ? 300 : 180;
+    for (let y = step / 2, row = 0; y < H; y += step, row++) {
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 20) {
+        const yy = y + Math.sin((x + row * 70) / period * Math.PI * 2) * amp;
+        if (x === 0) ctx.moveTo(x, yy);
+        else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+    }
+    if (!sand) {
+      // Suv osti nur dog'lari
+      for (let i = 0; i < 60; i++) {
+        ctx.fillStyle = `rgba(165,243,252,${0.03 + hash(i) * 0.04})`;
+        ctx.beginPath();
+        ctx.arc(hash(i + 40) * W, hash(i + 80) * H, 20 + hash(i + 120) * 60, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (theme.pattern === "hex") {
+    // Olti burchakli metall plitalar va chetda ogohlantirish chiziqlari
+    const r = 46;
+    const hw = Math.sqrt(3) * r;
+    ctx.strokeStyle = "rgba(250,204,21,0.06)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let row = 0, y = 0; y < H + r; row++, y += r * 1.5) {
+      for (let x = row % 2 ? hw / 2 : 0; x < W + hw; x += hw) {
+        for (let k = 0; k <= 6; k++) {
+          const a = (Math.PI / 3) * k + Math.PI / 6;
+          const px = x + Math.cos(a) * r;
+          const py = y + Math.sin(a) * r;
+          if (k === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+      }
+    }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(250,204,21,0.10)";
+    for (let x = 0; x < W; x += 80) {
+      ctx.beginPath();
+      ctx.moveTo(x, 14);
+      ctx.lineTo(x + 40, 14);
+      ctx.lineTo(x + 20, 40);
+      ctx.lineTo(x - 20, 40);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x, H - 14);
+      ctx.lineTo(x + 40, H - 14);
+      ctx.lineTo(x + 20, H - 40);
+      ctx.lineTo(x - 20, H - 40);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   ctx.restore();
 }
 

@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-maps-wild-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kiber jang: 4 ta yangi xarita",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🌋",
+        title: "«Yovvoyi dunyolar» to'plami",
+        text: "🌋 Vulqon oroli, 🏜️ Cho'l qal'asi, 🐠 Marjon rif va 🏭 Robot zavodi! Ovoz berishda avval to'plamni (Klassik olamlar yoki Yovvoyi dunyolar), keyin xaritani tanlang.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-maps-wild-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Kiber jang: 8 ta xarita, 2 to'plam",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🗺️",
+        title: "Yangi xaritalar va ixcham ovoz ekrani",
+        text: "«Yovvoyi dunyolar» to'plamida 4 ta yangi xarita (vulqon, cho'l qal'asi, marjon rif, robot zavodi). Proyektorda ikkala to'plam ekranga sig'adi; o'quvchilar telefonda avval to'plamni, keyin xaritani tanlaydi. Ovoz berish 15 soniya.",
+      },
+    ],
+  },
+  {
     id: "mentor-team-podium-fix-2026-11-26",
     date: "2026-11-26",
     audience: "mentor",

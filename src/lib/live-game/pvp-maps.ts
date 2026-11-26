@@ -13,8 +13,22 @@ export interface MapPoint {
   y: number;
 }
 
-export type MapId = "neon" | "ice" | "forest" | "space";
-export const MAP_IDS: MapId[] = ["neon", "ice", "forest", "space"];
+export type MapId = "neon" | "ice" | "forest" | "space" | "lava" | "desert" | "reef" | "factory";
+export const MAP_IDS: MapId[] = ["neon", "ice", "forest", "space", "lava", "desert", "reef", "factory"];
+
+/** Xarita to'plamlari: o'quvchi avval to'plamni, keyin uning ichidagi xaritani tanlaydi */
+export interface MapPack {
+  id: "classic" | "wild";
+  name: string;
+  emoji: string;
+  tagline: string;
+  maps: MapId[];
+}
+export const MAP_PACKS: MapPack[] = [
+  { id: "classic", name: "Klassik olamlar", emoji: "🌐", tagline: "Neon shahar, muz labirint, sehrli o'rmon, kosmos", maps: ["neon", "ice", "forest", "space"] },
+  { id: "wild", name: "Yovvoyi dunyolar", emoji: "🌋", tagline: "Vulqon, cho'l qal'asi, marjon rif, robot zavodi", maps: ["lava", "desert", "reef", "factory"] },
+];
+export const packOf = (id: MapId): MapPack => MAP_PACKS.find((p) => p.maps.includes(id)) ?? MAP_PACKS[0];
 
 export interface MapTheme {
   floor: string;
@@ -32,6 +46,8 @@ export interface MapTheme {
   bases: [string, string, string, string];
   /** Fonda yulduzlar */
   stars?: boolean;
+  /** Pol naqshi (bo'lmasa — oddiy katak) */
+  pattern?: "lava" | "sand" | "waves" | "hex";
 }
 
 export interface ArenaMap {
@@ -370,7 +386,229 @@ const SPACE = build({
   ],
 });
 
-export const ARENA_MAPS: Record<MapId, ArenaMap> = { neon: NEON, ice: ICE, forest: FOREST, space: SPACE };
+// ================= "Yovvoyi dunyolar" to'plami =================
+
+// ---- 5. Vulqon oroli: markazda krater, pog'onali qoyalar, lava oqimlari (tezlik) ----
+const LV_W = 3000;
+const LV_H = 1750;
+const LAVA = build({
+  id: "lava",
+  name: "Vulqon oroli",
+  emoji: "🌋",
+  tagline: "Krater atrofida jang, lava oqimida tez yuguring",
+  w: LV_W,
+  h: LV_H,
+  theme: {
+    floor: "#1a0b08",
+    grid: "rgba(248,113,113,0.05)",
+    edge: "251,146,60",
+    wall: "#2b1511",
+    wallEdge: "249,115,22",
+    box: "#3d1c13",
+    boxEdge: "250,204,21",
+    bush: ["rgba(120,53,15,0.92)", "rgba(146,64,14,0.92)", "rgba(68,32,14,0.95)"],
+    pad: "251,146,60",
+    bases: ["251,146,60", "250,204,21", "248,113,113", "253,186,116"],
+    pattern: "lava",
+  },
+  walls: [
+    ...mirror(
+      [
+        { x: 420, y: 300, w: 160, h: 36 },
+        { x: 580, y: 336, w: 36, h: 120 },
+        { x: 616, y: 420, w: 160, h: 36 },
+        { x: 900, y: 190, w: 70, h: 70 },
+        { x: 985, y: 260, w: 70, h: 70 },
+        { x: 1250, y: 560, w: 140, h: 36 },
+        { x: 1140, y: 640, w: 36, h: 130 },
+        { x: 250, y: 680, w: 220, h: 36 },
+      ],
+      LV_W,
+      LV_H
+    ),
+    { x: LV_W / 2 - 45, y: LV_H / 2 - 45, w: 90, h: 90 },
+  ],
+  bushes: mirror(
+    [
+      { x: 150, y: 400, w: 160, h: 150 },
+      { x: 1080, y: 130, w: 190, h: 110 },
+    ],
+    LV_W,
+    LV_H
+  ),
+  teleports: [{ a: { x: 300, y: LV_H / 2 }, b: { x: LV_W - 300, y: LV_H / 2 }, color: "#fb923c" }],
+  pads: [
+    { x: 700, y: LV_H / 2 - 20, w: 400, h: 40 },
+    { x: LV_W - 1100, y: LV_H / 2 - 20, w: 400, h: 40 },
+    { x: LV_W / 2 - 20, y: 150, w: 40, h: 320 },
+    { x: LV_W / 2 - 20, y: LV_H - 470, w: 40, h: 320 },
+  ],
+});
+
+// ---- 6. Cho'l qal'asi: markazda 4 darvozali qal'a, tashqarida qum tepaliklari ----
+const DS_W = 3200;
+const DS_H = 1800;
+const DESERT = build({
+  id: "desert",
+  name: "Cho'l qal'asi",
+  emoji: "🏜️",
+  tagline: "Qal'ani egallang — 4 darvoza, ochiq qumliklar",
+  w: DS_W,
+  h: DS_H,
+  theme: {
+    floor: "#2a1f12",
+    grid: "rgba(253,230,138,0.04)",
+    edge: "251,191,36",
+    wall: "#5b4326",
+    wallEdge: "253,224,71",
+    box: "#6b4f2c",
+    boxEdge: "254,240,138",
+    bush: ["rgba(161,98,7,0.85)", "rgba(202,138,4,0.85)", "rgba(133,77,14,0.9)"],
+    pad: "253,224,71",
+    bases: ["251,191,36", "234,88,12", "250,204,21", "217,119,6"],
+    pattern: "sand",
+  },
+  walls: [
+    ...mirror(
+      [
+        // Qal'a devorlari (o'rtada darvoza qoladi)
+        { x: 1100, y: 500, w: 380, h: 36 },
+        { x: 1100, y: 536, w: 36, h: 240 },
+        // Qal'a ichidagi ustunlar
+        { x: 1340, y: 690, w: 70, h: 70 },
+        // Tashqi qoyalar
+        { x: 560, y: 400, w: 80, h: 80 },
+        { x: 860, y: 190, w: 70, h: 70 },
+        { x: 320, y: 620, w: 200, h: 36 },
+      ],
+      DS_W,
+      DS_H
+    ),
+  ],
+  bushes: mirror(
+    [
+      { x: 300, y: 230, w: 240, h: 140 },
+      { x: 690, y: 640, w: 200, h: 160 },
+    ],
+    DS_W,
+    DS_H
+  ),
+  teleports: [{ a: { x: DS_W / 2, y: 180 }, b: { x: DS_W / 2, y: DS_H - 180 }, color: "#facc15" }],
+  pads: [
+    { x: 200, y: DS_H / 2 - 40, w: 700, h: 80 },
+    { x: DS_W - 900, y: DS_H / 2 - 40, w: 700, h: 80 },
+  ],
+});
+
+// ---- 7. Marjon rif: marjon butalari ko'p, oqim yo'laklari, kesishgan pufak-teleportlar ----
+const RF_W = 3000;
+const RF_H = 1800;
+const REEF = build({
+  id: "reef",
+  name: "Marjon rif",
+  emoji: "🐠",
+  tagline: "Marjonlarda yashiring, oqim bilan suzib keting",
+  w: RF_W,
+  h: RF_H,
+  theme: {
+    floor: "#04223a",
+    grid: "rgba(56,189,248,0.05)",
+    edge: "34,211,238",
+    wall: "#0e3a4f",
+    wallEdge: "45,212,191",
+    box: "#134e5e",
+    boxEdge: "251,191,36",
+    bush: ["rgba(244,114,182,0.88)", "rgba(251,113,133,0.88)", "rgba(190,24,93,0.9)"],
+    pad: "56,189,248",
+    bases: ["34,211,238", "244,114,182", "45,212,191", "251,191,36"],
+    pattern: "waves",
+  },
+  walls: [
+    ...mirror(
+      [
+        { x: 500, y: 300, w: 90, h: 90 },
+        { x: 1000, y: 520, w: 120, h: 60 },
+        { x: 300, y: 650, w: 60, h: 120 },
+        { x: 1250, y: 200, w: 36, h: 260 },
+      ],
+      RF_W,
+      RF_H
+    ),
+    { x: RF_W / 2 - 60, y: RF_H / 2 - 60, w: 120, h: 120 },
+  ],
+  bushes: mirror(
+    [
+      { x: 180, y: 250, w: 200, h: 150 },
+      { x: 640, y: 500, w: 240, h: 200 },
+      { x: 1050, y: 280, w: 160, h: 150 },
+      { x: 820, y: 110, w: 180, h: 110 },
+      { x: 1180, y: 640, w: 170, h: 150 },
+    ],
+    RF_W,
+    RF_H
+  ),
+  teleports: [
+    { a: { x: 440, y: 470 }, b: { x: RF_W - 440, y: RF_H - 470 }, color: "#22d3ee" },
+    { a: { x: RF_W - 440, y: 470 }, b: { x: 440, y: RF_H - 470 }, color: "#f472b6" },
+  ],
+  pads: [
+    { x: 400, y: RF_H / 2 - 30, w: 520, h: 60 },
+    { x: RF_W - 920, y: RF_H / 2 - 30, w: 520, h: 60 },
+    { x: RF_W / 2 - 30, y: 150, w: 60, h: 380 },
+    { x: RF_W / 2 - 30, y: RF_H - 530, w: 60, h: 380 },
+  ],
+});
+
+// ---- 8. Robot zavodi: yashik qatorlari orasida konveyerlar, liftlar ----
+const FC_W = 3200;
+const FC_H = 1800;
+const FACTORY = build({
+  id: "factory",
+  name: "Robot zavodi",
+  emoji: "🏭",
+  tagline: "Yashiklar orasida konveyer — tez, lekin ochiq joy",
+  w: FC_W,
+  h: FC_H,
+  theme: {
+    floor: "#111318",
+    grid: "rgba(250,204,21,0.04)",
+    edge: "250,204,21",
+    wall: "#1f2937",
+    wallEdge: "250,204,21",
+    box: "#374151",
+    boxEdge: "251,146,60",
+    bush: ["rgba(148,163,184,0.72)", "rgba(100,116,139,0.78)", "rgba(71,85,105,0.85)"],
+    pad: "250,204,21",
+    bases: ["250,204,21", "56,189,248", "251,146,60", "163,230,53"],
+    pattern: "hex",
+  },
+  walls: [
+    ...mirror(
+      [
+        ...[0, 1, 2, 3].flatMap((i) => [
+          { x: 450 + i * 260, y: 330, w: 70, h: 70 },
+          { x: 450 + i * 260, y: 620, w: 70, h: 70 },
+        ]),
+        { x: 300, y: 180, w: 36, h: 220 },
+      ],
+      FC_W,
+      FC_H
+    ),
+    { x: FC_W / 2 - 80, y: FC_H / 2 - 80, w: 160, h: 160 },
+  ],
+  bushes: mirror([{ x: 120, y: 520, w: 150, h: 150 }], FC_W, FC_H),
+  teleports: [
+    { a: { x: 200, y: FC_H / 2 }, b: { x: FC_W - 200, y: FC_H / 2 }, color: "#facc15" },
+    { a: { x: FC_W / 2, y: 150 }, b: { x: FC_W / 2, y: FC_H - 150 }, color: "#38bdf8" },
+  ],
+  pads: [
+    ...mirror([{ x: 400, y: 470, w: 900, h: 60 }], FC_W, FC_H),
+    { x: FC_W / 2 - 30, y: 220, w: 60, h: 420 },
+    { x: FC_W / 2 - 30, y: FC_H - 640, w: 60, h: 420 },
+  ],
+});
+
+export const ARENA_MAPS: Record<MapId, ArenaMap> = { neon: NEON, ice: ICE, forest: FOREST, space: SPACE, lava: LAVA, desert: DESERT, reef: REEF, factory: FACTORY };
 export const DEFAULT_MAP: ArenaMap = NEON;
 export const isMapId = (v: unknown): v is MapId => typeof v === "string" && (MAP_IDS as string[]).includes(v);
 export const mapOf = (id: string | null | undefined): ArenaMap => (isMapId(id) ? ARENA_MAPS[id] : DEFAULT_MAP);

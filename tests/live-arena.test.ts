@@ -19,7 +19,7 @@ const route = await import("@/app/api/live/pvp/route");
 const resultRoute = await import("@/app/api/live/pvp/result/route");
 const { hmacSign, verifyTicket } = await import("@/lib/live-game/arena-token");
 const { NextRequest } = await import("next/server");
-const { REVIVE_DEAD_HP, REVIVE_DEAD_MS, REVIVE_HP, REVIVE_MS, PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
+const { MAP_VOTE_S, REVIVE_DEAD_HP, REVIVE_DEAD_MS, REVIVE_HP, REVIVE_MS, PICKUP_EVERY_MS, PVP_INTRO_S, SPAWN_SHIELD_MS, TEAM_WIN_BONUS, pvpBonus, pvpLoadout, pvpStandings, resolve, stepShots, fireShots, teleportFrom, teamArenaStandings } = await import("@/lib/live-game/pvp");
 
 const NOW = new Date("2026-11-10T16:40:00+05:00");
 const tick = (ms: number) => vi.setSystemTime(new Date(Date.now() + ms));
@@ -283,7 +283,7 @@ describe("ovoz proyektorsiz ham hal bo'ladi (qotib qolmaydi)", () => {
     as(ali);
     expect((await live.getLivePlayerStateAction(id)).success && true).toBe(true);
     expect((await LiveGame.findById(id).lean())!.arena?.map ?? null).toBe(null);
-    tick(13_000);
+    tick((MAP_VOTE_S + 1) * 1000);
     const st = await live.getLivePlayerStateAction(id);
     expect(st.success && st.data.arena).toMatchObject({ vote: null, ready: true });
     expect((await LiveGame.findById(id).lean())!.arena?.map).toBeTruthy();

@@ -21,6 +21,8 @@ import { Modal } from "@/components/ui/modal";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast";
+import { MapVote } from "@/components/live/arena/map-vote";
+import type { MapId } from "@/lib/live-game/pvp";
 import {
   Sparkles,
   Heart,
@@ -369,6 +371,9 @@ export default function UIDevShowroomPage() {
         </div>
       </Modal>
 
+      {/* Kiber jang: xarita uchun ovoz (proyektor va telefon ko'rinishi, namunaviy ma'lumot) */}
+      <MapVoteShowcase />
+
       <BottomSheet
         isOpen={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -397,5 +402,29 @@ export default function UIDevShowroomPage() {
         confirmText="O'chirish"
       />
     </div>
+  );
+}
+
+const DEMO_COUNTS: Record<MapId, number> = { neon: 3, ice: 1, forest: 0, space: 2, lava: 5, desert: 1, reef: 2, factory: 0 };
+
+function MapVoteShowcase() {
+  const [mine, setMine] = React.useState<MapId | null>(null);
+  const [endsAt] = React.useState(() => Date.now() + 15 * 60_000);
+  const [now, setNow] = React.useState(endsAt - 15 * 60_000);
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const vote = { endsInMs: Math.max(0, endsAt - now), counts: DEMO_COUNTS, voted: 14, total: 20 };
+  return (
+    <section className="space-y-4" aria-label="Kiber jang xaritalari">
+      <h2 className="text-lg font-bold">Kiber jang: xarita uchun ovoz</h2>
+      <div data-demo="map-vote-host" className="flex h-[70vh] flex-col rounded-3xl bg-slate-950 p-4 text-white">
+        <MapVote vote={vote} big />
+      </div>
+      <div data-demo="map-vote-phone" className="mx-auto w-[375px] max-w-full rounded-3xl bg-slate-950 p-3 text-white">
+        <MapVote vote={vote} myVote={mine} onVote={setMine} />
+      </div>
+    </section>
   );
 }
