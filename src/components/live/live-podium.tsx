@@ -198,7 +198,8 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
                 <div
                   className={cn(
                     "relative -mt-2.5 flex w-full flex-col items-center justify-start gap-0.5 overflow-hidden rounded-b-xl bg-gradient-to-b px-2 pb-2 pt-2 shadow-2xl",
-                    p.team !== undefined ? TEAM_STYLES[p.team]?.bar : face,
+                    // Jamoa rangi faqat e'lon qilingach — oldindan ustun rangidan g'olib bilinib qolmasin
+                    p.team !== undefined && open ? TEAM_STYLES[p.team]?.bar : face,
                     text
                   )}
                   style={{ minHeight: pillarH[place], ...(open ? { boxShadow: `0 0 60px ${glow}` } : {}) }}

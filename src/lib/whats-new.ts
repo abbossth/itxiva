@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-team-podium-fix-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Tuzatildi",
+    title: "Jamoaviy shohsupa sirini saqlaydi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏆",
+        title: "G'olib oldindan bilinmaydi",
+        text: "Jamoaviy o'yin oxirida shohsupa ustunlari e'londan oldin jamoa rangida (qizil, sariq, yashil…) ko'rinib, g'olib bilinib qolardi. Endi ustun o'rin rangida turadi, jamoa rangi faqat e'lon qilinganda chiqadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-revive-5s-2026-11-26",
     date: "2026-11-26",
     audience: "student",
