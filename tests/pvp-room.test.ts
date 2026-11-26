@@ -200,7 +200,7 @@ describe("jamoaviy xona: yiqilish va qutqarish", () => {
     return { room, shoot };
   };
 
-  it("HP 10 ga tushsa yiqiladi: ota olmaydi; raqib qutqara olmaydi; jamoadosh 3 s bosib tursa 50 HP bilan turadi, o'q tegsa — qaytadan", () => {
+  it("HP 10 ga tushsa yiqiladi: ota olmaydi; raqib qutqara olmaydi; jamoadosh 5 s bosib tursa 50 HP bilan turadi, o'q tegsa — qaytadan", () => {
     const { room, shoot } = setup();
     shoot("vali", "olim", START + 1000);
     const olim = room.players.get("olim")!;
@@ -218,7 +218,7 @@ describe("jamoaviy xona: yiqilish va qutqarish", () => {
     shoot("vali", "ali", START + 3000);
     room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000 + REVIVE_MS);
     expect(olim.downed).toBe(true);
-    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 5000 + REVIVE_MS + 1);
+    room.input("ali", { x: 300, y: 300, rv: "olim" }, START + 2000 + REVIVE_MS * 2 + 1);
     expect(olim).toMatchObject({ downed: false, out: false, lives: REVIVE_HP, revives: 1 });
     expect(room.feed.at(-1)).toMatchObject({ kind: "revive", a: "ALI", b: "OLIM" });
   });
@@ -271,7 +271,7 @@ describe("jamoaviy xona: F bilan qutqarish (haqiqiy oqim) va o'lganni tiriltiris
     }
   };
 
-  it("yiqilgan jamoadosh: F ni 3 s bosib turish — HP kamayayotgan bo'lsa ham qutqaradi", () => {
+  it("yiqilgan jamoadosh: F ni 5 s bosib turish — HP kamayayotgan bo'lsa ham qutqaradi", () => {
     const room = setup();
     room.input("vali", { x: 700, y: 300, shots: [{ id: 1, x: 360, y: 300, a: 3.14 }], hits: [{ target: "olim", shot: 1 }] }, START + 1000);
     expect(room.players.get("olim")!.downed).toBe(true);
@@ -293,9 +293,9 @@ describe("jamoaviy xona: F bilan qutqarish (haqiqiy oqim) va o'lganni tiriltiris
     const d = decodeRoomMessage(room.frame(START + 1500, "ali", { pickups: 0, feed: 0 }), st, "ali", null)!;
     expect(d.world.peers.find((p) => p.id === "olim")).toMatchObject({ out: true, revivable: true });
     // 3 s yetmaydi, 5 s kerak
-    hold(room, START + 2000, REVIVE_MS + 100, "olim");
+    hold(room, START + 2000, 3000, "olim");
     expect(olim.out).toBe(true);
-    hold(room, START + 2000 + REVIVE_MS + 166, REVIVE_DEAD_MS, "olim");
+    hold(room, START + 2000 + 3066, REVIVE_DEAD_MS, "olim");
     expect(olim).toMatchObject({ out: false, killedBy: null });
     expect(olim.lives).toBeGreaterThanOrEqual(REVIVE_DEAD_HP);
     // Yana o'ldi, 30 s o'tdi — endi tiriltirib bo'lmaydi

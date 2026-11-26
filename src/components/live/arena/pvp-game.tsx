@@ -1276,7 +1276,7 @@ export function PvpGame({
               : "WASD / strelkalar — yurish, sichqoncha — nishon va otish (Space ham), Shift — sakrash, 1–4 — reaksiya, Tab — statistika"}
           </p>
           <p className="max-w-md text-xs text-slate-300">
-            Sog&apos;lig&apos;ingiz 100 HP — har o&apos;q 16–20 HP oladi (faqat o&apos;zingiz ko&apos;rasiz).{myTeam >= 0 ? " HP 10 ga tushsa yiqilasiz — jamoadosh yoningizga kelib F (🩹) ni 3 soniya bosib tursa, 50 HP bilan turasiz. O'lsangiz ham 30 soniya ichida tiriltirishi mumkin (5 soniya, 30 HP)!" : ""} Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
+            Sog&apos;lig&apos;ingiz 100 HP — har o&apos;q 16–20 HP oladi (faqat o&apos;zingiz ko&apos;rasiz).{myTeam >= 0 ? " HP 10 ga tushsa yiqilasiz — jamoadosh yoningizga kelib F (🩹) ni 5 soniya bosib tursa, 50 HP bilan turasiz. O'lsangiz ham 30 soniya ichida tiriltirishi mumkin (5 soniya, 30 HP)!" : ""} Xaritadagi ❤ 🛡 ⚡ 🔥 ✳ sovg&apos;alarni oling, butaga yashiring, teleportdan foydalaning!
             <br />
             🌀 Vaqt o&apos;tgan sari xavfsiz doira torayadi — tashqarida qolsangiz jon ketadi. Oq punktir — keyingi doira.
           </p>
@@ -1317,7 +1317,7 @@ export function PvpGame({
           className="absolute bottom-[230px] left-1/2 z-20 flex -translate-x-1/2 cursor-pointer select-none flex-col items-center gap-1 rounded-2xl bg-emerald-600/85 px-5 py-2.5 font-black text-white shadow-xl ring-2 ring-emerald-300/70 backdrop-blur active:scale-95 sm:bottom-24"
         >
           <span className="text-sm">
-            🩹 {hud.revive.name} {hud.revive.dead ? "(tiriltirish, 5 s)" : ""} — {touch ? "bosib turing" : "F ni bosib turing"}
+            🩹 {hud.revive.name} — {touch ? "5 soniya bosib turing" : "F ni 5 soniya bosib turing"}
           </span>
           <span className="h-2 w-44 overflow-hidden rounded-full bg-white/25">
             <span className="block h-full rounded-full bg-white transition-[width] duration-150" style={{ width: `${hud.revive.pct}%` }} />

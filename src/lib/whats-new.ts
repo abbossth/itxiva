@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-revive-5s-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Qutqarish — 5 soniya",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "F ni 5 soniya bosib turing",
+        text: "Yiqilgan yoki o'lgan (30 soniya ichida) jamoadosh yonida F ni (telefonda 🩹 tugmasini) 5 soniya bosib turing. Yiqilgan — 50 HP, o'lgan — 30 HP bilan qaytadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-revive-dead-2026-11-26",
     date: "2026-11-26",
     audience: "student",

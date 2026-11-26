@@ -127,12 +127,12 @@ export const HEART_HP = 30;
 export const ZONE_DAMAGE = 10;
 // ---- Jamoaviy jang: yiqilish va qutqarish ----
 // HP 10 ga tushsa o'yinchi YIQILADI: sekin sudraladi, ota olmaydi, HP har soniyada 1 tadan kamayadi.
-// Jamoadosh yoniga kelib tugmani 3 s bosib tursa — 50 HP bilan turadi. Qutqarilmasa (yoki yana o'q tegsa) — chiqadi.
+// Jamoadosh yoniga kelib tugmani 5 s bosib tursa — 50 HP bilan turadi. Qutqarilmasa (yoki yana o'q tegsa) — chiqadi.
 export const DOWN_HP = 10;
 export const BLEED_MS = 1000;
 /** Yiqilganning tezligi (oddiy tezlikka nisbatan) */
 export const DOWNED_SPEED = 0.35;
-export const REVIVE_MS = 3000;
+export const REVIVE_MS = 5000;
 export const REVIVE_R = 90;
 export const REVIVE_HP = 50;
 /** Bitta o'yinchi ko'pi bilan necha marta qutqariladi (keyingi safar to'g'ridan-to'g'ri chiqadi) */
