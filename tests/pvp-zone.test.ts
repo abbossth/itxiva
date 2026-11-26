@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ARENA_MAPS as MAPS_BY_ID, ZONE_DAMAGE_MS, ZONE_FINAL_R, ZONE_KILLER, outsideZone, zoneAt, zoneStep } from "@/lib/live-game/pvp";
+import { REGEN_DELAY_MS, REGEN_EVERY_MS, regenStep, ARENA_MAPS as MAPS_BY_ID, ZONE_DAMAGE_MS, ZONE_FINAL_R, ZONE_KILLER, outsideZone, zoneAt, zoneStep } from "@/lib/live-game/pvp";
 import { PvpRoom } from "@/lib/live-game/pvp-room";
 
 const ARENA_MAPS = Object.values(MAPS_BY_ID);
@@ -54,11 +54,34 @@ describe("toraluvchi zona", () => {
     // Boshida — hamma ichkarida
     room.step(START + 1000);
     expect(room.players.get("a")!.lives).toBe(2);
+    // Bu testda HP tiklanishi xalaqit bermasin (yaqinda zarar olgan)
+    room.players.get("a")!.lastHurt = START + 109_000;
     for (let t = 110_000; t <= 110_000 + ZONE_DAMAGE_MS * 2; t += 250) room.step(START + t);
     const a = room.players.get("a")!;
     expect(a).toMatchObject({ lives: 0, out: true, killedBy: ZONE_KILLER });
-    expect(room.players.get("b")!.lives).toBe(2); // doira ichida
+    expect(room.players.get("b")!.lives).toBeGreaterThanOrEqual(2); // doira ichida: zarar yo'q (HP tiklanadi)
     expect(room.feed.at(-1)).toMatchObject({ kind: "kill", a: ZONE_KILLER, b: "Ali" });
     expect(JSON.parse(room.frame(START + 110_000, "b", { pickups: 0, feed: 0 })).z).toHaveLength(8);
+  });
+});
+
+describe("HP sekin tiklanishi", () => {
+  it("zarardan 5 s o'tgach har 3 s da +1, 100 dan oshmaydi", () => {
+    const p = { lives: 50, lastHurt: START, regenAt: 0 };
+    expect(regenStep(p, START + REGEN_DELAY_MS, START).add).toBe(0);
+    const r = regenStep(p, START + REGEN_DELAY_MS + REGEN_EVERY_MS * 4 + 10, START);
+    expect(r.add).toBe(4);
+    // Keyingi hisob qolgan joydan davom etadi (ikki marta qo'shilmaydi)
+    expect(regenStep({ ...p, lives: 54, regenAt: r.regenAt }, START + REGEN_DELAY_MS + REGEN_EVERY_MS * 4 + 20, START).add).toBe(0);
+    expect(regenStep({ lives: 99, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(1);
+    expect(regenStep({ lives: 100, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(0);
+  });
+
+  it("xonada: tik turgan o'yinchi tiklanadi, yiqilgan — yo'q", () => {
+    const room = new PvpRoom("g", 1, START, END, () => 0.5, "neon");
+    const map = ARENA_MAPS[0];
+    room.join({ p: "a", n: "A", skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives: 60, maxLives: 100, x: map.w / 2, y: map.h / 2, shieldUntil: 0 });
+    room.step(START + 3000 + REGEN_EVERY_MS * 3);
+    expect(room.players.get("a")!.lives).toBeGreaterThan(60);
   });
 });

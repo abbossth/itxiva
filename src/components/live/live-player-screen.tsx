@@ -410,16 +410,20 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
   return (
     <div className="space-y-3 lg:space-y-5">
       {state.bonus && <p className="live-pop mx-auto w-fit rounded-xl bg-amber-400 px-4 py-1.5 text-sm font-black text-slate-950 lg:text-lg">⚡ BONUS: ochko ×2</p>}
-      <div className="flex items-start gap-3 lg:gap-5">
-        <div className="min-w-0 flex-1 rounded-2xl bg-white px-4 py-3 text-base font-black text-slate-900 sm:text-xl md:px-6 md:py-5 lg:text-4xl lg:leading-snug">
-          <ProtectedText text={q.prompt} lines={4} />
-        </div>
+      {/* Savol raqami va taymer tepada — savol matni telefonda butun kenglikni egallaydi */}
+      <div className="flex items-center justify-between gap-3">
+        <span className="rounded-full bg-white/10 px-3 py-1 text-sm font-bold text-slate-200 lg:text-lg">
+          {state.index + 1}-savol{state.total > 0 ? ` / ${state.total}` : ""}
+        </span>
         <span className="lg:hidden">
           <TimerBadge ms={remaining} limit={q.timeLimit} />
         </span>
         <span className="hidden lg:block">
           <TimerBadge ms={remaining} limit={q.timeLimit} big />
         </span>
+      </div>
+      <div className="rounded-2xl bg-white px-4 py-3.5 text-[17px] font-bold leading-snug text-slate-900 sm:text-xl md:px-6 md:py-5 lg:text-4xl">
+        <ProtectedText text={q.prompt} lines={7} minScale={0.6} minPx={14} lineHeight={1.35} />
       </div>
       {timeUp && <p className="text-center text-sm font-bold text-rose-300">Vaqt tugadi</p>}
       {!timeUp && state.me && (
@@ -441,17 +445,17 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
                   else setPicked((p) => (p.includes(opt) ? p.filter((x) => x !== opt) : [...p, opt]));
                 }}
                 className={cn(
-                  "quiz-tile flex min-h-[68px] cursor-pointer items-center gap-3 rounded-2xl border-b-4 px-4 text-left text-lg font-black shadow-md transition-transform hover:scale-[1.02] active:translate-y-0.5 disabled:opacity-50 sm:min-h-[96px] sm:text-xl lg:min-h-[130px] lg:gap-4 lg:px-6 lg:text-3xl",
+                  "quiz-tile flex min-h-[60px] cursor-pointer items-center gap-3 rounded-2xl border-b-4 px-3.5 py-2.5 text-left text-[17px] font-extrabold leading-snug shadow-md transition-transform hover:scale-[1.02] active:translate-y-0.5 disabled:opacity-50 sm:min-h-[96px] sm:px-4 sm:text-xl lg:min-h-[130px] lg:gap-4 lg:px-6 lg:text-3xl",
                   TILE_COLORS[i % TILE_COLORS.length],
                   on && "ring-4 ring-white",
                   hidden && "option-gone"
                 )}
                 style={{ animationDelay: `${i * 50}ms` }}
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono lg:h-14 lg:w-14 lg:text-2xl">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono text-base font-black lg:h-14 lg:w-14 lg:text-2xl">
                   {on ? <Check className="h-5 w-5" strokeWidth={3} /> : LETTERS[i]}
                 </span>
-                <ProtectedText text={opt} lines={3} minScale={0.55} className="min-w-0 flex-1" />
+                <ProtectedText text={opt} lines={4} minScale={0.7} minPx={14} lineHeight={1.3} className="min-w-0 flex-1" />
               </button>
             );
           })}
@@ -480,7 +484,7 @@ function AnswerView({ state, busy, onAnswer }: { state: LivePlayerState; busy: b
             disabled={busy || timeUp}
             onChange={(e) => setText(e.target.value.slice(0, 200))}
             placeholder="Javobingiz…"
-            className="w-full min-h-[60px] rounded-2xl border-2 border-white/20 bg-white/10 px-4 text-xl font-black text-white placeholder:text-slate-400 focus:border-white focus:outline-hidden lg:min-h-[84px] lg:text-3xl"
+            className="w-full min-h-[60px] rounded-2xl border-2 border-white/20 bg-white/10 px-4 text-xl font-bold text-white placeholder:text-slate-400 focus:border-white focus:outline-hidden lg:min-h-[84px] lg:text-3xl"
           />
           <button type="submit" disabled={busy || timeUp || !text.trim()} className="w-full min-h-[56px] cursor-pointer rounded-2xl bg-white text-lg font-black text-slate-900 disabled:opacity-50 lg:min-h-[72px] lg:text-2xl">
             Yuborish

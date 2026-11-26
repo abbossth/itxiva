@@ -29,6 +29,42 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-regen-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kiber jang: HP o'zi tiklanadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💚",
+        title: "Sekin tiklanish",
+        text: "O'q yoki zona tegmasa, 5 soniyadan keyin HP har 3 soniyada +1 dan tiklanadi. Yashirinib nafas oling!",
+      },
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "Jamoadoshni qutqarish — F",
+        text: "Jamoadosh yiqilsa ekranda xabar va chetda yashil 🩹 ko'rsatkich chiqadi. Yoniga boring va F ni (telefonda 🩹 tugmasini) 3 soniya bosib turing — u 50 HP bilan turadi.",
+      },
+    ],
+  },
+  {
+    id: "student-live-mobile-text-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Telefonda savollar o'qishga qulay",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📱",
+        title: "Katta va aniq matn",
+        text: "Jonli o'yinda savol endi ekranning butun kengligida, o'qiladigan shriftda; variantlar mayda bo'lib ketmaydi. Kodli savollar esa kod shriftida chiqadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-90s-2026-11-26",
     date: "2026-11-26",
     audience: "student",

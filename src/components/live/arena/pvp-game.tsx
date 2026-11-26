@@ -492,6 +492,13 @@ export function PvpGame({
           if (victim) burst(sparks, victim.x, victim.y, skinOf(victim.skin).body, 34);
           if (f.a === me.name) say(`💥 ${f.b} yiqitildi!`, "kill");
           else if (sound && f.b !== me.name) playBoom();
+        } else if (f.kind === "down" && myTeam >= 0 && !me.out && !me.downed && f.b !== me.name) {
+          // Jamoadosh yiqildi: qayerga borib nima bosishni aytamiz
+          const mate = world.peers.find((p) => p.name === f.b && !p.isMe);
+          if (mate && sameTeam(myTeam, mate.team)) {
+            say(`🩸 ${f.b} yiqildi — yoniga borib ${usingTouch ? "🩹 ni" : "F ni"} bosib turing`, "hurt");
+            haptic([40, 60, 40]);
+          }
         }
       }
       feedSeen = fresh;
@@ -774,6 +781,40 @@ export function PvpGame({
 
       // ---- Ekran qatlami ----
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Ekrandan tashqaridagi yiqilgan jamoadosh: chetda yashil ko'rsatkich
+      if (myTeam >= 0 && me && !me.out && !me.downed) {
+        for (const p of world?.peers ?? []) {
+          if (p.isMe || !p.downed || p.out || !sameTeam(myTeam, p.team)) continue;
+          const s = shown.get(p.id) ?? p;
+          const px = (s.x - view.cx) * scale + w / 2;
+          const py = (s.y - view.cy) * scale + h / 2;
+          if (px > 24 && px < w - 24 && py > 24 && py < h - 24) continue;
+          const m = 30;
+          const ex = Math.max(m, Math.min(w - m, px));
+          const ey = Math.max(m + 40, Math.min(h - m, py));
+          const ang = Math.atan2(py - h / 2, px - w / 2);
+          ctx.save();
+          ctx.translate(ex, ey);
+          ctx.fillStyle = `rgba(22,163,74,${0.75 + Math.sin(t * 6) * 0.2})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.rotate(ang);
+          ctx.fillStyle = "#fff";
+          ctx.beginPath();
+          ctx.moveTo(26, 0);
+          ctx.lineTo(16, -7);
+          ctx.lineTo(16, 7);
+          ctx.closePath();
+          ctx.fill();
+          ctx.rotate(-ang);
+          ctx.font = "16px system-ui";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("🩹", 0, 1);
+          ctx.restore();
+        }
+      }
       // Kichik xarita
       const mmW = Math.min(190, w * 0.3);
       const mmH = (mmW * map.h) / map.w;

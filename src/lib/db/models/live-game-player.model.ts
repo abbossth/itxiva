@@ -159,6 +159,9 @@ export interface ILiveArenaPlayer {
   bleedAt?: number;
   downedBy?: string | null;
   downedById?: string | null;
+  /** Oxirgi zarar vaqti va HP tiklanishi hisobi */
+  lastHurt?: number;
+  regenAt?: number;
   /** Oxirgi otilgan o'qlar (boshqalar ko'rishi va tekkanini tekshirish uchun) */
   shots: ILiveArenaShot[];
   /** Tekkan deb hisoblangan o'qlar (ikki marta hisoblanmasin) */
@@ -321,6 +324,8 @@ const LiveGamePlayerSchema = new Schema<ILiveGamePlayer>(
           bleedAt: { type: Number, default: 0 },
           downedBy: { type: String, default: null },
           downedById: { type: String, default: null },
+          lastHurt: { type: Number, default: 0 },
+          regenAt: { type: Number, default: 0 },
           shots: {
             type: [new Schema({ id: Number, x: Number, y: Number, a: Number, at: Number }, { _id: false })],
             default: [],

@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, regenStep, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -59,6 +59,9 @@ export interface RoomPlayer {
   downed: boolean;
   bleedAt: number;
   downedBy: string | null;
+  /** Oxirgi zarar va HP tiklanishi hisobi */
+  lastHurt: number;
+  regenAt: number;
   shots: Map<number, { x: number; y: number; a: number; at: number }>;
   used: Set<number>;
   /** Hali boshqalarga yuborilmagan o'qlar */
@@ -166,6 +169,8 @@ export class PvpRoom {
       downed: false,
       bleedAt: 0,
       downedBy: null,
+      lastHurt: 0,
+      regenAt: 0,
       shots: new Map(),
       used: new Set(),
       fresh: [],
@@ -209,6 +214,7 @@ export class PvpRoom {
   /** Zarar: jamoaviy jangda HP 10 ga tushsa — yiqiladi (jamoasida tik turgan bo'lsa va qutqarishlar tugamagan bo'lsa) */
   private damage(t: RoomPlayer, dmg: number, now: number, by: RoomPlayer | null, byName: string | null) {
     t.rev = null;
+    t.lastHurt = now;
     if (t.downed) {
       t.lives = Math.max(0, t.lives - dmg);
       if (t.lives <= 0) this.eliminate(t, now, by, byName);
@@ -280,6 +286,7 @@ export class PvpRoom {
         rv.downed = false;
         rv.downedBy = null;
         rv.lives = REVIVE_HP;
+        rv.lastHurt = now;
         rv.revives += 1;
         rv.hitUntil = now + REVIVE_GRACE_MS;
         rv.zoneSince = 0;
@@ -318,6 +325,13 @@ export class PvpRoom {
         p.hitsTaken += 1;
         this.damage(p, ZONE_DAMAGE, now, null, ZONE_KILLER);
       }
+    }
+    // HP sekin tiklanadi (tik turganlarda)
+    for (const p of this.players.values()) {
+      if (p.out || p.downed) continue;
+      const r = regenStep(p, now, this.startedAt);
+      p.regenAt = r.regenAt;
+      if (r.add > 0) p.lives += r.add;
     }
     // Yiqilganlar: HP har soniyada 1 kamayadi; jamoasida tik turgan qolmasa — darhol chiqadi
     for (const p of this.players.values()) {

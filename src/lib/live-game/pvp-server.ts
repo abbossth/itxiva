@@ -18,6 +18,7 @@ import {
   MAX_REVIVES,
   BLEED_MS,
   DOWN_HP,
+  regenStep,
   REVIVE_GRACE_MS,
   REVIVE_HP,
   REVIVE_MS,
@@ -151,6 +152,16 @@ export async function setupPvp(gameId: Id, startedAt: Date, teams = false, mapId
           team,
           emote: -1,
           emoteAt: 0,
+          zoneSince: 0,
+          revTarget: null,
+          revSince: 0,
+          revives: 0,
+          downed: false,
+          bleedAt: 0,
+          downedBy: null,
+          downedById: null,
+          lastHurt: 0,
+          regenAt: 0,
         };
         return { updateOne: { filter: { _id: p._id }, update: { $set: { arena } } } };
       })
@@ -402,6 +413,20 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
     // Yiqilgan o'zi: ota olmaydi, sovg'a ololmaydi, qutqara olmaydi
     const iAmDown = Boolean(before.arena!.downed);
 
+    // ---- HP sekin tiklanishi (o'z so'rovida; shartli — ikki so'rov ikki marta qo'shmasin) ----
+    if (!iAmDown) {
+      const b = before.arena!;
+      const r = regenStep({ lives: b.lives, lastHurt: b.lastHurt ?? 0, regenAt: b.regenAt ?? 0 }, now, start);
+      if (r.add > 0) {
+        const up = await LiveGamePlayer.updateOne(
+          { _id: meDoc._id, "arena.out": false, "arena.downed": { $ne: true }, "arena.regenAt": b.regenAt ?? 0, "arena.lastHurt": b.lastHurt ?? 0 },
+          [{ $set: { "arena.lives": { $min: [MAX_HP, { $add: ["$arena.lives", r.add] }] }, "arena.regenAt": r.regenAt } }],
+          { updatePipeline: true }
+        );
+        if (up.modifiedCount > 0) zoneHurt = true; // o'z holati qayta o'qilsin
+      }
+    }
+
     // ---- Tekkizishlar ----
     const hits = iAmDown ? [] : (Array.isArray(input?.hits) ? input.hits : []).slice(0, 8);
     if (hits.length > 0) {
@@ -429,7 +454,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
             "arena.shieldUntil": { $lt: now },
             "arena.hitUntil": { $lt: now },
           },
-          { $inc: { "arena.lives": -hitDamage(before.arena!.weapon), "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS, "arena.revTarget": null } },
+          { $inc: { "arena.lives": -hitDamage(before.arena!.weapon), "arena.hitsTaken": 1 }, $set: { "arena.hitUntil": now + HIT_GRACE_MS, "arena.revTarget": null, "arena.lastHurt": now } },
           { returnDocument: "after", projection: VICTIM_FIELDS }
         ).lean();
         if (!hit) continue;
@@ -453,7 +478,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       if (z.damage) {
         const hurt = await LiveGamePlayer.findOneAndUpdate(
           { _id: meDoc._id, "arena.out": false, "arena.lives": { $gt: 0 } },
-          { $inc: { "arena.lives": -ZONE_DAMAGE, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since, "arena.revTarget": null } },
+          { $inc: { "arena.lives": -ZONE_DAMAGE, "arena.hitsTaken": 1 }, $set: { "arena.zoneSince": z.since, "arena.revTarget": null, "arena.lastHurt": now } },
           { returnDocument: "after", projection: VICTIM_FIELDS }
         ).lean();
         if (hurt) feed.push(...(await afterDamage(players, hurt as Victim, now, { id: null, name: ZONE_KILLER })).feed);
@@ -477,7 +502,7 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
           const up = await LiveGamePlayer.updateOne(
             { _id: t._id, "arena.out": false, "arena.downed": true },
             {
-              $set: { "arena.downed": false, "arena.downedBy": null, "arena.downedById": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0 },
+              $set: { "arena.downed": false, "arena.downedBy": null, "arena.downedById": null, "arena.lives": REVIVE_HP, "arena.hitUntil": now + REVIVE_GRACE_MS, "arena.zoneSince": 0, "arena.lastHurt": now },
               $inc: { "arena.revives": 1 },
             }
           );

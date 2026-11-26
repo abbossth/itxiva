@@ -430,8 +430,8 @@ function QuestionScreen({
         </div>
 
         <div className="quiz-pop rounded-2xl bg-white px-4 py-5 text-center text-slate-900 shadow-lg sm:px-6 sm:py-7">
-          <div className="text-lg font-black leading-snug sm:text-2xl">
-            <ProtectedText text={question.prompt} lines={5} />
+          <div className="text-lg font-bold leading-snug sm:text-2xl">
+            <ProtectedText text={question.prompt} lines={7} minScale={0.6} minPx={14} lineHeight={1.35} />
           </div>
           {question.type === "multiple_choice" && <p className="mt-2 text-xs font-semibold text-slate-500">Bir nechta to&apos;g&apos;ri javob bo&apos;lishi mumkin</p>}
         </div>
@@ -461,7 +461,7 @@ function QuestionScreen({
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/20 font-mono text-base font-black">
                     {on ? <Check className="h-5 w-5" strokeWidth={3} /> : LETTERS[i] ?? i + 1}
                   </span>
-                  <ProtectedText text={opt} lines={3} minScale={0.6} className="min-w-0 flex-1" />
+                  <ProtectedText text={opt} lines={4} minScale={0.7} minPx={14} lineHeight={1.3} className="min-w-0 flex-1" />
                 </button>
               );
             })}

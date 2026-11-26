@@ -81,3 +81,13 @@ describe("qoidabuzarliklarni yozish", () => {
     expect(describeCheats(row!.counts)).toBe("3 marta boshqa oyna/ilovaga o'tdi, 1 marta nusxalashga urindi, 1 marta screenshot olishga urindi");
   });
 });
+
+describe("himoyalangan matn: kod bo'lagini aniqlash", () => {
+  it("``` yoki chekinishli ko'p qatorli matn — kod (mono shrift), oddiy savol — yo'q", async () => {
+    const { looksLikeCode } = await import("@/components/anti-cheat/protected-text");
+    expect(looksLikeCode("for i in range(3):\n    print(i)")).toBe(true);
+    expect(looksLikeCode("Natija nima?\n```python\nprint(2 ** 3)\n```")).toBe(true);
+    expect(looksLikeCode("Python'da ro'yxat qanday yaratiladi?")).toBe(false);
+    expect(looksLikeCode("Birinchi qator\nIkkinchi qator")).toBe(false);
+  });
+});

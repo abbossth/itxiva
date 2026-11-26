@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   text: string;
+  /** Eng kichik shrift (px): telefonda matn o'qib bo'lmaydigan darajada kichraymasin */
+  minPx?: number;
   /** Shu qatordan oshmaguncha shrift kichrayadi */
   lines?: number;
   /** Eng kichik o'lcham — asl o'lchamning ulushi */
@@ -55,7 +57,16 @@ export function wrapText(measure: (s: string) => number, text: string, width: nu
   return out;
 }
 
-export function ProtectedText({ text, lines = 5, minScale = 0.5, lineHeight = 1.28, className }: Props) {
+/** Kod bo'lagimi: ``` bilan o'ralgan yoki ko'p qatorli va chekinishli — u holda mono shrift (chekinish saqlanadi) */
+export function looksLikeCode(text: string): boolean {
+  if (text.includes("```")) return true;
+  const rows = text.split("\n");
+  return rows.length > 1 && rows.some((r) => /^( {2,}|\t)\S/.test(r));
+}
+
+export function ProtectedText({ text: raw, lines = 5, minScale = 0.5, minPx = 0, lineHeight = 1.28, className }: Props) {
+  const code = looksLikeCode(raw);
+  const text = code ? raw.replace(/```[a-zA-Z]*\n?/g, "").replace(/\n$/, "") : raw;
   const wrap = useRef<HTMLSpanElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [height, setHeight] = useState<number | undefined>(undefined);
@@ -72,17 +83,20 @@ export function ProtectedText({ text, lines = 5, minScale = 0.5, lineHeight = 1.
       if (!ctx || width <= 0) return;
       const cs = getComputedStyle(host);
       const base = parseFloat(cs.fontSize) || 16;
-      const font = (size: number) => `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+      // Kod — mono, oddiy matn — ota elementning shrifti
+      const family = code ? "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" : cs.fontFamily;
+      const font = (size: number) => `${cs.fontStyle} ${code ? "600" : cs.fontWeight} ${size}px ${family}`;
       const measure = (s: string) => ctx.measureText(s).width;
 
       // Eng katta o'lcham: `lines` qatorga sig'adigan
       let size = base;
       let rows: string[] = [];
+      const floor = Math.min(base, Math.max(base * minScale, minPx));
       for (;;) {
         ctx.font = font(size);
         rows = wrapText(measure, text, width);
-        if (rows.length <= lines || size <= base * minScale) break;
-        size = Math.max(base * minScale, size - Math.max(0.5, base * 0.04));
+        if (rows.length <= lines || size <= floor) break;
+        size = Math.max(floor, size - Math.max(0.5, base * 0.04));
       }
 
       const lh = size * lineHeight;
@@ -122,7 +136,7 @@ export function ProtectedText({ text, lines = 5, minScale = 0.5, lineHeight = 1.
       mo.disconnect();
       mq.removeEventListener("change", schedule);
     };
-  }, [text, lines, minScale, lineHeight]);
+  }, [text, code, lines, minScale, minPx, lineHeight]);
 
   return (
     <span ref={wrap} className={cn("pt-text block w-full", className)} aria-hidden>
