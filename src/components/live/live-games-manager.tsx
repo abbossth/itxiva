@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Heart, Orbit, Pickaxe, Plus, Rocket, Swords, Target, Users } from "lucide-react";
+import { Bot, Cable, Castle, Crosshair, Crown, Flag, Flame, Footprints, Gamepad2, Gem, Goal, Heart, Orbit, Palmtree, Pickaxe, Plus, Rocket, Swords, Target, Users } from "lucide-react";
 import Link from "@/components/ui/link";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { createLiveGameAction, getLiveGameSetupAction, type LiveGameListItem, ty
 import { DEFAULT_PRIZES, LIVE_MODES } from "@/lib/live-game/modes";
 import type { LiveGameSource } from "@/lib/db/models/live-game.model";
 import { LIVE_GAME_MODES, type LiveGameMode } from "@/lib/live-game/mode-list";
+import { isTeamMode } from "@/lib/live-game/modes";
 import { cn, formatDateTimeUz } from "@/lib/utils";
 
 export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = {
@@ -28,6 +29,10 @@ export const MODE_ICONS: Record<LiveGameMode, typeof Flame> = {
   gold: Pickaxe,
   galaxy: Orbit,
   zone: Target,
+  tug: Cable,
+  siege: Castle,
+  football: Goal,
+  island: Palmtree,
 };
 export const MODE_COLORS: Record<LiveGameMode, string> = {
   classic: "from-orange-500 to-rose-600",
@@ -42,6 +47,10 @@ export const MODE_COLORS: Record<LiveGameMode, string> = {
   gold: "from-yellow-400 to-amber-700",
   galaxy: "from-violet-500 via-fuchsia-500 to-cyan-500",
   zone: "from-green-400 via-emerald-500 to-sky-600",
+  tug: "from-orange-500 via-rose-500 to-sky-600",
+  siege: "from-stone-500 to-amber-800",
+  football: "from-lime-500 to-emerald-700",
+  island: "from-teal-400 via-cyan-500 to-amber-500",
 };
 
 const STATUS_LABEL = { lobby: "Kutish zali", question: "Savol", reveal: "Natija", minigame: "Qisqa o'yin", arena: "Arena", galaxy: "3D poyga", zone: "Yashil zona", finished: "Yakunlangan" } as const;
@@ -259,11 +268,12 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             </ul>
           </Field>
 
-          {mode === "team" && (
+          {(mode === "team" || mode === "siege" || mode === "island") && (
             <Field label="Jamoalar soni">
               <Segmented value={teams} options={[2, 3, 4]} onChange={setTeams} />
             </Field>
           )}
+          {(mode === "tug" || mode === "football") && <p className="text-xs text-slate-500">Bu o&apos;yin doim 2 jamoa: Qizillar va Ko&apos;klar.</p>}
 
           <Field label="Savollar">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -361,9 +371,9 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
           </>
           )}
 
-          <Field label={mode === "team" ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
+          <Field label={isTeamMode(mode) ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
             <div className="flex gap-2">
-              {(mode === "team" ? [0] : [0, 1, 2]).map((i) => (
+              {(isTeamMode(mode) ? [0] : [0, 1, 2]).map((i) => (
                 <input
                   key={i}
                   type="number"

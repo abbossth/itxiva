@@ -29,6 +29,42 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-team-adventures-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "4 ta yangi jamoaviy o'yin!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🪢",
+        title: "Arqon tortish va Penalti jangi",
+        text: "🪢 Ikki jamoa bitta arqonni tortadi — personajingiz ham tortadi! ⚽ Penalti: burchakni tanlab zarba bering, raqib qayerni qo'riqlashini taxmin qiling.",
+      },
+      {
+        art: "emoji",
+        emoji: "🏰",
+        title: "Qal'a qamali va Orol xazinasi",
+        text: "🏰 Qal'angizni ta'mirlang, qalqon qo'ying yoki raqib qal'asiga hujum qiling. 🏝️ Jamoa bilan orolni kezing: palma oldinga otadi, timsohdan kompas saqlaydi, xazina — birinchi yetganniki!",
+      },
+    ],
+  },
+  {
+    id: "mentor-team-adventures-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "4 ta yangi jamoaviy rejim",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🧩",
+        title: "Arqon tortish, Qal'a qamali, Penalti jangi, Orol xazinasi",
+        text: "Jonli o'yin turlariga qo'shildi. O'quvchilar avtomatik jamoalarga bo'linadi (arqon va penalti — 2 jamoa, qal'a va orol — 2–4). Har savoldan keyin telefonda taktika tanlanadi, proyektorda personajlar harakat qiladi. G'olib jamoa o'yin holati bo'yicha (arqon g'alabalari, qal'a HP, gollar, xazinaga yetish) aniqlanadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-maps-wild-2026-11-26",
     date: "2026-11-26",
     audience: "student",

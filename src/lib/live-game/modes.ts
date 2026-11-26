@@ -1,6 +1,18 @@
 import { answerPoints } from "@/lib/quiz-game";
 import type { LiveGameMode } from "@/lib/db/models/live-game.model";
 import { isAdventure } from "./adventures";
+import { isTeamAdventure, teamAdventureRanking } from "./team-adventures";
+
+/** Jamoalarga bo'linadigan rejimlar */
+export const isTeamMode = (mode: string) => mode === "team" || isTeamAdventure(mode);
+
+/** Jamoalar tartibi: jamoaviy sarguzashtlarda — o'yin holati bo'yicha (arqon, qal'a, gollar, orol), aks holda o'rtacha ochko */
+export function teamStandingsFor(mode: string, players: { team: number; score: number }[], teams: number, cells: number[] = []) {
+  const base = teamStandings(players, teams);
+  if (!isTeamAdventure(mode)) return base;
+  const order = teamAdventureRanking(mode, cells, teams);
+  return [...base].sort((a, b) => order.indexOf(a.team) - order.indexOf(b.team));
+}
 
 // Jonli o'yin turlarining qoidalari — sof funksiyalar (server ham, test ham shu yerdan foydalanadi).
 // Bu fayl brauzerda ham ishlatiladi (qoida matnlari), shuning uchun serverga bog'liq emas.
@@ -60,6 +72,26 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
     title: "Ko'prikdan o'tish",
     tagline: "Qaysi taxta mustahkam?",
     rules: ["To'g'ri javob — taxta tanlab bir qadam oldinga", "Har qadamda 3 taxta, bittasi yoriq — singanini hamma ko'radi", "Xato javob — suvga, bir qadam orqaga · qirg'oqqa birinchi yetgan yutadi"],
+  },
+  tug: {
+    title: "Arqon tortish",
+    tagline: "Ikki jamoa — bitta arqon!",
+    rules: ["Ikki jamoa: to'g'ri va tez javob — jamoangiz arqonni ko'proq tortadi", "Taktika: 💪 kuchli tortish, 🦶 mahkam turish (raqibni susaytiradi) yoki 🔥 siltash (×1,8, xatoda raqibga yordam)", "Arqonni o'z tomoniga tortgan jamoa raund yutadi · ko'p raund yutgan g'olib"],
+  },
+  siege: {
+    title: "Qal'a qamali",
+    tagline: "Qal'angizni saqlang, raqibnikini buzing",
+    rules: ["Har jamoada 1000 HP li qal'a", "Taktika: 🏹 hujum (qaysi qal'aga — o'zingiz tanlaysiz), 🧱 ta'mirlash yoki 🛡️ qalqon", "Oxirida qal'asi eng mustahkam jamoa yutadi"],
+  },
+  football: {
+    title: "Penalti jangi",
+    tagline: "Zarba — gol yoki darvozabon?",
+    rules: ["Ikki jamoa: har to'g'ri javob — penalti zarbasi (tez javob — kuchliroq)", "Burchakni tanlang: ⬅️ ⬆️ ➡️ · jamoangiz ko'p tanlagan burchakni darvozabon qo'riqlaydi", "Raqib qayerni qo'riqlashini taxmin qiling · ko'p gol urgan jamoa yutadi"],
+  },
+  island: {
+    title: "Orol xazinasi",
+    tagline: "Jamoa bilan orolni kezing — xazina kimniki?",
+    rules: ["Jamoalar 36 katakli orolda xazinaga yuradi: to'g'ri va tez javob — ko'proq qadam", "🌴 palma oldinga otadi, 🐊 timsoh orqaga quvadi, 💰 sandiq ochko beradi", "Taktika: 🎲 oddiy, 🦘 tavakkal (×2) yoki 🧭 kompas · xazinaga birinchi yetgan yutadi"],
   },
   gold: {
     title: "Oltin kon",
@@ -200,11 +232,12 @@ export function computeAwards<T extends RankablePlayer>(
   mode: LiveGameMode,
   players: T[],
   prizes: number[],
-  teams: number
+  teams: number,
+  cells: number[] = []
 ): { id: string; place: number; coins: number }[] {
   const played = players.filter((p) => p.score > 0 || (mode === "survival" && !p.eliminated));
-  if (mode === "team") {
-    const standings = teamStandings(played, teams);
+  if (isTeamMode(mode)) {
+    const standings = teamStandingsFor(mode, played, teams, cells);
     const winner = standings.find((s) => s.members > 0 && s.average > 0);
     if (!winner) return [];
     return played.filter((p) => p.team === winner.team).map((p) => ({ id: p.id, place: 1, coins: prizes[0] ?? 0 }));

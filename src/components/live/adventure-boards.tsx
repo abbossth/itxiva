@@ -9,6 +9,8 @@ import { cn, formatNumberUz } from "@/lib/utils";
 import { playHurt, playZap } from "@/lib/sound";
 import { useViewportHeight } from "./live-ui";
 import { GoldCoin } from "@/components/ui/gold-coin";
+import { TeamAdventureBoard } from "./team-boards";
+import { isTeamAdventure } from "@/lib/live-game/team-adventures";
 
 // Sarguzasht rejimlarining proyektordagi maydonlari: poyga yo'li, osmon, ko'prik, kon va hudud xaritasi.
 // Har o'quvchi o'z personaji bilan: natijada avvalgi joyidan yangisiga yuguradi/uchadi/sakraydi,
@@ -58,6 +60,7 @@ export function AdventureBoard({ state, sound = true }: { state: LiveHostState; 
       {state.mode === "bridge" && <BridgeBoard players={state.players} goal={state.goal} slotOf={slotOf} index={state.index} planks={state.planks ?? []} />}
       {state.mode === "gold" && <GoldBoard players={state.players} slotOf={slotOf} index={state.index} />}
       {state.mode === "territory" && <TerritoryBoard players={state.players} cells={state.cells} slots={state.slots} index={state.index} />}
+      {isTeamAdventure(state.mode) && <TeamAdventureBoard state={state} />}
       {state.events.length > 0 && (
         <div className="flex flex-wrap justify-center gap-2">
           {state.events.slice(0, 4).map((e, i) => (

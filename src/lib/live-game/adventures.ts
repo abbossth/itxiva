@@ -3,8 +3,9 @@
 // Sof funksiyalar: server ham, test ham shu yerdan foydalanadi.
 
 import type { LiveGameMode } from "@/lib/db/models/live-game.model";
+import { TEAM_DEFAULT_TACTIC, TEAM_TACTICS, isTeamAdventure, revealTeamAdventure, type TeamAdvPlayer } from "./team-adventures";
 
-export const ADVENTURE_MODES = ["race", "rocket", "bridge", "gold", "territory"] as const;
+export const ADVENTURE_MODES = ["race", "rocket", "bridge", "gold", "territory", "tug", "siege", "football", "island"] as const;
 export type AdventureMode = (typeof ADVENTURE_MODES)[number];
 export const isAdventure = (m: LiveGameMode | string): m is AdventureMode => (ADVENTURE_MODES as readonly string[]).includes(m);
 
@@ -48,9 +49,10 @@ export const TACTICS: Record<AdventureMode, Tactic[]> = {
     { id: "attack", icon: "⚔️", title: "Hujum", hint: "Qo'shni raqibdan +1 ko'proq katak tortib olasiz", target: true },
     { id: "defend", icon: "🏰", title: "Mudofaa", hint: "Bu raund kataklaringizni hech kim ololmaydi (+1 katak)" },
   ],
+  ...TEAM_TACTICS,
 };
 /** Taktika tanlanmasa */
-export const DEFAULT_TACTIC: Record<AdventureMode, string> = { race: "normal", rocket: "steady", bridge: "random", gold: "mid", territory: "expand" };
+export const DEFAULT_TACTIC: Record<AdventureMode, string> = { race: "normal", rocket: "steady", bridge: "random", gold: "mid", territory: "expand", ...TEAM_DEFAULT_TACTIC };
 export const isTactic = (mode: AdventureMode, id: string) => TACTICS[mode].some((t) => t.id === id);
 
 /** Ko'prikda har qadamda 3 ta taxta, bittasi yoriq */
@@ -125,8 +127,10 @@ export interface AdvPlayer {
   ms: number;
   /** Tanlangan taktika (bo'lmasa — DEFAULT_TACTIC) */
   tactic?: string | null;
-  /** Nishon: poygada o'yinchi id'si, hududda raqib tartib raqami (slot) */
+  /** Nishon: poygada o'yinchi id'si, hududda raqib tartib raqami (slot), qal'ada raqib jamoa raqami */
   target?: string | null;
+  /** Jamoaviy sarguzashtlarda jamoa raqami */
+  team?: number;
 }
 
 export interface AdvEffect {
@@ -156,6 +160,8 @@ export interface AdvContext {
   /** Ko'prik: har qadamdagi yoriq taxta (yashirin) va ochilgan taxtalar (bit maskasi) */
   cracks?: number[];
   known?: number[];
+  /** Jamoaviy sarguzashtlarda jamoalar soni */
+  teams?: number;
 }
 
 export interface AdvResult {
@@ -171,6 +177,9 @@ const speedOf = (p: AdvPlayer, limitMs: number) => (p.correct ? Math.max(0, Math
 /** Natija ochilganda: har o'yinchiga rejim va tanlangan taktika ta'siri */
 export function revealAdventure(mode: AdventureMode, players: AdvPlayer[], ctx: AdvContext): AdvResult {
   if (mode === "territory") return revealTerritory(players, ctx);
+  if (isTeamAdventure(mode)) {
+    return revealTeamAdventure(mode, players.map((p) => ({ ...p, team: p.team ?? 0 }) as TeamAdvPlayer), { teams: ctx.teams ?? 2, cells: ctx.cells, limitMs: ctx.limitMs, total: ctx.total, rng: ctx.rng });
+  }
   const events: string[] = [];
   // Tezlar birinchi (marraga yetish tartibi shunga bog'liq)
   const order = [...players].sort((a, b) => Number(b.correct) - Number(a.correct) || a.ms - b.ms);

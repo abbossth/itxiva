@@ -30,9 +30,11 @@ export function TacticView({
       ? t.ahead.map((a) => ({ id: a.id, label: a.name, sub: `+${formatNumberUz(a.progress - (me?.progress ?? 0))} m oldinda` }))
       : state.mode === "territory"
       ? t.rivals.map((r) => ({ id: String(r.slot), label: r.name, sub: `${r.cells} katak` }))
+      : state.mode === "siege"
+      ? (t.castles ?? []).map((c) => ({ id: String(c.team), label: `🏰 ${c.name}`, sub: `${formatNumberUz(c.hp)} HP` }))
       : [];
   const disabledWhy = (tc: Tactic): string | null => {
-    if (tc.target && targets.length === 0) return state.mode === "race" ? "Oldingizda robot yo'q" : "Chegaradosh raqib yo'q";
+    if (tc.target && targets.length === 0) return state.mode === "race" ? "Oldingizda robot yo'q" : state.mode === "siege" ? "Raqib qal'asi qolmadi" : "Chegaradosh raqib yo'q";
     if (state.mode === "bridge" && t.plank && t.plank.broken & (1 << Number(tc.id))) return "Singan!";
     return null;
   };
@@ -92,7 +94,7 @@ export function TacticView({
 
       {active?.target && targets.length > 0 && (
         <div className="space-y-2 rounded-2xl bg-black/20 p-3">
-          <p className="text-sm font-black">{state.mode === "race" ? "⚡ Kimga to'r tashlaysiz?" : "⚔️ Kimga hujum qilasiz?"}</p>
+          <p className="text-sm font-black">{state.mode === "race" ? "⚡ Kimga to'r tashlaysiz?" : state.mode === "siege" ? "🏹 Qaysi qal'aga hujum qilasiz?" : "⚔️ Kimga hujum qilasiz?"}</p>
           <div className="flex flex-wrap gap-2">
             {targets.map((x) => (
               <button

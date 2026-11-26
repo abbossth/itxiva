@@ -1,5 +1,7 @@
 "use client";
 
+import { isTeamMode } from "@/lib/live-game/modes";
+
 import { useEffect, useState, useTransition } from "react";
 import { cancelMyStudentGameAction, contributeStudentGameAction, startStudentGameAction, type LivePlayerState } from "@/actions/live-game.actions";
 import { CONTRIBUTION_STEPS } from "@/lib/live-game/student-games-config";
@@ -158,7 +160,7 @@ export function StudentFundPanel({ state, onChange }: { state: LivePlayerState; 
         </div>
       )}
       {sg.mine > 0 && <p className="mt-2 text-center text-xs text-white/60">Siz qo&apos;shgan: {sg.mine} coin. O&apos;yin boshlanmasa — qaytariladi.</p>}
-      <PrizeLine prizes={sg.prizes} team={state.mode === "team"} minPlayers={sg.minPlayers} />
+      <PrizeLine prizes={sg.prizes} team={isTeamMode(state.mode)} minPlayers={sg.minPlayers} />
 
       {sg.creator && !sg.funded && (
         <div className="mt-3 text-center">

@@ -54,6 +54,10 @@ export const DEFAULT_STUDENT_GAME_PRICES: Record<LiveGameMode, number> = {
   zone: 30,
   galaxy: 30,
   arena: 40,
+  tug: 25,
+  siege: 25,
+  football: 25,
+  island: 25,
 };
 
 export const MIN_STUDENT_GAME_PRICE = 10;

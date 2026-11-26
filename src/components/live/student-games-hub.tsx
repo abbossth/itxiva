@@ -1,5 +1,7 @@
 "use client";
 
+import { isTeamMode } from "@/lib/live-game/modes";
+
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Coins, Gamepad2, Users } from "lucide-react";
@@ -242,7 +244,7 @@ export function StudentGamesHub({ setup, games }: { setup: StudentGameSetup | nu
                 </div>
               )}
 
-              {mode && (!free || setup.freePrizes) && <PrizeLine prizes={mode === "team" ? [setup.teamPrize] : setup.prizes} team={mode === "team"} minPlayers={setup.minPlayers} light />}
+              {mode && (!free || setup.freePrizes) && <PrizeLine prizes={isTeamMode(mode) ? [setup.teamPrize] : setup.prizes} team={isTeamMode(mode)} minPlayers={setup.minPlayers} light />}
               {error && <p className="rounded-xl bg-rose-500/30 px-3 py-2 text-sm font-bold">{error}</p>}
               <button
                 type="button"

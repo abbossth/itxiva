@@ -86,10 +86,9 @@ function MapCard({
       <Preview id={id} />
       <div className="flex min-w-0 items-center gap-1">
         <span className={cn("shrink-0", big ? "text-xl lg:text-2xl" : "text-sm sm:text-lg")}>{m.emoji}</span>
-        <span className={cn("min-w-0 flex-1 font-black leading-tight", big ? "truncate text-sm lg:text-lg" : "line-clamp-2 text-[11px] sm:text-sm")}>{m.name}</span>
+        <span className={cn("min-w-0 flex-1 font-black leading-tight", big ? "truncate text-sm lg:text-base" : "line-clamp-2 text-[11px] sm:text-sm")}>{m.name}</span>
         <span className={cn("shrink-0 font-mono font-black tabular-nums", big ? "text-lg lg:text-2xl" : "text-sm sm:text-lg")}>{n}</span>
       </div>
-      {big && <p className="truncate text-xs text-slate-300">{m.tagline}</p>}
       <div className={cn("overflow-hidden rounded-full bg-white/10", big ? "h-1.5" : "h-1")}>
         <div className="h-full rounded-full bg-gradient-to-r from-fuchsia-500 to-amber-300 transition-[width] duration-500" style={{ width: `${(n / max) * 100}%` }} />
       </div>
@@ -120,29 +119,55 @@ export function MapVote({
   const leader = MAP_IDS.reduce((a, b) => ((vote.counts[b] ?? 0) > (vote.counts[a] ?? 0) ? b : a), MAP_IDS[0]);
   const isLead = (id: MapId) => (vote.counts[id] ?? 0) > 0 && id === leader;
 
-  // Proyektor: ikkala to'plam ikki qatorda; kenglik ekran balandligidan cheklanadi — hammasi skrollsiz sig'adi
-  if (!onVote) {
-    return (
-      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 lg:gap-4" style={{ maxWidth: "min(100%, calc((100dvh - 300px) * 2.9))" }}>
-        <Header vote={vote} title="Xarita uchun ovoz berish" big={big} />
-        {MAP_PACKS.map((p) => (
-          <section key={p.id} className="space-y-1.5">
-            <p className="flex items-center gap-2 text-sm font-black lg:text-base">
-              <span className="text-lg">{p.emoji}</span> {p.name}
-              <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-xs">{packVotes(p, vote.counts)} ovoz</span>
-            </p>
-            <div className="grid grid-cols-4 gap-2 lg:gap-3">
-              {p.maps.map((id) => (
-                <MapCard key={id} id={id} n={vote.counts[id] ?? 0} max={max} mine={false} lead={isLead(id)} big={big} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    );
-  }
-
+  // Proyektor: ikkala to'plam ikki qatorda; o'lcham ekranda QOLGAN balandlikdan hisoblanadi — 8 tasi ham skrollsiz sig'adi
+  if (!onVote) return <HostVote vote={vote} max={max} isLead={isLead} big={big} />;
   return <PlayerVote vote={vote} myVote={myVote} onVote={onVote} busy={busy} max={max} isLead={isLead} />;
+}
+
+/** Proyektor: blok tepasidan ekran pastigacha qolgan joyga sig'adigan kenglik hisoblanadi */
+function HostVote({ vote, max, isLead, big }: { vote: MapVoteView; max: number; isLead: (id: MapId) => boolean; big: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      const top = el.getBoundingClientRect().top;
+      // Pastdagi izoh qatori uchun joy qoldiriladi
+      const avail = Math.max(240, window.innerHeight - top - 56);
+      // Sarlavha (~72px) + 2 ta to'plam sarlavhasi (~28px) + har kartadagi matn va chiziq (~44px) + oraliqlar
+      const previewH = Math.max(50, (avail - 72 - 2 * 28 - 2 * 44 - 40) / 2);
+      const cardW = (previewH * 16) / 9 + 16;
+      const parent = el.parentElement?.clientWidth ?? window.innerWidth;
+      setWidth(Math.min(parent, Math.round(cardW * 4 + 3 * 10)));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(document.body);
+    window.addEventListener("resize", fit);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
+  return (
+    <div ref={ref} className="mx-auto flex min-h-0 w-full flex-col gap-2" style={{ maxWidth: width ?? 900 }}>
+      <Header vote={vote} title="Xarita uchun ovoz berish" big={big} />
+      {MAP_PACKS.map((p) => (
+        <section key={p.id} className="space-y-1.5">
+          <p className="flex items-center gap-2 text-sm font-black lg:text-base">
+            <span className="text-lg">{p.emoji}</span> {p.name}
+            <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-xs">{packVotes(p, vote.counts)} ovoz</span>
+          </p>
+          <div className="grid grid-cols-4 gap-2.5">
+            {p.maps.map((id) => (
+              <MapCard key={id} id={id} n={vote.counts[id] ?? 0} max={max} mine={false} lead={isLead(id)} big={big} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
 }
 
 /** Telefon: 1) to'plamni tanlash, 2) xaritani tanlash (4 tasi bir qatorda) */

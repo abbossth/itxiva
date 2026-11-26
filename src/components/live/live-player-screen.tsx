@@ -1,5 +1,7 @@
 "use client";
 
+import { isTeamMode } from "@/lib/live-game/modes";
+
 import { AntiCheatGuard } from "@/components/anti-cheat/anti-cheat-guard";
 import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { CharacterSvg } from "@/components/character/character-svg";
@@ -237,7 +239,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
                 <Lives lives={me.lives} max={SURVIVAL_LIVES} />
               </span>
             )}
-            {state.mode === "team" && (
+            {isTeamMode(state.mode) && (
               <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 ring-1", TEAM_STYLES[me.team]?.soft)}>
                 <span className={cn("h-2 w-2 rounded-full", TEAM_STYLES[me.team]?.dot)} /> {me.teamName}
               </span>
@@ -561,7 +563,7 @@ function RevealView({
         </div>
       )}
 
-      {state.mode === "team" && state.standings.length > 0 && (
+      {isTeamMode(state.mode) && state.standings.length > 0 && (
         <div className="space-y-1.5">
           {state.standings.map((s) => (
             <div key={s.team} className={cn("flex items-center justify-between rounded-xl px-3 py-2 text-sm font-bold ring-1", TEAM_STYLES[s.team]?.soft)}>

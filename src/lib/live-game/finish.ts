@@ -39,7 +39,8 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
       joinedAt: new Date(p.createdAt ?? 0).getTime(),
     })),
     game.prizes,
-    game.teams
+    game.teams,
+    game.cells ?? []
   );
   const byId = new Map(players.map((p) => [p._id.toString(), p]));
   const modeTitle = LIVE_MODES[game.mode].title;

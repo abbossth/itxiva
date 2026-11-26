@@ -173,7 +173,7 @@ describe("taktikalar", () => {
   });
 });
 
-async function seed(mode: "race" | "territory" | "arena" | "rocket" | "bridge", count = 5) {
+async function seed(mode: "race" | "territory" | "arena" | "rocket" | "bridge" | "tug" | "siege" | "football" | "island", count = 5, teams = 2) {
   const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
   const group = await Group.create({ name: "9-A", grade: 9 });
   const mk = (login: string) => User.create({ login, fullName: login.toUpperCase(), role: "student", passwordHash: "x", groupId: group._id });
@@ -187,7 +187,7 @@ async function seed(mode: "race" | "territory" | "arena" | "rocket" | "bridge", 
     questions: Array.from({ length: count }, (_, i) => ({ type: "single_choice" as const, prompt: `${i}?`, options: [`ok${i}`, "x"], correctAnswers: [`ok${i}`], points: 1, timeLimit: 10 })),
   });
   as(mentor);
-  const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode, source: "all", count: 5, minigames: true });
+  const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode, source: "all", count: 5, minigames: true, teams });
   if (!res.success) throw new Error(res.error);
   const id = res.data.gameId;
   for (const s of [ali, vali]) {
@@ -310,6 +310,43 @@ describe("sarguzasht rejimlari (server)", () => {
     expect(mine).toBeGreaterThanOrEqual(2);
     expect((await player(ali)).score).toBe(mine * 100);
     expect((await player(vali)).score).toBe(0);
+  });
+
+  it("jamoaviy sarguzashtlar: o'quvchilar jamoalarga bo'linadi, natijada jamoa holati saqlanadi va g'olib jamoa coin oladi", async () => {
+    const { initialTeamCells, CASTLE_HP } = await import("@/lib/live-game/team-adventures");
+    // Qal'a qamali: 4 jamoa so'ralsa ham 2 o'yinchi — 2 jamoaga taqsimlanadi
+    const { mentor, ali, vali, id } = await seed("siege", 5, 3);
+    let g = (await LiveGame.findById(id).lean())!;
+    expect(g.teams).toBe(3);
+    expect(g.cells).toEqual(initialTeamCells("siege", 3));
+    const [pa, pv] = [await player(ali), await player(vali)];
+    expect(pa.team).not.toBe(pv.team);
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    g = (await LiveGame.findById(id).lean())!;
+    as(ali);
+    await live.answerLiveQuestionAction(id, g.index, g.questions[g.index].correctAnswers[0]);
+    expect((await live.chooseLiveTacticAction(id, g.index, "attack", String(pv.team))).success).toBe(true);
+    // Taktika oynasida hujum qilish mumkin bo'lgan qal'alar
+    const st = await live.getLivePlayerStateAction(id);
+    expect(st.success && st.data.tactics?.castles.map((c) => c.team)).toContain(pv.team);
+    as(vali);
+    await live.answerLiveQuestionAction(id, g.index, "x");
+    as(mentor);
+    await live.revealLiveQuestionAction(id);
+    g = (await LiveGame.findById(id).lean())!;
+    expect(g.cells[pv.team]).toBeLessThan(CASTLE_HP);
+    expect(g.cells[pa.team]).toBe(CASTLE_HP);
+    expect((await player(ali)).score).toBeGreaterThan(0);
+    // Proyektor holatida jamoalar tartibi o'yin holati bo'yicha
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.standings[0].team).toBe(pa.team);
+    expect(host.success && host.data.cells.length).toBe(8);
+  });
+
+  it("arqon tortish va futbol doim 2 jamoa", async () => {
+    const tug = await seed("tug", 5, 4);
+    expect((await LiveGame.findById(tug.id).lean())!.teams).toBe(2);
   });
 
   it("kiber arena rejimi: har 3 savoldan keyin qisqa jang, keyin savol davom etadi, oxirida final jang", async () => {

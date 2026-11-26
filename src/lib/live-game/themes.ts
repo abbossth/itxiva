@@ -19,6 +19,38 @@ export interface ModeTheme {
 }
 
 export const MODE_THEMES: Record<LiveGameMode, ModeTheme> = {
+  tug: {
+    emoji: "🪢",
+    bg: ["#160b06", "#3a1408", "#0b1f3a"],
+    glow: ["rgba(244,63,94,0.24)", "rgba(59,130,246,0.22)"],
+    accent: "#fb923c",
+    floaters: ["🪢", "💪", "🔥"],
+    music: { transpose: -2, tempo: 1.1, wave: "sawtooth", minor: false },
+  },
+  siege: {
+    emoji: "🏰",
+    bg: ["#0f0c08", "#2b2015", "#1c1917"],
+    glow: ["rgba(217,119,6,0.24)", "rgba(148,163,184,0.16)"],
+    accent: "#f59e0b",
+    floaters: ["🏰", "🏹", "🛡️"],
+    music: { transpose: -5, tempo: 0.95, wave: "sawtooth", minor: true },
+  },
+  football: {
+    emoji: "⚽",
+    bg: ["#03160b", "#064e3b", "#14532d"],
+    glow: ["rgba(132,204,22,0.24)", "rgba(255,255,255,0.12)"],
+    accent: "#a3e635",
+    floaters: ["⚽", "🥅", "🧤"],
+    music: { transpose: 2, tempo: 1.15, wave: "square", minor: false },
+  },
+  island: {
+    emoji: "🏝️",
+    bg: ["#031a24", "#0e4a5c", "#164e63"],
+    glow: ["rgba(45,212,191,0.24)", "rgba(251,191,36,0.2)"],
+    accent: "#2dd4bf",
+    floaters: ["🏝️", "🌴", "💰"],
+    music: { transpose: 4, tempo: 1.05, wave: "triangle", minor: false },
+  },
   zone: {
     emoji: "🟢",
     bg: ["#03130c", "#06281b", "#0b1e3a"],

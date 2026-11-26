@@ -769,11 +769,11 @@ export function PvpGame({
         }
         ctx.restore();
       }
-      // Ismlar — butalar ustida
+      // Ismlar — faqat jamoadoshlarda (dushmanning ismi ko'rinmaydi; yakka jangda — hech kimda)
       for (const p of world?.peers ?? []) {
-        if (p.isMe || (!p.out && !vis.has(p.id))) continue;
+        if (p.isMe || !sameTeam(myTeam, p.team) || (!p.out && !vis.has(p.id))) continue;
         const s = shown.get(p.id) ?? p;
-        nameTag(ctx, `${p.out ? "💀 " : ""}${sameTeam(myTeam, p.team) ? "🤝 " : ""}${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), 0, 0);
+        nameTag(ctx, `${p.out ? "💀 " : ""}🤝 ${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), 0, 0);
       }
       if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", 0, 0);
       // Emoji-reaksiyalar

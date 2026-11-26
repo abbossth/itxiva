@@ -25,7 +25,7 @@ import { MODE_THEMES } from "@/lib/live-game/themes";
 import { AdventureBoard } from "./adventure-boards";
 import { useLivePoll } from "./use-live-poll";
 import { ModeIntro } from "./live-intro";
-import { LIVE_MODES, SURVIVAL_LIVES } from "@/lib/live-game/modes";
+import { LIVE_MODES, SURVIVAL_LIVES, isTeamMode } from "@/lib/live-game/modes";
 import { playCheckInSound, playGameStart, playTickSound, unlockSound } from "@/lib/sound";
 import { liveMusic } from "@/lib/live-game/music";
 import { LiveLeaderboard } from "./live-leaderboard";
@@ -813,7 +813,7 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
           <SkipForward className="h-4 w-4" /> Natijani ko&apos;rsatish
         </Button>
       </div>
-      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} teams={state.mode === "team" ? state.standings : undefined} />
+      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} teams={isTeamMode(state.mode) ? state.standings : undefined} />
     </div>
   );
 }
@@ -921,7 +921,7 @@ function RevealView({
       {step === "board" ? (
         <>
           <p className="text-center text-sm font-black uppercase tracking-[0.35em] text-fuchsia-300">
-            {state.mode === "team" ? "Jamoalar poygasi" : `${state.index + 1}-savoldan keyin reyting`}
+            {state.mode === "team" ? "Jamoalar poygasi" : isTeamMode(state.mode) ? `${LIVE_MODES[state.mode].title} · ${state.index + 1}-savoldan keyin` : `${state.index + 1}-savoldan keyin reyting`}
           </p>
           {state.mode === "team" ? (
             <ModePanel state={state} />
