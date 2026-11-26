@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Brain, Calculator, CheckCheck, Crosshair, Gift, Hand, ListOrdered, Palette, Scale, ScanSearch, Sparkles, Tally5, Timer, Zap } from "lucide-react";
+import { Brain, Calculator, CheckCheck, Code2, Crosshair, Gift, Hand, Keyboard, ListOrdered, Palette, Scale, ScanSearch, Sparkles, Tally5, Timer, Zap } from "lucide-react";
 import { submitMinigameAction, type LiveMinigameView, type LivePlayerState } from "@/actions/live-game.actions";
-import { MINIGAMES, WHEEL, prizeOf, wheelPoints, wheelText, type MinigameKind } from "@/lib/live-game/minigames";
+import { MINIGAMES, WHEEL, comboGain, prizeOf, wheelPoints, wheelText, type MinigameKind } from "@/lib/live-game/minigames";
 import { haptic } from "@/lib/haptics";
 import { fireConfetti } from "@/lib/confetti";
 import { playCheckInSound, playCorrectSound, playFanfare, playRewardSound, playTickSound, playWrongSound } from "@/lib/sound";
@@ -28,6 +28,8 @@ const ICONS: Record<MinigameKind, typeof Hand> = {
   sequence: ListOrdered,
   count: Tally5,
   truth: CheckCheck,
+  code: Code2,
+  typing: Keyboard,
 };
 const GRADIENT: Record<MinigameKind, string> = {
   tap: "from-orange-500 to-rose-600",
@@ -43,6 +45,8 @@ const GRADIENT: Record<MinigameKind, string> = {
   sequence: "from-indigo-500 to-sky-500",
   count: "from-rose-500 to-fuchsia-600",
   truth: "from-teal-500 to-lime-500",
+  code: "from-slate-700 to-emerald-600",
+  typing: "from-blue-500 to-violet-600",
 };
 const WHEEL_SEGMENTS = WHEEL.map((w) => ({ label: w.label, icon: w.icon, color: w.color }));
 
@@ -57,8 +61,10 @@ function valueLabel(kind: MinigameKind, value: number): string {
       return `${value} nishon`;
     case "tap":
       return `${value} marta`;
+    case "typing":
+      return `${value} so'z`;
     default:
-      return `${value} ta to'g'ri`;
+      return `${value} ball`;
   }
 }
 
@@ -300,7 +306,26 @@ export function MinigamePlayer({ gameId, m }: { gameId: string; m: PlayerMinigam
   }
   const props = { gameId, round: m.round, remaining, active: playing };
   if (!mounted) return <div className="min-h-[50vh]" />;
-  switch (m.kind) {
+  return (
+    <div className="space-y-2">
+      {/* Jonli o'rin: o'yin davomida yangilanib turadi */}
+      <div className="flex justify-end">
+        <span
+          className={cn(
+            "rounded-full px-3 py-1 text-xs font-black transition-colors",
+            m.place === 1 ? "bg-amber-400 text-slate-950" : m.place > 0 ? "bg-white/15 text-white" : "bg-white/5 text-slate-400"
+          )}
+        >
+          {m.place === 1 ? "👑 Hozir 1-o'rindasiz!" : m.place > 0 ? `🏅 Hozir ${m.place}-o'rindasiz` : "Boshlang — o'rningiz shu yerda ko'rinadi"}
+        </span>
+      </div>
+      <MinigameBody kind={m.kind} props={props} />
+    </div>
+  );
+}
+
+function MinigameBody({ kind, props }: { kind: MinigameKind; props: GameProps }) {
+  switch (kind) {
     case "memory":
       return <MemoryGame {...props} />;
     case "math":
@@ -319,6 +344,10 @@ export function MinigamePlayer({ gameId, m }: { gameId: string; m: PlayerMinigam
       return <ChoiceGame {...props} make={makeCount} title="Sanab ko'r" />;
     case "truth":
       return <TruthGame {...props} />;
+    case "code":
+      return <ChoiceGame {...props} make={makeCode} title="Kod natijasi" />;
+    case "typing":
+      return <TypingGame {...props} />;
     case "tap":
     case "target":
     default:
@@ -879,10 +908,176 @@ function TruthGame(props: GameProps) {
   return <ChoiceGame {...props} make={make} title="Rost yoki yolg'on" />;
 }
 
+/* ---------- Kod natijasi: Python kodi nima chiqaradi? ---------- */
+
+function codeBlock(src: string) {
+  return (
+    <pre className="max-w-full overflow-hidden whitespace-pre-wrap rounded-2xl bg-slate-950/80 px-4 py-3 text-left font-mono text-lg leading-relaxed text-emerald-200 ring-1 ring-white/10 sm:text-2xl lg:text-3xl">
+      {src}
+    </pre>
+  );
+}
+
+/** Javob va unga o'xshash 3 ta noto'g'ri variant */
+function withDistractors(answer: string, wrong: string[]): Challenge["options"] {
+  const uniq = [...new Set(wrong.filter((w) => w !== answer))].slice(0, 3);
+  while (uniq.length < 3) uniq.push(`${answer}${uniq.length + 1}`);
+  return shuffle([answer, ...uniq]).map((label) => ({ label, key: label }));
+}
+const nums = (n: number, ...d: number[]) => d.map((x) => String(n + x));
+
+function makeCode(level: number): Challenge {
+  const hard = level >= 4;
+  const t = rnd(0, hard ? 11 : 7);
+  let src = "";
+  let answer = "";
+  let wrong: string[] = [];
+  if (t === 0) {
+    const a = rnd(2, 9), b = rnd(1, 9), c = rnd(2, 4);
+    src = `x = ${a}\nx += ${b}\nprint(x * ${c})`;
+    answer = String((a + b) * c);
+    wrong = [String(a + b * c), String(a * c + b), ...nums((a + b) * c, c, -c)];
+  } else if (t === 1) {
+    const a = rnd(10, 40), b = rnd(3, 7);
+    src = `print(${a} // ${b}, ${a} % ${b})`;
+    answer = `${Math.floor(a / b)} ${a % b}`;
+    wrong = [`${a % b} ${Math.floor(a / b)}`, `${(a / b).toFixed(1)} ${a % b}`, `${Math.floor(a / b) + 1} ${a % b}`];
+  } else if (t === 2) {
+    const words = ["python", "kompyuter", "dastur", "algoritm", "massiv"];
+    const w = words[rnd(0, words.length - 1)];
+    const i = rnd(0, 2), j = rnd(i + 2, Math.min(w.length, i + 5));
+    src = `s = "${w}"\nprint(s[${i}:${j}])`;
+    answer = w.slice(i, j);
+    wrong = [w.slice(i, j + 1), w.slice(i + 1, j + 1), w.slice(Math.max(0, i - 1), j)];
+  } else if (t === 3) {
+    const w = ["salom", "python", "ITXiva", "kod", "dasturchi"][rnd(0, 4)];
+    src = `print(len("${w}"))`;
+    answer = String(w.length);
+    wrong = nums(w.length, 1, -1, 2);
+  } else if (t === 4) {
+    const arr = [rnd(1, 9), rnd(1, 9), rnd(1, 9), rnd(1, 9)];
+    src = `n = [${arr.join(", ")}]\nprint(n[-1] + n[0])`;
+    answer = String(arr[3] + arr[0]);
+    wrong = [String(arr[0] + arr[1]), String(arr[2] + arr[3]), String(arr[3] - arr[0])];
+  } else if (t === 5) {
+    const k = rnd(3, 6);
+    src = `t = 0\nfor i in range(${k}):\n    t += i\nprint(t)`;
+    answer = String((k * (k - 1)) / 2);
+    wrong = [String((k * (k + 1)) / 2), String(k), String(k * k)];
+  } else if (t === 6) {
+    const s = ["ab", "ha", "xo"][rnd(0, 2)], k = rnd(2, 3);
+    src = `print("${s}" * ${k})`;
+    answer = s.repeat(k);
+    wrong = [s.repeat(k + 1), `${s}${k}`, `${s} * ${k}`];
+  } else if (t === 7) {
+    const k = rnd(3, 6);
+    src = `print(2 ** ${k})`;
+    answer = String(2 ** k);
+    wrong = [String(2 * k), String(k ** 2), String(2 ** (k + 1))];
+  } else if (t === 8) {
+    const a = rnd(1, 9), b = rnd(1, 9), c = rnd(1, 9), d = rnd(1, 9);
+    src = `print(${a} > ${b} and ${c} < ${d})`;
+    answer = String(a > b && c < d ? "True" : "False");
+    wrong = [answer === "True" ? "False" : "True", "None", "Error"];
+  } else if (t === 9) {
+    const x = rnd(10, 99);
+    src = `x = ${x}\nif x % 2 == 0:\n    print("juft")\nelse:\n    print("toq")`;
+    answer = x % 2 === 0 ? "juft" : "toq";
+    wrong = [answer === "juft" ? "toq" : "juft", "True", String(x % 2)];
+  } else if (t === 10) {
+    const arr = [rnd(1, 9), rnd(1, 9), rnd(1, 9)];
+    src = `a = [${arr.join(", ")}]\na.append(${arr[0]})\nprint(sum(a))`;
+    const sm = arr.reduce((x, y) => x + y, 0) + arr[0];
+    answer = String(sm);
+    wrong = nums(sm, -arr[0], 1, arr[1]);
+  } else {
+    const k = rnd(2, 4), m = rnd(2, 3);
+    src = `c = 0\nfor i in range(${k}):\n    for j in range(${m}):\n        c += 1\nprint(c)`;
+    answer = String(k * m);
+    wrong = [String(k + m), String(k * m + 1), String((k - 1) * m)];
+  }
+  return { prompt: codeBlock(src), options: withDistractors(answer, wrong), answer };
+}
+
+/* ---------- Tez yozish: so'zni xatosiz yozish ---------- */
+
+const TYPE_WORDS = [
+  ["kod", "sikl", "list", "bool", "web", "fayl", "json", "html", "css", "int"],
+  ["python", "dastur", "funksiya", "massiv", "server", "brauzer", "kompyuter", "string", "print", "input"],
+  ["algoritm", "dasturchi", "internet", "klaviatura", "parametr", "kutubxona", "operator", "interfeys", "ma'lumot", "xotira"],
+];
+const normWord = (s: string) => s.trim().toLowerCase().replace(/[ʻʼ‘’`´]/g, "'");
+
+function TypingGame({ gameId, round, remaining, active }: GameProps) {
+  const [score, setScore] = useState(0);
+  const [word, setWord] = useState(() => TYPE_WORDS[0][rnd(0, TYPE_WORDS[0].length - 1)]);
+  const [text, setText] = useState("");
+  const [flash, setFlash] = useState(0);
+  useReporter(gameId, round, score, active);
+  const nextWord = (n: number) => {
+    const tier = TYPE_WORDS[Math.min(TYPE_WORDS.length - 1, Math.floor(n / 4))];
+    let w = tier[rnd(0, tier.length - 1)];
+    if (w === word) w = tier[(tier.indexOf(w) + 1) % tier.length];
+    setWord(w);
+  };
+  const typed = normWord(text);
+  const target = normWord(word);
+  const okPrefix = target.startsWith(typed);
+  return (
+    <div className="relative flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-slate-300">
+          Tez yozish: <span className="font-mono text-2xl font-black text-white">{score}</span>
+        </span>
+        <Clock remaining={remaining} />
+      </div>
+      <div className="relative flex min-h-[22vh] items-center justify-center overflow-hidden rounded-3xl bg-white/5 px-4 text-center ring-1 ring-white/10">
+        {flash > 0 && <span key={flash} className="live-flash absolute inset-0 bg-emerald-500/40" />}
+        <span className="relative font-mono text-4xl font-black tracking-wide sm:text-6xl">
+          {[...word].map((ch, i) => (
+            <span key={i} className={i < typed.length ? (typed[i] === normWord(ch) ? "text-emerald-300" : "text-rose-400") : "text-white"}>
+              {ch}
+            </span>
+          ))}
+        </span>
+      </div>
+      <input
+        value={text}
+        disabled={!active}
+        autoFocus
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
+        inputMode="text"
+        aria-label="So'zni yozing"
+        onChange={(e) => {
+          const v = e.target.value;
+          if (normWord(v) === target) {
+            haptic([10]);
+            setFlash((f) => f + 1);
+            setScore((s) => s + 1);
+            setText("");
+            nextWord(score + 1);
+            return;
+          }
+          setText(v);
+        }}
+        className={cn(
+          "min-h-[56px] w-full rounded-2xl border-2 bg-white/10 px-4 text-center font-mono text-2xl font-bold text-white outline-none",
+          okPrefix ? "border-white/20 focus:border-emerald-400" : "border-rose-500"
+        )}
+        placeholder="shu yerga yozing…"
+      />
+    </div>
+  );
+}
+
 const LOCK_MS = 1500;
 
 function ChoiceGame({ gameId, round, remaining, active, make, title }: GameProps & { make: (level: number) => Challenge; title: string }) {
   const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [challenge, setChallenge] = useState<Challenge>(() => make(0));
   const [locked, setLocked] = useState(false);
   const [flash, setFlash] = useState<{ ok: boolean; key: number } | null>(null);
@@ -893,10 +1088,18 @@ function ChoiceGame({ gameId, round, remaining, active, make, title }: GameProps
     const ok = key === challenge.answer;
     setFlash((f) => ({ ok, key: (f?.key ?? 0) + 1 }));
     if (ok) {
-      haptic([10]);
-      setScore((s) => s + 1);
+      const next = streak + 1;
+      haptic(next === 3 || next === 6 ? [15, 30, 15] : [10]);
+      // Kombo bosqichiga chiqqanda — tovush va konfetti
+      if (next === 3 || next === 6) {
+        playCorrectSound();
+        void fireConfetti({ particleCount: next === 6 ? 70 : 35, spread: 60, origin: { y: 0.6 } });
+      }
+      setStreak(next);
+      setScore((s) => s + comboGain(next));
       setChallenge(make(score + 1));
     } else {
+      setStreak(0);
       haptic([60, 40, 60]);
       playWrongSound();
       setLocked(true);
@@ -913,6 +1116,18 @@ function ChoiceGame({ gameId, round, remaining, active, make, title }: GameProps
         <span className="text-sm font-bold text-slate-300">
           {title}: <span className="font-mono text-2xl font-black text-white">{score}</span>
         </span>
+        {streak >= 2 && (
+          <span
+            key={comboGain(streak)}
+            className={cn(
+              "live-pop rounded-full px-3 py-1 font-mono text-sm font-black",
+              streak >= 6 ? "bg-gradient-to-r from-rose-500 to-amber-400 text-white" : streak >= 3 ? "bg-orange-500 text-white" : "bg-white/10 text-orange-200"
+            )}
+          >
+            🔥 {streak}
+            {comboGain(streak) > 1 ? ` · ×${comboGain(streak)}` : ""}
+          </span>
+        )}
         <Clock remaining={remaining} />
       </div>
       <div

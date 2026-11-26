@@ -29,6 +29,42 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-minigames-combo-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "Mini o'yinlar qiziqroq bo'ldi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🔥",
+        title: "Kombo!",
+        text: "Savolli mini o'yinlarda ketma-ket to'g'ri javob — 🔥 kombo: 3 tadan har javob ×2, 6 tadan ×3 ball. Xato qilsangiz kombo yonib ketadi. O'yin davomida nechanchi o'rinda ekaningiz ham ko'rinib turadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "💻",
+        title: "Ikki yangi o'yin",
+        text: "«Kod natijasi» — Python kodi nima chiqarishini toping. «Tez yozish» — ekrandagi IT so'zini tez va xatosiz yozing!",
+      },
+    ],
+  },
+  {
+    id: "mentor-minigames-combo-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Mini o'yinlar: kombo va 2 ta yangi o'yin",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🔥",
+        title: "Kombo, «Kod natijasi», «Tez yozish»",
+        text: "Savolli mini o'yinlarda ketma-ket to'g'ri javob kombo beradi (×2, ×3). Yangi: «Kod natijasi» (Python kodi nima chiqaradi — darslarga bog'liq) va «Tez yozish». O'quvchilar o'yin davomida o'z o'rnini ko'radi.",
+      },
+    ],
+  },
+  {
     id: "student-promo-2026-11-26",
     date: "2026-11-26",
     audience: "student",

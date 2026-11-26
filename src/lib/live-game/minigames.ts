@@ -14,12 +14,19 @@ export type MinigameKind =
   | "compare"
   | "sequence"
   | "count"
-  | "truth";
+  | "truth"
+  | "code"
+  | "typing";
 // "Tezkor bosish" endi tanlanmaydi (o'quvchilar sichqonchani qiynab bosardi); tur faqat eski o'yinlar uchun qoldi.
 // Yangi o'yinlar tez-tez bosishga emas — xotira, hisob, diqqat va reaksiyaga asoslangan: noto'g'ri bosish vaqt oladi.
-export const MINIGAME_KINDS: MinigameKind[] = ["target", "memory", "math", "colors", "reaction", "spot", "compare", "sequence", "count", "truth", "wheel", "bonus"];
-/** Savolga javob beriladigan (to'g'ri javoblar soni hisoblanadigan) o'yinlar */
-export const CHOICE_MINIGAMES = ["math", "colors", "spot", "compare", "sequence", "count", "truth"] as const;
+export const MINIGAME_KINDS: MinigameKind[] = ["target", "memory", "math", "colors", "reaction", "spot", "compare", "sequence", "count", "truth", "code", "typing", "wheel", "bonus"];
+/**
+ * Savolga javob beriladigan o'yinlar. Natija — ball: ketma-ket to'g'ri javoblar KOMBO beradi
+ * (3 tadan — ×2, 6 tadan — ×3), xato kombo'ni nolga tushiradi.
+ */
+export const CHOICE_MINIGAMES = ["math", "colors", "spot", "compare", "sequence", "count", "truth", "code"] as const;
+/** Kombo: ketma-ket nechanchi to'g'ri javob qancha ball beradi */
+export const comboGain = (streak: number) => (streak >= 6 ? 3 : streak >= 3 ? 2 : 1);
 /** Tanlanish vazni: omad g'ildiragi eng sevimlisi — tez-tez chiqadi */
 const MINIGAME_WEIGHT: Partial<Record<MinigameKind, number>> = {
   target: 2,
@@ -32,6 +39,8 @@ const MINIGAME_WEIGHT: Partial<Record<MinigameKind, number>> = {
   sequence: 2,
   count: 2,
   truth: 2,
+  code: 3,
+  typing: 2,
   wheel: 4,
   bonus: 1,
 };
@@ -50,6 +59,8 @@ export const MINIGAMES: Record<MinigameKind, { title: string; rule: string; seco
   sequence: { title: "Keyingi son", rule: "Qonuniyatni toping va qatordagi keyingi sonni tanlang", seconds: 20 },
   count: { title: "Sanab ko'r", rule: "Aralash belgilar ichida ko'rsatilgani nechta? Tez va aniq sanang", seconds: 20 },
   truth: { title: "Rost yoki yolg'on", rule: "IT haqidagi gap to'g'rimi? Tez javob bering. Xato — 1,5 soniya pauza", seconds: 20 },
+  code: { title: "Kod natijasi", rule: "Python kodi nima chiqaradi? Ketma-ket to'g'ri javob — 🔥 kombo (×2, ×3)!", seconds: 25 },
+  typing: { title: "Tez yozish", rule: "Ekrandagi so'zni tez va xatosiz yozing — har so'z ochko!", seconds: 20 },
 };
 
 /** O'yin boshlanishidan oldingi sanoq (soniya) */
@@ -91,6 +102,8 @@ const ROUND_WEIGHT: Record<RoundKind, number> = {
   sequence: 2,
   count: 2,
   truth: 2,
+  code: 3,
+  typing: 2,
   wheel: 3,
   bonus: 1,
   zone: 2,
@@ -132,14 +145,17 @@ export const MINIGAME_CAP: Record<ScoredMinigame, number> = {
   tap: 150,
   target: 40,
   memory: 20,
-  math: 40,
-  colors: 40,
+  // Kombo bilan ball ko'proq bo'ladi
+  math: 60,
+  colors: 60,
   reaction: 5000,
-  spot: 40,
-  compare: 40,
-  sequence: 40,
-  count: 40,
-  truth: 40,
+  spot: 60,
+  compare: 60,
+  sequence: 60,
+  count: 60,
+  truth: 60,
+  code: 60,
+  typing: 40,
 };
 /** Reaksiya: bundan tezi odam emas — hisoblanmaydi */
 export const REACTION_MIN_MS = 120;
@@ -176,6 +192,8 @@ export function minigamePoints(kind: MinigameKind, values: { id: string; value: 
     for (const v of values) out.set(v.id, Math.min(v.value, MINIGAME_CAP.memory) * 80);
   } else if ((CHOICE_MINIGAMES as readonly string[]).includes(kind)) {
     for (const v of values) out.set(v.id, Math.min(v.value, MINIGAME_CAP[kind as ScoredMinigame]) * 40);
+  } else if (kind === "typing") {
+    for (const v of values) out.set(v.id, Math.min(v.value, MINIGAME_CAP.typing) * 50);
   } else if (kind === "reaction") {
     const valid = values.filter((v) => v.value >= REACTION_MIN_MS).sort((a, b) => a.value - b.value);
     valid.forEach((v, i) => out.set(v.id, REACTION_PLACES[i] ?? 150));

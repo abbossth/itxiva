@@ -98,7 +98,7 @@ describe("qoidalar", () => {
     for (const zone of [false, true]) {
       const history: string[] = [];
       const kinds = mg.MINIGAME_KINDS.length + (zone ? 1 : 0);
-      expect(mg.MINIGAME_KINDS.length).toBe(12);
+      expect(mg.MINIGAME_KINDS.length).toBe(14);
       for (let i = 0; i < kinds; i++) history.push(mg.pickRound(history, zone, Math.random()));
       expect(new Set(history).size).toBe(history.length);
       expect(history.includes("zone")).toBe(zone);
@@ -114,7 +114,7 @@ describe("qoidalar", () => {
       const p = mg.minigamePoints(kind, [{ id: "a", value: 7 }, { id: "b", value: 0 }]);
       expect(p.get("a")).toBe(280);
       expect(p.get("b")).toBe(0);
-      expect(mg.clampMinigameValue(kind, 999)).toBe(40);
+      expect(mg.clampMinigameValue(kind, 999)).toBe(60);
     }
   });
 
@@ -130,7 +130,11 @@ describe("qoidalar", () => {
   it("yangi o'yinlar: xotira ×80, hisob va rang ×40, reaksiya — eng tezlarga o'rin bo'yicha; odam bo'lmagan tezlik hisoblanmaydi", () => {
     expect(mg.minigamePoints("memory", [{ id: "a", value: 7 }]).get("a")).toBe(560);
     expect(mg.minigamePoints("math", [{ id: "a", value: 12 }]).get("a")).toBe(480);
-    expect(mg.minigamePoints("colors", [{ id: "a", value: 99 }]).get("a")).toBe(40 * 40);
+    expect(mg.minigamePoints("colors", [{ id: "a", value: 99 }]).get("a")).toBe(60 * 40);
+    expect(mg.minigamePoints("code", [{ id: "a", value: 10 }]).get("a")).toBe(400);
+    expect(mg.minigamePoints("typing", [{ id: "a", value: 12 }]).get("a")).toBe(600);
+    // Kombo: 1–2 to'g'ri — 1, 3–5 — 2, 6+ — 3 ball
+    expect([1, 2, 3, 5, 6, 9].map(mg.comboGain)).toEqual([1, 1, 2, 2, 3, 3]);
     const r = mg.minigamePoints("reaction", [
       { id: "slow", value: 450 },
       { id: "fast", value: 210 },
@@ -276,7 +280,7 @@ describe("o'yin ichida", () => {
     await playQuestions(mentor, id, 3);
     await skipFirstWheel(id);
     // tur: reaksiya (vaznlar: target, memory, math, colors, reaction 2 tadan → 0.375 * 24 = 9)
-    vi.spyOn(Math, "random").mockReturnValue(0.375);
+    vi.spyOn(Math, "random").mockReturnValue(0.3);
     await live.startLiveQuestionAction(id);
     vi.restoreAllMocks();
     expect((await LiveGame.findById(id).lean())?.minigame?.kind).toBe("reaction");

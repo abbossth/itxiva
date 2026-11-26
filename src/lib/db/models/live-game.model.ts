@@ -219,7 +219,7 @@ const LiveGameSchema = new Schema<ILiveGame>(
       type: new Schema(
         {
           round: Number,
-          kind: { type: String, enum: ["tap", "target", "wheel", "bonus", "memory", "math", "colors", "reaction", "spot", "compare", "sequence", "count", "truth"] },
+          kind: { type: String, enum: ["tap", "target", "wheel", "bonus", "memory", "math", "colors", "reaction", "spot", "compare", "sequence", "count", "truth", "code", "typing"] },
           startedAt: Date,
           endsAt: Date,
           endedAt: { type: Date, default: null },
