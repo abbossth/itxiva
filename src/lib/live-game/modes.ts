@@ -29,7 +29,7 @@ export const LIVE_MODES: Record<LiveGameMode, { title: string; tagline: string; 
   arena: {
     title: "Kiber arena",
     tagline: "Savol — jang — savol: hamma hammaga qarshi",
-    rules: ["Har 3 savoldan keyin 45 soniyalik otishma", "To'g'ri javoblar — ko'proq jon va kuchliroq qurol", "Oxirida 2 daqiqalik katta final jang"],
+    rules: ["Har 3 savoldan keyin 90 soniyalik otishma", "To'g'ri javoblar — kuchliroq va tezroq lazer", "Oxirida 2 daqiqalik katta final jang"],
   },
   zone: {
     title: "Yashil zona",

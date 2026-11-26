@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-90s-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kiber jang endi 90 soniya",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⏱️",
+        title: "Ko'proq vaqt",
+        text: "Savollar orasidagi Kiber jang 45 emas, 90 soniya davom etadi — sovg'a yig'ish, jamoadoshni qutqarish va zona torayishidan qochishga vaqt yetadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-90s-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Kiber jang: 90 soniya",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⏱️",
+        title: "Savollar orasidagi jang uzaytirildi",
+        text: "Har 3 savoldan keyingi jang endi 90 soniya (avval 45). Oxirgi final jang avvalgidek 2 daqiqa.",
+      },
+    ],
+  },
+  {
     id: "student-minigames-combo-2026-11-26",
     date: "2026-11-26",
     audience: "student",

@@ -93,7 +93,8 @@ import { INTRO_MS, borderRivals, bridgeLength, emptyCells, isAdventure, isTactic
 
 /** "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang, oxirida final */
 const ARENA_EVERY = 3;
-const ROUND_SECONDS = 45;
+// Savollar orasidagi jang: zona torayishi va qutqarishga vaqt yetishi uchun 90 s
+const ROUND_SECONDS = 90;
 
 function introLeft(game: Pick<ILiveGame, "status" | "introAt">): number {
   if (game.status !== "lobby" || !game.introAt) return 0;
