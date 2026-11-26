@@ -7,6 +7,7 @@ import { Product, IProductData } from "@/lib/db/models/product.model";
 import { Order, IOrder, IOrderData, OrderStatus } from "@/lib/db/models/order.model";
 import { User } from "@/lib/db/models/user.model";
 import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
+import { Promo } from "@/lib/db/models/promo.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getCurrentUser, requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { archiveEntity } from "@/lib/archive";
@@ -467,9 +468,12 @@ export async function getOrdersBadgeCount(): Promise<number> {
   if (!session) return 0;
   try {
     await connectToDatabase();
-    return session.role === "mentor"
-      ? await Order.countDocuments({ status: "pending" })
-      : await Order.countDocuments({ studentId: session.userId, status: "handed_over" });
+    if (session.role === "mentor") {
+      // Do'kon nishoni: yangi buyurtmalar va tasdiqlanmagan bosh sahifa e'lonlari
+      const [orders, promos] = await Promise.all([Order.countDocuments({ status: "pending" }), Promo.countDocuments({ status: "pending" })]);
+      return orders + promos;
+    }
+    return await Order.countDocuments({ studentId: session.userId, status: "handed_over" });
   } catch {
     return 0;
   }

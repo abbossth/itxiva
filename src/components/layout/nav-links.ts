@@ -52,7 +52,7 @@ export interface NavLink {
   more?: true;
 }
 
-export type NavBadgeKind = "orders" | "homework" | "quests" | "chat";
+export type NavBadgeKind = "orders" | "homework" | "quests" | "chat" | "promos";
 export type NavBadges = Partial<Record<NavBadgeKind, number>>;
 
 export const MENTOR_LINKS: NavLink[] = [
@@ -102,6 +102,7 @@ export const MENTOR_SECTIONS: { label: string; tabs: NavTab[] }[] = [
     tabs: [
       { href: "/mentor/shop", label: "Mahsulotlar", icon: Package },
       { href: "/mentor/orders", label: "Buyurtmalar", icon: PackageCheck, badge: "orders" },
+      { href: "/mentor/shop/promos", label: "Bosh sahifa e'lonlari", icon: Megaphone, badge: "promos" },
     ],
   },
   {

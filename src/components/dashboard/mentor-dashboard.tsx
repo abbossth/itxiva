@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 const todayLabel = () =>
   new Date().toLocaleDateString("uz-UZ", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Tashkent" });
 
-export function MentorDashboardView({ data }: { data: MentorDashboard }) {
+export function MentorDashboardView({ data, promos }: { data: MentorDashboard; promos?: React.ReactNode }) {
   const q = data.queue;
   const queueTotal = q.homework + q.exams + q.quests + q.orders;
   const subtitle =
@@ -118,6 +118,8 @@ export function MentorDashboardView({ data }: { data: MentorDashboard }) {
           )}
         </DashCard>
       </div>
+
+      {promos}
 
       {/* Haftalik ko'rsatkichlar */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

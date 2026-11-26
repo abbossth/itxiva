@@ -29,6 +29,38 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-promo-2026-11-26",
+    date: "2026-11-26",
+    audience: "student",
+    badge: "Yangi",
+    title: "Bosh sahifada e'loningiz",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📣",
+        title: "Loyihangizni hammaga ko'rsating",
+        text: "Do'konda \"Bosh sahifada e'lon\": o'zingiz, loyihangiz yoki e'loningiz haqida kartochka yarating — u hammaning bosh sahifasida chiqadi. Kuniga 150 coin, 1–3 kun. Ustoz tasdiqlagach chiqadi; rad etilsa coin qaytadi.",
+      },
+    ],
+    cta: { label: "Do'konni ochish", href: "/shop#promo" },
+  },
+  {
+    id: "mentor-promo-2026-11-26",
+    date: "2026-11-26",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "O'quvchilar e'lonlari",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📣",
+        title: "Coin evaziga bosh sahifada e'lon",
+        text: "O'quvchilar do'kondan bosh sahifaga e'lon (o'zi, loyihasi) joylay oladi. Do'kon → \"Bosh sahifa e'lonlari\" bo'limida tasdiqlang yoki sabab bilan rad eting (coin qaytadi). Bir vaqtda 3 tagacha chiqadi, ko'rinib turganini ham olib tashlash mumkin.",
+      },
+    ],
+    cta: { label: "E'lonlarni ko'rish", href: "/mentor/shop/promos" },
+  },
+  {
     id: "mentor-home-redesign-2026-11-25",
     date: "2026-11-25",
     audience: "mentor",

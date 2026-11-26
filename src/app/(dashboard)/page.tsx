@@ -5,6 +5,8 @@ import { getMentorDashboard, getStudentDashboard, getStudentHomeStats } from "@/
 import { getStudentQuestsData } from "@/actions/student-quest.actions";
 import { MentorDashboardView } from "@/components/dashboard/mentor-dashboard";
 import { StudentDashboardView } from "@/components/dashboard/student-dashboard";
+import { getActivePromos } from "@/actions/promo.actions";
+import { PromoBoard } from "@/components/promo/promo-board";
 
 export const metadata = {
   title: "Bosh sahifa — ITXiva",
@@ -16,8 +18,9 @@ export default async function DashboardPage() {
   if (session.role === "mentor") {
     // Kun davomida (AI limiti tiklangach) bajarilmay qolgan AI tekshiruvlari fonda qayta bajariladi — soatiga bir marta
     after(() => retryFailedAiWork().catch((error) => console.error("AI retry error:", error)));
-    return <MentorDashboardView data={await getMentorDashboard()} />;
+    const [data, promos] = await Promise.all([getMentorDashboard(), getActivePromos().catch(() => [])]);
+    return <MentorDashboardView data={data} promos={<PromoBoard promos={promos} role="mentor" />} />;
   }
-  const [data, stats, quests] = await Promise.all([getStudentDashboard(), getStudentHomeStats(), getStudentQuestsData()]);
-  return <StudentDashboardView data={data} stats={stats} quests={quests} />;
+  const [data, stats, quests, promos] = await Promise.all([getStudentDashboard(), getStudentHomeStats(), getStudentQuestsData(), getActivePromos().catch(() => [])]);
+  return <StudentDashboardView data={data} stats={stats} quests={quests} promos={<PromoBoard promos={promos} role="student" />} />;
 }

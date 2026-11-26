@@ -13,11 +13,14 @@ export function StudentDashboardView({
   data,
   stats,
   quests,
+  promos,
 }: {
   data: StudentDashboard;
   stats: StudentHomeStats;
   /** Gamifikatsiya o'chiq bo'lsa null */
   quests: StudentQuestsData | null;
+  /** O'quvchilar e'lonlari (bosh sahifa taxtasi) */
+  promos?: React.ReactNode;
 }) {
   const { homework } = data;
   const subtitle =
@@ -30,6 +33,8 @@ export function StudentDashboardView({
   return (
     <div className="space-y-4 pb-12">
       <Greeting name={data.firstName} subtitle={subtitle} />
+
+      {promos}
 
       {data.attendanceOpen && (
         <Link

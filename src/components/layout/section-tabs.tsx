@@ -22,6 +22,8 @@ export function SectionTabs({
   const pathname = usePathname();
   const section = sectionsFor(role, gamification).find((s) => s.tabs.some((t) => isNavLinkActive(t.href, pathname)));
   if (!section) return null;
+  // Eng aniq mos keladigan tab (masalan /mentor/shop/promos ochiq bo'lsa — /mentor/shop emas)
+  const activeHref = section.tabs.filter((t) => isNavLinkActive(t.href, pathname)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <nav
@@ -35,7 +37,7 @@ export function SectionTabs({
         </span>
         {section.tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = isNavLinkActive(tab.href, pathname);
+          const isActive = tab.href === activeHref;
           const count = tab.badge ? badges[tab.badge] ?? 0 : 0;
           return (
             <Link

@@ -13,6 +13,7 @@ import { getHomeworkBadgeCount } from "@/actions/homework.actions";
 import { getAppSettings } from "@/lib/settings";
 import { connectToDatabase } from "@/lib/db/connect";
 import { User } from "@/lib/db/models/user.model";
+import { Promo } from "@/lib/db/models/promo.model";
 import { getStudentLevelState } from "@/actions/gamification.actions";
 import { getQuestsBadgeCount } from "@/actions/quest-review.actions";
 import { LevelUpModal } from "@/components/gamification/level-up-modal";
@@ -64,7 +65,8 @@ export default async function DashboardLayout({
   const accentStyle = accentCss(settings.accent);
   const sidebarCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
   const gamification = settings.gamification.enabled;
-  const badges = { orders, homework, quests, chat };
+  const promos = session.role === "mentor" ? await Promo.countDocuments({ status: "pending" }).catch(() => 0) : 0;
+  const badges = { orders, homework, quests, chat, promos };
   // Bezaklar: o'quvchi profilida effektlarni o'chirgan bo'lsa — ko'rsatilmaydi
   const effectsOn = session.role !== "student" || me?.celebrationsEnabled !== false;
   const ambience = effectsOn ? resolveAmbience(settings.ambience, toDateKey()) : null;
