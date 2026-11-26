@@ -39,11 +39,13 @@ function Crew({ list, size, win, flip = false, className }: { list: LivePlayerRo
   return (
     <div className={cn("flex items-end", className)} style={{ gap: -size * 0.25 }}>
       {list.map((p) => (
-        <div key={p.id} className="flex flex-col items-center" style={{ marginInline: -size * 0.12 }}>
+        <div key={p.id} className="flex flex-col items-center" style={{ marginInline: -size * 0.04 }}>
           <div style={flip ? { transform: "scaleX(-1)" } : undefined}>
             <CharacterSvg look={p.look} size={size} mood={moodOf(p, win)} pedestal={false} still={list.length > 6} />
           </div>
-          <span className="max-w-[5.5rem] truncate rounded-full bg-black/40 px-1.5 text-[10px] font-bold">{firstName(p.name)}</span>
+          <span className="truncate rounded-full bg-black/40 px-1.5 text-[10px] font-bold" style={{ maxWidth: Math.max(44, size + 6) }}>
+            {firstName(p.name)}
+          </span>
         </div>
       ))}
     </div>
@@ -234,14 +236,16 @@ function cellPos(i: number): { x: number; y: number } {
   const row = Math.floor(k / COLS);
   const col = k % COLS;
   const x = row % 2 === 0 ? col : COLS - 1 - col;
-  return { x: 6 + x * (88 / (COLS - 1)), y: 86 - row * 22 };
+  // 37 katak (0…36) — 5 qator; oxirgi qatorda faqat 🏆 xazina
+  const rows = Math.ceil((ISLAND_LEN + 1) / COLS);
+  return { x: 6 + x * (88 / (COLS - 1)), y: 90 - row * (78 / (rows - 1)) };
 }
 const CELL_ICON: Record<string, string> = { palm: "🌴", croc: "🐊", chest: "💰", path: "" };
 
 function IslandBoard({ cells, teams, members }: { cells: number[]; teams: number; members: (t: number) => LivePlayerRow[] }) {
   const arrived = useArrived();
   return (
-    <div className="relative h-[50vh] min-h-[300px] overflow-hidden rounded-[2rem] bg-[radial-gradient(ellipse_at_center,#fde68a_0%,#f59e0b_35%,#0e7490_60%,#083344_100%)] ring-1 ring-white/10">
+    <div className="relative h-[56vh] min-h-[320px] overflow-hidden rounded-[2rem] bg-[radial-gradient(ellipse_at_center,#fde68a_0%,#f59e0b_35%,#0e7490_60%,#083344_100%)] ring-1 ring-white/10">
       <div className="absolute inset-[4%] rounded-[45%] bg-gradient-to-b from-lime-500/50 to-emerald-700/60 blur-[1px]" />
       {/* Yo'l kataklari */}
       {ISLAND_BOARD.map((kind, i) => {
@@ -265,13 +269,15 @@ function IslandBoard({ cells, teams, members }: { cells: number[]; teams: number
         const pos = cells[t] ?? 0;
         const prev = cells[8 + t] ?? pos;
         const p = cellPos(arrived ? pos : prev);
+        // Eng yuqori qatorda (xazina) — belgi katak ostida, aks holda maydondan chiqib ketadi
+        const top = p.y < 25;
         const crew = members(t);
         const leader = crew[0];
         const done = (cells[4 + t] ?? 0) > 0;
         return (
           <div
             key={t}
-            className="absolute z-10 flex -translate-x-1/2 -translate-y-[95%] flex-col items-center transition-[left,top] duration-[1800ms] ease-in-out"
+            className={cn("absolute z-10 flex -translate-x-1/2 flex-col items-center transition-[left,top] duration-[1800ms] ease-in-out", top ? "translate-y-[18%]" : "-translate-y-[95%]")}
             style={{ left: `calc(${p.x}% + ${(t - (teams - 1) / 2) * 22}px)`, top: `${p.y}%` }}
           >
             <span className="rounded-full px-2 text-[10px] font-black text-white shadow" style={{ background: TEAM_HEX[t] }}>
