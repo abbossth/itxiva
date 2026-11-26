@@ -550,7 +550,16 @@ export function RoomView({
   const remove = async (m: ChatMessageItem) => {
     const r = await deleteChatMessageAction(m.id);
     if (!r.success) return toast.error(r.error);
-    setMessages((prev) => (prev ?? []).map((x) => (x.id === m.id ? { ...x, deleted: true, text: "", voice: null, image: null, sticker: null, replyTo: null, reactions: [] } : x)));
+    setMessages((prev) =>
+      (prev ?? []).map((x) =>
+        x.id === m.id
+          ? { ...x, deleted: true, text: "", voice: null, image: null, sticker: null, replyTo: null, reactions: [] }
+          : x.replyTo?.id === m.id
+            ? { ...x, replyTo: { ...x.replyTo, text: "", deleted: true } }
+            : x
+      )
+    );
+    if (reply?.id === m.id) setReply(null);
   };
 
   const mute = async (m: ChatMessageItem, hours: number) => {
@@ -1144,14 +1153,14 @@ const Bubble = memo(function Bubble({
           {m.replyTo && !m.deleted && (
             <button
               type="button"
-              onClick={() => onAction({ t: "jump", id: m.replyTo!.id })}
+              onClick={() => !m.replyTo!.deleted && onAction({ t: "jump", id: m.replyTo!.id })}
               className={cn(
                 "mb-1 block w-full cursor-pointer rounded-lg border-l-[3px] px-2 py-1 text-left text-xs",
                 mine && !bare ? "border-white/70 bg-white/15" : "border-teal-500 bg-slate-100 dark:bg-slate-700/60"
               )}
             >
               <span className="block font-bold">{m.replyTo.senderName}</span>
-              <span className="line-clamp-1 opacity-80">{m.replyTo.text}</span>
+              <span className={cn("line-clamp-1 opacity-80", m.replyTo.deleted && "italic")}>{m.replyTo.deleted ? "Xabar o'chirildi" : m.replyTo.text}</span>
             </button>
           )}
           {m.deleted ? (

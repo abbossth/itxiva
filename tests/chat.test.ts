@@ -338,3 +338,40 @@ describe("chat: Telegram — shaxsiy xabar, belgilash, javob", () => {
     expect(notify.notifyMany).toHaveBeenCalledWith([String(ali._id)], "chat_message", expect.objectContaining({ reason: "reply", roomTitle: "Jamoa" }));
   });
 });
+
+describe("chat: o'chirilgan xabar iqtibosda ko'rinmaydi", () => {
+  it("javobdagi iqtibos va ro'yxatdagi oxirgi xabar matni yashiriladi; o'zgarish so'rovda keladi", async () => {
+    const { ali, vali, v } = await seed();
+    const general = (await core.listRooms(v(ali)))[0];
+    as(ali);
+    const q = await chat.sendChatMessageAction(general.id, "maxfiy gap");
+    if (!q.success) throw new Error(q.error);
+    as(vali);
+    const a = await chat.sendChatMessageAction(general.id, "otay", q.data.id);
+    if (!a.success) throw new Error(a.error);
+    as(ali);
+    const t0 = new Date(Date.now() - 1);
+    // Eski yozuv: iqtibosda "deleted" belgisi yo'q — o'qishda baribir yashiriladi
+    await ChatMessage.updateOne({ _id: q.data.id }, { $set: { deletedAt: new Date() } });
+    let reply = (await core.loadMessages(general.id, {})).find((m) => m.id === a.data.id)!;
+    expect(reply.replyTo).toMatchObject({ deleted: true, text: "" });
+    // Odatiy yo'l: o'chirish amali
+    await ChatMessage.updateOne({ _id: q.data.id }, { $set: { deletedAt: null } });
+    expect((await chat.deleteChatMessageAction(q.data.id)).success).toBe(true);
+    const changed = await core.loadChanged(general.id, t0);
+    reply = changed.find((m) => m.id === a.data.id)!;
+    expect(reply.replyTo).toMatchObject({ deleted: true, text: "" });
+    const raw = await ChatMessage.findById(a.data.id).lean();
+    expect(raw!.replyTo!.text).toBe("");
+  });
+
+  it("oxirgi xabar o'chirilsa — ro'yxatda matni qolmaydi", async () => {
+    const { ali, vali, v } = await seed();
+    const general = (await core.listRooms(v(ali)))[0];
+    as(ali);
+    const m = await chat.sendChatMessageAction(general.id, "maxfiy gap");
+    if (!m.success) throw new Error(m.error);
+    await chat.deleteChatMessageAction(m.data.id);
+    expect((await core.listRooms(v(vali)))[0].lastText).toBe("Ali: Xabar o'chirildi");
+  });
+});

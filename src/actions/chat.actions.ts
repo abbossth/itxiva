@@ -88,7 +88,14 @@ export async function deleteChatMessageAction(messageId: string): Promise<Result
     const room = await ChatRoom.findById(msg.roomId).lean();
     if (!room || !canRead(room, v)) return fail("Xabar topilmadi");
     if (v.role !== "mentor" && String(msg.senderId) !== v.userId) return fail("Faqat o'z xabaringizni o'chira olasiz");
-    await ChatMessage.updateOne({ _id: msg._id, deletedAt: null }, { $set: { deletedAt: new Date(), deletedBy: v.userId, changedAt: new Date() } });
+    const now = new Date();
+    await ChatMessage.updateOne({ _id: msg._id, deletedAt: null }, { $set: { deletedAt: now, deletedBy: v.userId, changedAt: now } });
+    // Unga berilgan javoblardagi iqtibos ham yashiriladi (ochiq suhbatlarda darhol yangilanadi)
+    await ChatMessage.updateMany({ roomId: msg.roomId, "replyTo.id": msg._id }, { $set: { "replyTo.text": "", "replyTo.deleted": true, changedAt: now } });
+    // Ro'yxatdagi "oxirgi xabar" shu bo'lsa — matni ko'rinmasin
+    if (msg.createdAt) {
+      await ChatRoom.updateOne({ _id: msg.roomId, lastMessageAt: msg.createdAt }, { $set: { "lastMessage.text": "Xabar o'chirildi" } });
+    }
     if (v.role === "mentor" && String(msg.senderId) !== v.userId) {
       await AuditLog.create({ actorId: v.userId, action: "CHAT_DELETE_MESSAGE", details: { messageId: msg._id, roomId: room._id, senderId: msg.senderId, text: msg.text.slice(0, 300) } });
     }

@@ -61,7 +61,7 @@ export interface IChatMessage {
   /** Stiker (STICKER_PACKS dagi kod) */
   sticker?: string | null;
   /** Javob berilgan xabar (iqtibos) */
-  replyTo?: { id: mongoose.Types.ObjectId; senderName: string; text: string } | null;
+  replyTo?: { id: mongoose.Types.ObjectId; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar (id va ism — matnda "@Ism Familiya" ko'rinishida) */
   mentions?: { id: mongoose.Types.ObjectId; name: string }[];
   /** Reaksiyalar: emoji va kim qo'ygani (bir odam — bitta reaksiya) */
@@ -84,7 +84,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     voice: { type: new Schema({ key: String, mime: String, duration: Number, size: Number }, { _id: false }), default: null },
     image: { type: new Schema({ key: String, mime: String, width: Number, height: Number, size: Number }, { _id: false }), default: null },
     sticker: { type: String, default: null },
-    replyTo: { type: new Schema({ id: Schema.Types.ObjectId, senderName: String, text: String }, { _id: false }), default: null },
+    replyTo: { type: new Schema({ id: Schema.Types.ObjectId, senderName: String, text: String, deleted: { type: Boolean, default: false } }, { _id: false }), default: null },
     mentions: { type: [new Schema({ id: Schema.Types.ObjectId, name: String }, { _id: false })], default: [] },
     reactions: { type: [new Schema({ emoji: String, userId: Schema.Types.ObjectId }, { _id: false })], default: [] },
     changedAt: { type: Date, default: null },

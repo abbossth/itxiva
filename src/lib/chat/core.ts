@@ -203,8 +203,8 @@ export interface ChatMessageItem {
   image: { width: number; height: number } | null;
   /** Stiker */
   sticker: string | null;
-  /** Javob berilgan xabar */
-  replyTo: { id: string; senderName: string; text: string } | null;
+  /** Javob berilgan xabar (o'chirilgan bo'lsa — deleted, matn bo'sh) */
+  replyTo: { id: string; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar */
   mentions: { id: string; name: string }[];
   /** Reaksiyalar: emoji va qo'yganlar id'si */
@@ -222,7 +222,7 @@ export function toItem(m: {
   voice?: { duration: number } | null;
   image?: { width: number; height: number } | null;
   sticker?: string | null;
-  replyTo?: { id: unknown; senderName: string; text: string } | null;
+  replyTo?: { id: unknown; senderName: string; text: string; deleted?: boolean } | null;
   reactions?: { emoji: string; userId: unknown }[];
   mentions?: { id: unknown; name: string }[];
   deletedAt?: Date | null;
@@ -240,7 +240,8 @@ export function toItem(m: {
     voice: m.voice && !gone ? { duration: m.voice.duration } : null,
     image: m.image && !gone ? { width: m.image.width, height: m.image.height } : null,
     sticker: m.sticker && !gone ? m.sticker : null,
-    replyTo: m.replyTo && !gone ? { id: String(m.replyTo.id), senderName: m.replyTo.senderName, text: m.replyTo.text } : null,
+    // Iqtibos qilingan xabar o'chirilgan bo'lsa — uning matni ko'rsatilmaydi
+    replyTo: m.replyTo && !gone ? { id: String(m.replyTo.id), senderName: m.replyTo.senderName, text: m.replyTo.deleted ? "" : m.replyTo.text, deleted: Boolean(m.replyTo.deleted) } : null,
     reactions: [...reactions].map(([emoji, users]) => ({ emoji, users })),
     mentions: gone ? [] : (m.mentions ?? []).map((x) => ({ id: String(x.id), name: x.name })),
     deleted: gone,
@@ -364,7 +365,20 @@ export async function setRoomMuted(roomId: Id, userId: string, muted: boolean) {
 }
 
 /** Xabarlar: `after` dan keyingilar (yangilari) yoki `before` dan oldingi 50 tasi (tarix) */
+/** Iqtibos qilingan xabarlardan o'chirilganlarini belgilaydi (eski yozuvlar uchun ham — o'qishda tekshiriladi) */
+async function hideDeletedQuotes(items: ChatMessageItem[]): Promise<ChatMessageItem[]> {
+  const ids = [...new Set(items.filter((m) => m.replyTo && !m.replyTo.deleted).map((m) => m.replyTo!.id))].filter((id) => mongoose.isValidObjectId(id));
+  if (ids.length === 0) return items;
+  const gone = new Set((await ChatMessage.find({ _id: { $in: ids.map(oid) }, deletedAt: { $ne: null } }).select("_id").lean()).map((d) => String(d._id)));
+  if (gone.size === 0) return items;
+  return items.map((m) => (m.replyTo && gone.has(m.replyTo.id) ? { ...m, replyTo: { ...m.replyTo, text: "", deleted: true } } : m));
+}
+
 export async function loadMessages(roomId: Id, opts: { after?: string | null; before?: string | null; limit?: number }): Promise<ChatMessageItem[]> {
+  return hideDeletedQuotes(await loadMessagesRaw(roomId, opts));
+}
+
+async function loadMessagesRaw(roomId: Id, opts: { after?: string | null; before?: string | null; limit?: number }): Promise<ChatMessageItem[]> {
   const limit = Math.min(100, Math.max(1, opts.limit ?? 50));
   if (opts.after && mongoose.isValidObjectId(opts.after)) {
     const list = await ChatMessage.find({ roomId: oid(roomId), _id: { $gt: oid(opts.after) } }).sort({ _id: 1 }).limit(limit).lean();
@@ -379,7 +393,7 @@ export async function loadMessages(roomId: Id, opts: { after?: string | null; be
 /** `since` dan keyin o'zgargan (reaksiya, o'chirish) xabarlar — ochiq suhbatni yangilash uchun */
 export async function loadChanged(roomId: Id, since: Date): Promise<ChatMessageItem[]> {
   const list = await ChatMessage.find({ roomId: oid(roomId), changedAt: { $gt: since } }).sort({ changedAt: 1 }).limit(100).lean();
-  return list.map((m) => toItem(m));
+  return hideDeletedQuotes(list.map((m) => toItem(m)));
 }
 
 /** Xabar tavsifi: ro'yxatda, iqtibosda va bildirishnomada */
