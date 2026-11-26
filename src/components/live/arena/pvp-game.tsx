@@ -412,7 +412,7 @@ export function PvpGame({
 
     // ---- Server bilan almashish ----
     // Raqiblar bir oz orqada, ikki ma'lum holat orasi to'ldirilib chiziladi (real vaqtda ~0,1 s, HTTP'da ~0,35 s)
-    const smooth = new Smoother(wsUrl ? 120 : 350);
+    const smooth = new Smoother(wsUrl ? 150 : 400);
     let claimSentAt = 0;
 
     /** Kelgan yangilanish (xonadan yoki HTTP'dan): o'z holati, dunyo, sovg'a natijasi */
@@ -426,7 +426,9 @@ export function PvpGame({
       const at = performance.now();
       if (world.zone) zoneMsg = { z: world.zone, at };
       for (const p of world.peers) if (!p.isMe && p.shots.some((sh) => sh.age < 160)) peerFired.set(p.id, at);
-      for (const p of world.peers) if (!p.isMe) smooth.push(p.id, at, p.x, p.y, p.a);
+      // Kadr vaqti server soatidan — tarmoq notekis bo'lsa ham harakat bir tekis
+      const st = smooth.align(world.serverNow, at);
+      for (const p of world.peers) if (!p.isMe) smooth.push(p.id, st, p.x, p.y, p.a);
       smooth.keep(new Set(world.peers.map((p) => p.id)));
       if (!pos.ready) {
         const mine = world.peers.find((p) => p.isMe);
@@ -451,7 +453,8 @@ export function PvpGame({
       if (prev) {
         if (me.lives < prev.lives) {
           flashUntil = performance.now() + 300;
-          shake = 14;
+          // O'q tekkanda kuchli, zona/oqib ketishda yengil silkinish
+          shake = prev.lives - me.lives >= 15 ? 12 : 3;
           burst(sparks, pos.x, pos.y, "#f87171", 12);
           if (sound) playHurt();
           haptic([70]);
@@ -704,8 +707,6 @@ export function PvpGame({
           ctx.stroke();
           if ((p.revive ?? 0) > 0) {
             ctx.strokeStyle = "#4ade80";
-            ctx.shadowColor = "#4ade80";
-            ctx.shadowBlur = 12;
             ctx.beginPath();
             ctx.arc(s.x, s.y, PLAYER_R + 16, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (p.revive ?? 0)) / 100);
             ctx.stroke();
@@ -734,13 +735,14 @@ export function PvpGame({
         ctx.fillStyle = `rgba(147,51,234,${0.2 + Math.sin(t * 2) * 0.04})`;
         ctx.fill("evenodd");
         ctx.lineWidth = 6;
+        // Nur (shadowBlur) ishlatilmaydi — katta doirada har kadrda juda og'ir
         ctx.strokeStyle = `rgba(216,180,254,${0.75 + Math.sin(t * 6) * 0.2})`;
-        ctx.shadowColor = "#c084fc";
-        ctx.shadowBlur = 18;
         ctx.beginPath();
         ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.lineWidth = 16;
+        ctx.strokeStyle = "rgba(192,132,252,0.18)";
+        ctx.stroke();
         if (zone.tr < zone.r - 2) {
           ctx.setLineDash([18, 14]);
           ctx.lineDashOffset = -t * 30;
@@ -904,6 +906,8 @@ export function PvpGame({
 
     // ---- Asosiy sikl ----
     let ended = false;
+    let introShown = -1;
+    let playShown = false;
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
@@ -914,8 +918,17 @@ export function PvpGame({
         tick();
       }
       const started = now >= tm.start;
-      if (!started) setIntro(Math.ceil((tm.start - now) / 1000));
-      else setPhase((p) => (p === "intro" ? "play" : p));
+      // Holat faqat o'zgarganda yangilanadi (har kadrda setState — React'ni bekorga band qiladi)
+      if (!started) {
+        const sec = Math.ceil((tm.start - now) / 1000);
+        if (sec !== introShown) {
+          introShown = sec;
+          setIntro(sec);
+        }
+      } else if (!playShown) {
+        playShown = true;
+        setPhase((p) => (p === "intro" ? "play" : p));
+      }
 
       // Harakat va otish
       if (started && pos.ready && me && !me.out && !ended) {

@@ -69,6 +69,8 @@ export interface PvpWorld {
   map: MapId;
   /** Toraluvchi xavfsiz doira (jang boshlanmaguncha — null) */
   zone: ZoneState | null;
+  /** Server soati (kadr tuzilgan payt): silliq chizish uchun */
+  serverNow?: number;
 }
 
 export interface PvpMe {

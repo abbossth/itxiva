@@ -542,6 +542,7 @@ export function decodeRoomMessage(
     total: peers.length,
     map: (typeof m.mp === "string" ? m.mp : "neon") as MapId,
     zone: zoneOfMsg(m.z),
+    serverNow: Number.isFinite(now) ? now : undefined,
   };
   let me: PvpMe | null = null;
   const mm = m.m as (number | string | null)[] | undefined;

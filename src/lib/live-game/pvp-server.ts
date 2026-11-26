@@ -267,6 +267,7 @@ export function pvpWorld(game: CachedGame, players: CachedPlayer[], meId: string
     total: peers.length,
     map: mapOf(a.map).id,
     zone: now >= start ? zoneAt(mapOf(a.map), start, new Date(a.endsAt).getTime(), now) : null,
+    serverNow: now,
   };
 }
 

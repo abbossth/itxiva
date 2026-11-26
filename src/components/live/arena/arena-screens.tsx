@@ -378,10 +378,10 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
     if (!canvas || !ctx) return;
     const map = mapOf(mapId);
     const layers = makeMapLayers(map);
-    const cam = { s: 0, x: 0, y: 0 };
+    const cam = { s: 0, x: 0, y: 0, target: 0 };
     const fired = new Map<string, number>();
     // Real vaqtda (tez kadrlar) kam kechikish, so'rovlarda — ko'proq bufer
-    const smooth = new Smoother(realtime ? 140 : 350);
+    const smooth = new Smoother(realtime ? 160 : 400);
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
     const shots: Shot[] = [];
     const seenShots = new Map<string, number>();
@@ -406,7 +406,8 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
       const world = worldRef.current;
       if (world && world !== lastWorld) {
         lastWorld = world;
-        for (const p of world.peers) smooth.push(p.id, now, p.x, p.y, p.a);
+        const st = smooth.align(world.serverNow, now);
+        for (const p of world.peers) smooth.push(p.id, st, p.x, p.y, p.a);
         for (const p of world.peers) if (p.shots.some((sh) => sh.age < 160)) fired.set(p.id, now);
         smooth.keep(new Set(world.peers.map((p) => p.id)));
         spawnForeignShots(shots, seenShots, world.peers, now, BULLET_SPEED, BULLET_RANGE);
@@ -444,8 +445,11 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
         tcx = (x0 + x1) / 2;
         tcy = (y0 + y1) / 2;
       }
-      const targetScale = Math.max(fit, Math.min(fit * 1.8, Math.min(r.width / tw, r.height / th)));
-      cam.s = cam.s === 0 ? targetScale : cam.s + (targetScale - cam.s) * Math.min(1, dt * 1.5);
+      const wanted = Math.max(fit, Math.min(fit * 1.8, Math.min(r.width / tw, r.height / th)));
+      // Kamera "nafas olmasin": kichik o'zgarishlarda kattalashtirish joyida qoladi, kattasida — sekin o'tadi
+      if (cam.target === 0 || Math.abs(wanted - cam.target) / cam.target > 0.12) cam.target = wanted;
+      const targetScale = cam.target;
+      cam.s = cam.s === 0 ? targetScale : cam.s + (targetScale - cam.s) * Math.min(1, dt * 0.8);
       const scale = cam.s;
       const halfW = r.width / 2 / scale;
       const halfH = r.height / 2 / scale;
@@ -453,8 +457,8 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
       const clampC = (c: number, half: number, size: number) => (half * 2 >= size ? size / 2 : Math.max(half, Math.min(size - half, c)));
       const ccx = clampC(tcx, halfW, map.w);
       const ccy = clampC(tcy, halfH, map.h);
-      cam.x = cam.x === 0 ? ccx : cam.x + (ccx - cam.x) * Math.min(1, dt * 1.5);
-      cam.y = cam.y === 0 ? ccy : cam.y + (ccy - cam.y) * Math.min(1, dt * 1.5);
+      cam.x = cam.x === 0 ? ccx : cam.x + (ccx - cam.x) * Math.min(1, dt * 1.0);
+      cam.y = cam.y === 0 ? ccy : cam.y + (ccy - cam.y) * Math.min(1, dt * 1.0);
       const ox = r.width / 2 - cam.x * scale;
       const oy = r.height / 2 - cam.y * scale;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

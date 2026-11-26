@@ -9,13 +9,29 @@ interface Sample {
   a: number;
 }
 
-const MAX_EXTRAPOLATE_MS = 250;
+// Kechikkan kadrni kutib oldinga taxmin — qisqa (uzun bo'lsa, yangi kadr kelganda orqaga "sakraydi" — tebranish)
+const MAX_EXTRAPOLATE_MS = 90;
 const TELEPORT_PX = 400;
 
 export class Smoother {
   private buf = new Map<string, Sample[]>();
 
   constructor(private delay: number) {}
+
+  /** Server soati bilan mahalliy soat farqi (eng kichik kuzatilgani — tarmoq kechikishi eng kam bo'lgan kadr) */
+  private offset: number | null = null;
+
+  /**
+   * Kadr vaqtini server soatidan oladi: kadrlar tarmoqda to'planib kelsa ham bir tekis (66 ms) oraliqda bo'ladi.
+   * Server vaqti bo'lmasa — kelgan vaqt.
+   */
+  align(serverNow: number | undefined, localNow: number): number {
+    if (!serverNow || !Number.isFinite(serverNow)) return localNow;
+    const d = localNow - serverNow;
+    // Farq sekin yuqoriga siljiy oladi (soatlar suzishi), pastga — darhol
+    this.offset = this.offset === null || d < this.offset ? d : this.offset + Math.min(2, (d - this.offset) * 0.02);
+    return serverNow + this.offset;
+  }
 
   setDelay(ms: number) {
     this.delay = ms;
