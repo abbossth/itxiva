@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Star, WifiOff } from "lucide-react";
+import { Bot, Star, Users, WifiOff } from "lucide-react";
 import type { LivePlayerState } from "@/actions/live-game.actions";
 import {
   FIELD,
@@ -19,26 +19,18 @@ import {
   type ZoneWave,
 } from "@/lib/live-game/zone";
 import { haptic } from "@/lib/haptics";
-import {
-  playHeartbeat,
-  playSeatTaken,
-  playShutdown,
-  playSplash,
-  playStarPickup,
-  playSurvive,
-  playTickSound,
-  playWhoosh,
-  playZap,
-  playZoneAppear,
-  playZoneClose,
-  playZoneFull,
-  unlockSound,
-} from "@/lib/sound";
+import { unlockSound } from "@/lib/sound";
+import { playSfx } from "@/lib/game/sfx";
+import { gameFont } from "@/lib/game/font";
+import { theme, themeCssVars } from "@/lib/game/theme";
+import { SfxToggle } from "@/components/game/sfx-toggle";
+import { CharacterSvg } from "@/components/character/character-svg";
 import { cn, formatNumberUz } from "@/lib/utils";
 import { ZoneFx, drawZoneField, toField, type DrawRobot } from "./zone-draw";
 import { ZoneNet } from "./zone-net";
 import { getGameLooksAction } from "@/actions/live-game.actions";
 import type { GameLook } from "@/lib/character/catalog";
+import { zoneLooks } from "./zone-looks";
 
 // "Yashil zona": o'quvchi ekrani. Robot ekranga bosilgan (yoki sudralgan) joyga yuradi, klaviaturada ←↑→↓ / WASD.
 // O'z roboti darhol (kechikishsiz) yuradi; joy real vaqt xonasiga ~20 marta/s yuboriladi (yo'q bo'lsa — HTTP).
@@ -47,33 +39,48 @@ import type { GameLook } from "@/lib/character/catalog";
 type PlayerZone = NonNullable<LivePlayerState["zone"]>;
 
 export function ZonePlayer({ gameId, z }: { gameId: string; z: PlayerZone }) {
+  return (
+    <div className={cn(gameFont.className, gameFont.variable, "game-ui")} style={themeCssVars()}>
+      <ZonePlayerBody gameId={gameId} z={z} />
+    </div>
+  );
+}
+
+function ZonePlayerBody({ gameId, z }: { gameId: string; z: PlayerZone }) {
   if (!z.joined) {
     return (
       <div className="flex flex-col items-center gap-3 py-14 text-center">
-        <Bot className="h-12 w-12 text-emerald-300" />
+        <Bot className="h-12 w-12 text-(--g-success-light)" />
         <p className="text-2xl font-black">Yashil zona raundi ketmoqda</p>
-        <p className="text-slate-300">Keyingi raundda siz ham yugurasiz!</p>
+        <p className="text-(--g-muted)">Keyingi raundda siz ham yugurasiz!</p>
       </div>
     );
   }
-  if (z.ended) return <ZoneResult z={z} />;
+  if (z.ended) return <ZoneResult gameId={gameId} z={z} />;
   return <ZoneRun key={z.round} gameId={gameId} z={z} />;
 }
 
-function ZoneResult({ z }: { z: PlayerZone }) {
+function ZoneResult({ gameId, z }: { gameId: string; z: PlayerZone }) {
+  const myLook = zoneLooks.get(gameId)?.get(z.playerId);
+  const won = !z.out;
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
-      <p className="text-xs font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : z.mini ? "Qisqa o'yin" : "Raund"} tugadi</p>
-      <p className="live-pop text-4xl font-black">{z.out ? `${z.outWave + 1}-to'lqinda o'chdingiz` : "🟢 Oxirigacha omon qoldingiz!"}</p>
+      <p className="text-xs font-black uppercase tracking-[0.35em] text-(--g-success-light)">{z.final ? "Final" : z.mini ? "Qisqa o'yin" : "Raund"} tugadi</p>
+      {myLook !== undefined && (
+        <div className="live-pop">
+          <CharacterSvg look={myLook} size={120} mood={won ? "cheer" : "sad"} pedestal={false} />
+        </div>
+      )}
+      <p className="live-pop text-4xl font-black">{won ? (z.place === 1 ? "Ajoyib! Oxirigacha omon qoldingiz!" : "Barakalla! Omon qoldingiz!") : `${z.outWave + 1}-to'lqinda o'chdingiz`}</p>
       {z.place > 0 && <p className="text-2xl font-black">{z.place}-o&apos;rin</p>}
-      {z.points > 0 && <p className="live-pop font-mono text-4xl font-black text-emerald-300">+{formatNumberUz(z.points)}</p>}
+      {z.points > 0 && <p className="live-pop text-4xl font-black text-(--g-success-light) tabular-nums">+{formatNumberUz(z.points)}</p>}
       <ol className="w-full max-w-md space-y-1.5 text-left">
         {z.top.map((r, i) => (
-          <li key={i} className="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-sm font-bold">
+          <li key={i} className="live-pop flex items-center gap-3 rounded-(--g-radius) bg-(--g-panel) px-3 py-2 text-sm font-bold shadow-[0_6px_16px_-10px_var(--g-shadow)]" style={{ animationDelay: `${Math.min(i, 10) * 70}ms` }}>
             <span className="w-6 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
             <span className="min-w-0 flex-1 truncate">{r.name}</span>
             {r.survivor && <span>🟢</span>}
-            <span className="font-mono text-slate-300">+{formatNumberUz(r.points)}</span>
+            <span className="tabular-nums text-(--g-muted)">+{formatNumberUz(r.points)}</span>
           </li>
         ))}
       </ol>
@@ -85,6 +92,8 @@ interface Hud {
   wave: number;
   waves: number;
   secs: number;
+  /** Share of wave time left (timer color) */
+  frac: number;
   countdown: number;
   lock: boolean;
   /** 0 — zonada emas, >0 — joyli, <0 — joy yetmadi */
@@ -107,7 +116,7 @@ const capsText = (w: ZoneWave) => (w.shared ? "Hamma uchun bitta zona!" : `${w.z
 function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const waves = zoneWaveCount(z.final);
-  const [hud, setHud] = useState<Hud>({ wave: 0, waves, secs: 0, countdown: 1, lock: false, seat: 0, stars: 0, alive: z.total, total: z.total, out: z.out, done: false, stunned: false, slowed: false, offline: false });
+  const [hud, setHud] = useState<Hud>({ wave: 0, waves, secs: 0, frac: 1, countdown: 1, lock: false, seat: 0, stars: 0, alive: z.total, total: z.total, out: z.out, done: false, stunned: false, slowed: false, offline: false });
   const [banner, setBanner] = useState<Banner | null>(null);
   const bannerKey = useRef(0);
   // O'yin holati (kadrlar orasida, React'dan tashqarida)
@@ -141,8 +150,8 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       meId: playerId || null,
       endAt,
       onOut: (_id, x, y) => {
-        fx.burst(x, y, "#f87171", 22, 22);
-        fx.burst(x, y, "#94a3b8", 10, 10);
+        fx.burst(x, y, theme.palette.dangerLight, 18, 22, "spark");
+        fx.burst(x, y, theme.palette.muted, 10, 10);
       },
     });
     net.start();
@@ -153,6 +162,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       .then((r) => {
         if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
         looksReady = r.success;
+        if (r.success) zoneLooks.set(gameId, looks);
       })
       .catch(() => {});
 
@@ -186,9 +196,10 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       return l;
     };
 
+    let dpr = Math.min(2, window.devicePixelRatio || 1);
     const fit = () => {
       const r = el.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
       el.width = Math.max(1, Math.round(r.width * dpr));
       el.height = Math.max(1, Math.round(r.height * dpr));
     };
@@ -217,20 +228,23 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         }
         if (me.o > 0 && !out) {
           out = true;
-          fx.burst(s.x, s.y, "#f87171", 30, 26);
-          fx.burst(s.x, s.y, "#fde047", 12, 16);
-          playShutdown();
+          fx.burst(s.x, s.y, theme.palette.dangerLight, 24, 26, "spark");
+          fx.burst(s.x, s.y, theme.zone.star, 12, 16);
+          fx.hitStop.trigger(90);
+          fx.shake.add(6);
+          playSfx("out");
           haptic([120, 60, 160]);
           say(mySeat < 0 ? "💥 Zona to'la edi — robot o'chdi!" : "💥 Joysiz qoldingiz — robot o'chdi!", "bad");
         }
         if (!out && !phase.lock && me.seat !== mySeat) {
           if (me.seat > 0) {
-            playSeatTaken();
+            playSfx("seat");
             haptic([20, 30, 20]);
-            fx.ring(s.x, s.y, "#4ade80", 5);
-            fx.text(s.x, s.y - 4, "Joy olindi!", "#86efac");
+            fx.ring(s.x, s.y, theme.zone.safe, 5);
+            fx.confetti(s.x, s.y - 2, 12);
+            fx.text(s.x, s.y - 5, "Joy olindi!", theme.zone.labelGood);
           } else if (me.seat < 0) {
-            playZoneFull();
+            playSfx("full");
             haptic([60]);
             say("⛔ Bu zona to'la! Boshqasiga yuguring", "bad");
           }
@@ -239,10 +253,12 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       }
       if (net.resolved > resolved) {
         resolved = net.resolved;
+        fx.cheer += 1;
         if (!out) {
-          playSurvive();
+          playSfx("survive");
           haptic([30, 30, 30]);
-          fx.burst(s.x, s.y, "#4ade80", 18, 16);
+          fx.confetti(s.x, s.y - 2, 22);
+          fx.text(s.x, s.y - 6, resolved % 2 ? "Zo'r!" : "Barakalla!", theme.zone.labelGood, 1.2);
           say(`🟢 Omon qoldingiz! ${resolved}/${waves}`, "good");
         }
       }
@@ -251,13 +267,13 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       if (phase.wave !== shownWave && phase.wave >= 0 && !phase.done) {
         shownWave = phase.wave;
         if (wave) {
-          playZoneAppear(wave.zones.length);
-          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, "#86efac", zc.r * 1.6);
+          playSfx("appear", wave.zones.length);
+          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, theme.zone.safeLight, zc.r * 1.6);
           if (!out) say(capsText(wave), "info");
         }
         taken.clear();
       }
-      if (phase.lock && !wasLock && !phase.done) playZoneClose();
+      if (phase.lock && !wasLock && !phase.done) playSfx("close");
       wasLock = phase.lock;
 
       const moving = phase.wave >= 0 && !phase.lock && !phase.done && !out;
@@ -287,15 +303,17 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
           else if (zapActive(tr, since) && now > zapImmuneUntil) {
             stunUntil = now + ZAP_STUN_MS;
             zapImmuneUntil = stunUntil + 700;
-            playZap();
+            playSfx("zap");
             haptic([80, 40, 80]);
-            fx.burst(s.x, s.y, "#fde047", 20, 20);
-            fx.text(s.x, s.y - 4, "⚡ Tok urdi!", "#fde047");
+            fx.burst(s.x, s.y, theme.zone.zapLight, 18, 22, "spark");
+            fx.hitStop.trigger(70);
+            fx.shake.add(3);
+            fx.text(s.x, s.y - 5, "⚡ Tok urdi!", theme.zone.zap);
           }
         }
         if (slow && !inSlow) {
-          playSplash();
-          fx.burst(s.x, s.y, "#c084fc", 10, 8);
+          playSfx("splash");
+          fx.burst(s.x, s.y, theme.zone.mudLight, 10, 8);
         }
         inSlow = slow;
         if (!stunned && now >= stunUntil && len > 0) {
@@ -313,17 +331,19 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
             if (Math.hypot(st.x - s.x, st.y - s.y) < STAR_R + ROBOT_R) {
               taken.add(st.id);
               stars += 1;
-              playStarPickup();
+              playSfx("star");
               haptic([10]);
-              fx.burst(st.x, st.y, "#fde047", 14, 14);
-              fx.text(st.x, st.y - 3, "+30", "#fde047");
+              fx.sparkle(st.x, st.y, theme.zone.starLight, 12);
+              fx.ring(st.x, st.y, theme.zone.star, 3);
+              fx.text(st.x, st.y - 3, "+30", theme.zone.star);
             }
           }
         }
       }
       net.send(s.x, s.y, stars);
       net.pump(now);
-      fx.step(dt);
+      // Visual time: capped at 1/30 s and frozen during hit-stop (the simulation above keeps the real dt)
+      fx.step(Math.min(dt, 1 / 30));
 
       const robots: DrawRobot[] = [];
       for (const p of net.peers.values()) {
@@ -364,6 +384,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         target: s.target,
         t: now / 1000,
         fx,
+        dpr,
       });
 
       if (now - lastHud > 120) {
@@ -373,13 +394,13 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
         // Sanoq: 3-2-1 va "start"
         const cnt = Math.ceil(countdown / 1000);
         if (cnt !== lastCount) {
-          if (cnt > 0 && cnt <= 3) playTickSound();
-          if (cnt === 0 && lastCount <= 3) playWhoosh(0.6);
+          if (cnt > 0 && cnt <= 3) playSfx("tick");
+          if (cnt === 0 && lastCount <= 3) playSfx("whoosh", 0.6);
           lastCount = cnt;
         }
         // Oxirgi 3 soniya — yurak urishi
         if (moving && secs <= 3 && secs > 0 && secs < lastBeat) {
-          playHeartbeat();
+          playSfx("heartbeat");
           if (mySeat <= 0) haptic([25]);
         }
         lastBeat = phase.lock ? 99 : secs;
@@ -389,6 +410,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
           wave: Math.max(0, phase.wave),
           waves,
           secs,
+          frac: wave && !phase.lock ? Math.max(0, (phase.waveEndsAt - wallNow) / WAVE_MS) : 1,
           countdown,
           lock: phase.lock,
           seat: mySeat,
@@ -404,6 +426,15 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
       }
     };
     raf = requestAnimationFrame(loop);
+    // Hidden tab: stop drawing; on return continue without a time jump
+    const onVis = () => {
+      cancelAnimationFrame(raf);
+      if (document.visibilityState === "visible") {
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
 
     const setKey = (e: KeyboardEvent, on: boolean) => {
       const k = e.key.toLowerCase();
@@ -423,6 +454,7 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
     window.addEventListener("blur", blur);
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVis);
       ro.disconnect();
       net.stop();
       window.removeEventListener("keydown", down);
@@ -446,32 +478,47 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
   }, [banner]);
 
   const status = hud.out
-    ? { text: "👀 O'chdingiz — tomosha qiling", cls: "bg-slate-800/90" }
+    ? { text: "👀 O'chdingiz — tomosha qiling", cls: "bg-(--g-panel-strong) text-white" }
     : hud.stunned
-    ? { text: "⚡ Tok urdi — qotib qoldingiz!", cls: "bg-amber-500 text-slate-950" }
+    ? { text: "⚡ Tok urdi — qotib qoldingiz!", cls: "bg-(--g-zap) text-(--g-ink)" }
     : hud.seat > 0
-    ? { text: "✅ Joy olindi — zonadan chiqmang!", cls: "bg-emerald-500 text-white" }
+    ? { text: "✅ Joy olindi — zonadan chiqmang!", cls: "bg-(--g-success) text-white" }
     : hud.seat < 0
-    ? { text: "⛔ Zona to'la — boshqasiga!", cls: "bg-rose-600 text-white" }
+    ? { text: "⛔ Zona to'la — boshqasiga!", cls: "bg-(--g-danger) text-white" }
     : hud.slowed
-    ? { text: "🟣 Loy — sekin yuryapsiz", cls: "bg-purple-600 text-white" }
-    : { text: "🏃 Zonaga yuguring!", cls: "bg-rose-500/90 text-white" };
+    ? { text: "🟣 Loy — sekin yuryapsiz", cls: "bg-(--g-mud) text-white" }
+    : { text: "🏃 Zonaga yuguring!", cls: "bg-(--g-primary) text-white" };
+  // Timer: orange from 30% left, red + pulse from 10%
+  const timerCls = hud.countdown > 0 || hud.lock ? "bg-(--g-panel)" : hud.frac <= 0.1 ? "game-pulse bg-(--g-danger) text-white" : hud.frac <= 0.3 ? "bg-(--g-warning) text-white" : "bg-(--g-success)/30";
+  const panel = "flex h-11 items-center gap-1.5 rounded-xl bg-(--g-panel) px-3 shadow-[0_6px_16px_-10px_var(--g-shadow)] ring-1 ring-white/10";
 
   return (
     <div className="flex flex-col gap-2" onPointerDown={unlockSound}>
-      <div className="flex items-center justify-between gap-2 text-sm font-bold">
-        <span className="rounded-xl bg-white/10 px-3 py-1.5">
-          To&apos;lqin {hud.wave + 1}/{hud.waves}
+      <div className="flex items-center justify-between gap-1.5 text-sm font-extrabold">
+        <span className={panel}>
+          <span className="text-(--g-muted)">To&apos;lqin</span>
+          <span className="tabular-nums">
+            {hud.wave + 1}/{hud.waves}
+          </span>
         </span>
-        <span className="rounded-xl bg-white/10 px-3 py-1.5">🤖 {hud.alive}/{hud.total}</span>
-        <span className="flex items-center gap-1 rounded-xl bg-white/10 px-3 py-1.5 text-amber-200">
-          <Star className="h-4 w-4" /> {hud.stars}
+        <span className={panel} aria-label="Tirik robotlar">
+          <Users className="h-4 w-4 text-(--g-success-light)" />
+          <span className="tabular-nums">
+            {hud.alive}/{hud.total}
+          </span>
         </span>
-        <span className={cn("min-w-14 rounded-xl px-3 py-1.5 text-center font-mono text-xl font-black", hud.lock ? "bg-rose-500/30" : hud.secs <= 3 ? "quiz-shake bg-rose-500 text-white" : "bg-emerald-500/25")}>
+        <span className={cn(panel, "text-(--g-accent-light)")} aria-label="Yulduzlar">
+          <Star className="h-4 w-4 fill-current" />
+          <span key={hud.stars} className={cn("inline-block tabular-nums", hud.stars > 0 && "game-bump")}>
+            {hud.stars}
+          </span>
+        </span>
+        <span className={cn("flex h-11 min-w-14 items-center justify-center rounded-xl px-3 text-xl font-black tabular-nums transition-colors", timerCls)}>
           {hud.countdown > 0 ? "—" : hud.lock ? "⛔" : hud.secs}
         </span>
+        <SfxToggle />
       </div>
-      <div className="relative w-full overflow-hidden rounded-3xl ring-1 ring-emerald-400/30" style={{ aspectRatio: `${FIELD.w} / ${FIELD.h}`, maxHeight: "calc(100dvh - 12rem)" }}>
+      <div className="relative w-full overflow-hidden rounded-3xl shadow-[0_18px_40px_-18px_var(--g-shadow)] ring-2 ring-(--g-outline)" style={{ aspectRatio: `${FIELD.w} / ${FIELD.h}`, maxHeight: "calc(100dvh - 12rem)" }}>
         <canvas
           ref={canvas}
           className="h-full w-full touch-none select-none"
@@ -484,22 +531,22 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
           }}
         />
         {hud.countdown > 0 && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/55 px-4 text-center">
-            <p className="text-sm font-black uppercase tracking-[0.35em] text-emerald-300">{z.final ? "Final" : z.mini ? "Qisqa o'yin · Yashil zona" : "Yashil zona"}</p>
-            <span key={Math.ceil(hud.countdown / 1000)} className="quiz-count font-mono text-7xl font-black">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-(--g-outline)/60 px-4 text-center">
+            <p className="text-sm font-black uppercase tracking-[0.35em] text-(--g-success-light)">{z.final ? "Final" : z.mini ? "Qisqa o'yin · Yashil zona" : "Yashil zona"}</p>
+            <span key={Math.ceil(hud.countdown / 1000)} className="quiz-count text-7xl font-black tabular-nums">
               {Math.ceil(hud.countdown / 1000)}
             </span>
-            <p className="max-w-sm text-sm font-semibold text-slate-200">
+            <p className="max-w-sm text-sm font-bold text-white/90">
               Ekranga bosing — robot o&apos;sha joyga yuradi (yoki ←↑→↓). Avval hamma uchun bitta zona, keyin 2–3 ta zona: joyni birinchi kirgan oladi!
             </p>
-            <p className="text-xs font-bold text-slate-300">🟣 loy sekinlatadi · ⚡ yoniq elektrga tegsangiz qotib qolasiz · ⭐ = +30</p>
+            <p className="text-xs font-bold text-white/75">🟣 loy sekinlatadi · ⚡ yoniq elektrga tegsangiz qotib qolasiz · ⭐ = +30</p>
           </div>
         )}
         {!hud.countdown && !hud.done && !hud.lock && (
-          <p className={cn("pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-sm font-black shadow-lg", status.cls)}>{status.text}</p>
+          <p key={status.text} className={cn("live-pop pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-sm font-black shadow-lg ring-2 ring-(--g-outline)", status.cls)}>{status.text}</p>
         )}
         {hud.offline && !hud.done && (
-          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-slate-900/90 px-3 py-1 text-xs font-bold text-amber-200">
+          <p className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-(--g-panel-strong) px-3 py-1 text-xs font-bold text-(--g-accent-light)">
             <WifiOff className="h-3.5 w-3.5" /> Aloqa tiklanmoqda…
           </p>
         )}
@@ -508,8 +555,8 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
             <p
               key={banner.key}
               className={cn(
-                "live-pop rounded-3xl px-6 py-3 text-center text-2xl font-black shadow-2xl",
-                banner.tone === "good" ? "bg-emerald-500" : banner.tone === "bad" ? "bg-rose-600" : "bg-sky-600/95"
+                "live-pop rounded-3xl px-6 py-3 text-center text-2xl font-black shadow-2xl ring-4 ring-(--g-outline)",
+                banner.tone === "good" ? "bg-(--g-success)" : banner.tone === "bad" ? "bg-(--g-danger)" : "bg-(--g-info)"
               )}
             >
               {banner.text}
@@ -517,8 +564,8 @@ function ZoneRun({ gameId, z }: { gameId: string; z: PlayerZone }) {
           </div>
         )}
         {hud.done && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/40">
-            <p className="live-pop rounded-3xl bg-gradient-to-r from-emerald-400 to-sky-500 px-6 py-3 text-3xl font-black">🏁 Raund tugadi!</p>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-(--g-outline)/40">
+            <p className="live-pop rounded-3xl bg-linear-to-r from-(--g-success) to-(--g-info) px-6 py-3 text-3xl font-black ring-4 ring-(--g-outline)">🏁 Raund tugadi!</p>
           </div>
         )}
       </div>

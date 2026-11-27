@@ -1,10 +1,22 @@
-// "Yashil zona" maydonini chizish (canvas 2D): o'quvchi telefoni va proyektor uchun umumiy.
-// Koordinatalar maydon birligida (FIELD.w × FIELD.h), chizishda ekranga moslanadi.
-// Fon bir marta alohida canvas'ga chiziladi (har kadrda emas) — kuchsiz telefonda ham silliq.
+// "Yashil zona" field renderer (canvas 2D), shared by the student phone and the projector.
+// Coordinates are field units (FIELD.w × FIELD.h) mapped to the screen. The floor is pre-rendered once.
+// Visual only: game rules, timings and network state come from the caller unchanged.
+// Style: shared ITXiva theme (lib/game/theme.ts) — indigo outlines, 3-tone shading, light from top-left,
+// students' own characters as animated rigs (components/character/character-rig.ts).
 
-import { FIELD, ROBOT_COLORS, ROBOT_R, STAR_R, ZAP_PERIOD_MS, zapActive, type ZoneWave } from "@/lib/live-game/zone";
+import { FIELD, ROBOT_R, STAR_R, ZAP_PERIOD_MS, zapActive, type ZoneWave } from "@/lib/live-game/zone";
 import type { GameLook } from "@/lib/character/catalog";
-import { characterSprite, drawCharacterSprite } from "@/components/character/character-sprite";
+import { characterRig, drawRig } from "@/components/character/character-rig";
+import { ease, clamp01 } from "@/lib/game/easing";
+import { FloatTextPool, HitStop, ParticlePool, RingPool, Shake, groundShadow, starPath, type ParticleKind } from "@/lib/game/fx";
+import { GAME_FONT } from "@/lib/game/font";
+import { motionScale, reducedMotion } from "@/lib/game/motion";
+import { RigActor, newPose, type Pose } from "@/lib/game/rig";
+import { skinFx } from "@/lib/game/skins";
+import { alpha, theme, tone3 } from "@/lib/game/theme";
+
+const Z = theme.zone;
+const P = theme.palette;
 
 export interface DrawRobot {
   id: string;
@@ -14,110 +26,100 @@ export interface DrawRobot {
   color: number;
   out: boolean;
   me?: boolean;
-  /** Harakat yo'nalishi (ko'zlar shu tomonga qaraydi) */
+  /** Move direction (faces that way) */
   dx?: number;
   dy?: number;
-  /** Joy: 0 — zonada emas, z+1 — joyli, -(z+1) — joy yetmadi */
+  /** Seat: 0 — not in a zone, z+1 — seated, -(z+1) — zone was full */
   seat: number;
   stunned?: boolean;
   moving?: boolean;
-  /** O'quvchi personaji — bo'lsa robot o'rniga shu chiziladi */
+  /** Student's character; undefined = not loaded yet (a robot is drawn meanwhile) */
   look?: GameLook | null;
 }
 
 export interface DrawState {
   wave: ZoneWave | null;
-  /** To'lqin boshidan beri (ms) — zona paydo bo'lishi va elektr tuzoqlar uchun */
+  /** Since wave start (ms) — zone appear and electric traps */
   sinceWaveMs: number;
-  /** To'lqin tugashigacha ulush (1 → 0); null — sanoq yoki tugagan */
+  /** Share of wave time left (1 → 0); null — countdown or over */
   timeLeft: number | null;
   lock: boolean;
   stars: ZoneWave["stars"];
   robots: DrawRobot[];
-  /** Ism yozuvlari (proyektorda — hammaga, telefonda — yaqinlarga) */
+  /** Name tags: projector — everyone, phone — nearby only */
   labels: "all" | "near";
-  /** O'zi uchun: eng yaqin bo'sh zonaga yo'l ko'rsatkich */
+  /** Own robot: path to the nearest free zone */
   guide?: { x: number; y: number } | null;
-  /** Bosilgan nuqta (telefonda) */
+  /** Tapped point (phone) */
   target?: { x: number; y: number } | null;
   t: number;
   fx: ZoneFx;
+  /** Device pixel ratio (screen shake is specified in CSS px) */
+  dpr?: number;
 }
 
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; size: number };
-type FloatText = { x: number; y: number; text: string; color: string; life: number; max: number };
-type Ring = { x: number; y: number; color: string; life: number; max: number; r: number };
+interface ZoneActor {
+  rig: RigActor;
+  pose: Pose;
+  seat: number;
+  out: boolean;
+  stunned: boolean;
+  nextZap: number;
+  fallDir: 1 | -1;
+  cheer: number;
+}
 
-/** Effektlar: uchqunlar, yozuvlar, halqalar va robot izlari (maydon birligida) */
+/** Effects + per-character animation state (field units) */
 export class ZoneFx {
-  particles: Particle[] = [];
-  texts: FloatText[] = [];
-  rings: Ring[] = [];
-  trails = new Map<string, { x: number; y: number }[]>();
+  particles = new ParticlePool(150);
+  texts = new FloatTextPool(24);
+  rings = new RingPool(16);
+  shake = new Shake();
+  hitStop = new HitStop();
+  actors = new Map<string, ZoneActor>();
+  /** Visual dt of the current frame (0 during hit-stop) */
+  vdt = 0;
+  /** Bumped by the game when a wave is survived — alive characters celebrate */
+  cheer = 0;
 
-  burst(x: number, y: number, color: string, n = 16, speed = 18) {
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const v = speed * (0.35 + Math.random() * 0.65);
-      const max = 0.5 + Math.random() * 0.5;
-      this.particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: max, max, color, size: 0.35 + Math.random() * 0.5 });
-    }
-    if (this.particles.length > 500) this.particles.splice(0, this.particles.length - 500);
+  burst(x: number, y: number, color: string, n = 16, speed = 18, kind: ParticleKind = "dot") {
+    this.particles.emit(x, y, { color, n, speed, kind, size: kind === "spark" ? 0.5 : 0.42, life: 0.75 });
   }
 
-  text(x: number, y: number, text: string, color: string) {
-    this.texts.push({ x, y, text, color, life: 1.2, max: 1.2 });
+  sparkle(x: number, y: number, color: string = Z.starLight, n = 10) {
+    this.particles.emit(x, y, { kind: "star", color, n, speed: 12, size: 0.45, life: 0.7, drag: 4 });
+  }
+
+  confetti(x: number, y: number, n = 18) {
+    const colors = [P.accent, P.success, P.primaryLight, P.danger, P.info];
+    for (let i = 0; i < colors.length; i++) {
+      this.particles.emit(x, y, { kind: "confetti", color: colors[i], n: Math.ceil(n / colors.length), speed: 20, dir: -Math.PI / 2, spread: 2.2, gravity: 34, drag: 1.6, size: 0.45, life: 1.1 });
+    }
+  }
+
+  dust(x: number, y: number, color: string = Z.tileLight) {
+    this.particles.emit(x, y, { kind: "dust", color, n: 1, speed: 3, dir: -Math.PI / 2, spread: 2.4, size: 0.35, grow: 1.6, life: 0.45, drag: 5 });
+  }
+
+  text(x: number, y: number, text: string, color: string, size = 1) {
+    this.texts.add(x, y, text, color, size);
   }
 
   ring(x: number, y: number, color: string, r = 6) {
-    this.rings.push({ x, y, color, life: 0.6, max: 0.6, r });
+    this.rings.add(x, y, color, r);
   }
 
+  /** Call once per frame with the real dt; game simulation must keep using the real dt */
   step(dt: number) {
-    for (const p of this.particles) {
-      p.life -= dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vx *= 1 - Math.min(1, dt * 3);
-      p.vy *= 1 - Math.min(1, dt * 3);
-    }
-    this.particles = this.particles.filter((p) => p.life > 0);
-    for (const t of this.texts) {
-      t.life -= dt;
-      t.y -= dt * 4;
-    }
-    this.texts = this.texts.filter((t) => t.life > 0);
-    for (const r of this.rings) r.life -= dt;
-    this.rings = this.rings.filter((r) => r.life > 0);
-  }
-
-  trail(id: string, x: number, y: number, moving: boolean) {
-    let arr = this.trails.get(id);
-    if (!arr) {
-      arr = [];
-      this.trails.set(id, arr);
-    }
-    const last = arr[arr.length - 1];
-    if (!moving) {
-      if (arr.length > 0) arr.shift();
-      return;
-    }
-    if (!last || Math.hypot(last.x - x, last.y - y) > 0.8) arr.push({ x, y });
-    if (arr.length > 7) arr.shift();
+    this.vdt = this.hitStop.filter(dt);
+    this.particles.step(this.vdt);
+    this.texts.step(this.vdt);
+    this.rings.step(this.vdt);
+    this.shake.step(dt);
   }
 }
 
-function starPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rot: number) {
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a = rot + (i * Math.PI) / 5 - Math.PI / 2;
-    const rr = i % 2 === 0 ? r : r * 0.45;
-    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-  }
-  ctx.closePath();
-}
-
-// ---- Fon (keshlanadi) ----
+// ---- Floor (cached) ----
 let bgCache: { w: number; h: number; c: HTMLCanvasElement } | null = null;
 
 function background(width: number, height: number): HTMLCanvasElement {
@@ -131,36 +133,50 @@ function background(width: number, height: number): HTMLCanvasElement {
   const oy = (height - FIELD.h * k) / 2;
   const fw = FIELD.w * k;
   const fh = FIELD.h * k;
-  const bg = ctx.createLinearGradient(0, oy, 0, oy + fh);
-  bg.addColorStop(0, "#06172a");
-  bg.addColorStop(0.5, "#081a33");
-  bg.addColorStop(1, "#0b0f2e");
-  ctx.fillStyle = bg;
-  ctx.fillRect(ox, oy, fw, fh);
-  // Olti burchakli pol plitalari
-  ctx.strokeStyle = "rgba(56,189,248,0.07)";
-  ctx.lineWidth = 1;
-  const hs = 4 * k;
-  const hw = Math.sqrt(3) * hs;
+  const rr = Math.min(fw, fh) * 0.04;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(ox, oy, fw, fh);
+  ctx.roundRect(ox, oy, fw, fh, rr);
   ctx.clip();
+  const bg = ctx.createLinearGradient(0, oy, 0, oy + fh);
+  bg.addColorStop(0, Z.fieldTop);
+  bg.addColorStop(0.5, Z.fieldMid);
+  bg.addColorStop(1, Z.fieldBottom);
+  ctx.fillStyle = bg;
+  ctx.fillRect(ox, oy, fw, fh);
+  // Hex floor plates: faint fill + soft top-left bevel, low contrast so characters pop
+  const hs = 4 * k;
+  const hw = Math.sqrt(3) * hs;
+  ctx.lineWidth = Math.max(1, k * 0.12);
   for (let row = 0, y = oy; y < oy + fh + hs * 2; row++, y += hs * 1.5) {
-    for (let x = ox + (row % 2 ? hw / 2 : 0); x < ox + fw + hw; x += hw) {
+    for (let x = ox + (row % 2 ? hw / 2 : 0), col = 0; x < ox + fw + hw; x += hw, col++) {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const a = Math.PI / 6 + (i * Math.PI) / 3;
-        ctx.lineTo(x + Math.cos(a) * hs, y + Math.sin(a) * hs);
+        ctx.lineTo(x + Math.cos(a) * hs * 0.94, y + Math.sin(a) * hs * 0.94);
       }
       ctx.closePath();
+      ctx.fillStyle = alpha(Z.tile, (row + col) % 3 === 0 ? 0.035 : 0.018);
+      ctx.fill();
+      ctx.strokeStyle = alpha(Z.tile, 0.07);
+      ctx.stroke();
+      // bevel highlight on the top-left edges
+      ctx.strokeStyle = alpha(Z.tileLight, 0.05);
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos((7 * Math.PI) / 6) * hs * 0.9, y + Math.sin((7 * Math.PI) / 6) * hs * 0.9);
+      ctx.lineTo(x + Math.cos((3 * Math.PI) / 2) * hs * 0.9, y + Math.sin((3 * Math.PI) / 2) * hs * 0.9);
       ctx.stroke();
     }
   }
-  // Chetlari qorong'i (vinetka)
-  const vg = ctx.createRadialGradient(ox + fw / 2, oy + fh / 2, Math.min(fw, fh) * 0.3, ox + fw / 2, oy + fh / 2, Math.max(fw, fh) * 0.7);
-  vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(1, "rgba(0,0,0,0.45)");
+  // Light from top-left, vignette at the edges
+  const light = ctx.createRadialGradient(ox + fw * 0.18, oy + fh * 0.1, 0, ox + fw * 0.18, oy + fh * 0.1, Math.max(fw, fh) * 0.7);
+  light.addColorStop(0, alpha(Z.tileLight, 0.09));
+  light.addColorStop(1, alpha(Z.tileLight, 0));
+  ctx.fillStyle = light;
+  ctx.fillRect(ox, oy, fw, fh);
+  const vg = ctx.createRadialGradient(ox + fw / 2, oy + fh / 2, Math.min(fw, fh) * 0.35, ox + fw / 2, oy + fh / 2, Math.max(fw, fh) * 0.72);
+  vg.addColorStop(0, alpha(theme.outline, 0));
+  vg.addColorStop(1, alpha(theme.outline, 0.55));
   ctx.fillStyle = vg;
   ctx.fillRect(ox, oy, fw, fh);
   ctx.restore();
@@ -168,11 +184,42 @@ function background(width: number, height: number): HTMLCanvasElement {
   return c;
 }
 
-const easeOutBack = (x: number) => {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
-};
+function pill(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, size: number, bg: string, fg: string, weight = 900) {
+  ctx.font = `${weight} ${size.toFixed(1)}px ${GAME_FONT}`;
+  const w = ctx.measureText(text).width + size * 1.1;
+  const h = size * 1.55;
+  ctx.fillStyle = alpha(theme.outline, 0.9);
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2 - 1.5, y - h / 2 - 1.5, w + 3, h + 3, h / 2 + 1.5);
+  ctx.fill();
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = fg;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y + size * 0.06);
+}
+
+function actorFor(fx: ZoneFx, r: DrawRobot): ZoneActor {
+  let a = fx.actors.get(r.id);
+  if (!a) {
+    a = {
+      rig: new RigActor({ amp: motionScale(), seed: r.color * 7.3 + r.id.length, celebrate: skinFx(r.look?.costume).celebrate }),
+      pose: newPose(),
+      seat: r.seat,
+      out: r.out,
+      stunned: false,
+      nextZap: 0,
+      fallDir: r.color % 2 ? 1 : -1,
+      cheer: fx.cheer,
+    };
+    if (r.out) a.rig.knockOut();
+    fx.actors.set(r.id, a);
+  }
+  return a;
+}
 
 export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, height: number, s: DrawState) {
   const k = Math.min(width / FIELD.w, height / FIELD.h);
@@ -182,16 +229,22 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
   const Y = (y: number) => oy + y * k;
   const fw = FIELD.w * k;
   const fh = FIELD.h * k;
+  const fx = s.fx;
+  const t = s.t;
+  const dpr = s.dpr ?? 1;
+  const ol = Math.max(1.5, k * 0.32);
 
   ctx.clearRect(0, 0, width, height);
+  ctx.save();
+  if (fx.shake.x || fx.shake.y) ctx.translate(fx.shake.x * dpr, fx.shake.y * dpr);
   ctx.drawImage(background(width, height), 0, 0);
 
   const wave = s.wave;
-  const appear = wave ? Math.min(1, Math.max(0, s.sinceWaveMs / 550)) : 0;
-  const scale = wave ? easeOutBack(appear) : 0;
+  const appear = wave ? clamp01(s.sinceWaveMs / 550) : 0;
+  const scale = wave ? ease.outBack(appear) : 0;
   const seated = wave ? wave.zones.map((_, zi) => s.robots.filter((r) => !r.out && r.seat === zi + 1).length) : [];
 
-  // ---- Tuzoqlar ----
+  // ---- Traps ----
   if (wave) {
     for (const tr of wave.traps) {
       const x = X(tr.x);
@@ -199,91 +252,120 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       const r = tr.r * k * scale;
       if (r <= 0) continue;
       if (tr.kind === "slow") {
-        // Binafsha loy: to'lqinsimon chekka va pufakchalar
-        ctx.save();
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, "rgba(168,85,247,0.55)");
-        g.addColorStop(1, "rgba(88,28,135,0.35)");
-        ctx.fillStyle = g;
+        // Purple mud: wobbly blob, 3-tone, bubbles that pop
+        const tones = tone3(Z.mud);
         ctx.beginPath();
-        for (let i = 0; i <= 24; i++) {
-          const a = (i / 24) * Math.PI * 2;
-          const rr = r * (1 + Math.sin(a * 5 + s.t * 2 + tr.id) * 0.06);
+        for (let i = 0; i <= 28; i++) {
+          const a = (i / 28) * Math.PI * 2;
+          const rr = r * (1 + Math.sin(a * 5 + t * 2 + tr.id) * 0.05 * motionScale());
           ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
         }
         ctx.closePath();
+        const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.05, x, y, r);
+        g.addColorStop(0, alpha(tones.light, 0.5));
+        g.addColorStop(0.55, alpha(Z.mud, 0.42));
+        g.addColorStop(1, alpha(tones.shadow, 0.55));
+        ctx.fillStyle = g;
         ctx.fill();
-        ctx.strokeStyle = "rgba(216,180,254,0.5)";
-        ctx.lineWidth = Math.max(1, k * 0.2);
+        ctx.lineWidth = ol;
+        ctx.strokeStyle = alpha(theme.outline, 0.85);
         ctx.stroke();
-        ctx.fillStyle = "rgba(233,213,255,0.55)";
-        for (let b = 0; b < 3; b++) {
-          const ph = (s.t * 0.8 + b / 3 + tr.id * 0.37) % 1;
+        for (let b = 0; b < 4; b++) {
+          const ph = (t * 0.7 + b / 4 + tr.id * 0.37) % 1;
+          const bx = x + Math.cos(b * 2.1 + tr.id) * r * 0.5;
+          const by = y + Math.sin(b * 2.1 + tr.id) * r * 0.42;
+          const br = k * 0.5 * ease.outCubic(ph);
+          ctx.globalAlpha = 1 - ph * ph;
+          ctx.fillStyle = alpha(Z.mudLight, 0.7);
           ctx.beginPath();
-          ctx.arc(x + Math.cos(b * 2.1 + tr.id) * r * 0.45, y + Math.sin(b * 2.1 + tr.id) * r * 0.45, k * 0.3 * (0.5 + ph), 0, Math.PI * 2);
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
           ctx.fill();
+          ctx.strokeStyle = alpha(Z.mudLight, 0.9);
+          ctx.lineWidth = Math.max(1, k * 0.12);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
         }
         if (r > k * 3) {
-          ctx.font = `800 ${Math.max(9, k * 1.4)}px system-ui, sans-serif`;
+          ctx.font = `900 ${Math.max(9, k * 1.4).toFixed(1)}px ${GAME_FONT}`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillStyle = "rgba(243,232,255,0.65)";
+          ctx.fillStyle = alpha(Z.mudLight, 0.8);
           ctx.fillText("LOY", x, y);
         }
-        ctx.restore();
       } else {
-        // Elektr pad: yoniq — chaqmoqlar; o'chishiga/yonishiga oz qolganda miltillaydi
+        // Electric pad: metal hex plate; glows and arcs when on, blinks just before switching on
         const on = zapActive(tr, s.sinceWaveMs);
         const phase = (s.sinceWaveMs + tr.phase) % ZAP_PERIOD_MS;
         const soon = !on && ZAP_PERIOD_MS - phase < 500;
-        ctx.save();
-        ctx.fillStyle = on ? "rgba(250,204,21,0.35)" : soon && Math.floor(s.t * 16) % 2 ? "rgba(250,204,21,0.22)" : "rgba(51,65,85,0.6)";
-        ctx.strokeStyle = on ? "#fde047" : "rgba(148,163,184,0.7)";
-        ctx.lineWidth = Math.max(1.5, k * 0.3);
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const a = (i * Math.PI) / 3;
-          ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        // Belgisi
-        ctx.fillStyle = on ? "#fef08a" : "rgba(203,213,225,0.8)";
-        ctx.beginPath();
-        const z = r * 0.55;
-        ctx.moveTo(x + z * 0.15, y - z);
-        ctx.lineTo(x - z * 0.45, y + z * 0.1);
-        ctx.lineTo(x - z * 0.02, y + z * 0.1);
-        ctx.lineTo(x - z * 0.15, y + z);
-        ctx.lineTo(x + z * 0.45, y - z * 0.1);
-        ctx.lineTo(x + z * 0.02, y - z * 0.1);
-        ctx.closePath();
-        ctx.fill();
+        const hex = (rad: number) => {
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i * Math.PI) / 3;
+            ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+          }
+          ctx.closePath();
+        };
         if (on) {
-          ctx.strokeStyle = "rgba(254,240,138,0.9)";
-          ctx.lineWidth = Math.max(1, k * 0.18);
+          const glow = ctx.createRadialGradient(x, y, r * 0.3, x, y, r * 1.6);
+          glow.addColorStop(0, alpha(Z.zap, 0.45));
+          glow.addColorStop(1, alpha(Z.zap, 0));
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(x, y, r * 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        hex(r);
+        const plate = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+        plate.addColorStop(0, Z.padMetalLight);
+        plate.addColorStop(0.5, Z.padMetal);
+        plate.addColorStop(1, Z.padMetalDark);
+        ctx.fillStyle = plate;
+        ctx.fill();
+        ctx.lineWidth = ol;
+        ctx.strokeStyle = theme.outline;
+        ctx.stroke();
+        hex(r * 0.72);
+        ctx.fillStyle = on ? alpha(Z.zap, 0.85) : soon && Math.floor(t * 16) % 2 ? alpha(Z.zap, 0.5) : alpha(Z.padMetalDark, 0.9);
+        ctx.fill();
+        // Bolt icon
+        const zz = r * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x + zz * 0.15, y - zz);
+        ctx.lineTo(x - zz * 0.45, y + zz * 0.1);
+        ctx.lineTo(x - zz * 0.02, y + zz * 0.1);
+        ctx.lineTo(x - zz * 0.15, y + zz);
+        ctx.lineTo(x + zz * 0.45, y - zz * 0.1);
+        ctx.lineTo(x + zz * 0.02, y - zz * 0.1);
+        ctx.closePath();
+        ctx.fillStyle = on ? Z.zapLight : alpha(Z.padMetalLight, 0.85);
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, ol * 0.6);
+        ctx.strokeStyle = theme.outline;
+        ctx.stroke();
+        if (on) {
+          ctx.strokeStyle = alpha(Z.zapLight, 0.95);
+          ctx.lineWidth = Math.max(1, k * 0.2);
+          ctx.lineCap = "round";
           for (let b = 0; b < 3; b++) {
-            const a0 = s.t * 9 + b * 2.1 + Math.sin(s.t * 31 + b) * 0.6;
+            const a0 = t * 9 + b * 2.1 + Math.sin(t * 31 + b) * 0.6;
             ctx.beginPath();
-            ctx.moveTo(x + Math.cos(a0) * r * 0.3, y + Math.sin(a0) * r * 0.3);
+            ctx.moveTo(x + Math.cos(a0) * r * 0.4, y + Math.sin(a0) * r * 0.4);
             for (let j = 1; j <= 3; j++) {
-              const rr = r * (0.3 + j * 0.3);
+              const rr = r * (0.4 + j * 0.3);
               const aj = a0 + (Math.random() - 0.5) * 0.5;
               ctx.lineTo(x + Math.cos(aj) * rr, y + Math.sin(aj) * rr);
             }
             ctx.stroke();
           }
+          ctx.lineCap = "butt";
         }
-        ctx.restore();
       }
     }
   }
 
-  // ---- Zona yopilganda tashqarisi qizarib ketadi ----
+  // ---- Zone closed: outside turns red ----
   if (wave && s.lock) {
-    ctx.save();
-    ctx.fillStyle = `rgba(239,68,68,${0.3 + Math.sin(s.t * 12) * 0.08})`;
+    ctx.fillStyle = alpha(Z.lock, 0.26 + Math.sin(t * 12) * 0.06 * motionScale());
     ctx.beginPath();
     ctx.rect(ox, oy, fw, fh);
     for (const z of wave.zones) {
@@ -291,10 +373,9 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       ctx.arc(X(z.cx), Y(z.cy), z.r * k, 0, Math.PI * 2, true);
     }
     ctx.fill("evenodd");
-    ctx.restore();
   }
 
-  // ---- Xavfsiz zonalar ----
+  // ---- Safe zones: glowing landing pads ----
   if (wave) {
     wave.zones.forEach((z, zi) => {
       const x = X(z.cx);
@@ -302,100 +383,112 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       const r = z.r * k * scale;
       if (r <= 0) return;
       const full = z.cap > 0 && seated[zi] >= z.cap;
-      const pulse = 1 + Math.sin(s.t * 4 + zi) * 0.02;
-      // Nur ustuni (paydo bo'lganda yorqinroq)
-      const beam = ctx.createRadialGradient(x, y, 0, x, y, r * 1.35);
-      const a0 = full ? "rgba(250,204,21,0.32)" : "rgba(74,222,128,0.38)";
-      beam.addColorStop(0, appear < 1 ? (full ? "rgba(250,204,21,0.6)" : "rgba(134,239,172,0.7)") : a0);
-      beam.addColorStop(0.75, full ? "rgba(234,179,8,0.2)" : "rgba(34,197,94,0.24)");
-      beam.addColorStop(1, "rgba(34,197,94,0)");
+      const col = full ? Z.full : Z.safe;
+      const tones = tone3(col);
+      const pulse = 1 + Math.sin(t * 4 + zi) * 0.018 * motionScale();
+      // Light column glow (brighter while appearing)
+      const beam = ctx.createRadialGradient(x, y, 0, x, y, r * 1.4);
+      beam.addColorStop(0, alpha(tones.light, appear < 1 ? 0.55 : 0.22));
+      beam.addColorStop(0.7, alpha(col, 0.16));
+      beam.addColorStop(1, alpha(col, 0));
       ctx.fillStyle = beam;
       ctx.beginPath();
-      ctx.arc(x, y, r * 1.35, 0, Math.PI * 2);
+      ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
       ctx.fill();
-      // Paydo bo'lish to'lqini
-      if (appear < 1) {
-        ctx.strokeStyle = `rgba(187,247,208,${1 - appear})`;
-        ctx.lineWidth = Math.max(2, k * 0.6);
-        ctx.beginPath();
-        ctx.arc(x, y, z.r * k * (1 + appear * 1.2), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      // Ichki aylanuvchi halqalar
-      ctx.save();
-      ctx.lineWidth = Math.max(2, k * 0.5);
-      ctx.strokeStyle = s.lock ? "#bbf7d0" : full ? "#facc15" : "#4ade80";
-      ctx.setLineDash([k * 2, k * 1.2]);
-      ctx.lineDashOffset = -s.t * k * 6 * (zi % 2 ? -1 : 1);
+      // Pad: 3-tone disk, light from top-left
       ctx.beginPath();
       ctx.arc(x, y, r * pulse, 0, Math.PI * 2);
+      const pad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.05, x, y, r);
+      pad.addColorStop(0, alpha(tones.light, 0.34));
+      pad.addColorStop(0.6, alpha(col, 0.2));
+      pad.addColorStop(1, alpha(tones.shadow, 0.32));
+      ctx.fillStyle = pad;
+      ctx.fill();
+      ctx.lineWidth = ol * 1.6;
+      ctx.strokeStyle = alpha(theme.outline, 0.9);
+      ctx.stroke();
+      ctx.lineWidth = Math.max(2, k * 0.45);
+      ctx.strokeStyle = s.lock ? Z.safeLight : col;
+      ctx.setLineDash([k * 2, k * 1.2]);
+      ctx.lineDashOffset = -t * k * 6 * (zi % 2 ? -1 : 1) * motionScale();
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.5, r * pulse - k * 0.4), 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.strokeStyle = full ? "rgba(250,204,21,0.25)" : "rgba(134,239,172,0.25)";
+      ctx.strokeStyle = alpha(tones.light, 0.3);
       ctx.lineWidth = Math.max(1, k * 0.25);
       ctx.beginPath();
-      ctx.arc(x, y, r * 0.65, s.t * 1.5, s.t * 1.5 + Math.PI * 1.3);
+      ctx.arc(x, y, r * 0.62, t * 1.5, t * 1.5 + Math.PI * 1.3);
       ctx.stroke();
-      ctx.restore();
-      // Qolgan vaqt — zona atrofidagi yoy
-      if (s.timeLeft !== null && !s.lock) {
-        ctx.lineWidth = Math.max(3, k * 0.8);
-        ctx.strokeStyle = s.timeLeft < 0.3 ? "#f87171" : "#fde047";
-        ctx.lineCap = "round";
+      // Appear shock ring
+      if (appear < 1) {
+        ctx.strokeStyle = alpha(Z.safeLight, 1 - appear);
+        ctx.lineWidth = Math.max(2, k * 0.6);
         ctx.beginPath();
-        ctx.arc(x, y, r + k * 1.4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * s.timeLeft);
+        ctx.arc(x, y, Math.max(0.5, z.r * k * (1 + ease.outCubic(appear) * 1.2)), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Time left: arc around the zone (orange from 30%, red + pulse from 10%)
+      if (s.timeLeft !== null && !s.lock) {
+        const tl = s.timeLeft;
+        const danger = tl <= 0.1;
+        const tc = danger ? theme.timer.danger : tl <= 0.3 ? theme.timer.warn : Z.full;
+        const w = Math.max(3, k * 0.8) * (danger ? 1 + Math.abs(Math.sin(t * 14)) * 0.5 * motionScale() : 1);
+        ctx.lineCap = "round";
+        ctx.lineWidth = w + ol;
+        ctx.strokeStyle = alpha(theme.outline, 0.85);
+        ctx.beginPath();
+        ctx.arc(x, y, r + k * 1.4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * tl);
+        ctx.stroke();
+        ctx.lineWidth = w;
+        ctx.strokeStyle = tc;
         ctx.stroke();
         ctx.lineCap = "butt";
       }
-      // Joylar: "3/6" va nuqtachalar
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      // Yorliq zona tepasida (robotlar ostida qolib ketmasin)
-      const badge = (label: string, bg: string, fg: string) => {
-        ctx.font = `900 ${Math.max(11, k * 2.2)}px system-ui, sans-serif`;
-        const w = ctx.measureText(label).width + k * 2.4;
-        const h = Math.max(16, k * 3.2);
-        const by = Math.max(oy + h / 2 + 2, y - r - k * 3.4);
-        ctx.fillStyle = bg;
-        ctx.beginPath();
-        ctx.roundRect(x - w / 2, by - h / 2, w, h, h / 2);
-        ctx.fill();
-        ctx.fillStyle = fg;
-        ctx.fillText(label, x, by + 1);
-      };
+      // Seats: pips on the rim + "3/6" badge above the zone
+      const by = Math.max(oy + k * 2.4, y - r - k * 3.4);
+      const fs = Math.max(11, k * 2);
       if (z.cap > 0) {
-        badge(full ? `TO'LA ${z.cap}/${z.cap}` : `👤 ${seated[zi]}/${z.cap}`, full ? "rgba(234,179,8,0.92)" : "rgba(22,101,52,0.9)", full ? "#1c1917" : "#dcfce7");
-        // Nuqtachalar zona chetida
+        pill(ctx, x, by, full ? `TO'LA ${z.cap}/${z.cap}` : `${seated[zi]}/${z.cap} joy`, fs, full ? Z.full : Z.safeDark, full ? theme.outline : P.white);
         const n = z.cap;
-        const pr = Math.max(1.5, k * 0.45);
+        const pr = Math.max(1.6, k * 0.48);
         for (let i = 0; i < n; i++) {
           const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
-          const px = x + Math.cos(a) * (r - pr * 2.2);
-          const py = y + Math.sin(a) * (r - pr * 2.2);
-          ctx.fillStyle = i < seated[zi] ? (full ? "#facc15" : "#4ade80") : "rgba(15,23,42,0.6)";
-          ctx.strokeStyle = "rgba(220,252,231,0.6)";
-          ctx.lineWidth = 1;
+          const rim = Math.max(0, r - pr * 2.4);
+          const px = x + Math.cos(a) * rim;
+          const py = y + Math.sin(a) * rim;
+          const taken = i < seated[zi];
+          ctx.fillStyle = taken ? (full ? Z.full : Z.safe) : alpha(theme.outline, 0.7);
+          ctx.strokeStyle = theme.outline;
+          ctx.lineWidth = Math.max(1, k * 0.18);
           ctx.beginPath();
-          ctx.arc(px, py, pr, 0, Math.PI * 2);
+          ctx.arc(px, py, taken ? pr * 1.1 : pr, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+          if (taken) {
+            ctx.fillStyle = alpha(P.white, 0.6);
+            ctx.beginPath();
+            ctx.arc(px - pr * 0.35, py - pr * 0.35, pr * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       } else {
-        badge("HAMMA UCHUN", "rgba(22,101,52,0.9)", "#dcfce7");
+        pill(ctx, x, by, "HAMMA UCHUN", fs, Z.safeDark, P.white);
       }
     });
   }
 
-  // ---- Yo'l ko'rsatkich (o'zidan eng yaqin bo'sh zonaga) ----
+  // ---- Guide line to the nearest free zone (own robot) ----
   const mine = s.robots.find((r) => r.me);
   if (s.guide && mine && !mine.out && !s.lock) {
     const d = Math.hypot(s.guide.x - mine.x, s.guide.y - mine.y);
     if (d > 3) {
       ctx.save();
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = Math.max(1.5, k * 0.3);
-      ctx.setLineDash([k * 1, k * 1.2]);
-      ctx.lineDashOffset = -s.t * k * 8;
+      ctx.strokeStyle = alpha(P.white, 0.55);
+      ctx.lineWidth = Math.max(1.5, k * 0.32);
+      ctx.lineCap = "round";
+      ctx.setLineDash([k * 0.4, k * 1.4]);
+      ctx.lineDashOffset = -t * k * 8;
       ctx.beginPath();
       ctx.moveTo(X(mine.x), Y(mine.y));
       ctx.lineTo(X(s.guide.x), Y(s.guide.y));
@@ -403,245 +496,257 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       ctx.restore();
     }
   }
-  // Bosilgan nuqta
+  // Tapped point
   if (s.target && mine && !mine.out) {
-    const pr = (s.t * 2) % 1;
-    ctx.strokeStyle = `rgba(255,255,255,${0.8 - pr * 0.6})`;
+    const pr = (t * 2) % 1;
+    ctx.strokeStyle = alpha(P.white, 0.85 - pr * 0.65);
     ctx.lineWidth = Math.max(1.5, k * 0.25);
     ctx.beginPath();
-    ctx.arc(X(s.target.x), Y(s.target.y), k * (0.6 + pr * 1.4), 0, Math.PI * 2);
+    ctx.ellipse(X(s.target.x), Y(s.target.y), k * (0.6 + pr * 1.4), k * (0.3 + pr * 0.7), 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // ---- Yulduzlar ----
+  // ---- Stars: collectibles bob, spin and shine ----
   for (const st of s.stars) {
+    const bob = Math.sin(t * ((Math.PI * 2) / 1.5) + st.id) * k * 0.4 * motionScale();
     const x = X(st.x);
-    const y = Y(st.y);
-    const rr = STAR_R * k * (1 + Math.sin(s.t * 5 + st.id) * 0.12) * scale;
+    const y = Y(st.y) + bob;
+    const rr = STAR_R * k * scale * 1.1;
     if (rr <= 0) continue;
+    groundShadow(ctx, X(st.x), Y(st.y) + STAR_R * k * 0.9, rr * 0.7, rr * 0.25, 0.3 + bob / (k * 2));
     const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.2);
-    g.addColorStop(0, "rgba(250,204,21,0.45)");
-    g.addColorStop(1, "rgba(250,204,21,0)");
+    g.addColorStop(0, alpha(Z.star, 0.38));
+    g.addColorStop(1, alpha(Z.star, 0));
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, rr * 2.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#fde047";
-    starPath(ctx, x, y, rr, s.t + st.id);
+    const rot = Math.sin(t * 1.6 + st.id) * 0.35 * motionScale();
+    starPath(ctx, x, y, rr, rot, 0.5);
+    const sg = ctx.createLinearGradient(x - rr, y - rr, x + rr, y + rr);
+    sg.addColorStop(0, Z.starLight);
+    sg.addColorStop(0.45, Z.star);
+    sg.addColorStop(1, Z.starDark);
+    ctx.fillStyle = sg;
     ctx.fill();
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(1.2, k * 0.26);
+    ctx.strokeStyle = theme.outline;
+    ctx.stroke();
+    // Shine sweep
+    const sw = ((t * 0.6 + st.id * 0.13) % 1.6) - 0.3;
+    if (sw > 0 && sw < 1) {
+      ctx.save();
+      starPath(ctx, x, y, rr * 0.92, rot, 0.5);
+      ctx.clip();
+      ctx.fillStyle = alpha(P.white, 0.65);
+      ctx.translate(x - rr + sw * rr * 2, y);
+      ctx.rotate(0.5);
+      ctx.fillRect(-rr * 0.15, -rr * 1.5, rr * 0.3, rr * 3);
+      ctx.restore();
+    }
   }
 
-  // ---- Izlar ----
-  for (const r of s.robots) {
-    s.fx.trail(r.id, r.x, r.y, Boolean(r.moving) && !r.out);
-    const tr = s.fx.trails.get(r.id);
-    if (!tr || tr.length < 2) continue;
-    const color = ROBOT_COLORS[r.color % ROBOT_COLORS.length];
-    ctx.fillStyle = color;
-    tr.forEach((p, i) => {
-      ctx.globalAlpha = (i / tr.length) * 0.35;
-      ctx.beginPath();
-      ctx.arc(X(p.x), Y(p.y), ROBOT_R * k * (0.25 + (i / tr.length) * 0.4), 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-  }
-
-  // ---- Robotlar: o'chganlari pastda, o'zi eng ustida. Telefonda ism faqat yaqin turganlarda ----
+  // ---- Characters: knocked-out under, own one on top. Phone shows names only nearby ----
   const labelled = (r: DrawRobot) => s.labels === "all" || r.me || (mine !== undefined && Math.hypot(r.x - mine.x, r.y - mine.y) < 22);
-  const order = [...s.robots].sort((a, b) => Number(!a.out) - Number(!b.out) || Number(Boolean(a.me)) - Number(Boolean(b.me)));
+  const order = [...s.robots].sort((a, b) => Number(!a.out) - Number(!b.out) || Number(Boolean(a.me)) - Number(Boolean(b.me)) || a.y - b.y);
+  const seen = new Set<string>();
   for (const r of order) {
+    seen.add(r.id);
     const x = X(r.x);
     const y = Y(r.y);
     const rad = ROBOT_R * k;
-    const color = r.out ? "#475569" : ROBOT_COLORS[r.color % ROBOT_COLORS.length];
-    const bob = r.out ? 0 : Math.sin(s.t * (r.moving ? 14 : 3) + r.color) * rad * (r.moving ? 0.12 : 0.06);
-    const sprite = r.look !== undefined ? characterSprite(r.look) : null;
-    ctx.save();
-    ctx.globalAlpha = r.out ? 0.45 : 1;
-    // Soya
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(x, y + rad * 0.95, rad * 0.9, rad * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Joy holati: joyli — yashil halqa, joy yetmadi — qizil miltillash
-    if (!r.out && r.seat > 0) {
-      ctx.strokeStyle = "rgba(74,222,128,0.9)";
-      ctx.lineWidth = Math.max(1.5, k * 0.3);
+    const feet = y + rad * 1.05;
+    const h = rad * 3.6;
+    const color = theme.players[r.color % theme.players.length];
+    const a = actorFor(fx, r);
+
+    // State changes → rig states (visual only)
+    if (r.out && !a.out) a.rig.knockOut();
+    if (!r.out && a.out) a.rig.revive();
+    if (!r.out) {
+      if (r.stunned && (!a.stunned || t >= a.nextZap)) {
+        a.rig.request("hit");
+        a.nextZap = t + 0.34;
+      }
+      if (r.seat > 0 && a.seat <= 0) a.rig.request("celebrate");
+      else if (r.seat < 0 && a.seat >= 0) a.rig.request("sad");
+      if (fx.cheer !== a.cheer && (r.seat > 0 || wave?.shared)) a.rig.request("celebrate");
+      if (s.lock && r.seat <= 0 && a.rig.state === "idle") a.rig.request("think");
+      if (!s.lock && a.rig.state === "think") a.rig.request("idle");
+    }
+    a.cheer = fx.cheer;
+    a.seat = r.seat;
+    a.out = r.out;
+    a.stunned = Boolean(r.stunned);
+    a.rig.update(fx.vdt, { moving: Boolean(r.moving) && !r.out, dirX: r.dx });
+    const pose = a.rig.pose(a.pose);
+    if (a.rig.stepped && fx.vdt > 0) fx.dust(r.x - (r.dx ?? 0) * 0.05, r.y + ROBOT_R * 1.05);
+    if (a.rig.landed) fx.dust(r.x, r.y + ROBOT_R * 1.05);
+
+    // Ground: shadow, seat decal, own marker
+    groundShadow(ctx, x, feet, rad * 1.0, rad * 0.34, pose.y * 2.5);
+    if (!r.out && r.seat !== 0) {
+      const good = r.seat > 0;
+      const blink = good || Math.floor(t * 6) % 2 === 0;
+      ctx.lineWidth = Math.max(2, k * 0.36);
+      ctx.strokeStyle = good ? Z.safe : alpha(Z.lock, blink ? 0.95 : 0.35);
       ctx.beginPath();
-      ctx.arc(x, y, rad * 1.45, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (!r.out && r.seat < 0) {
-      ctx.strokeStyle = Math.floor(s.t * 6) % 2 ? "rgba(248,113,113,0.95)" : "rgba(248,113,113,0.3)";
-      ctx.lineWidth = Math.max(1.5, k * 0.3);
-      ctx.beginPath();
-      ctx.arc(x, y, rad * 1.45, 0, Math.PI * 2);
+      ctx.ellipse(x, feet, rad * 1.45, rad * 0.55, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (r.me && !r.out) {
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = Math.max(2, k * 0.35);
+      const pr = (t * 1.4) % 1;
+      ctx.strokeStyle = alpha(P.white, 0.9 - pr * 0.6);
+      ctx.lineWidth = Math.max(2, k * 0.32);
       ctx.beginPath();
-      ctx.arc(x, y, rad + k * 1.1 + Math.sin(s.t * 6) * k * 0.2, 0, Math.PI * 2);
+      ctx.ellipse(x, feet, rad * (1.25 + pr * 0.6), rad * (0.45 + pr * 0.22), 0, 0, Math.PI * 2);
       ctx.stroke();
     }
-    if (sprite) {
-      // Personaj: oyoqlari robot o'rnida, yo'nalishiga qarab ko'zgu aksi
-      drawCharacterSprite(ctx, sprite, x, y + rad * 1.05, rad * 3.6, { t: s.t, moving: r.moving, faceLeft: (r.dx ?? 0) < -0.05, out: r.out, seed: r.color });
-      if (r.stunned && !r.out) {
-        ctx.strokeStyle = "#fde047";
-        ctx.lineWidth = Math.max(1, k * 0.2);
-        for (let b = 0; b < 3; b++) {
-          const a = s.t * 12 + b * 2.1;
-          ctx.beginPath();
-          ctx.moveTo(x + Math.cos(a) * rad * 1.3, y - rad + Math.sin(a) * rad * 1.3);
-          ctx.lineTo(x + Math.cos(a + 0.4) * rad * 1.9, y - rad + Math.sin(a + 0.4) * rad * 1.9);
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-      if (labelled(r)) {
-        ctx.font = `800 ${Math.max(10, k * (r.me ? 2 : 1.7))}px system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "bottom";
-        ctx.fillStyle = r.out ? "rgba(148,163,184,0.7)" : "#fff";
-        ctx.strokeStyle = "rgba(2,6,23,0.7)";
-        ctx.lineWidth = Math.max(2, k * 0.35);
-        const name = r.me ? "Siz" : r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name;
-        ctx.strokeText(name, x, y - rad * 2.7);
-        ctx.fillText(name, x, y - rad * 2.7);
-      }
-      if (!r.out && r.seat < 0) {
-        ctx.font = `900 ${Math.max(10, k * 1.8)}px system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillStyle = "#fca5a5";
-        ctx.fillText("joy yo'q!", x, y + rad * 1.3);
-      }
-      continue;
-    }
-    ctx.translate(0, -bob);
-    // Antenna
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(1.5, k * 0.25);
-    ctx.beginPath();
-    ctx.moveTo(x, y - rad * 0.8);
-    ctx.lineTo(x, y - rad * 1.45);
-    ctx.stroke();
-    ctx.fillStyle = r.out ? "#64748b" : Math.floor(s.t * 3 + r.color) % 2 ? "#fef08a" : "#f87171";
-    ctx.beginPath();
-    ctx.arc(x, y - rad * 1.5, rad * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-    // Tana (yorug'lik gradienti bilan)
-    const body = ctx.createLinearGradient(x, y - rad, x, y + rad);
-    body.addColorStop(0, r.out ? "#64748b" : "#ffffff");
-    body.addColorStop(0.25, color);
-    body.addColorStop(1, r.out ? "#334155" : color);
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.roundRect(x - rad, y - rad * 0.85, rad * 2, rad * 1.7, rad * 0.55);
-    ctx.fill();
-    // Ko'zlar
-    const len = Math.hypot(r.dx ?? 0, r.dy ?? 0) || 1;
-    const lx = ((r.dx ?? 0) / len) * rad * 0.18;
-    const ly = ((r.dy ?? 0) / len) * rad * 0.18;
-    ctx.fillStyle = "#0f172a";
-    ctx.beginPath();
-    ctx.roundRect(x - rad * 0.75, y - rad * 0.45, rad * 1.5, rad * 0.75, rad * 0.3);
-    ctx.fill();
-    if (r.out || r.stunned) {
-      ctx.strokeStyle = r.out ? "#f87171" : "#fde047";
-      ctx.lineWidth = Math.max(1.5, k * 0.25);
-      for (const ex of [-0.35, 0.35]) {
-        ctx.beginPath();
-        ctx.moveTo(x + rad * (ex - 0.15), y - rad * 0.22);
-        ctx.lineTo(x + rad * (ex + 0.15), y + rad * 0.12);
-        ctx.moveTo(x + rad * (ex + 0.15), y - rad * 0.22);
-        ctx.lineTo(x + rad * (ex - 0.15), y + rad * 0.12);
-        ctx.stroke();
+
+    const rig = r.look !== undefined ? characterRig(r.look, h) : null;
+    if (rig) {
+      drawRig(ctx, rig, pose, x, feet, h, { alpha: r.out ? 0.55 : 1, t, fallDir: a.fallDir });
+      // Skin effects: idle particles (epic/legendary) and golden run trail
+      if (!r.out && fx.vdt > 0 && !reducedMotion()) {
+        if (rig.fx.particles && Math.random() < fx.vdt * 2.2) fx.particles.emit(r.x + (Math.random() - 0.5) * 3, r.y - 2.5, { kind: "star", color: rig.fx.particles, n: 1, speed: 2, dir: -Math.PI / 2, spread: 1, size: 0.3, life: 0.8, drag: 2 });
+        if (rig.fx.trail && r.moving && a.rig.stepped) fx.particles.emit(r.x, r.y + ROBOT_R, { kind: "star", color: rig.fx.trail, n: 1, speed: 2, size: 0.28, life: 0.5 });
       }
     } else {
-      const blink = Math.floor(s.t * 0.7 + r.color * 0.13) !== Math.floor(s.t * 0.7 + r.color * 0.13 + 0.06);
-      ctx.fillStyle = "#67e8f9";
-      for (const ex of [-0.35, 0.35]) {
+      drawRobot(ctx, r, pose, x, feet, rad, color, t, ol);
+    }
+
+    // Shocked: electric arcs around the body
+    if (r.stunned && !r.out) {
+      ctx.strokeStyle = Z.zapLight;
+      ctx.lineWidth = Math.max(1, k * 0.22);
+      ctx.lineCap = "round";
+      for (let b = 0; b < 3; b++) {
+        const ang = t * 12 + b * 2.1;
+        const cy = feet - h * 0.45;
         ctx.beginPath();
-        if (blink) ctx.rect(x + rad * ex + lx - rad * 0.17, y - rad * 0.1 + ly, rad * 0.34, rad * 0.06);
-        else ctx.arc(x + rad * ex + lx, y - rad * 0.08 + ly, rad * 0.17, 0, Math.PI * 2);
+        ctx.moveTo(x + Math.cos(ang) * rad * 1.2, cy + Math.sin(ang) * rad * 1.6);
+        ctx.lineTo(x + Math.cos(ang + 0.25) * rad * 1.6, cy + Math.sin(ang + 0.25) * rad * 1.9);
+        ctx.lineTo(x + Math.cos(ang + 0.45) * rad * 1.9, cy + Math.sin(ang + 0.45) * rad * 2.1);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+    }
+    // Knocked out: little dizzy stars
+    if (r.out && pose.down > 0.6 && !reducedMotion()) {
+      const cx = x + a.fallDir * h * 0.5;
+      const cy = feet - rad * 0.9;
+      for (let b = 0; b < 3; b++) {
+        const ang = t * 3 + (b * Math.PI * 2) / 3;
+        ctx.fillStyle = alpha(Z.star, 0.8);
+        starPath(ctx, cx + Math.cos(ang) * rad * 0.9, cy + Math.sin(ang) * rad * 0.35, rad * 0.28, ang);
         ctx.fill();
       }
     }
-    // Qotib qolgan — atrofida uchqunlar
-    if (r.stunned && !r.out) {
-      ctx.strokeStyle = "#fde047";
-      ctx.lineWidth = Math.max(1, k * 0.2);
-      for (let b = 0; b < 3; b++) {
-        const a = s.t * 12 + b * 2.1;
+
+    // Name tag (pill above the head)
+    if (labelled(r)) {
+      const name = r.me ? "Siz" : r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name;
+      const fs = Math.max(10, k * (r.me ? 1.9 : 1.6));
+      const ty = feet - h * (r.out ? 0.5 : 0.9) - pose.y * h - fs * 0.95;
+      ctx.globalAlpha = r.out ? 0.6 : 1;
+      pill(ctx, x, ty, name, fs, r.me ? P.primary : alpha(theme.outline, 0.82), r.out ? Z.labelMuted : P.white, 800);
+      ctx.globalAlpha = 1;
+      if (r.me && !r.out) {
+        // Bouncing marker above own name
+        const bob = Math.abs(Math.sin(t * 4)) * k * 0.6 * motionScale();
+        const my = ty - fs * 1.2 - bob;
         ctx.beginPath();
-        ctx.moveTo(x + Math.cos(a) * rad * 1.1, y + Math.sin(a) * rad * 1.1);
-        ctx.lineTo(x + Math.cos(a + 0.4) * rad * 1.6, y + Math.sin(a + 0.4) * rad * 1.6);
+        ctx.moveTo(x - fs * 0.45, my - fs * 0.45);
+        ctx.lineTo(x + fs * 0.45, my - fs * 0.45);
+        ctx.lineTo(x, my + fs * 0.1);
+        ctx.closePath();
+        ctx.fillStyle = P.accent;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.2, k * 0.2);
+        ctx.strokeStyle = theme.outline;
+        ctx.lineJoin = "round";
         ctx.stroke();
       }
     }
-    ctx.restore();
-    // Ism
-    if (labelled(r)) {
-      ctx.font = `800 ${Math.max(10, k * (r.me ? 2 : 1.7))}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.fillStyle = r.out ? "rgba(148,163,184,0.7)" : "#fff";
-      ctx.strokeStyle = "rgba(2,6,23,0.7)";
-      ctx.lineWidth = Math.max(2, k * 0.35);
-      const name = r.me ? "Siz" : r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name;
-      ctx.strokeText(name, x, y - rad * 1.95 - bob);
-      ctx.fillText(name, x, y - rad * 1.95 - bob);
-    }
     if (!r.out && r.seat < 0) {
-      ctx.font = `900 ${Math.max(10, k * 1.8)}px system-ui, sans-serif`;
+      ctx.font = `900 ${Math.max(10, k * 1.7).toFixed(1)}px ${GAME_FONT}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = "#fca5a5";
-      ctx.fillText("joy yo'q!", x, y + rad * 1.2);
+      ctx.lineWidth = Math.max(2, k * 0.35);
+      ctx.strokeStyle = theme.outline;
+      ctx.strokeText("joy yo'q!", x, feet + rad * 0.5);
+      ctx.fillStyle = Z.labelBad;
+      ctx.fillText("joy yo'q!", x, feet + rad * 0.5);
     }
   }
+  // Forget characters that left the game
+  if (fx.actors.size > seen.size) for (const id of fx.actors.keys()) if (!seen.has(id)) fx.actors.delete(id);
 
-  // ---- Effektlar ----
-  for (const rg of s.fx.rings) {
-    const p = 1 - rg.life / rg.max;
-    ctx.strokeStyle = rg.color;
-    ctx.globalAlpha = 1 - p;
-    ctx.lineWidth = Math.max(2, k * 0.5);
-    ctx.beginPath();
-    ctx.arc(X(rg.x), Y(rg.y), rg.r * k * (0.3 + p), 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  for (const p of s.fx.particles) {
-    ctx.globalAlpha = Math.max(0, p.life / p.max);
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(X(p.x), Y(p.y), p.size * k, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  for (const t of s.fx.texts) {
-    ctx.globalAlpha = Math.min(1, (t.life / t.max) * 1.5);
-    ctx.font = `900 ${Math.max(12, k * 2.4)}px system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.strokeStyle = "rgba(2,6,23,0.8)";
-    ctx.lineWidth = Math.max(2, k * 0.4);
-    ctx.strokeText(t.text, X(t.x), Y(t.y));
-    ctx.fillStyle = t.color;
-    ctx.fillText(t.text, X(t.x), Y(t.y));
-  }
-  ctx.globalAlpha = 1;
+  // ---- Effects ----
+  fx.rings.draw(ctx, X, Y, k);
+  fx.particles.draw(ctx, X, Y, k);
+  fx.texts.draw(ctx, X, Y, k, GAME_FONT);
 
-  // Chegara
-  ctx.strokeStyle = s.lock ? "rgba(248,113,113,0.7)" : "rgba(74,222,128,0.6)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(ox, oy, fw, fh);
+  // Border
+  ctx.lineWidth = Math.max(2, k * 0.35);
+  ctx.strokeStyle = s.lock ? alpha(Z.lock, 0.75) : alpha(Z.safe, 0.5);
+  ctx.beginPath();
+  ctx.roundRect(ox + 1, oy + 1, fw - 2, fh - 2, Math.min(fw, fh) * 0.04);
+  ctx.stroke();
+  ctx.restore();
 }
 
-/** Ekrandagi nuqtani maydon koordinatasiga */
+/** Fallback while the character rig is baking: a small themed robot that uses the same pose */
+function drawRobot(ctx: CanvasRenderingContext2D, r: DrawRobot, pose: Pose, x: number, feet: number, rad: number, color: string, t: number, ol: number) {
+  const tones = tone3(r.out ? Z.out : color);
+  ctx.save();
+  ctx.globalAlpha = r.out ? 0.55 : 1;
+  ctx.translate(x + pose.shakeX * rad * 3, feet - pose.y * rad * 3.6);
+  if (pose.down) ctx.rotate(pose.down * 1.3);
+  ctx.scale(pose.sx, pose.sy);
+  const cy = -rad * 1.05;
+  // Antenna
+  ctx.strokeStyle = theme.outline;
+  ctx.lineWidth = Math.max(1.5, ol * 0.7);
+  ctx.beginPath();
+  ctx.moveTo(0, cy - rad * 0.8);
+  ctx.lineTo(0, cy - rad * 1.45);
+  ctx.stroke();
+  ctx.fillStyle = r.out ? Z.out : Math.floor(t * 3 + r.color) % 2 ? Z.zapLight : P.danger;
+  ctx.beginPath();
+  ctx.arc(0, cy - rad * 1.5, rad * 0.24, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Body (3-tone)
+  const body = ctx.createLinearGradient(-rad, cy - rad, rad, cy + rad);
+  body.addColorStop(0, tones.light);
+  body.addColorStop(0.45, tones.base);
+  body.addColorStop(1, tones.shadow);
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.roundRect(-rad, cy - rad * 0.85, rad * 2, rad * 1.7, rad * 0.55);
+  ctx.fill();
+  ctx.lineWidth = ol;
+  ctx.strokeStyle = theme.outline;
+  ctx.stroke();
+  // Visor + eyes
+  ctx.fillStyle = theme.outline;
+  ctx.beginPath();
+  ctx.roundRect(-rad * 0.75, cy - rad * 0.45, rad * 1.5, rad * 0.75, rad * 0.3);
+  ctx.fill();
+  const eye = r.out || r.stunned ? (r.out ? P.dangerLight : Z.zapLight) : P.turquoiseLight;
+  ctx.fillStyle = eye;
+  for (const ex of [-0.35, 0.35]) {
+    ctx.beginPath();
+    if (pose.face === "blink") ctx.rect(rad * ex - rad * 0.17, cy - rad * 0.1, rad * 0.34, rad * 0.06);
+    else ctx.arc(rad * ex, cy - rad * 0.08, rad * 0.17, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Screen point → field coordinates */
 export function toField(width: number, height: number, px: number, py: number): { x: number; y: number } {
   const k = Math.min(width / FIELD.w, height / FIELD.h);
   const ox = (width - FIELD.w * k) / 2;

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Star, WifiOff } from "lucide-react";
+import { Bot, Star, Users, WifiOff } from "lucide-react";
 import type { LiveZoneView } from "@/actions/live-game.actions";
 import { FIELD, WAVE_MS, aliveAt, zonePhase, zoneWave, zoneWaveCount, type ZoneWave } from "@/lib/live-game/zone";
-import { playFanfare, playHeartbeat, playShutdown, playSurvive, playTickSound, playWhoosh, playZoneAppear, playZoneClose } from "@/lib/sound";
+import { playSfx, type SfxName } from "@/lib/game/sfx";
+import { gameFont } from "@/lib/game/font";
+import { theme, themeCssVars } from "@/lib/game/theme";
+import { CharacterSvg } from "@/components/character/character-svg";
 import { cn, formatNumberUz } from "@/lib/utils";
+import { zoneLooks } from "./zone-looks";
 import { ZoneFx, drawZoneField, type DrawRobot } from "./zone-draw";
 import { ZoneNet } from "./zone-net";
 import { getGameLooksAction } from "@/actions/live-game.actions";
@@ -16,7 +20,7 @@ import type { GameLook } from "@/lib/character/catalog";
 export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: LiveZoneView; sound: boolean; actions: React.ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const waves = zoneWaveCount(z.final);
-  const [info, setInfo] = useState({ wave: 0, waves, secs: 0, countdown: 1, lock: false, alive: 0, total: 0, done: false, caps: "", offline: false });
+  const [info, setInfo] = useState({ wave: 0, waves, secs: 0, frac: 1, countdown: 1, lock: false, alive: 0, total: 0, done: false, caps: "", offline: false });
   // Vaqt: server soatidagi boshlanish/tugash (xona soatiga moslab hisoblanadi)
   const init = useRef({ startAt: z.startAt, endAt: z.endAt, ws: z.ws ?? null });
   const soundRef = useRef(sound);
@@ -32,8 +36,8 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
     const fx = new ZoneFx();
     const t0 = performance.now();
     const { startAt: startMs, endAt } = init.current;
-    const sfx = (f: () => void) => {
-      if (soundRef.current) f();
+    const sfx = (name: SfxName, arg?: number) => {
+      if (soundRef.current) playSfx(name, arg);
     };
     let outsThisWave = 0;
     const net = new ZoneNet({
@@ -43,9 +47,10 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       meId: null,
       endAt,
       onOut: (_id, x, y) => {
-        fx.burst(x, y, "#f87171", 24, 22);
-        fx.burst(x, y, "#94a3b8", 10, 10);
-        fx.text(x, y - 4, "💥", "#fca5a5");
+        fx.burst(x, y, theme.palette.dangerLight, 20, 22, "spark");
+        fx.burst(x, y, theme.palette.muted, 10, 10);
+        fx.text(x, y - 5, "💥", theme.palette.dangerLight);
+        fx.shake.add(2);
         outsThisWave += 1;
       },
     });
@@ -57,6 +62,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       .then((r) => {
         if (r.success) for (const [id, l] of Object.entries(r.data)) looks.set(id, l);
         looksReady = r.success;
+        if (r.success) zoneLooks.set(gameId, looks);
       })
       .catch(() => {});
     let raf = 0;
@@ -81,9 +87,10 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       return l;
     };
 
+    let dpr = Math.min(2, window.devicePixelRatio || 1);
     const fit = () => {
       const r = el.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
       el.width = Math.max(1, Math.round(r.width * dpr));
       el.height = Math.max(1, Math.round(r.height * dpr));
     };
@@ -93,7 +100,7 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
 
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(1 / 30, (now - last) / 1000);
       last = now;
       const wallNow = net.now();
       const phase = zonePhase(startMs, wallNow, waves);
@@ -104,16 +111,17 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       if (phase.wave !== shownWave && phase.wave >= 0 && !phase.done) {
         shownWave = phase.wave;
         if (wave) {
-          sfx(() => playZoneAppear(wave.zones.length));
-          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, "#86efac", zc.r * 1.6);
+          sfx("appear", wave.zones.length);
+          for (const zc of wave.zones) fx.ring(zc.cx, zc.cy, theme.zone.safeLight, zc.r * 1.6);
         }
       }
-      if (phase.lock && !wasLock && !phase.done) sfx(playZoneClose);
+      if (phase.lock && !wasLock && !phase.done) sfx("close");
       wasLock = phase.lock;
       if (net.resolved > resolved) {
         resolved = net.resolved;
-        sfx(outsThisWave > 0 ? playShutdown : playSurvive);
+        sfx(outsThisWave > 0 ? "out" : "survive");
         outsThisWave = 0;
+        fx.cheer += 1;
       }
 
       const list: DrawRobot[] = [];
@@ -136,22 +144,24 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
         labels: "all",
         t: now / 1000,
         fx,
+        dpr,
       });
       if (now - lastInfo > 150) {
         lastInfo = now;
         const secs = Math.max(0, Math.ceil((phase.waveEndsAt - wallNow) / 1000));
         const countdown = Math.max(0, startMs - wallNow);
         const tickSec = countdown > 0 ? Math.ceil(countdown / 1000) : phase.lock ? 99 : secs;
-        if (tickSec > 0 && tickSec <= 3 && tickSec < lastTick) sfx(countdown > 0 ? playTickSound : playHeartbeat);
+        if (tickSec > 0 && tickSec <= 3 && tickSec < lastTick) sfx(countdown > 0 ? "tick" : "heartbeat");
         if (countdown <= 0 && !started) {
           started = true;
-          sfx(() => playWhoosh(0.6));
+          sfx("whoosh", 0.6);
         }
         lastTick = tickSec;
         setInfo({
           wave: Math.max(0, phase.wave),
           waves,
           secs,
+          frac: wave && !phase.lock ? Math.max(0, (phase.waveEndsAt - wallNow) / WAVE_MS) : 1,
           countdown,
           lock: phase.lock,
           alive: list.filter((r) => !r.out).length,
@@ -163,44 +173,65 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       }
     };
     raf = requestAnimationFrame(loop);
+    const onVis = () => {
+      cancelAnimationFrame(raf);
+      if (document.visibilityState === "visible") {
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVis);
       ro.disconnect();
       net.stop();
     };
   }, [gameId, z.round, z.seed, z.final, z.ended, waves]);
 
   useEffect(() => {
-    if (z.ended && soundRef.current) playFanfare(z.final);
+    if (z.ended && soundRef.current) playSfx(z.final ? "winGrand" : "win");
   }, [z.ended, z.final]);
 
+  const looks = zoneLooks.get(gameId);
+  const timerCls = info.countdown > 0 || info.lock ? "bg-(--g-panel)" : info.frac <= 0.1 ? "game-pulse bg-(--g-danger)" : info.frac <= 0.3 ? "bg-(--g-warning)" : "bg-(--g-success)/30";
+  const panel = "flex items-center gap-2 rounded-2xl bg-(--g-panel) px-4 py-2 text-lg font-black shadow-[0_8px_20px_-12px_var(--g-shadow)] ring-1 ring-white/10";
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-3 game-ui", gameFont.className, gameFont.variable)} style={themeCssVars()}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-green-400 via-emerald-500 to-sky-600 shadow-lg shadow-emerald-500/30">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-(--g-success) to-(--g-info) shadow-lg ring-2 ring-(--g-outline)">
             <Bot className="h-6 w-6" />
           </span>
           <div>
             <p className="text-2xl font-black sm:text-4xl">{z.final ? "Final: Yashil zona" : z.mini ? "Qisqa o'yin: Yashil zona" : "Yashil zona"}</p>
-            <p className="text-sm text-slate-300">
-              {info.caps && !z.ended ? <span className="font-bold text-emerald-200">{info.caps}</span> : "Avval bitta umumiy zona, keyin 2–3 ta zona — joyni birinchi kirgan oladi!"}
-              <span className="ml-2 text-slate-400">🟣 loy · ⚡ elektr · ⭐ +30</span>
+            <p className="text-sm text-white/75">
+              {info.caps && !z.ended ? <span className="font-bold text-(--g-success-light)">{info.caps}</span> : "Avval bitta umumiy zona, keyin 2–3 ta zona — joyni birinchi kirgan oladi!"}
+              <span className="ml-2 text-white/55">🟣 loy · ⚡ elektr · ⭐ +30</span>
             </p>
           </div>
         </div>
         {!z.ended && (
           <div className="flex items-center gap-3">
             {info.offline && (
-              <span className="flex items-center gap-1.5 rounded-2xl bg-amber-500/20 px-3 py-2 text-sm font-bold text-amber-200">
+              <span className="flex items-center gap-1.5 rounded-2xl bg-(--g-accent)/20 px-3 py-2 text-sm font-bold text-(--g-accent-light)">
                 <WifiOff className="h-4 w-4" /> Ulanmoqda
               </span>
             )}
-            <span className="rounded-2xl bg-white/10 px-4 py-2 text-lg font-black">
-              To&apos;lqin {info.wave + 1}/{info.waves}
+            <span className={panel}>
+              <span className="text-white/60">To&apos;lqin</span>
+              <span className="tabular-nums">
+                {info.wave + 1}/{info.waves}
+              </span>
             </span>
-            <span className="rounded-2xl bg-white/10 px-4 py-2 text-lg font-black">🤖 {info.alive}/{info.total}</span>
-            <span className={cn("min-w-20 rounded-2xl px-4 py-1 text-center font-mono text-5xl font-black", info.lock ? "bg-rose-500/30" : info.secs <= 3 ? "bg-rose-500 quiz-shake" : "bg-emerald-500/25")}>
+            <span className={panel}>
+              <Users className="h-5 w-5 text-(--g-success-light)" />
+              <span className="tabular-nums">
+                {info.alive}/{info.total}
+              </span>
+            </span>
+            <span className={cn("min-w-20 rounded-2xl px-4 py-1 text-center text-5xl font-black tabular-nums ring-2 ring-(--g-outline) transition-colors", timerCls)}>
               {info.countdown > 0 ? Math.ceil(info.countdown / 1000) : info.lock ? "⛔" : info.secs}
             </span>
           </div>
@@ -208,37 +239,45 @@ export function ZoneHost({ gameId, z, sound, actions }: { gameId: string; z: Liv
       </div>
 
       {z.ended ? (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl bg-white/5 p-4 ring-1 ring-emerald-500/30">
-          <p className="mb-3 text-xs font-black uppercase tracking-[0.35em] text-emerald-300">Natijalar</p>
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-3xl bg-(--g-panel) p-4 ring-1 ring-(--g-success)/30">
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.35em] text-(--g-success-light)">Natijalar</p>
           <ol className="grid gap-2 sm:grid-cols-2">
-            {z.rows.map((r, i) => (
-              <li key={r.id} className={cn("live-pop flex items-center gap-3 rounded-2xl px-4 py-2.5", !r.out ? "bg-emerald-500/25 ring-1 ring-emerald-400/50" : "bg-white/10")} style={{ animationDelay: `${Math.min(i, 12) * 90}ms` }}>
-                <span className="w-7 text-center font-mono font-black">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-lg font-black">{r.name}</span>
-                <span className="text-sm text-slate-300">{r.out ? `${r.outWave + 1}-to'lqin` : "🟢 omon"}</span>
-                <span className="flex items-center gap-1 text-sm font-bold text-amber-200">
-                  <Star className="h-3.5 w-3.5" />
-                  {r.stars}
-                </span>
-                <span className="w-16 text-right font-mono font-black text-emerald-300">+{formatNumberUz(r.points)}</span>
-              </li>
-            ))}
+            {z.rows.map((r, i) => {
+              const look = looks?.get(r.id);
+              return (
+                <li key={r.id} className={cn("live-pop flex items-center gap-3 rounded-2xl px-4 py-2.5 shadow-[0_8px_20px_-14px_var(--g-shadow)]", !r.out ? "bg-(--g-success)/25 ring-1 ring-(--g-success)/50" : "bg-(--g-panel)")} style={{ animationDelay: `${Math.min(i, 12) * 90}ms` }}>
+                  <span className="w-7 text-center font-black tabular-nums">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
+                  {look !== undefined && (
+                    <span className="-my-1 shrink-0">
+                      <CharacterSvg look={look} size={34} headOnly still mood={r.out ? "sad" : "happy"} />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-lg font-black">{r.name}</span>
+                  <span className="text-sm text-white/70">{r.out ? `${r.outWave + 1}-to'lqin` : "🟢 omon"}</span>
+                  <span className="flex items-center gap-1 text-sm font-bold text-(--g-accent-light)">
+                    <Star className="h-3.5 w-3.5 fill-current" />
+                    {r.stars}
+                  </span>
+                  <span className="w-16 text-right font-black tabular-nums text-(--g-success-light)">+{formatNumberUz(r.points)}</span>
+                </li>
+              );
+            })}
           </ol>
         </div>
       ) : (
         <div className="relative mx-auto w-full min-h-0 flex-1" style={{ maxWidth: `calc((100dvh - 14rem) * ${FIELD.w / FIELD.h})` }}>
-          <canvas ref={canvas} className="h-full w-full rounded-3xl" style={{ aspectRatio: `${FIELD.w} / ${FIELD.h}` }} />
+          <canvas ref={canvas} className="h-full w-full rounded-3xl shadow-[0_24px_60px_-24px_var(--g-shadow)] ring-2 ring-(--g-outline)" style={{ aspectRatio: `${FIELD.w} / ${FIELD.h}` }} />
           {info.countdown > 0 && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-3xl bg-slate-950/50">
-              <span key={Math.ceil(info.countdown / 1000)} className="quiz-count font-mono text-9xl font-black">
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-3xl bg-(--g-outline)/55">
+              <span key={Math.ceil(info.countdown / 1000)} className="quiz-count text-9xl font-black tabular-nums">
                 {Math.ceil(info.countdown / 1000)}
               </span>
-              <p className="text-xl font-bold text-emerald-200">Telefoningizda ekranga bosib robotni yurgizing!</p>
+              <p className="text-xl font-bold text-(--g-success-light)">Telefoningizda ekranga bosib robotni yurgizing!</p>
             </div>
           )}
           {info.done && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <p className="live-pop rounded-3xl bg-gradient-to-r from-emerald-400 to-sky-500 px-8 py-4 text-4xl font-black">🏁 Raund tugadi!</p>
+              <p className="live-pop rounded-3xl bg-linear-to-r from-(--g-success) to-(--g-info) px-8 py-4 text-4xl font-black ring-4 ring-(--g-outline)">🏁 Raund tugadi!</p>
             </div>
           )}
         </div>

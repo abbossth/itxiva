@@ -3,6 +3,8 @@
 // (tagidagi supa materiali, nur, aura) va yangi qismlar ochiladi; ba'zilari coin evaziga sotib olinadi.
 // Bu fayl brauzer va server uchun umumiy (sof funksiyalar).
 
+import { SKINS } from "@/lib/game/skins";
+
 export const CHAR_SLOTS = ["skin", "hair", "eyes", "mouth", "head", "outfit", "back", "hand", "pet", "costume"] as const;
 export type CharSlot = (typeof CHAR_SLOTS)[number];
 
@@ -127,6 +129,8 @@ export const CHAR_ITEMS: CharItem[] = [
   I("costume", "knight", "Ritsar", 4, 100),
   I("costume", "robot", "Temir robot", 5, 120),
   I("costume", "wizard", "Sehrgar", 6, 140),
+  // Data-driven skins (lib/game/skins.ts): one per rarity — Futbolchi, Dutor ustasi, Ichan qal'a qo'riqchisi, Xorazm palvoni
+  ...SKINS.map((s) => I("costume", s.id, s.name, s.level, s.price)),
 ];
 
 const BY_KEY = new Map(CHAR_ITEMS.map((it) => [`${it.slot}:${it.id}`, it]));

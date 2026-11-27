@@ -940,6 +940,38 @@ h1,
   .chr-calm *, .chr-calm .chr-body { animation: none !important; }
 }
 
+/* ---- Personaj: o'ylash, zarba va palvon pozasi (rig holatlari: think / hit / flex) ---- */
+.chr-think .chr-body { animation: chr-breathe 3.2s ease-in-out infinite !important; }
+.chr-think .chr-head { transform-origin: 50% 92%; transform: rotate(7deg); }
+.chr-think .chr-arm-r { transform-origin: 50% 8%; animation: chr-think-arm 2.4s ease-in-out infinite; }
+.chr-hit .chr-body { transform-origin: 50% 100%; animation: chr-hit 0.42s cubic-bezier(0.2, 0.8, 0.3, 1) 1 both !important; }
+.chr-flex .chr-arm-l { animation: chr-flex-l 1.4s ease-in-out infinite !important; }
+.chr-flex .chr-arm-r { animation: chr-flex-r 1.4s ease-in-out infinite !important; }
+@keyframes chr-think-arm { 0%, 100% { transform: rotate(-138deg); } 50% { transform: rotate(-146deg); } }
+@keyframes chr-hit { 0% { transform: translateX(0) rotate(0deg) scale(1.1, 0.9); } 25% { transform: translateX(-2px) rotate(-5deg) scale(1, 1); } 50% { transform: translateX(1.5px) rotate(3deg); } 75% { transform: translateX(-0.8px) rotate(-1deg); } 100% { transform: none; } }
+@keyframes chr-flex-l { 0%, 100% { transform: rotate(118deg); } 50% { transform: rotate(128deg) scale(1.06); } }
+@keyframes chr-flex-r { 0%, 100% { transform: rotate(-118deg); } 50% { transform: rotate(-128deg) scale(1.06); } }
+
+/* ---- O'yin tugmalari va HUD (lib/game/theme.ts → --g-* o'zgaruvchilari) ---- */
+/* O'yin ekranlarida sarlavha va raqamlar ham o'yin shriftida (saytdagi mono qoidasi o'rniga) */
+.game-ui :is(h1, .font-black, .tabular-nums, .font-display) { font-family: var(--font-game), var(--font-sans); letter-spacing: normal; }
+.game-btn { transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 120ms ease; }
+.game-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.game-btn:active { transform: scale(0.95); transition-duration: 80ms; }
+.game-btn:disabled { filter: grayscale(1); opacity: 0.5; transform: none; }
+.game-bump { animation: game-bump 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes game-bump { 0% { transform: scale(1); } 35% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.game-pulse { animation: game-pulse 0.6s ease-in-out infinite; }
+@keyframes game-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.game-shine { position: relative; overflow: hidden; }
+.game-shine::after { content: ""; position: absolute; inset: -40% auto -40% -60%; width: 40%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent); animation: game-shine 2.6s ease-in-out infinite; pointer-events: none; }
+@keyframes game-shine { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@media (prefers-reduced-motion: reduce) {
+  .chr-think *, .chr-hit .chr-body, .chr-flex * { animation: none !important; }
+  .game-btn, .game-btn:hover, .game-btn:active { transition: none; transform: none; }
+  .game-bump, .game-pulse, .game-shine::after { animation: none; }
+}
+
 /* ---- Harakatlar g'ildiragi (live/emote-pad.tsx) ---- */
 @keyframes emote-ring { to { transform: rotate(360deg); } }
 .emote-ring { animation: emote-ring 24s linear infinite; }

@@ -11,6 +11,8 @@ import { LEVEL_UP_CLOSED_EVENT, OVERLAY_FREE_EVENT, claimOverlay, overlayBusy, r
 import { fireConfetti, prefersReducedMotion } from "@/lib/confetti";
 import { playRankUp, playWhoosh, unlockSound } from "@/lib/sound";
 import { CharacterSvg } from "@/components/character/character-svg";
+import { SkinPreview } from "@/components/character/skin-preview";
+import { SKINS } from "@/lib/game/skins";
 import { cn } from "@/lib/utils";
 import { GoldCoin } from "@/components/ui/gold-coin";
 
@@ -287,6 +289,14 @@ function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: strin
             <span className="rounded-2xl bg-rose-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 <GoldCoin /></span>
             <span className="rounded-2xl bg-violet-600 px-4 py-2 font-mono text-2xl font-black text-white shadow-lg">−10 XP</span>
           </div>
+        </div>
+      );
+    case "skins":
+      return (
+        <div className="flex items-end gap-2">
+          {SKINS.map((sk, i) => (
+            <SkinPreview key={sk.id} look={{ ...look, costume: sk.id, level: 1, power: 0 }} rarity={sk.rarity} size={i === SKINS.length - 1 ? 96 : 66} play={i === SKINS.length - 1} />
+          ))}
         </div>
       );
     default:

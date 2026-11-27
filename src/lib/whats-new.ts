@@ -5,7 +5,7 @@
 // Ko'rilganlari `User.seenNews` da saqlanadi. Slayd rasmi `art` bo'yicha komponentda chiziladi.
 // Bu fayl brauzer va server uchun umumiy.
 
-export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emotes" | "xp-penalty" | "boosters" | "games" | "emoji";
+export type NewsArt = "character-hello" | "character-levels" | "character-shop" | "character-games" | "character-prizes" | "emotes" | "xp-penalty" | "boosters" | "games" | "skins" | "emoji";
 
 export interface NewsSlide {
   title: string;
@@ -28,6 +28,41 @@ export interface NewsItem {
 }
 
 export const NEWS: NewsItem[] = [
+  {
+    id: "student-zone-polish-skins-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangi",
+    title: "Yashil zona yangilandi + 4 ta yangi kostyum",
+    slides: [
+      {
+        art: "games",
+        title: "Personajingiz endi jonli harakat qiladi",
+        text: "Yashil zonada personajingiz yuguradi, oyoq-qo'llari qimirlaydi, joy olsa sakrab quvonadi, tok ursa titraydi, o'chsa yiqiladi. Yulduz, zona va tuzoqlar ham yangi ko'rinishda. 🔊 tugmasi bilan ovozni o'chirib qo'yishingiz mumkin.",
+      },
+      {
+        art: "skins",
+        title: "Yangi kostyumlar: oddiydan afsonaviygacha",
+        text: "⚽ Futbolchi (Oddiy), 🎶 Dutor ustasi (Noyob), 🏯 Ichan qal'a qo'riqchisi (Epik) va 💪 Xorazm palvoni (Afsonaviy) — oltin aura va palvon pozasi bilan! Personaj sahifasida har buyumning darajasi rangli ramkada ko'rinadi.",
+      },
+    ],
+    cta: { label: "Personajimni bezash", href: "/profile?tab=character" },
+  },
+  {
+    id: "mentor-zone-polish-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Yashil zona: yangi grafika, qoidalar o'zgarmadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎨",
+        title: "Proyektor va telefonda yangi ko'rinish",
+        text: "O'quvchilarning personajlari endi to'liq animatsiyali: yugurish, quvonish, tok urishi, yiqilish. Natijalar ro'yxatida personaj boshi ko'rinadi. O'yin qoidalari, ochko va coin mukofotlari o'zgarmadi. Do'konda 4 ta yangi kostyum (40, 80, 130 va 200 coin) va buyumlar uchun daraja ramkalari qo'shildi.",
+      },
+    ],
+  },
   {
     id: "student-team-adventures-2026-11-26",
     date: "2026-11-26",

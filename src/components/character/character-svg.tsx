@@ -3,6 +3,7 @@
 import { memo, useId } from "react";
 import { DEFAULT_LOOK, OUTFIT_COLORS, tierOf, type GameLook } from "@/lib/character/catalog";
 import { emoteOf } from "@/lib/character/emotes";
+import { SKINS, skinFx, type Skin, type SkinEmblem, type SkinHat } from "@/lib/game/skins";
 import { cn } from "@/lib/utils";
 
 // O'quvchi personaji (SVG): multfilm uslubida — har qism kontur chiziq, yorug'lik/soya gradienti va yaltirash bilan.
@@ -14,7 +15,10 @@ import { cn } from "@/lib/utils";
  * Kayfiyat: idle — tinch (nafas oladi, atrofga qaraydi), happy — tinch, lekin xursand yuz,
  * cheer/jump — qisqa quvonch lahzalari uchun, run/fly/work — harakat paytida, sad — xafa.
  */
-export type CharMood = "idle" | "happy" | "run" | "jump" | "cheer" | "sad" | "work" | "fly";
+export type CharMood = "idle" | "happy" | "run" | "jump" | "cheer" | "sad" | "work" | "fly" | "think" | "hit";
+
+/** Named rig layers (the canvas rig bakes each one separately and animates it around its pivot) */
+export type RigLayer = "aura" | "back" | "legL" | "legR" | "torso" | "armL" | "armR" | "head" | "pet";
 
 const SKIN: Record<string, string> = {
   peach: "#ffd9b8",
@@ -55,6 +59,8 @@ export interface CharacterSvgProps {
   gaze?: { x: number; y: number } | null;
   /** Harakat (emot) — salom berish, raqs va h.k. (lib/character/emotes.ts) */
   emote?: string | null;
+  /** Eyes closed (the canvas rig blinks by swapping to this face) */
+  blink?: boolean;
 }
 
 type Outfit = { body: string; trim: string; legs: string };
@@ -67,12 +73,18 @@ export interface Costume extends Outfit {
   helmet?: boolean;
   /** Shlem turi: kiber (sukut), ritsar (tirqishli, pat), kosmonavt (shisha gumbaz — yuz ko'rinadi) */
   helmetStyle?: "cyber" | "knight" | "astro";
-  hat?: "pirate" | "ice" | "leaf" | "wizard";
+  hat?: "pirate" | "ice" | "leaf" | "wizard" | SkinHat;
+  hatColor?: string;
+  hatTrim?: string;
   mask?: string;
   eyepatch?: boolean;
   tail?: string;
   cape?: string;
-  emblem?: "moon" | "wind" | "hex" | "leaf" | "star" | "skull" | "snow" | "belly";
+  emblem?: "moon" | "wind" | "hex" | "leaf" | "star" | "skull" | "snow" | "belly" | SkinEmblem;
+  /** Accent color used by skin emblems */
+  accent?: string;
+  /** Item held in the right hand (overrides the hand slot) */
+  hand?: string;
   /** Soch ko'rinmaydi (qalpoq yoki shlem ostida) */
   noHair?: boolean;
 }
@@ -96,7 +108,28 @@ export const COSTUMES: Record<string, Costume> = {
   shadow: { body: "#111827", trim: "#a855f7", legs: "#0f172a", hood: "#111827", ears: "none", mask: "#111827", emblem: "hex", noHair: true },
   robot: { body: "#64748b", trim: "#facc15", legs: "#334155", skin: "#cbd5e1", helmet: true, emblem: "hex", noHair: true },
   bee: { body: "#facc15", trim: "#111827", legs: "#111827", hood: "#facc15", ears: "spikes", tail: "#111827", emblem: "belly", noHair: true },
+  // Data-driven skins (lib/game/skins.ts)
+  ...Object.fromEntries(SKINS.map((sk) => [sk.id, costumeOfSkin(sk)])),
 };
+
+/** A skin's palette + parts → costume drawn by this rig */
+function costumeOfSkin(sk: Skin): Costume {
+  const p = sk.palette;
+  const body = p.body ?? "#64748b";
+  return {
+    body,
+    trim: p.trim ?? shade(body, 1.4),
+    legs: p.limbs ?? shade(body, 0.6),
+    hat: sk.parts?.head,
+    hatColor: p.hat,
+    hatTrim: p.hatTrim,
+    cape: sk.parts?.back === "cape" ? p.cape ?? shade(body, 0.8) : undefined,
+    emblem: sk.parts?.emblem,
+    accent: p.accent,
+    hand: sk.parts?.hand,
+    noHair: sk.parts?.head === "guard" || sk.parts?.head === "chugirma",
+  };
+}
 
 function outfitOf(kind: string, main: string): Outfit {
   switch (kind) {
@@ -130,7 +163,7 @@ function mx(d: string): string {
 /** To'liq ko'rinishda bosh 82% (iyak atrofida) va 5 birlik yuqorida: bo'yin va gavda uzunroq — odamga yaqin nisbat */
 const HEAD_FIT = "translate(0 -5) translate(50 61) scale(0.82) translate(-50 -61)";
 
-function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedestal = true, holding = null, className, title, still = false, headOnly = false, gaze = null, emote = null }: CharacterSvgProps) {
+function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedestal = true, holding = null, className, title, still = false, headOnly = false, gaze = null, emote = null, blink = false }: CharacterSvgProps) {
   const em = emoteOf(emote);
   const mood: CharMood = em ? em.mood : baseMood;
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -145,6 +178,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
   const anim = !still;
   const sad = mood === "sad";
   const cheer = mood === "cheer" || mood === "happy";
+  const sfx = skinFx(look.costume);
   // Har personaj o'z vaqtida qimirlaydi (hammasi bir vaqtda emas): id dan barqaror kechikish
   const phase = -((uid.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % 70) / 10);
   const calm = anim && !em && (mood === "idle" || mood === "happy");
@@ -158,7 +192,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
       viewBox={vb}
       width={size}
       height={headOnly ? size : typeof size === "number" ? size * 1.24 : size}
-      className={cn("chr overflow-visible", anim && "chr-anim", anim && !em && `chr-${mood === "happy" ? "idle" : mood}`, calm && !gaze && "chr-calm", anim && em && `chr-emote chr-e-${em.anim}`, className)}
+      className={cn("chr overflow-visible", anim && "chr-anim", anim && !em && `chr-${mood === "happy" ? "idle" : mood}`, anim && !em && mood === "cheer" && sfx.celebrate === "flex" && "chr-flex", calm && !gaze && "chr-calm", anim && em && `chr-emote chr-e-${em.anim}`, className)}
       style={{ ["--chr-d" as string]: `${phase}s` }}
       role="img"
       aria-label={title ?? "Personaj"}
@@ -236,6 +270,13 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           <stop offset="45%" stopColor="#fcd34d" />
           <stop offset="100%" stopColor="#b45309" />
         </linearGradient>
+        {sfx.aura && (
+          <radialGradient id={`${uid}skinAura`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={sfx.aura} stopOpacity={0.5} />
+            <stop offset="65%" stopColor={sfx.aura} stopOpacity={0.16} />
+            <stop offset="100%" stopColor={sfx.aura} stopOpacity={0} />
+          </radialGradient>
+        )}
         <radialGradient id={`${uid}shadow`} cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#000" stopOpacity={0.4} />
           <stop offset="100%" stopColor="#000" stopOpacity={0} />
@@ -244,13 +285,27 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
       {title && <title>{title}</title>}
 
       {/* ---- Daraja: aura, halqalar, supa ---- */}
+      <g data-layer="aura">
       {!headOnly && (look.level >= 4 || power > 0) && <circle cx="50" cy="62" r="48" fill={g("aura")} className={anim ? "chr-pulse" : undefined} />}
+      {/* Legendary skin aura */}
+      {!headOnly && sfx.aura && (
+        <g className={anim ? "chr-pulse" : undefined}>
+          <circle cx="50" cy="62" r="46" fill={g("skinAura")} />
+          <circle cx="50" cy="62" r="43" fill="none" stroke={sfx.aura} strokeOpacity={0.5} strokeWidth="1.2" strokeDasharray="2 5" />
+        </g>
+      )}
       {!headOnly && look.level >= 7 && (
         <g className={anim ? "chr-spin" : undefined} opacity={0.55}>
           <circle cx="50" cy="62" r="45" fill="none" stroke={tier.light} strokeWidth="1.6" strokeDasharray="3 6" />
           <circle cx="50" cy="62" r="40" fill="none" stroke={tier.light} strokeWidth="0.8" strokeDasharray="10 5" opacity={0.6} />
         </g>
       )}
+      {/* Epic/legendary skin: idle particles */}
+      {!headOnly && sfx.particles &&
+        SKIN_MOTES.map((m, i) => (
+          <circle key={i} cx={m.x} cy={m.y} r={m.r} fill={sfx.particles!} className={anim ? "chr-twinkle" : undefined} style={{ animationDelay: `${i * 0.31}s` }} />
+        ))}
+      </g>
       {!headOnly && pedestal && (
         <g>
           <ellipse cx="50" cy="116.5" rx="31" ry="7" fill={shade(tier.base, 0.7)} />
@@ -264,13 +319,13 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
 
       <g className="chr-body">
         {/* ---- Orqadagi narsalar ---- */}
-        {!headOnly && (cos ? <CostumeBack c={cos} /> : <BackItem kind={look.back} uid={uid} />)}
+        {!headOnly && <g data-layer="back">{cos ? <CostumeBack c={cos} /> : <BackItem kind={look.back} uid={uid} />}</g>}
 
         {/* ---- Oyoqlar: shim (tizza va burma bilan) va krossovka ---- */}
         {!headOnly && (
           <g>
             {(["chr-leg-l", "chr-leg-r"] as const).map((cls, i) => (
-              <g key={cls} className={cls}>
+              <g key={cls} className={cls} data-layer={i ? "legR" : "legL"}>
                 <g transform={i ? "translate(100 0) scale(-1 1)" : undefined}>
                   <path d="M35 93.5 L49.5 93.5 L48.7 104.6 Q48.5 106.9 46.1 106.9 L39 106.9 Q36.6 106.9 36.4 104.6 Z" fill={g(i ? "legsHr" : "legsH")} stroke={ol(o.legs)} strokeWidth={SW} strokeLinejoin="round" />
                   {/* Tizza va shim burmasi */}
@@ -291,7 +346,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
 
         {/* ---- Tana: bo'yin, yelka, bel (anatomik shakl), kiyim burmalari va kamar ---- */}
         {!headOnly && (
-          <g>
+          <g data-layer="torso">
             {/* Bo'yin */}
             <path d="M45.4 48 L45.2 58 Q50 60.6 54.8 58 L54.6 48 Z" fill={g("skin")} stroke={ol(skin)} strokeWidth={SW} />
             <path d="M45.6 53.2 Q50 56 54.4 53.2" fill="none" stroke="#000" strokeOpacity={0.16} strokeWidth="1.8" />
@@ -324,7 +379,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
               const m = side === "r" ? mx : (d: string) => d;
               const X = (x: number, w = 0) => (side === "r" ? 100 - x - w : x);
               return (
-                <g key={side} className={`chr-arm-${side}`}>
+                <g key={side} className={`chr-arm-${side}`} data-layer={side === "l" ? "armL" : "armR"}>
                   {/* Yelkadan tirsakkacha */}
                   <path d={m("M33.4 58.4 C27.4 58.2 24 61 23.6 66.4 L23.3 76 L32.9 76 L34 64 Z")} fill={g("bodyH")} stroke={ol(o.body)} strokeWidth={SW} strokeLinejoin="round" />
                   <path d={m("M26 61.6 Q24.4 65.4 24.5 70")} fill="none" stroke="#fff" strokeOpacity={0.28} strokeWidth="1.6" strokeLinecap="round" />
@@ -340,7 +395,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
                     <path d={m("M31.3 88 Q34 88.4 33.6 91.1 Q33 92.6 31.3 91.8")} fill={g("skinH")} stroke={ol(skin)} strokeWidth={0.9} strokeLinejoin="round" />
                     <path d={m("M26.4 92.2 L26.6 94.2 M28.1 92.6 L28.1 94.9 M29.8 92.2 L29.6 94.3")} stroke={ol(skin)} strokeWidth="0.7" strokeLinecap="round" opacity={0.7} />
                     <path d={m("M25.6 89.2 Q28 88.6 30.4 89.2")} fill="none" stroke="#000" strokeOpacity={0.12} strokeWidth="0.8" strokeLinecap="round" />
-                    {side === "r" && <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? look.hand} uid={uid} />}
+                    {side === "r" && <HandItem kind={em?.anim === "guitar" ? "guitar" : holding ?? cos?.hand ?? look.hand} uid={uid} />}
                   </g>
                 </g>
               );
@@ -349,7 +404,7 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
         )}
 
         {/* ---- Bosh: to'liq ko'rinishda kichikroq va yuqoriroq — odamga yaqin nisbat (tana uzunroq) ---- */}
-        <g transform={headOnly ? undefined : HEAD_FIT}>
+        <g transform={headOnly ? undefined : HEAD_FIT} data-layer="head">
         <g className={cn("chr-head", sad && "chr-head-sad")} transform={gaze ? `rotate(${(gaze.x * 5).toFixed(1)} 50 60)` : undefined}>
           {/* Quloqlar */}
           {[27.5, 72.5].map((x) => (
@@ -380,10 +435,10 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           <ellipse cx="63.2" cy="47" rx="4.2" ry="2.4" fill="#fb7185" opacity={0.16} />
           {look.eyes !== "visor" && <Brows mood={mood} color={ol(hairHex)} />}
           <g className="chr-gaze" transform={gaze ? `translate(${(gaze.x * 2.4).toFixed(2)} ${(gaze.y * 1.6).toFixed(2)})` : undefined}>
-            <Eyes kind={look.eyes} sad={sad} happy={cheer} galaxy={look.skin === "galaxy"} />
+            <Eyes kind={look.eyes} sad={sad} happy={cheer} galaxy={look.skin === "galaxy"} blink={blink} mood={mood} />
           </g>
           {look.mouth !== "mask" && <Nose skin={skin} />}
-          <Mouth kind={look.mouth} sad={sad} happy={cheer} />
+          <Mouth kind={look.mouth} sad={sad} happy={cheer} mood={mood} />
           {cos ? <CostumeHead c={cos} uid={uid} /> : <HeadItem kind={look.head} main={main} uid={uid} />}
         </g>
         </g>
@@ -392,9 +447,14 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
       {/* Harakat (emot) — faqat tana harakati: atrofida stiker/emoji chiqmaydi */}
 
       {/* ---- Hamroh ---- */}
-      {!headOnly && look.pet !== "none" && <Pet kind={look.pet} />}
+      {!headOnly && look.pet !== "none" && (
+        <g data-layer="pet">
+          <Pet kind={look.pet} />
+        </g>
+      )}
 
       {/* ---- Kuch: uchqunlar ---- */}
+      <g data-layer="aura">
       {power > 0 &&
         SPARKS.slice(0, power * 2).map((s, i) => (
           <path
@@ -416,12 +476,23 @@ function CharacterSvgImpl({ look: raw, size = 96, mood: baseMood = "idle", pedes
           <circle cx="10" cy="62" r="1.8" fill="#a5f3fc" />
         </g>
       )}
+      </g>
     </svg>
   );
 }
 
 /** Harakat belgilari: personaj atrofida turli joydan, turli vaqtda ko'tariladi */
 
+
+/** Skin idle particles (epic/legendary) */
+const SKIN_MOTES = [
+  { x: 18, y: 44, r: 1.4 },
+  { x: 82, y: 40, r: 1.2 },
+  { x: 24, y: 86, r: 1.1 },
+  { x: 78, y: 92, r: 1.3 },
+  { x: 50, y: 10, r: 1.1 },
+  { x: 88, y: 66, r: 0.9 },
+];
 
 const SPARKS = [
   { x: 14, y: 30, r: 4 },
@@ -502,6 +573,44 @@ function CostumeChest({ c }: { c: Costume }) {
           <rect x="47" y="83" width="6" height="6" rx="1" fill="#fbbf24" stroke="#92400e" strokeWidth="0.6" />
           <circle cx="44" cy="78" r="1.3" fill="#fbbf24" />
           <circle cx="56" cy="78" r="1.3" fill="#fbbf24" />
+        </g>
+      );
+    case "ten":
+      return (
+        <g>
+          <path d="M37 62 Q50 66 63 62" fill="none" stroke={c.trim} strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M33.4 64 L36 89 M66.6 64 L64 89" stroke={c.trim} strokeWidth="1.6" strokeLinecap="round" opacity={0.9} />
+          <text x="50" y="84" textAnchor="middle" fontSize="15" fontWeight="900" fontFamily="system-ui, sans-serif" fill={c.trim} stroke={c.accent ?? s} strokeWidth="0.8" paintOrder="stroke">10</text>
+        </g>
+      );
+    case "stripes":
+      // Beqasam: vertical woven stripes of a Khorezm chopon
+      return (
+        <g strokeLinecap="round">
+          {[38, 44, 56, 62].map((x, i) => (
+            <path key={x} d={`M${x} 60 Q${x + (x < 50 ? -1.4 : 1.4)} 76 ${x + (x < 50 ? -1 : 1)} 94`} fill="none" stroke={i % 2 ? c.accent ?? c.trim : c.trim} strokeWidth="1.8" opacity={0.9} />
+          ))}
+          <path d="M43.4 57 L50 70 L56.6 57" fill="none" stroke={c.trim} strokeWidth="2.6" strokeLinejoin="round" />
+        </g>
+      );
+    case "tile":
+      // Girih star (Ichan qal'a majolica)
+      return (
+        <g>
+          <path d="M50 68 L53 73 L58.6 72.4 L56.2 77.4 L60 81.6 L54.4 82.4 L52.6 87.8 L50 83 L47.4 87.8 L45.6 82.4 L40 81.6 L43.8 77.4 L41.4 72.4 L47 73 Z" fill={c.accent ?? c.trim} stroke={c.trim} strokeWidth="1.1" strokeLinejoin="round" />
+          <circle cx="50" cy="78" r="3" fill={c.trim} stroke={s} strokeWidth="0.6" />
+          <path d="M33 66 L67 66" stroke={c.trim} strokeWidth="1.4" strokeDasharray="2 2" />
+        </g>
+      );
+    case "sash":
+      // Palvon belbog': wide sash with a knot and fringe, open collar
+      return (
+        <g>
+          <path d="M42 57.5 L50 72 L58 57.5" fill="none" stroke={c.trim} strokeWidth="2.6" strokeLinejoin="round" />
+          <path d="M33.6 83.2 Q50 87.4 66.4 83.2 L66 90.6 Q50 94.4 34 90.6 Z" fill={c.accent ?? c.trim} stroke={ol(c.accent ?? c.trim)} strokeWidth="1" />
+          <path d="M34 85.6 Q50 89.4 66 85.6" fill="none" stroke={c.trim} strokeWidth="0.9" strokeDasharray="1.6 1.6" />
+          <path d="M57 88 Q60.4 93.6 58.4 99 L55.4 98.6 Q56.8 93.8 54.4 89.2 Z" fill={c.accent ?? c.trim} stroke={ol(c.accent ?? c.trim)} strokeWidth="0.8" />
+          <circle cx="56.4" cy="88.6" r="2.4" fill={c.trim} stroke={ol(c.trim)} strokeWidth="0.7" />
         </g>
       );
     case "snow":
@@ -586,6 +695,50 @@ function CostumeHead({ c, uid }: { c: Costume; uid: string }) {
           {[-18, -9, 0, 9, 18].map((dx, i) => (
             <path key={i} d={`M${50 + dx} 18 Q${46 + dx} 8 ${50 + dx} 3 Q${54 + dx} 8 ${50 + dx} 18 Z`} fill={i % 2 ? "#84cc16" : "#65a30d"} transform={`rotate(${dx * 1.6} ${50 + dx} 18)`} />
           ))}
+        </g>
+      )}
+      {c.hat === "doppi" && (
+        // Chust do'ppi: square-ish black skullcap with white almond (qalampir) motifs
+        <g stroke={ol(c.hatColor ?? "#111827")} strokeWidth={SW} strokeLinejoin="round">
+          <path d="M29 26.5 Q29.4 14 50 13.4 Q70.6 14 71 26.5 Q50 23 29 26.5 Z" fill={c.hatColor ?? "#111827"} />
+          <path d="M29 26.5 Q50 23 71 26.5 L71.2 29.6 Q50 26.2 28.8 29.6 Z" fill={shade(c.hatColor ?? "#111827", 1.5)} />
+          {[36, 50, 64].map((x) => (
+            <path key={x} d={`M${x - 3} 22 Q${x} 15.6 ${x + 3} 22 Q${x} 23.6 ${x - 3} 22 Z`} fill={c.hatTrim ?? "#f8fafc"} stroke="none" />
+          ))}
+          <path d="M34 17.6 Q42 14.6 50 14.6" fill="none" stroke="#fff" strokeOpacity={0.3} strokeWidth="1.4" strokeLinecap="round" />
+        </g>
+      )}
+      {c.hat === "chugirma" && (
+        // Khorezm chug'irma: big shaggy sheepskin hat
+        <g stroke={ol(c.hatColor ?? "#f5f5f4")} strokeWidth={SW} strokeLinejoin="round">
+          <path d="M22 34 Q18 20 26 12 Q34 2 50 1.5 Q66 2 74 12 Q82 20 78 34 Q64 28 50 28.6 Q36 28 22 34 Z" fill={c.hatColor ?? "#f5f5f4"} />
+          {[
+            [28, 18],
+            [36, 10],
+            [46, 6],
+            [56, 7],
+            [65, 11],
+            [72, 19],
+            [32, 27],
+            [43, 18],
+            [54, 17],
+            [66, 26],
+          ].map(([x, y], i) => (
+            <path key={i} d={`M${x - 3.6} ${y + 1} Q${x - 2} ${y - 3.4} ${x} ${y} Q${x + 2} ${y - 3.4} ${x + 3.6} ${y + 1}`} fill="none" stroke={c.hatTrim ?? "#d6d3d1"} strokeWidth="1.3" strokeLinecap="round" />
+          ))}
+          <path d="M29 12 Q38 5 50 4.6" fill="none" stroke="#fff" strokeOpacity={0.55} strokeWidth="2" strokeLinecap="round" />
+        </g>
+      )}
+      {c.hat === "guard" && (
+        // Ichan qal'a guard: pointed iron helmet with a turquoise tile band and mail flaps
+        <g stroke="#334155" strokeWidth={SW} strokeLinejoin="round">
+          <path d="M24.5 47 Q22 26 30 19 Q40 11 50 -3 Q60 11 70 19 Q78 26 75.5 47 L70 47 Q70 33 50 31 Q30 33 30 47 Z" fill={`url(#${uid}metal)`} />
+          <path d="M28 33 Q50 27 72 33 L72.4 38 Q50 32.4 27.6 38 Z" fill={c.hatTrim ?? "#22d3ee"} />
+          {[34, 42, 50, 58, 66].map((x) => (
+            <circle key={x} cx={x} cy={33.6 - Math.abs(50 - x) * 0.05} r="1.1" fill="#f8fafc" stroke="none" />
+          ))}
+          <path d="M50 -3 L50 31" stroke="#94a3b8" strokeWidth="1" />
+          <path d="M33 18 Q41 11 49 6" fill="none" stroke="#fff" strokeOpacity={0.6} strokeWidth="1.8" strokeLinecap="round" />
         </g>
       )}
       {c.eyepatch && (
@@ -769,7 +922,11 @@ function Hair({ style, fill, outline, hidden }: { style: string; fill: string; o
 /** Qoshlar: kayfiyatni ko'rsatadi */
 function Brows({ mood, color }: { mood: CharMood; color: string }) {
   const d =
-    mood === "sad"
+    mood === "think"
+      ? ["M35 30.5 Q40 29 45 30.5", "M55 27 Q60 23.8 65 26.8"]
+      : mood === "hit"
+      ? ["M35 27.5 Q40 30 45 31.5", "M55 31.5 Q60 30 65 27.5"]
+      : mood === "sad"
       ? ["M35 31 Q40 30.5 45 27.5", "M55 27.5 Q60 30.5 65 31"]
       : mood === "cheer" || mood === "jump"
       ? ["M35 28.5 Q40 25 45 27.5", "M55 27.5 Q60 25 65 28.5"]
@@ -784,7 +941,24 @@ function Brows({ mood, color }: { mood: CharMood; color: string }) {
   );
 }
 
-function Eyes({ kind, sad, happy, galaxy }: { kind: string; sad: boolean; happy: boolean; galaxy: boolean }) {
+function Eyes({ kind, sad, happy, galaxy, blink = false, mood = "idle" }: { kind: string; sad: boolean; happy: boolean; galaxy: boolean; blink?: boolean; mood?: CharMood }) {
+  const covered = kind === "shades" || kind === "visor";
+  // Hurt: squeezed shut ("> <")
+  if (mood === "hit" && !covered)
+    return (
+      <g fill="none" stroke="#1e1b4b" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M36 37.6 L43.6 40.6 L36 43.4" />
+        <path d="M64 37.6 L56.4 40.6 L64 43.4" />
+      </g>
+    );
+  // Blink: closed lids (relaxed downward arcs)
+  if (blink && !covered && !happy && kind !== "happy")
+    return (
+      <g fill="none" stroke="#1e1b4b" strokeWidth="2.2" strokeLinecap="round">
+        <path d="M35.4 40.4 Q40 43.2 44.6 40.4" />
+        <path d="M55.4 40.4 Q60 43.2 64.6 40.4" />
+      </g>
+    );
   if (kind === "shades")
     return (
       <g>
@@ -833,6 +1007,9 @@ function Eyes({ kind, sad, happy, galaxy }: { kind: string; sad: boolean; happy:
       </g>
     );
   const iris = kind === "fire" ? "#ea580c" : galaxy ? "#7c3aed" : "#5b3417";
+  // Thinking: pupils look up and to the side
+  const lx = mood === "think" ? 1.5 : 0.2;
+  const ly = mood === "think" ? 38.9 : 40.1;
   const one = (x: number, wink = false) =>
     wink ? (
       <path key={x} d={`M${x - 4.5} 41 Q${x} 37 ${x + 4.5} 41`} fill="none" stroke="#1e1b4b" strokeWidth="2.6" strokeLinecap="round" />
@@ -844,11 +1021,11 @@ function Eyes({ kind, sad, happy, galaxy }: { kind: string; sad: boolean; happy:
         {/* Ko'z oqi — bodom shakli */}
         <path d={`M${x - 4.8} 40.4 Q${x - 1.6} 36.8 ${x + 0.4} 36.9 Q${x + 3.4} 37 ${x + 4.8} 40 Q${x + 2} 43.2 ${x - 0.4} 43.2 Q${x - 3.2} 43 ${x - 4.8} 40.4 Z`} fill="#f8fafc" stroke="#475569" strokeWidth="0.55" />
         {/* Kamalak parda, qorachiq, yaltirash */}
-        <circle cx={x + 0.2} cy="40.1" r="2.45" fill={`url(#eyeIris${iris.slice(1)})`} />
-        <circle cx={x + 0.2} cy="40.1" r="2.45" fill="none" stroke="#0f172a" strokeWidth="0.45" opacity={0.7} />
-        <circle cx={x + 0.2} cy="40.1" r="1.05" fill="#0b0716" />
-        <circle cx={x + 1.1} cy="39.2" r="0.62" fill="#fff" />
-        <circle cx={x - 0.6} cy="41" r="0.3" fill="#fff" opacity={0.8} />
+        <circle cx={x + lx} cy={ly} r="2.45" fill={`url(#eyeIris${iris.slice(1)})`} />
+        <circle cx={x + lx} cy={ly} r="2.45" fill="none" stroke="#0f172a" strokeWidth="0.45" opacity={0.7} />
+        <circle cx={x + lx} cy={ly} r="1.05" fill="#0b0716" />
+        <circle cx={x + lx + 0.9} cy={ly - 0.9} r="0.62" fill="#fff" />
+        <circle cx={x + lx - 0.8} cy={ly + 0.9} r="0.3" fill="#fff" opacity={0.8} />
         {/* Ustki qovoq (kiprik chizig'i) va pastki qovoq */}
         <path d={`M${x - 5} 40.2 Q${x - 1.6} 36.4 ${x + 0.4} 36.6 Q${x + 3.6} 36.8 ${x + 5.1} 39.7`} fill="none" stroke="#1e1b4b" strokeWidth="1.25" strokeLinecap="round" />
         <path d={`M${x + 4.6} 38.8 L${x + 5.8} 37.9`} stroke="#1e1b4b" strokeWidth="0.8" strokeLinecap="round" />
@@ -875,7 +1052,14 @@ function Eyes({ kind, sad, happy, galaxy }: { kind: string; sad: boolean; happy:
   );
 }
 
-function Mouth({ kind, sad, happy }: { kind: string; sad: boolean; happy: boolean }) {
+function Mouth({ kind, sad, happy, mood = "idle" }: { kind: string; sad: boolean; happy: boolean; mood?: CharMood }) {
+  if (kind !== "mask" && mood === "hit")
+    return (
+      <g>
+        <path d="M43.5 53.6 Q46 51.4 48.5 53.4 Q51 55.4 53.5 53.2 Q55.4 51.6 56.6 53.4" fill="none" stroke="#7f1d1d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    );
+  if (kind !== "mask" && mood === "think") return <path d="M45.5 53.6 Q50 53.2 54.8 51.6" fill="none" stroke="#7f1d1d" strokeWidth="2" strokeLinecap="round" />;
   if (kind === "mask")
     return (
       <g>
@@ -1072,6 +1256,19 @@ function HandItem({ kind, uid }: { kind: string; uid: string }) {
           <path d="M64 74 L80 74 L78 86 Q72 90 66 86 Z" fill={`url(#${uid}gold)`} />
           <rect x="70" y="88" width="4" height="5" fill="#a16207" />
           <rect x="66" y="93" width="12" height="3" rx="1" fill="#78350f" />
+        </g>
+      );
+    case "dutor":
+      // Dutor: two-string Khorezm lute — pear body, long neck, two pegs
+      return (
+        <g transform="rotate(-38 72 89)" stroke="#451a03" strokeWidth="0.8" strokeLinejoin="round">
+          <rect x="70.8" y="50" width="2.6" height="34" rx="1" fill="#92400e" />
+          <path d="M72.1 80 Q63 84 65.4 95 Q68 101 72.1 101 Q76.2 101 78.8 95 Q81.2 84 72.1 80 Z" fill="#b45309" />
+          <path d="M72.1 83 Q67 86 68 94" fill="none" stroke="#fde68a" strokeOpacity={0.6} strokeWidth="0.9" />
+          <path d="M71.4 52 L71.4 97 M72.8 52 L72.8 97" stroke="#fef3c7" strokeWidth="0.35" />
+          <rect x="69" y="48" width="6.2" height="3" rx="1" fill="#451a03" />
+          <circle cx="68.6" cy="52.4" r="1.1" fill="#fbbf24" />
+          <circle cx="75.6" cy="52.4" r="1.1" fill="#fbbf24" />
         </g>
       );
     case "guitar":

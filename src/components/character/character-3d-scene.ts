@@ -501,6 +501,25 @@ export class Character3DScene {
       const leaf = this.mesh(new SphereGeometry(0.12, 10, 8), this.mat(i % 2 ? 0x84cc16 : 0x65a30d), -0.36 + i * 0.18, 0.66, 0, head);
       leaf.scale.set(0.6, 1.6, 0.4);
     }
+    if (c.hat === "doppi") {
+      this.mesh(new CylinderGeometry(0.5, 0.56, 0.26, 4), this.mat(hex(c.hatColor ?? "#111827")), 0, 0.5, 0, head).rotation.y = Math.PI / 4;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        this.mesh(new SphereGeometry(0.07, 8, 6), this.mat(hex(c.hatTrim ?? "#f8fafc")), Math.sin(a) * 0.4, 0.52, Math.cos(a) * 0.4, head).scale.set(1, 1.4, 0.4);
+      }
+    }
+    if (c.hat === "chugirma") {
+      const fur = this.mat(hex(c.hatColor ?? "#f5f5f4"), { roughness: 1 });
+      this.mesh(new SphereGeometry(0.74, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), fur, 0, 0.22, 0, head).scale.set(1.05, 1.15, 1.05);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        this.mesh(new SphereGeometry(0.16, 8, 6), fur, Math.sin(a) * 0.62, 0.42 + (i % 2) * 0.12, Math.cos(a) * 0.62, head);
+      }
+    }
+    if (c.hat === "guard") {
+      this.mesh(new ConeGeometry(0.68, 0.9, 24), this.mat(0x94a3b8, { metalness: 0.5, roughness: 0.3 }), 0, 0.72, 0, head);
+      this.mesh(new TorusGeometry(0.62, 0.06, 8, 32), this.mat(hex(c.hatTrim ?? "#22d3ee")), 0, 0.32, 0, head).rotation.x = Math.PI / 2;
+    }
     if (c.eyepatch) this.mesh(new SphereGeometry(0.11, 12, 10), this.mat(0x111827), 0.2, 0.04, 0.55, head).scale.set(1, 1, 0.4);
   }
 

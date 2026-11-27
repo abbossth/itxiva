@@ -25,6 +25,8 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn, formatNumberUz } from "@/lib/utils";
 import { CharacterSvg } from "./character-svg";
+import { RarityBadge, RarityFrame } from "./skin-preview";
+import { rarityOf } from "@/lib/game/skins";
 import { Character2D } from "./character-2d";
 import { Character3D } from "./character-3d";
 import { BoosterShop } from "@/components/live/boosters";
@@ -348,16 +350,18 @@ export function CharacterEditor({ initial }: { initial: MyCharacter }) {
                       locked && "opacity-60"
                     )}
                   >
-                    <span className={cn("flex h-16 w-16 items-end justify-center", locked && "grayscale")}>
+                    <RarityFrame rarity={rarityOf(it)} className={cn("flex h-16 w-16 items-end justify-center overflow-hidden", locked && "grayscale")}>
                       <CharacterSvg
                         look={{ ...look, [it.slot]: it.id, level: 1, power: 0 }}
                         size={it.slot === "skin" || it.slot === "hair" || it.slot === "eyes" || it.slot === "mouth" || it.slot === "head" ? 62 : 52}
                         headOnly={it.slot === "skin" || it.slot === "hair" || it.slot === "eyes" || it.slot === "mouth" || it.slot === "head"}
                         pedestal={false}
-                        still
+                        mood={on && it.slot === "costume" ? "cheer" : "idle"}
+                        still={!(on && it.slot === "costume")}
                       />
-                    </span>
+                    </RarityFrame>
                     <span className="line-clamp-1 text-[11px] font-bold text-slate-800 dark:text-slate-100">{it.name}</span>
+                    {it.price > 0 && <RarityBadge rarity={rarityOf(it)} />}
                     <span
                       className={cn(
                         "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black",
