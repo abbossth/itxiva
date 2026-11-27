@@ -48,6 +48,8 @@ import {
   reportChatMessageAction,
   sendChatMessageAction,
   sendChatStickerAction,
+  sendChatGifAction,
+  getChatMediaInfoAction,
   setChatAdminAction,
   setChatBlockAction,
   setChatOnlyAdminsAction,
@@ -58,6 +60,11 @@ import {
 } from "@/actions/chat.actions";
 import type { ChatMessageItem, ChatReader, ChatRoomItem } from "@/lib/chat/core";
 import { STICKER_PACKS } from "@/lib/chat/stickers";
+import { GIFS, PREMIUM_STICKERS, isGif, isPremiumSticker, searchEmoji } from "@/lib/chat/media-catalog";
+import { bubbleOf } from "@/lib/premium";
+import { AnimatedEmoji, AnimatedSticker } from "./animated-sticker";
+import { ChatGif } from "./chat-gif";
+import { PremiumName } from "@/components/premium/premium-name";
 import { Initials, PeoplePicker } from "./people-picker";
 
 // Bitta suhbat. Tezlik uchun: birinchi ochilishda faqat oxirgi 30 ta xabar, yuqoriga aylantirganda yana 30 tadan;
@@ -233,6 +240,16 @@ export function RoomView({
   const [report, setReport] = useState<ChatMessageItem | null>(null);
   const [info, setInfo] = useState(false);
   const [stickers, setStickers] = useState(false);
+  /** ":" suggestions: q === "" — popular stickers; q — emoji matching the word */
+  const [colon, setColon] = useState<{ start: number; q: string } | null>(null);
+  const [media, setMedia] = useState<{ popular: string[]; premium: boolean } | null>(null);
+  const loadMedia = useCallback(async () => {
+    if (media) return media;
+    const r = await getChatMediaInfoAction().catch(() => null);
+    const next = { popular: r?.success ? r.data.popular.map((p) => p.key) : [], premium: r?.success ? r.data.premium : false };
+    setMedia(next);
+    return next;
+  }, [media]);
   const [pending, setPending] = useState<PendingImage | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [rec, setRec] = useState<{ seconds: number } | null>(null);
@@ -283,10 +300,11 @@ export function RoomView({
         if (d.messages.length || d.changed.length) {
           if (d.messages.length) lastId.current = d.messages[d.messages.length - 1].id;
           const changed = new Map(d.changed.map((m) => [m.id, m]));
+          // Deleted messages vanish completely (no "deleted" placeholder)
           setMessages((prev) => {
-            const base = (prev ?? []).map((m) => changed.get(m.id) ?? m);
+            const base = (prev ?? []).map((m) => changed.get(m.id) ?? m).filter((m) => !m.deleted);
             const seen = new Set(base.map((m) => m.id));
-            return [...base, ...d.messages.filter((m) => !seen.has(m.id))];
+            return [...base, ...d.messages.filter((m) => !seen.has(m.id) && !m.deleted)];
           });
           if (d.messages.length && (stick.current || first)) scrollDown();
         } else setMessages((prev) => prev ?? []);
@@ -370,7 +388,7 @@ export function RoomView({
     olderBusy.current = false;
     if (!d) return;
     if (d.messages.length < PAGE) setHasMore(false);
-    setMessages((prev) => [...d.messages, ...(prev ?? [])]);
+    setMessages((prev) => [...d.messages.filter((m) => !m.deleted), ...(prev ?? [])]);
     // Ko'rib turgan joy siljimasin
     requestAnimationFrame(() => {
       if (el) el.scrollTop += el.scrollHeight - prevH;
@@ -396,6 +414,39 @@ export function RoomView({
     lastPing.current = 0;
     append(r.data);
     inputRef.current?.focus();
+  };
+
+  /** Kursor oldidagi ":" yoki ":so'z" — stiker / emoji takliflari */
+  const detectColon = (value: string, caret: number) => {
+    const m = /(^|\s):([^\s:]{0,20})$/.exec(value.slice(0, caret));
+    if (!m) return setColon(null);
+    setColon({ start: caret - m[2].length - 1, q: m[2] });
+    void loadMedia();
+  };
+  const colonEmoji = colon && colon.q ? searchEmoji(colon.q) : [];
+  const colonStickers = colon && !colon.q ? (media?.popular.filter((k) => !isGif(k) && (!isPremiumSticker(k) || media.premium)) ?? []).concat(STICKER_PACKS[0].items).filter((v, i, a) => a.indexOf(v) === i).slice(0, 12) : [];
+  const pickColonEmoji = (e: string) => {
+    if (!colon) return;
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? text.length;
+    const next = text.slice(0, colon.start) + e + text.slice(caret);
+    setText(next);
+    setColon(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = colon.start + e.length;
+      el?.setSelectionRange(pos, pos);
+    });
+  };
+  const pickColonSticker = async (st: string) => {
+    if (!colon) return;
+    const rest = (text.slice(0, colon.start) + text.slice(colon.start + 1 + colon.q.length)).trim();
+    setColon(null);
+    if (rest) return pickColonEmoji(isPremiumSticker(st) ? PREMIUM_STICKERS.find((x) => x.id === st)!.emoji : st);
+    setText("");
+    const r = await sendChatStickerAction(room.id, st, reply?.id ?? null);
+    if (!r.success) return toast.error(r.error);
+    append(r.data);
   };
 
   /** Kursor oldidagi "@so'z" — belgilash ro'yxatini ochadi */
@@ -426,7 +477,7 @@ export function RoomView({
 
   const sendSticker = async (s: string) => {
     // Matn yozilayotgan bo'lsa — stiker matnga qo'shiladi (xabar bilan birga ketadi)
-    if (text.trim()) {
+    if (text.trim() && !isPremiumSticker(s)) {
       const el = inputRef.current;
       const a = el?.selectionStart ?? text.length;
       const b = el?.selectionEnd ?? text.length;
@@ -439,6 +490,13 @@ export function RoomView({
     }
     setStickers(false);
     const r = await sendChatStickerAction(room.id, s, reply?.id ?? null);
+    if (!r.success) return toast.error(r.error);
+    append(r.data);
+  };
+
+  const sendGif = async (g: string) => {
+    setStickers(false);
+    const r = await sendChatGifAction(room.id, g, reply?.id ?? null);
     if (!r.success) return toast.error(r.error);
     append(r.data);
   };
@@ -551,13 +609,9 @@ export function RoomView({
     const r = await deleteChatMessageAction(m.id);
     if (!r.success) return toast.error(r.error);
     setMessages((prev) =>
-      (prev ?? []).map((x) =>
-        x.id === m.id
-          ? { ...x, deleted: true, text: "", voice: null, image: null, sticker: null, replyTo: null, reactions: [] }
-          : x.replyTo?.id === m.id
-            ? { ...x, replyTo: { ...x.replyTo, text: "", deleted: true } }
-            : x
-      )
+      (prev ?? [])
+        .filter((x) => x.id !== m.id)
+        .map((x) => (x.replyTo?.id === m.id ? { ...x, replyTo: { ...x.replyTo, text: "", deleted: true } } : x))
     );
     if (reply?.id === m.id) setReply(null);
   };
@@ -804,7 +858,31 @@ export function RoomView({
                 ))}
               </ul>
             )}
-            {stickers && <StickerPanel onPick={(s) => void sendSticker(s)} onClose={() => setStickers(false)} />}
+            {colon && (colonEmoji.length > 0 || colonStickers.length > 0) && (
+              <div role="listbox" aria-label={colon.q ? "Emoji takliflari" : "Stikerlar"} className="mb-2 flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                <span className="shrink-0 px-1.5 text-[11px] font-bold text-slate-400">{colon.q ? `:${colon.q}` : "Stiker"}</span>
+                {(colon.q ? colonEmoji : colonStickers).map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onMouseDown={(ev) => ev.preventDefault()}
+                    onClick={() => (colon.q ? pickColonEmoji(e) : void pickColonSticker(e))}
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl text-2xl transition hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    aria-label={e}
+                  >
+                    {isPremiumSticker(e) ? <AnimatedSticker id={e} size={40} /> : e}
+                  </button>
+                ))}
+              </div>
+            )}
+            {stickers && (
+              <StickerPanel
+                load={loadMedia}
+                onPick={(s) => void sendSticker(s)}
+                onGif={(g) => void sendGif(g)}
+                onClose={() => setStickers(false)}
+              />
+            )}
             {rec ? (
               <div className="flex items-center gap-2">
                 <Button type="button" variant="ghost" size="icon" onClick={() => stopRec(true)} aria-label="Bekor qilish">
@@ -849,6 +927,7 @@ export function RoomView({
                   onChange={(e) => {
                     setText(e.target.value);
                     detectMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                    detectColon(e.target.value, e.target.selectionStart ?? e.target.value.length);
                     ping(e.target.value.trim().length > 0);
                     const el = e.target;
                     el.style.height = "";
@@ -1092,7 +1171,9 @@ const Bubble = memo(function Bubble({
   const cancelPress = () => {
     if (press.current) clearTimeout(press.current);
   };
-  const bare = Boolean(m.sticker) && !m.deleted;
+  const bare = (Boolean(m.sticker) || Boolean(m.gif)) && !m.deleted;
+  const pstyle = m.senderStyle;
+  const bubble = pstyle && !bare && !m.image ? bubbleOf(pstyle.bubble) : null;
   const handlers = {
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
@@ -1139,18 +1220,19 @@ const Bubble = memo(function Bubble({
               : cn(
                   "rounded-[20px] shadow-sm",
                   m.image ? "overflow-hidden p-1" : "px-3 py-1.5",
-                  mine ? "bg-teal-600 text-white" : "bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-100",
+                  bubble ? "text-white" : mine ? "bg-teal-600 text-white" : "bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-100",
                   tail && (mine ? "rounded-br-md" : "rounded-bl-md")
                 )
           )}
+          style={bubble ? { backgroundImage: `linear-gradient(135deg, ${bubble.from}, ${bubble.to})` } : undefined}
         >
           {showName && (
             <p className={cn("mb-0.5 text-xs font-bold", m.image && "px-2 pt-1", m.senderRole === "mentor" ? "text-amber-600" : "text-teal-700 dark:text-teal-300")}>
-              {m.senderName}
+              <PremiumName name={m.senderName} style={pstyle} className={bubble ? "[&_.premium-name]:!text-white [&_.premium-name]:![background-image:none]" : undefined} />
               {m.senderRole === "mentor" && " · Ustoz"}
             </p>
           )}
-          {m.replyTo && !m.deleted && (
+          {m.replyTo && !m.deleted && !m.replyTo.deleted && (
             <button
               type="button"
               onClick={() => !m.replyTo!.deleted && onAction({ t: "jump", id: m.replyTo!.id })}
@@ -1167,11 +1249,20 @@ const Bubble = memo(function Bubble({
             <p className="italic opacity-70">
               Xabar o&apos;chirildi {stamp}
             </p>
+          ) : m.gif ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <ChatGif id={m.gif} look={m.senderLook} />
+              {stamp}
+            </div>
           ) : m.sticker ? (
             <div className="flex flex-col items-end">
-              <span className="chat-sticker block select-none text-[72px] leading-none" role="img" aria-label="Stiker">
-                {m.sticker}
-              </span>
+              {isPremiumSticker(m.sticker) ? (
+                <AnimatedSticker id={m.sticker} size={110} />
+              ) : (
+                <span className="chat-sticker block select-none text-[72px] leading-none" role="img" aria-label="Stiker">
+                  {m.sticker}
+                </span>
+              )}
               {stamp}
             </div>
           ) : m.image ? (
@@ -1205,7 +1296,7 @@ const Bubble = memo(function Bubble({
             </div>
           ) : onlyEmoji(m.text) ? (
             <div className="flex items-end gap-1">
-              <span className="chat-sticker text-5xl leading-tight">{m.text}</span>
+              {pstyle ? <AnimatedEmoji text={m.text} className="text-6xl" /> : <span className="chat-sticker text-5xl leading-tight">{m.text}</span>}
               {stamp}
             </div>
           ) : (
@@ -1332,37 +1423,108 @@ function MenuButton({ onOpen }: { onOpen: (x: number, y: number) => void }) {
   );
 }
 
-function StickerPanel({ onPick, onClose }: { onPick: (s: string) => void; onClose: () => void }) {
-  const [pack, setPack] = useState(STICKER_PACKS[0].id);
-  const items = STICKER_PACKS.find((p) => p.id === pack)?.items ?? [];
+type PanelTab = "popular" | "premium" | "gif" | string;
+
+function StickerPanel({ load, onPick, onGif, onClose }: { load: () => Promise<{ popular: string[]; premium: boolean }>; onPick: (s: string) => void; onGif: (g: string) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<PanelTab>("popular");
+  const [info, setInfo] = useState<{ popular: string[]; premium: boolean } | null>(null);
+  const { toast } = useToast();
+  useEffect(() => {
+    let alive = true;
+    void load().then((d) => alive && setInfo(d));
+    return () => {
+      alive = false;
+    };
+  }, [load]);
+  const premium = info?.premium ?? false;
+  const locked = () => toast.info("Bu IT Xiva Premium uchun — Premium sahifasida oling ✨");
+  const tabs: { id: PanelTab; label: string }[] = [
+    { id: "popular", label: "🔥 Mashhur" },
+    { id: "gif", label: "🎞️ GIF" },
+    { id: "premium", label: "✨ Premium" },
+    ...STICKER_PACKS.map((p) => ({ id: p.id, label: `${p.items[0]} ${p.title}` })),
+  ];
+  const popular = (info?.popular ?? []).filter((k) => !isGif(k));
+  const popularGifs = (info?.popular ?? []).filter((k) => isGif(k));
+  const tile = "flex cursor-pointer items-center justify-center rounded-xl p-1 transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800";
+  const sticker = (s: string) =>
+    isPremiumSticker(s) ? (
+      <button key={s} type="button" onClick={() => (premium ? onPick(s) : locked())} aria-label="Animatsiyali stiker" className={cn(tile, "relative")}>
+        <AnimatedSticker id={s} size={48} />
+        {!premium && <span className="absolute right-0 top-0 text-xs">🔒</span>}
+      </button>
+    ) : (
+      <button key={s} type="button" onClick={() => onPick(s)} aria-label={`Stiker ${s}`} className={cn(tile, "text-4xl")}>
+        {s}
+      </button>
+    );
   return (
     <div className="mb-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
       <div className="mb-1.5 flex items-center gap-1 overflow-x-auto">
-        {STICKER_PACKS.map((p) => (
+        {tabs.map((p) => (
           <button
             key={p.id}
             type="button"
-            onClick={() => setPack(p.id)}
+            onClick={() => setTab(p.id)}
             className={cn(
               "shrink-0 cursor-pointer rounded-full px-3 py-1 text-xs font-semibold",
-              pack === p.id ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+              tab === p.id ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
             )}
           >
-            {p.items[0]} {p.title}
+            {p.label}
           </button>
         ))}
         <button type="button" onClick={onClose} aria-label="Yopish" className="ml-auto shrink-0 cursor-pointer rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="grid max-h-44 grid-cols-6 gap-1 overflow-y-auto sm:grid-cols-8">
-        {items.map((s) => (
-          <button key={s} type="button" onClick={() => onPick(s)} aria-label={`Stiker ${s}`} className="cursor-pointer rounded-xl p-1 text-4xl transition-transform hover:scale-110 hover:bg-slate-100 dark:hover:bg-slate-800">
-            {s}
-          </button>
-        ))}
+      <div className="max-h-56 overflow-y-auto">
+        {tab === "popular" && (
+          <>
+            {popular.length === 0 && popularGifs.length === 0 && <p className="py-4 text-center text-xs text-slate-400">Hali mashhurlar yo&apos;q — birinchi bo&apos;lib yuboring!</p>}
+            <div className="grid grid-cols-6 gap-1 sm:grid-cols-8">{popular.map(sticker)}</div>
+            {popularGifs.length > 0 && (
+              <div className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                {popularGifs.map((g) => (
+                  <GifTile key={g} id={g} premium={premium} onPick={onGif} locked={locked} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {tab === "premium" && (
+          <>
+            {!premium && (
+              <a href="/premium" className="mb-2 flex items-center justify-between rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-xs font-bold text-white">
+                <span>✨ Animatsiyali stikerlar — IT Xiva Premium bilan</span>
+                <span>Olish →</span>
+              </a>
+            )}
+            <div className="grid grid-cols-5 gap-1 sm:grid-cols-8">{PREMIUM_STICKERS.map((p) => sticker(p.id))}</div>
+          </>
+        )}
+        {tab === "gif" && (
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+            {GIFS.map((g) => (
+              <GifTile key={g.id} id={g.id} premium={premium} onPick={onGif} locked={locked} />
+            ))}
+          </div>
+        )}
+        {STICKER_PACKS.some((p) => p.id === tab) && <div className="grid grid-cols-6 gap-1 sm:grid-cols-8">{STICKER_PACKS.find((p) => p.id === tab)!.items.map(sticker)}</div>}
       </div>
     </div>
+  );
+}
+
+function GifTile({ id, premium, onPick, locked }: { id: string; premium: boolean; onPick: (g: string) => void; locked: () => void }) {
+  const g = GIFS.find((x) => x.id === id);
+  if (!g) return null;
+  const lock = g.premium && !premium;
+  return (
+    <button type="button" onClick={() => (lock ? locked() : onPick(id))} className="relative cursor-pointer overflow-hidden rounded-xl transition-transform hover:scale-[1.03]" aria-label={`GIF ${g.caption}`}>
+      <ChatGif id={id} size={96} className="pointer-events-none" />
+      {lock && <span className="absolute right-1 top-1 rounded-md bg-black/50 px-1 text-[10px]">🔒</span>}
+    </button>
   );
 }
 

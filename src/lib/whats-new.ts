@@ -29,6 +29,43 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-premium-chat-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangi",
+    title: "IT Xiva Premium, GIF'lar va stikerlar!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "👑",
+        title: "IT Xiva Premium — 150 coin / oy",
+        text: "Chatda animatsiyali stikerlar va katta jonli emoji, ismingiz 8 xil chiroyli shriftda, o'zingiz tanlagan premium belgi va rangli xabarlar. Menyudagi «IT Xiva Premium» bo'limida oling va uslubni tanlang.",
+      },
+      {
+        art: "emoji",
+        emoji: "🎞️",
+        title: "GIF va mashhur stikerlar — hammaga",
+        text: "Chatda 😊 tugmasini bosing: 🔥 Mashhur (hamma eng ko'p yuborganlari), 🎞️ GIF — personajingiz «Salom!», «Ura!», «Ketdik!» deydi. «:» yozsangiz stikerlar, «:kul» yozsangiz mos emoji chiqadi. O'chirilgan xabar endi izsiz yo'qoladi.",
+      },
+    ],
+    cta: { label: "Premiumni ko'rish", href: "/premium" },
+  },
+  {
+    id: "mentor-premium-chat-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Chat: Premium, GIF'lar, emoji takliflari",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💬",
+        title: "O'quvchilar uchun yangi imkoniyatlar",
+        text: "IT Xiva Premium (150 coin / 30 kun, coin daftariga «IT Xiva Premium» yozuvi bilan yechiladi): animatsiyali stikerlar, chiroyli ism, belgi, rangli xabarlar. Hammaga: o'z GIF to'plamimiz (tashqi saytlarsiz, xavfsiz), mashhur stikerlar, «:» bilan emoji takliflari. O'chirilgan xabar chatda izsiz yo'qoladi (ustoz o'chirgani audit jurnalida qoladi).",
+      },
+    ],
+  },
+  {
     id: "student-3d-everywhere-2026-11-27",
     date: "2026-11-27",
     audience: "student",

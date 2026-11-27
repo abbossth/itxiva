@@ -13,9 +13,12 @@ import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getCurrentUser, requireMentor } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { groupShortName } from "@/lib/group-name";
-import { canRead, dmKeyOf, isGroupAdmin, setRoomMuted, MAX_CUSTOM_MEMBERS, MAX_OWNED_GROUPS, MESSAGE_MAX, postChatMessage, type ChatMessageItem, type ChatViewer } from "@/lib/chat/core";
+import { canRead, dmKeyOf, isGroupAdmin, setRoomMuted, MAX_CUSTOM_MEMBERS, MAX_OWNED_GROUPS, MESSAGE_MAX, postChatMessage, previewOf, type ChatMessageItem, type ChatViewer } from "@/lib/chat/core";
 import { notifyMentors } from "@/lib/notifications/notify";
 import { isSticker } from "@/lib/chat/stickers";
+import { gifOf, isGif, isPremiumSticker } from "@/lib/chat/media-catalog";
+import { isPremium } from "@/lib/premium";
+import { popularMedia } from "@/lib/chat/core";
 
 type Result<T> = { success: true; data: T } | { success: false; error: string };
 const fail = (error: string): { success: false; error: string } => ({ success: false, error });
@@ -67,13 +70,51 @@ export async function sendChatStickerAction(roomId: string, sticker: string, rep
   try {
     const v = await viewer();
     if (!v) return fail("Tizimga kiring");
-    if (!validId(roomId) || !isSticker(sticker)) return fail("Stiker topilmadi");
+    if (!validId(roomId) || !(isSticker(sticker) || isPremiumSticker(sticker))) return fail("Stiker topilmadi");
+    if (isPremiumSticker(sticker) && !(await hasPremium(v))) return fail("Animatsiyali stikerlar — IT Xiva Premium uchun");
     const rate = checkRateLimit(`chat_${v.userId}`, 20, 60_000);
     if (!rate.allowed) return fail(`Juda tez yozyapsiz. ${rate.resetInSeconds} soniyadan keyin`);
     const r = await postChatMessage(roomId, v, { sticker, replyToId: validId(replyToId) ? replyToId : null });
     return r.ok ? { success: true, data: r.item } : fail(r.error);
   } catch (err) {
     return errorOf(err, "Stikerni yuborib bo'lmadi");
+  }
+}
+
+/** Premium faolmi (mentorlarga hamma narsa ochiq) */
+async function hasPremium(v: ChatViewer): Promise<boolean> {
+  if (v.role === "mentor") return true;
+  await connectToDatabase();
+  const u = await User.findById(v.userId).select("premiumUntil").lean();
+  return isPremium(u?.premiumUntil);
+}
+
+/** GIF yuborish (o'z to'plamimizdan) */
+export async function sendChatGifAction(roomId: string, gif: string, replyToId?: string | null): Promise<Result<ChatMessageItem>> {
+  try {
+    const v = await viewer();
+    if (!v) return fail("Tizimga kiring");
+    if (!validId(roomId) || !isGif(gif)) return fail("GIF topilmadi");
+    if (gifOf(gif)?.premium && !(await hasPremium(v))) return fail("Bu GIF — IT Xiva Premium uchun");
+    const rate = checkRateLimit(`chat_${v.userId}`, 20, 60_000);
+    if (!rate.allowed) return fail(`Juda tez yozyapsiz. ${rate.resetInSeconds} soniyadan keyin`);
+    const r = await postChatMessage(roomId, v, { gif, replyToId: validId(replyToId) ? replyToId : null });
+    return r.ok ? { success: true, data: r.item } : fail(r.error);
+  } catch (err) {
+    return errorOf(err, "GIFni yuborib bo'lmadi");
+  }
+}
+
+/** Platformadagi eng mashhur stiker va GIF'lar; o'zim Premiummanmi */
+export async function getChatMediaInfoAction(): Promise<Result<{ popular: { key: string; count: number }[]; premium: boolean }>> {
+  try {
+    const v = await viewer();
+    if (!v) return fail("Tizimga kiring");
+    await connectToDatabase();
+    const [popular, premium] = await Promise.all([popularMedia(24), hasPremium(v)]);
+    return { success: true, data: { popular, premium } };
+  } catch (err) {
+    return errorOf(err, "Ma'lumotni olib bo'lmadi");
   }
 }
 
@@ -92,9 +133,15 @@ export async function deleteChatMessageAction(messageId: string): Promise<Result
     await ChatMessage.updateOne({ _id: msg._id, deletedAt: null }, { $set: { deletedAt: now, deletedBy: v.userId, changedAt: now } });
     // Unga berilgan javoblardagi iqtibos ham yashiriladi (ochiq suhbatlarda darhol yangilanadi)
     await ChatMessage.updateMany({ roomId: msg.roomId, "replyTo.id": msg._id }, { $set: { "replyTo.text": "", "replyTo.deleted": true, changedAt: now } });
-    // Ro'yxatdagi "oxirgi xabar" shu bo'lsa — matni ko'rinmasin
+    // Ro'yxatdagi "oxirgi xabar" shu bo'lsa — o'rniga undan oldingi xabar ko'rinadi (o'chirilgani izsiz yo'qoladi)
     if (msg.createdAt) {
-      await ChatRoom.updateOne({ _id: msg.roomId, lastMessageAt: msg.createdAt }, { $set: { "lastMessage.text": "Xabar o'chirildi" } });
+      const prevMsg = await ChatMessage.findOne({ roomId: msg.roomId, deletedAt: null }).sort({ _id: -1 }).select("senderName text voice image sticker gif createdAt").lean();
+      await ChatRoom.updateOne(
+        { _id: msg.roomId, lastMessageAt: msg.createdAt },
+        prevMsg
+          ? { $set: { lastMessageAt: prevMsg.createdAt, lastMessage: { text: previewOf(prevMsg).slice(0, 120), senderName: prevMsg.senderName.split(" ")[0] || prevMsg.senderName } } }
+          : { $set: { lastMessage: null } }
+      );
     }
     if (v.role === "mentor" && String(msg.senderId) !== v.userId) {
       await AuditLog.create({ actorId: v.userId, action: "CHAT_DELETE_MESSAGE", details: { messageId: msg._id, roomId: room._id, senderId: msg.senderId, text: msg.text.slice(0, 300) } });

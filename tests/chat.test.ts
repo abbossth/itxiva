@@ -365,13 +365,16 @@ describe("chat: o'chirilgan xabar iqtibosda ko'rinmaydi", () => {
     expect(raw!.replyTo!.text).toBe("");
   });
 
-  it("oxirgi xabar o'chirilsa — ro'yxatda matni qolmaydi", async () => {
+  it("oxirgi xabar o'chirilsa — izsiz yo'qoladi, ro'yxatda undan oldingisi ko'rinadi", async () => {
     const { ali, vali, v } = await seed();
     const general = (await core.listRooms(v(ali)))[0];
     as(ali);
+    await chat.sendChatMessageAction(general.id, "salom");
     const m = await chat.sendChatMessageAction(general.id, "maxfiy gap");
     if (!m.success) throw new Error(m.error);
     await chat.deleteChatMessageAction(m.data.id);
-    expect((await core.listRooms(v(vali)))[0].lastText).toBe("Ali: Xabar o'chirildi");
+    const last = (await core.listRooms(v(vali)))[0].lastText;
+    expect(last).toBe("Ali: salom");
+    expect(last).not.toContain("o'chirildi");
   });
 });

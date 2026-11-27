@@ -23,6 +23,7 @@ import {
   Coins,
   Megaphone,
   MessagesSquare,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -127,6 +128,7 @@ export const STUDENT_LINKS: NavLink[] = [
   { href: "/live", label: "Jonli o'yin", shortLabel: "O'yin", icon: Gamepad2, match: ["/live/"] },
   { href: "/chat", label: "Chat", shortLabel: "Chat", icon: MessagesSquare, badge: "chat" },
   { href: "/shop", label: "Coin do'koni", shortLabel: "Do'kon", icon: ShoppingBag, badge: "orders" },
+  { href: "/premium", label: "IT Xiva Premium", shortLabel: "Premium", icon: Crown },
   { href: "/profile", label: "Mening profilim", shortLabel: "Profil", icon: User, sidebar: false },
 ];
 

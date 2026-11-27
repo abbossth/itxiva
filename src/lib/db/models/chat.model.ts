@@ -58,8 +58,10 @@ export interface IChatMessage {
   voice?: { key: string; mime: string; duration: number; size: number } | null;
   /** Rasm: R2 kaliti, turi, o'lchamlari va hajmi */
   image?: { key: string; mime: string; width: number; height: number; size: number } | null;
-  /** Stiker (STICKER_PACKS dagi kod) */
+  /** Stiker (STICKER_PACKS dagi kod yoki animatsiyali premium stiker "a:…") */
   sticker?: string | null;
+  /** GIF (o'z to'plamimizdagi "g:…" kodi) */
+  gif?: string | null;
   /** Javob berilgan xabar (iqtibos) */
   replyTo?: { id: mongoose.Types.ObjectId; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar (id va ism — matnda "@Ism Familiya" ko'rinishida) */
@@ -84,6 +86,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     voice: { type: new Schema({ key: String, mime: String, duration: Number, size: Number }, { _id: false }), default: null },
     image: { type: new Schema({ key: String, mime: String, width: Number, height: Number, size: Number }, { _id: false }), default: null },
     sticker: { type: String, default: null },
+    gif: { type: String, default: null },
     replyTo: { type: new Schema({ id: Schema.Types.ObjectId, senderName: String, text: String, deleted: { type: Boolean, default: false } }, { _id: false }), default: null },
     mentions: { type: [new Schema({ id: Schema.Types.ObjectId, name: String }, { _id: false })], default: [] },
     reactions: { type: [new Schema({ emoji: String, userId: Schema.Types.ObjectId }, { _id: false })], default: [] },
@@ -124,6 +127,19 @@ ChatReadSchema.index({ userId: 1, roomId: 1 }, { unique: true });
 // "Kim o'qidi" — suhbat bo'yicha
 ChatReadSchema.index({ roomId: 1, lastReadId: -1 });
 
+/** Stiker va GIF'lar necha marta yuborilgan — "Mashhur" ro'yxati uchun */
+export interface IChatMediaStat {
+  key: string;
+  count: number;
+  lastAt: Date;
+}
+const ChatMediaStatSchema = new Schema<IChatMediaStat>({
+  key: { type: String, required: true, unique: true },
+  count: { type: Number, default: 0 },
+  lastAt: { type: Date, default: () => new Date() },
+});
+ChatMediaStatSchema.index({ count: -1 });
+
 export const ChatRoom: Model<IChatRoom> = mongoose.models.ChatRoom || mongoose.model<IChatRoom>("ChatRoom", ChatRoomSchema);
 export const ChatMessage: Model<IChatMessage> = mongoose.models.ChatMessage || mongoose.model<IChatMessage>("ChatMessage", ChatMessageSchema);
 export const ChatRead: Model<IChatRead> = mongoose.models.ChatRead || mongoose.model<IChatRead>("ChatRead", ChatReadSchema);
@@ -145,3 +161,5 @@ ChatTypingSchema.index({ roomId: 1, userId: 1 }, { unique: true });
 // Eski yozuvlarni baza o'zi tozalaydi (so'rovda baribir oxirgi soniyalar olinadi)
 ChatTypingSchema.index({ at: 1 }, { expireAfterSeconds: 120 });
 export const ChatTyping: Model<IChatTyping> = mongoose.models.ChatTyping || mongoose.model<IChatTyping>("ChatTyping", ChatTypingSchema);
+
+export const ChatMediaStat: Model<IChatMediaStat> = mongoose.models.ChatMediaStat || mongoose.model<IChatMediaStat>("ChatMediaStat", ChatMediaStatSchema);

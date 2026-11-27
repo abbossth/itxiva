@@ -1,7 +1,10 @@
 import { isSticker } from "./stickers";
+import { gifOf, isGif, isPremiumSticker, premiumSticker } from "./media-catalog";
+import { cleanStyle, isPremium, type PremiumStyle } from "@/lib/premium";
+import { gameLook, type GameLook } from "@/lib/character/catalog";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db/connect";
-import { CHAT_MESSAGE_TTL_DAYS, ChatMessage, ChatRead, ChatRoom, ChatTyping, type IChatRoom } from "@/lib/db/models/chat.model";
+import { CHAT_MESSAGE_TTL_DAYS, ChatMediaStat, ChatMessage, ChatRead, ChatRoom, ChatTyping, type IChatRoom } from "@/lib/db/models/chat.model";
 import { Group } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { groupShortName } from "@/lib/group-name";
@@ -201,8 +204,14 @@ export interface ChatMessageItem {
   voice: { duration: number } | null;
   /** Rasm: ko'rish manzili /api/chat/media?m=<id> */
   image: { width: number; height: number } | null;
-  /** Stiker */
+  /** Stiker (emoji yoki animatsiyali premium "a:…") */
   sticker: string | null;
+  /** GIF (o'z to'plamimiz, "g:…") */
+  gif: string | null;
+  /** Yuboruvchi Premium bo'lsa — ism shrifti, belgi, xabar rangi */
+  senderStyle: PremiumStyle | null;
+  /** Personajli GIF uchun yuboruvchining personaji */
+  senderLook: GameLook | null;
   /** Javob berilgan xabar (o'chirilgan bo'lsa — deleted, matn bo'sh) */
   replyTo: { id: string; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar */
@@ -222,6 +231,7 @@ export function toItem(m: {
   voice?: { duration: number } | null;
   image?: { width: number; height: number } | null;
   sticker?: string | null;
+  gif?: string | null;
   replyTo?: { id: unknown; senderName: string; text: string; deleted?: boolean } | null;
   reactions?: { emoji: string; userId: unknown }[];
   mentions?: { id: unknown; name: string }[];
@@ -240,6 +250,9 @@ export function toItem(m: {
     voice: m.voice && !gone ? { duration: m.voice.duration } : null,
     image: m.image && !gone ? { width: m.image.width, height: m.image.height } : null,
     sticker: m.sticker && !gone ? m.sticker : null,
+    gif: m.gif && !gone ? m.gif : null,
+    senderStyle: null,
+    senderLook: null,
     // Iqtibos qilingan xabar o'chirilgan bo'lsa — uning matni ko'rsatilmaydi
     replyTo: m.replyTo && !gone ? { id: String(m.replyTo.id), senderName: m.replyTo.senderName, text: m.replyTo.deleted ? "" : m.replyTo.text, deleted: Boolean(m.replyTo.deleted) } : null,
     reactions: [...reactions].map(([emoji, users]) => ({ emoji, users })),
@@ -375,7 +388,36 @@ async function hideDeletedQuotes(items: ChatMessageItem[]): Promise<ChatMessageI
 }
 
 export async function loadMessages(roomId: Id, opts: { after?: string | null; before?: string | null; limit?: number }): Promise<ChatMessageItem[]> {
-  return hideDeletedQuotes(await loadMessagesRaw(roomId, opts));
+  return withSenders(await hideDeletedQuotes(await loadMessagesRaw(roomId, opts)));
+}
+
+/** Senders' Premium style (name font, badge, bubble) and — for character GIFs — their character */
+export async function withSenders(items: ChatMessageItem[]): Promise<ChatMessageItem[]> {
+  const ids = [...new Set(items.map((m) => m.senderId))].filter((id) => mongoose.isValidObjectId(id));
+  if (ids.length === 0) return items;
+  const users = await User.find({ _id: { $in: ids.map(oid) } }).select("premiumUntil premiumStyle character level").lean();
+  const byId = new Map(users.map((u) => [String(u._id), u]));
+  const now = Date.now();
+  return items.map((m) => {
+    const u = byId.get(m.senderId);
+    if (!u) return m;
+    const style = isPremium(u.premiumUntil, now) ? cleanStyle(u.premiumStyle) : null;
+    const wantsLook = m.gif ? gifOf(m.gif)?.kind === "char" : false;
+    const look = wantsLook ? gameLook((u.character?.look ?? null) as Partial<GameLook> | null, u.level ?? 1) : null;
+    return style || look ? { ...m, senderStyle: style, senderLook: look } : m;
+  });
+}
+
+/** A sticker or GIF was sent: count it for the "Mashhur" list */
+export async function countMedia(key: string) {
+  await ChatMediaStat.updateOne({ key }, { $inc: { count: 1 }, $set: { lastAt: new Date() } }, { upsert: true });
+}
+
+/** Most sent stickers and GIFs in the last 60 days */
+export async function popularMedia(limit = 24): Promise<{ key: string; count: number }[]> {
+  const since = new Date(Date.now() - 60 * 86_400_000);
+  const rows = await ChatMediaStat.find({ lastAt: { $gte: since } }).sort({ count: -1 }).limit(limit).lean();
+  return rows.filter((r) => isSticker(r.key) || isPremiumSticker(r.key) || isGif(r.key)).map((r) => ({ key: r.key, count: r.count }));
 }
 
 async function loadMessagesRaw(roomId: Id, opts: { after?: string | null; before?: string | null; limit?: number }): Promise<ChatMessageItem[]> {
@@ -393,12 +435,13 @@ async function loadMessagesRaw(roomId: Id, opts: { after?: string | null; before
 /** `since` dan keyin o'zgargan (reaksiya, o'chirish) xabarlar — ochiq suhbatni yangilash uchun */
 export async function loadChanged(roomId: Id, since: Date): Promise<ChatMessageItem[]> {
   const list = await ChatMessage.find({ roomId: oid(roomId), changedAt: { $gt: since } }).sort({ changedAt: 1 }).limit(100).lean();
-  return hideDeletedQuotes(list.map((m) => toItem(m)));
+  return withSenders(await hideDeletedQuotes(list.map((m) => toItem(m))));
 }
 
 /** Xabar tavsifi: ro'yxatda, iqtibosda va bildirishnomada */
-export function previewOf(m: { text?: string; voice?: unknown; image?: unknown; sticker?: string | null }): string {
-  if (m.sticker) return `${m.sticker} Stiker`;
+export function previewOf(m: { text?: string; voice?: unknown; image?: unknown; sticker?: string | null; gif?: string | null }): string {
+  if (m.gif) return `🎞️ GIF${gifOf(m.gif) ? ` · ${gifOf(m.gif)!.caption}` : ""}`;
+  if (m.sticker) return `${premiumSticker(m.sticker)?.emoji ?? m.sticker} Stiker`;
   if (m.voice) return "🎤 Ovozli xabar";
   if (m.image) return m.text ? `🖼 ${m.text}` : "🖼 Rasm";
   return m.text ?? "";
@@ -432,6 +475,7 @@ export async function postChatMessage(
     voice?: { key: string; mime: string; duration: number; size: number };
     image?: { key: string; mime: string; width: number; height: number; size: number };
     sticker?: string;
+    gif?: string;
     replyToId?: string | null;
     /** @belgilanganlar (matnda "@Ism" bo'lishi shart) */
     mentionIds?: string[];
@@ -455,7 +499,7 @@ export async function postChatMessage(
   let replyTo: { id: mongoose.Types.ObjectId; senderName: string; text: string } | null = null;
   let replyToUserId: string | null = null;
   if (body.replyToId && mongoose.isValidObjectId(body.replyToId)) {
-    const orig = await ChatMessage.findOne({ _id: oid(body.replyToId), roomId: room._id, deletedAt: null }).select("senderId senderName text voice image sticker").lean();
+    const orig = await ChatMessage.findOne({ _id: oid(body.replyToId), roomId: room._id, deletedAt: null }).select("senderId senderName text voice image sticker gif").lean();
     if (orig) {
       replyTo = { id: orig._id, senderName: orig.senderName, text: previewOf(orig).slice(0, 120) };
       replyToUserId = String(orig.senderId);
@@ -471,7 +515,8 @@ export async function postChatMessage(
     text,
     voice: body.voice ?? null,
     image: body.image ?? null,
-    sticker: body.sticker && isSticker(body.sticker) ? body.sticker : null,
+    sticker: body.sticker && (isSticker(body.sticker) || isPremiumSticker(body.sticker)) ? body.sticker : null,
+    gif: body.gif && isGif(body.gif) ? body.gif : null,
     replyTo,
     mentions,
   });
@@ -507,7 +552,9 @@ export async function postChatMessage(
     }
     for (const [title, ids] of groups) void sendPush(ids, { title, body: preview || "Yangi xabar", url: `/chat?room=${room._id}`, tag: `chat-${room._id}` });
   }
-  return { ok: true, item: toItem(msg.toObject()) };
+  if (msg.sticker || msg.gif) void countMedia((msg.gif ?? msg.sticker)!).catch(() => {});
+  const [item] = await withSenders([toItem(msg.toObject())]);
+  return { ok: true, item };
 }
 
 export interface ChatReader {

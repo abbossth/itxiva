@@ -21,6 +21,10 @@ export interface IUserData {
   celebrationsEnabled?: boolean;
   /** Mentor chatda yozishni shu vaqtgacha taqiqlagan (o'qish mumkin) */
   chatMutedUntil?: Date | string | null;
+  /** IT Xiva Premium: shu vaqtgacha faol (coin evaziga oylik) */
+  premiumUntil?: Date | string | null;
+  /** Premium uslubi: ism shrifti, belgi, xabar rangi */
+  premiumStyle?: { font: string; badge: string; bubble: string } | null;
   /** Chatda bloklagan odamlari: ular shaxsiy xabar yoza olmaydi va bu foydalanuvchini guruhga qo'sha olmaydi */
   chatBlocked?: (string | mongoose.Types.ObjectId)[];
   /** Mukofot tabrigi ko'rsatilgan oxirgi coin/XP yozuvi vaqti; null — hali boshlanmagan */
@@ -129,6 +133,8 @@ const UserSchema = new Schema<IUser>(
     notificationPrefs: { type: Schema.Types.Mixed, default: () => ({}) },
     celebrationsEnabled: { type: Boolean, default: true },
     chatMutedUntil: { type: Date, default: null },
+    premiumUntil: { type: Date, default: null },
+    premiumStyle: { type: new Schema({ font: String, badge: String, bubble: String }, { _id: false }), default: null },
     chatBlocked: { type: [{ type: Schema.Types.ObjectId, ref: "User" }], default: [] },
     rewardsSeenAt: { type: Date, default: null },
     xp: { type: Number, default: 0, min: 0 },
