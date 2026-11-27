@@ -202,7 +202,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, zoneMini, arena, teamArena: mode === "team" && teamArena });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, zoneMini, arena, teamArena: isTeamMode(mode) && teamArena });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -336,7 +336,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             <input type="checkbox" checked={arena} onChange={(e) => setArena(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-600" />
             <span>
               <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">
-                Oxirida &quot;Kiber jang&quot; ({mode === "team" && teamArena ? "jamoa jamoaga qarshi" : "hamma hammaga qarshi"} otishma)
+                Oxirida &quot;Kiber jang&quot; ({isTeamMode(mode) && teamArena ? "jamoa jamoaga qarshi" : "hamma hammaga qarshi"} otishma)
               </span>
               <span className="block text-xs text-slate-500 dark:text-slate-400">
                 2 daqiqalik jang: har kimda 3 jon, 3 o&apos;q yegan chiqadi. 3+ to&apos;g&apos;ri javob — qo&apos;shimcha jon va tezroq qurol. Yiqitganlar va oxirgi qolganga bonus ochko
@@ -344,7 +344,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             </span>
           </label>
 
-          {mode === "team" && arena && (
+          {isTeamMode(mode) && arena && (
             <Field label="Kiber jang qanday o'tadi">
               <div className="grid gap-2 sm:grid-cols-2">
                 {[

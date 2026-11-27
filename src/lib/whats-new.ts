@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-team-adventure-teams-fix-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Tuzatildi",
+    title: "Jamoaviy o'yinlarda jamoalar va jamoaviy Kiber jang",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤝",
+        title: "Arqon tortish, Qal'a qamali, Penalti jangi, Orol xazinasi",
+        text: "Kutish zalida o'quvchilar proyektorda endi jamoalar bo'yicha ko'rinadi. Oxiridagi Kiber jangni ham «Jamoaviy» qilib tanlash mumkin: jamoadoshlar birga jang qiladi, bir-biriga o'q tegmaydi. Bu sozlama yangi yaratilgan o'yinlarda ishlaydi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-polish-2026-11-27",
     date: "2026-11-27",
     audience: "student",

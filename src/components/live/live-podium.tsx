@@ -133,7 +133,7 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
   const charSmall = Math.round(charBig * 0.74);
   // Ustunda medal, ism va ochko sig'ishi kerak — balandlik undan past bo'lmaydi
   const pillarH = { 1: Math.max(96, Math.round(vh * 0.19)), 2: Math.max(84, Math.round(vh * 0.15)), 3: Math.max(76, Math.round(vh * 0.12)) } as const;
-  const rest = shown === -1 && state.mode !== "team" ? scored.slice(3, vh > 820 ? 12 : 9) : [];
+  const rest = shown === -1 && !isTeamMode(state.mode) ? scored.slice(3, vh > 820 ? 12 : 9) : [];
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col items-center justify-between gap-3 overflow-hidden pb-1 text-center">

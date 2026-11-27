@@ -279,7 +279,7 @@ export async function createLiveGameAction(input: {
           : {
               minigames: input.minigames !== false,
               arena: input.arena === true,
-              teamArena: input.mode === "team" && input.arena === true && input.teamArena === true,
+              teamArena: isTeamMode(input.mode) && input.arena === true && input.teamArena === true,
               zone: input.minigames !== false && input.zoneMini === true,
             },
       cells: startCells(input.mode, teams),
@@ -379,7 +379,7 @@ async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Re
       // Oxirgi savoldan keyin — final jang (yoqilgan bo'lsa, bir marta), keyin g'oliblar
       const finalKey = game.questions.length - 1;
       if (game.options?.arena && !rounds.includes(finalKey) && game.status !== "arena") {
-        await startArena(game._id, finalKey, PVP_SECONDS, game.mode === "team" && Boolean(game.options?.teamArena));
+        await startArena(game._id, finalKey, PVP_SECONDS, isTeamMode(game.mode) && Boolean(game.options?.teamArena));
         return { success: true, data: { finished: false } };
       }
       if (game.mode === "zone" && !zoneRounds.includes(finalKey) && game.status !== "zone") {

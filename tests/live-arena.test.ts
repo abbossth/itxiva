@@ -210,6 +210,36 @@ describe("jamoaviy arena", () => {
     expect(ev.some((t) => t.includes("g'alaba"))).toBe(true);
   });
 
+  it.each(["tug", "island"] as const)("jamoaviy sarguzasht (%s): qo'shilganda jamoalarga bo'linadi, final jang ham jamoaviy", async (mode) => {
+    const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
+    const group = await Group.create({ name: "9-A", grade: 9 });
+    const mk = (login: string) => User.create({ login, fullName: login.toUpperCase(), role: "student", passwordHash: "x", groupId: group._id });
+    const studs = [await mk("ali"), await mk("vali"), await mk("olim"), await mk("soli")];
+    const lesson = await Lesson.create({ groupId: group._id, quarter: 2, order: 1, title: "Dars", isPublished: true, date: NOW });
+    await Quiz.create({ lessonId: lesson._id, title: "T", isPublished: true, questions: [{ type: "single_choice" as const, prompt: "?", options: ["ok", "x"], correctAnswers: ["ok"], points: 1, timeLimit: 10 }] });
+    as(mentor);
+    const res = await live.createLiveGameAction({ groupId: group._id.toString(), mode, source: "all", count: 5, teams: 2, minigames: false, arena: true, teamArena: true });
+    if (!res.success) throw new Error(res.error);
+    const id = res.data.gameId;
+    expect((await LiveGame.findById(id).lean())?.options).toMatchObject({ arena: true, teamArena: true });
+    for (const s of studs) {
+      as(s);
+      await live.joinLiveGameAction(id);
+    }
+    const joined = await LiveGamePlayer.find({ gameId: id }).lean();
+    expect(joined.filter((p) => p.team === 0)).toHaveLength(2);
+    expect(joined.filter((p) => p.team === 1)).toHaveLength(2);
+    as(mentor);
+    await live.startLiveQuestionAction(id);
+    await live.revealLiveQuestionAction(id);
+    await live.startLiveQuestionAction(id);
+    await voteAndGo(id, mentor, studs);
+    expect((await LiveGame.findById(id).lean())?.status).toBe("arena");
+    for (const p of await LiveGamePlayer.find({ gameId: id }).lean()) expect(p.arena?.team).toBe(p.team);
+    const host = await live.getLiveHostStateAction(id);
+    expect(host.success && host.data.arena?.teams?.map((t) => t.members)).toEqual([2, 2]);
+  });
+
   it("individual tanlansa — jamoadoshni ham urish mumkin", async () => {
     const mentor = await User.create({ login: "ustoz", fullName: "Ustoz", role: "mentor", passwordHash: "x" });
     const group = await Group.create({ name: "9-A", grade: 9 });
