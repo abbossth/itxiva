@@ -53,6 +53,23 @@ export interface Pose {
   facing: number;
   /** Aura pulse 0…1 */
   glow: number;
+  // ---- 3D skeleton (used by the three.js character; the 2D rig ignores these) ----
+  /** Thigh swing forward (+) / back (−), rad */
+  legSwingL: number;
+  legSwingR: number;
+  /** Knee bend, rad (+ = shin folds back) */
+  kneeL: number;
+  kneeR: number;
+  /** Upper arm swing forward (+) / back (−), rad */
+  armSwingL: number;
+  armSwingR: number;
+  /** Elbow bend, rad (+ = forearm comes up/forward) */
+  foreL: number;
+  foreR: number;
+  /** Knees bend and hips drop, feet stay planted 0…1 */
+  crouch: number;
+  /** Chest breathing 0…1 */
+  breath: number;
 }
 
 export interface RigInput {
@@ -236,6 +253,16 @@ export class RigActor {
     p.down = 0;
     p.facing = this.facing.value;
     p.glow = 0.5 + Math.sin(c * 2.2) * 0.5;
+    p.legSwingL = 0;
+    p.legSwingR = 0;
+    p.kneeL = 0.04;
+    p.kneeR = 0.04;
+    p.armSwingL = 0.04;
+    p.armSwingR = 0.04;
+    p.foreL = 0.22;
+    p.foreR = 0.22;
+    p.crouch = 0;
+    p.breath = 0.5 + 0.5 * Math.sin((c * TAU) / 3.4);
     // Secondary motion: breathing (scaleY 1 → 1.03 over 2 s) and a slight head bob
     const breath = Math.sin((c * TAU) / 2);
     const breathe = () => {
@@ -249,6 +276,13 @@ export class RigActor {
     switch (this.state) {
       case "idle": {
         breathe();
+        {
+          const w = Math.sin(c * 1.2);
+          p.kneeL = 0.05 + 0.08 * Math.max(0, w) * a;
+          p.kneeR = 0.05 + 0.08 * Math.max(0, -w) * a;
+          p.armSwingL = 0.04 + 0.03 * w * a;
+          p.armSwingR = 0.04 - 0.03 * w * a;
+        }
         if (this.fidgetT >= 0) {
           const f = Math.sin(clamp01(this.fidgetT / 1.6) * Math.PI);
           p.head = Math.sin(this.fidgetT * 4) * 0.12 * f * a;
@@ -268,6 +302,18 @@ export class RigActor {
         p.armL = 0.18 + Math.max(0, -s) * 0.5 * a;
         p.armR = 0.18 + Math.max(0, s) * 0.5 * a;
         p.head = -s * 0.04 * a;
+        // 3D gait: thighs swing, the knee folds while the leg comes forward, arms bent ~70° swing opposite
+        {
+          const cph = Math.cos(ph);
+          p.legSwingL = 0.7 * s * a;
+          p.legSwingR = -0.7 * s * a;
+          p.kneeL = 0.15 + 0.95 * Math.max(0, cph) * a;
+          p.kneeR = 0.15 + 0.95 * Math.max(0, -cph) * a;
+          p.armSwingL = -0.65 * s * a;
+          p.armSwingR = 0.65 * s * a;
+          p.foreL = p.foreR = 1.25;
+          p.crouch = 0.1 * (1 - Math.abs(s)) * a;
+        }
         break;
       }
       case "jump": {
@@ -277,6 +323,9 @@ export class RigActor {
           p.sy = 1 - 0.15 * k * a;
           p.sx = 1 + 0.15 * k * a;
           p.armL = p.armR = 0.08 - 0.1 * k;
+          p.crouch = 0.6 * k * a;
+          p.armSwingL = p.armSwingR = -0.6 * k;
+          p.foreL = p.foreR = 0.3;
         } else {
           const k = progress(t, 0.1, 0.24);
           p.y = ease.outCubic(k) * 0.2 * a;
@@ -286,6 +335,12 @@ export class RigActor {
           p.armL = p.armR = 0.4 + 1.6 * ease.outBack(k) * 0.5;
           p.legL = 0.12 * k;
           p.legR = -0.12 * k;
+          p.crouch = 0.6 * (1 - Math.min(1, k * 2.5)) * a;
+          p.armSwingL = p.armSwingR = -0.6 + 1.4 * ease.outCubic(k);
+          p.legSwingL = 0.5 * k;
+          p.legSwingR = 0.15 * k;
+          p.kneeL = 0.9 * k;
+          p.kneeR = 0.5 * k;
         }
         break;
       }
@@ -295,6 +350,9 @@ export class RigActor {
         p.sy = 1 + 0.07 * a;
         p.sx = 1 / p.sy;
         p.armL = p.armR = 1.1 - k * 0.6;
+        p.legSwingL = 0.3 * (1 - k);
+        p.kneeL = 0.5 * (1 - k) + 0.15;
+        p.kneeR = 0.3;
         break;
       }
       case "land": {
@@ -303,6 +361,8 @@ export class RigActor {
         p.sy = lerp(1 - 0.2 * a, 1, k);
         p.sx = 1 / p.sy;
         p.armL = p.armR = lerp(0.6, 0.08, k);
+        p.crouch = lerp(0.65, 0, ease.outCubic(progress(t, 0, 0.16))) * a;
+        p.armSwingL = p.armSwingR = lerp(0.5, 0.04, k);
         break;
       }
       case "celebrate": {
@@ -338,6 +398,8 @@ export class RigActor {
           p.armR = 2.2 - wave;
         }
         p.face = "happy";
+        p.foreL = p.foreR = this.opts.celebrate === "flex" ? 1.7 : 0.35;
+        if (this.opts.celebrate !== "flex") p.crouch = t < 0.08 ? 0.4 * (t / 0.08) : 0;
         break;
       }
       case "hit": {
@@ -349,6 +411,9 @@ export class RigActor {
         p.sy = 1 / p.sx;
         p.armL = p.armR = 0.9 * decay + 0.1;
         p.face = "hit";
+        p.crouch = 0.25 * decay;
+        p.armSwingL = p.armSwingR = 0.5 * decay;
+        p.foreL = p.foreR = 0.22 + 0.7 * decay;
         break;
       }
       case "think": {
@@ -356,6 +421,11 @@ export class RigActor {
         p.head = 0.13;
         p.armR = 2.6;
         p.face = "think";
+        // 3D: hand to the chin, the other arm across the body
+        p.armSwingR = 1.15;
+        p.foreR = 2.25;
+        p.armSwingL = 0.55;
+        p.foreL = 1.5;
         break;
       }
       case "sad": {
@@ -365,6 +435,9 @@ export class RigActor {
         p.head = -0.08 + Math.sin(c * 1.4) * 0.03 * a;
         p.armL = p.armR = 0.0;
         p.face = "sad";
+        p.crouch = 0.08;
+        p.armSwingL = p.armSwingR = -0.04;
+        p.foreL = p.foreR = 0.08;
         break;
       }
     }
@@ -389,7 +462,35 @@ export class RigActor {
 }
 
 export function newPose(): Pose {
-  return { y: 0, sx: 1, sy: 1, lean: 0, head: 0, headY: 0, armL: 0.08, armR: 0.08, legL: 0, legR: 0, back: 0, face: "idle", shadow: 1, shakeX: 0, down: 0, facing: 1, glow: 0 };
+  return {
+    y: 0,
+    sx: 1,
+    sy: 1,
+    lean: 0,
+    head: 0,
+    headY: 0,
+    armL: 0.08,
+    armR: 0.08,
+    legL: 0,
+    legR: 0,
+    back: 0,
+    face: "idle",
+    shadow: 1,
+    shakeX: 0,
+    down: 0,
+    facing: 1,
+    glow: 0,
+    legSwingL: 0,
+    legSwingR: 0,
+    kneeL: 0,
+    kneeR: 0,
+    armSwingL: 0,
+    armSwingR: 0,
+    foreL: 0,
+    foreR: 0,
+    crouch: 0,
+    breath: 0,
+  };
 }
 
 /** Deterministic pseudo-random 0…1 from a seed (so each character moves on its own phase) */

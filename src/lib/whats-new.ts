@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-3d-character-v2-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangi",
+    title: "Personajingiz endi haqiqiy 3D!",
+    slides: [
+      {
+        art: "character-hello",
+        title: "Yangi 3D personaj profilingizda",
+        text: "Katta yaltiroq ko'zlar (pirpiratadi va kursoringizga qaraydi), jonli soch tutamlari, mato kiyim, charm botinkalar va yumshoq yorug'lik. Personaj nafas oladi, atrofga qaraydi; bosing — quvonadi yoki sakraydi, sudrang — aylanadi. Keyingi yangilanishlarda xuddi shu 3D personaj o'yinlarga ham ko'chadi.",
+      },
+    ],
+    cta: { label: "3D personajimni ko'rish", href: "/profile?tab=character" },
+  },
+  {
     id: "mentor-team-cyber-arena-2026-11-27",
     date: "2026-11-27",
     audience: "mentor",
