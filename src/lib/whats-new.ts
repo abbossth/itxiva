@@ -29,6 +29,20 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-lobby-redesign-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kutish zali tartibga keldi",
+    slides: [
+      {
+        art: "emotes",
+        title: "«Siz o'yindasiz!» — hammasi joyida",
+        text: "Tepada holat va jamoangiz (jamoaviy o'yinlarda rangli belgi bilan), o'rtada personajingiz va harakatlar g'ildiragi, pastda tablar: Qo'shnilar, Kuchaytirgichlar va Harakatlar do'koni. Uzun ro'yxat endi yo'q.",
+      },
+    ],
+  },
+  {
     id: "mentor-team-adventure-teams-fix-2026-11-27",
     date: "2026-11-27",
     audience: "mentor",

@@ -20,7 +20,7 @@ import { GoldCoin } from "@/components/ui/gold-coin";
 const SLOTS = 8;
 const hue = (id: string) => (id.split("").reduce((a, c) => a + c.charCodeAt(0), 0) * 47) % 360;
 
-export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | null }) {
+export function EmotePad({ gameId, look, shop = true }: { gameId: string; look: GameLook | null; /** Show the "locked emotes" shop list under the wheel */ shop?: boolean }) {
   const [owned, setOwned] = useState<string[] | null>(null);
   const [playing, setPlaying] = useState<{ id: string; key: number } | null>(null);
   const [page, setPage] = useState(0);
@@ -144,7 +144,29 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
       <p className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-fuchsia-200/90">Bosing — personajingiz katta ekranda harakat qiladi</p>
 
       {/* Do'kondagi harakatlar */}
-      {owned !== null && locked.length > 0 && (
+      {shop && owned !== null && locked.length > 0 && <LockedEmotes locked={locked} />}
+    </div>
+  );
+}
+
+/** Harakatlar do'koni: hali ochilmagan harakatlar (bosilsa — «Personajim» bo'limi) */
+export function EmoteShop() {
+  const [owned, setOwned] = useState<string[] | null>(null);
+  useEffect(() => {
+    void getMyCharacter()
+      .then((c) => setOwned(c?.owned ?? []))
+      .catch(() => setOwned([]));
+  }, []);
+  if (owned === null) return <p className="py-6 text-center text-sm text-white/50">Yuklanmoqda…</p>;
+  const locked = EMOTES.filter((e) => !hasEmote(e, owned)).sort((a, b) => a.price - b.price);
+  if (locked.length === 0) return <p className="py-6 text-center text-sm font-bold text-emerald-200">🎉 Barcha harakatlar sizda bor!</p>;
+  return <LockedEmotes locked={locked} />;
+}
+
+function LockedEmotes({ locked }: { locked: Emote[] }) {
+  return (
+    <>
+      {locked.length > 0 && (
         <div className="w-full max-w-md">
           <Link href="/profile?tab=character" className="mb-1.5 flex items-center justify-between px-1 text-xs font-black text-amber-200">
             <span>🛍️ Yana {locked.length} ta harakat</span>
@@ -168,7 +190,7 @@ export function EmotePad({ gameId, look }: { gameId: string; look: GameLook | nu
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

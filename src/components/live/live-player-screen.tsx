@@ -6,8 +6,8 @@ import { AntiCheatGuard } from "@/components/anti-cheat/anti-cheat-guard";
 import { ProtectedText } from "@/components/anti-cheat/protected-text";
 import { CharacterSvg } from "@/components/character/character-svg";
 import type { GameLook } from "@/lib/character/catalog";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Crown, Gem, Hourglass, Shield, Sparkles, X, Zap } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Check, Crown, Gem, Hourglass, Shield, ShoppingBag, Sparkles, Users, Backpack, X, Zap } from "lucide-react";
 import Link from "@/components/ui/link";
 import { useLivePoll, withRetry } from "./use-live-poll";
 import {
@@ -28,7 +28,7 @@ import { GalaxyPlayer } from "./galaxy/galaxy-race";
 import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
-import { EmotePad, EmoteStrip } from "./emote-pad";
+import { EmotePad, EmoteShop, EmoteStrip } from "./emote-pad";
 import { VoiceChat } from "./voice/voice-chat";
 import { BoosterBar, BoosterShop } from "./boosters";
 import { StudentFundPanel } from "./student-fund";
@@ -222,7 +222,11 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
               <p className="text-[11px] text-slate-400">{state.groupName}</p>
             </div>
           </div>
-          {me && (
+          {me && state.status === "lobby" ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-bold ring-1 ring-white/10">
+              <Users className="h-4 w-4 text-emerald-300" /> {me.players} o&apos;yinchi
+            </span>
+          ) : me && (
             <div className="text-right">
               <p className="font-mono text-xl font-black tabular-nums lg:text-3xl">{formatNumberUz(me.score)}</p>
               <p className="text-[11px] text-slate-400">
@@ -232,7 +236,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
           )}
         </div>
 
-        {me && (
+        {me && state.status !== "lobby" && (
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-bold">
             {state.mode === "survival" && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1">
@@ -272,17 +276,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
         {!state.joined && state.status !== "finished" ? (
           <JoinView state={state} busy={busy} onJoin={join} />
         ) : state.status === "lobby" ? (
-          <div className="quiz-pop flex flex-col items-center gap-2 py-4 text-center">
-            <p className="text-2xl font-black lg:text-4xl">Siz o&apos;yindasiz!</p>
-            <p className="max-w-xs text-sm text-slate-300">
-              {state.studentGame
-                ? `Kamida ${state.studentGame.needPlayers} kishi yig'ilgach (va coin to'langach) o'yin egasi yoki mentor boshlaydi. Savollar shu yerda chiqadi.`
-                : "Mentor o'yinni boshlashini kuting. Savollar shu yerda chiqadi."}
-            </p>
-            <EmotePad gameId={state.id} look={me?.look ?? null} />
-            {state.lobby && <LobbyPush gameId={state.id} lobby={state.lobby} look={me?.look ?? null} onDone={() => void refresh()} />}
-            <BoosterShop compact />
-          </div>
+          <LobbyView state={state} onRefresh={() => void refresh()} />
         ) : state.status === "question" ? (
           me?.eliminated ? (
             <Waiting title="Siz o'yindan chiqdingiz" text="Jonlar tugadi — oxirigacha tomosha qiling." tone="out" look={me?.look} />
@@ -327,6 +321,128 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
       </LiveShell>
       </div>
     </ImmersiveFrame>
+  );
+}
+
+type LobbyTab = "friends" | "boost" | "emotes";
+const LOBBY_TAB_KEY = "itxiva:lobby-tab";
+let lobbyTabMemory: LobbyTab | null = null;
+function readLobbyTab(): LobbyTab {
+  if (lobbyTabMemory) return lobbyTabMemory;
+  try {
+    const saved = window.localStorage.getItem(LOBBY_TAB_KEY);
+    lobbyTabMemory = saved === "boost" || saved === "emotes" ? saved : "friends";
+  } catch {
+    lobbyTabMemory = "friends";
+  }
+  return lobbyTabMemory;
+}
+function setLobbyTab(t: LobbyTab) {
+  try {
+    window.localStorage.setItem(LOBBY_TAB_KEY, t);
+  } catch {
+    // storage blocked — still switch for this page
+  }
+  lobbyTabMemory = t;
+  window.dispatchEvent(new Event(LOBBY_TAB_KEY));
+}
+function subscribeLobbyTab(cb: () => void) {
+  window.addEventListener(LOBBY_TAB_KEY, cb);
+  return () => window.removeEventListener(LOBBY_TAB_KEY, cb);
+}
+
+/**
+ * Waiting room ("Siz o'yindasiz!"): a clear status card (and the team, in team modes), the character with
+ * its emote wheel as the main stage, and the extras grouped in tabs instead of one long column.
+ */
+export function LobbyView({ state, onRefresh }: { state: LivePlayerState; onRefresh: () => void }) {
+  const me = state.me;
+  const hasNeighbors = Boolean(state.lobby?.left || state.lobby?.right);
+  // Remembered tab (per device); server and first client render use the default
+  const tab = useSyncExternalStore(subscribeLobbyTab, readLobbyTab, () => "friends" as LobbyTab);
+  const pick = setLobbyTab;
+  const team = me && isTeamMode(state.mode) ? TEAM_STYLES[me.team] : null;
+  const tabs: { id: LobbyTab; label: string; icon: typeof Users }[] = [
+    { id: "friends", label: "Qo'shnilar", icon: Users },
+    { id: "boost", label: "Kuchaytirgich", icon: Backpack },
+    { id: "emotes", label: "Harakatlar", icon: ShoppingBag },
+  ];
+  return (
+    <div className="quiz-pop flex flex-col gap-4">
+      {/* Holat */}
+      <div className="flex items-center gap-3 rounded-3xl bg-gradient-to-br from-emerald-500/25 via-emerald-500/10 to-transparent p-4 text-left ring-1 ring-emerald-400/30">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+          <Check className="h-7 w-7" strokeWidth={3} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-black leading-tight sm:text-xl lg:text-3xl">Siz o&apos;yindasiz!</p>
+          <p className="mt-0.5 text-sm text-slate-300">
+            {state.studentGame
+              ? `Kamida ${state.studentGame.needPlayers} kishi yig'ilgach (va coin to'langach) o'yin egasi yoki mentor boshlaydi.`
+              : "Mentor o'yinni boshlashini kuting — savollar shu yerda chiqadi"}
+            <span className="lobby-dots" aria-hidden />
+          </p>
+        </div>
+      </div>
+
+      {/* Jamoa (jamoaviy rejimlarda) */}
+      {team && me && (
+        <div className={cn("flex items-center justify-center gap-2.5 rounded-2xl px-4 py-3 text-lg font-black ring-2", team.soft)}>
+          <span className={cn("h-4 w-4 rounded-full ring-2 ring-white/60", team.dot)} />
+          Jamoangiz: {me.teamName}
+        </div>
+      )}
+
+      {/* Sahna: personaj va harakatlar g'ildiragi */}
+      <div className="flex justify-center">
+        <EmotePad gameId={state.id} look={me?.look ?? null} shop={false} />
+      </div>
+
+      {/* Qo'shimchalar — tablar */}
+      <div>
+        <div role="tablist" aria-label="Kutish zali" className="grid grid-cols-3 gap-1 rounded-2xl bg-white/5 p-1 ring-1 ring-white/10">
+          {tabs.map((t) => {
+            const on = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => pick(t.id)}
+                className={cn(
+                  "flex min-h-12 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold leading-tight transition sm:flex-row sm:gap-1.5 sm:text-sm",
+                  on ? "bg-white text-slate-900 shadow" : "text-white/70 hover:bg-white/10 hover:text-white"
+                )}
+              >
+                <t.icon className="h-4 w-4 shrink-0" />
+                <span className="max-w-full truncate">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div role="tabpanel" className="mt-3">
+          {tab === "friends" &&
+            (state.lobby && hasNeighbors ? (
+              <LobbyPush gameId={state.id} lobby={state.lobby} look={me?.look ?? null} onDone={onRefresh} />
+            ) : (
+              <p className="rounded-3xl bg-white/5 px-4 py-6 text-center text-sm text-white/60 ring-1 ring-white/10">
+                Yoningizga boshqalar qo&apos;shilsa — ularni hazil qilib ko&apos;tarib ekranga otishingiz mumkin 😄
+              </p>
+            ))}
+          {tab === "boost" && (
+            <div className="flex justify-center rounded-3xl bg-white/5 p-3 ring-1 ring-white/10">
+              <BoosterShop compact />
+            </div>
+          )}
+          {tab === "emotes" && (
+            <div className="flex justify-center rounded-3xl bg-white/5 p-3 ring-1 ring-white/10">
+              <EmoteShop />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
