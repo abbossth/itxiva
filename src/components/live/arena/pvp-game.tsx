@@ -42,7 +42,11 @@ import {
   type Shot,
   type ZoneState,
 } from "@/lib/live-game/pvp";
-import { playBoom, playCorrectSound, playHurt, playShot, unlockSound } from "@/lib/sound";
+import { unlockSound } from "@/lib/sound";
+import { playSfx } from "@/lib/game/sfx";
+import { gameFont } from "@/lib/game/font";
+import { alpha, theme, themeCssVars } from "@/lib/game/theme";
+import { SfxToggle } from "@/components/game/sfx-toggle";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { TEAM_NAMES } from "@/lib/live-game/modes";
@@ -60,8 +64,10 @@ import {
   nameTag,
   spawnForeignShots,
   stepSparks,
-  type Spark,
+  ArenaFx,
 } from "./pvp-draw";
+
+const AC = theme.arena;
 
 // "Kiber jang": hamma hammaga qarshi. Kompyuter: WASD/strelkalar + sichqoncha (nishon va otish, Space ham).
 // Telefon/planshet: chap tomonda joystik, o'ng tomonni bosib turing — eng yaqin raqibga avtomatik nishon bilan otadi.
@@ -96,6 +102,8 @@ interface Hud {
   alive: number;
   total: number;
   left: number;
+  /** Share of fight time left (timer color) */
+  frac: number;
   powers: { kind: PowerKind; s: number }[];
   feed: PvpFeedView[];
   out: boolean;
@@ -145,6 +153,7 @@ export function PvpGame({
     alive: 0,
     total: 0,
     left: Math.ceil(remainingMs / 1000),
+    frac: 1,
     powers: [],
     feed: [],
     out: false,
@@ -205,7 +214,8 @@ export function PvpGame({
     const myShots: Shot[] = [];
     const foreign: Shot[] = [];
     const seenShots = new Map<string, number>();
-    const sparks: Spark[] = [];
+    // Effects + characters' animation state (pooled particles, floating text, shake, hit-stop)
+    const sparks = new ArenaFx();
     const pendingShots: { id: number; x: number; y: number; a: number }[] = [];
     const pendingHits: { target: string; shot: number }[] = [];
     let claim: number | null = null;
@@ -223,7 +233,6 @@ export function PvpGame({
     let lastDust = 0;
     const peerFired = new Map<string, number>();
     let flashUntil = 0;
-    let shake = 0;
     let inFlight = false;
     let lastTick = 0;
     let lastHud = 0;
@@ -439,7 +448,9 @@ export function PvpGame({
       if (data.claimed) {
         const def = POWERS[data.claimed];
         say(`${def.icon} ${def.label}!`, "power");
-        if (sound) playCorrectSound();
+        if (sound) playSfx("power");
+        sparks.text(pos.x, pos.y - 80, `${def.icon} ${def.label}`, def.color, 0.9);
+        sparks.cheer(meId);
         haptic([10, 30, 10]);
         claim = null;
       } else if (sentClaim !== null) {
@@ -453,10 +464,13 @@ export function PvpGame({
       if (prev) {
         if (me.lives < prev.lives) {
           flashUntil = performance.now() + 300;
-          // O'q tekkanda kuchli, zona/oqib ketishda yengil silkinish
-          shake = prev.lives - me.lives >= 15 ? 12 : 3;
-          burst(sparks, pos.x, pos.y, "#f87171", 12);
-          if (sound) playHurt();
+          // O'q tekkanda kuchliroq (6 px), zona/oqib ketishda yengil silkinish; katta zarbada qisqa hit-stop
+          const big = prev.lives - me.lives >= 15;
+          sparks.shake.add(big ? 6 : 2);
+          if (big) sparks.hitStop.trigger(60);
+          burst(sparks, pos.x, pos.y, AC.hurt, 12);
+          sparks.text(pos.x, pos.y - 78, `−${prev.lives - me.lives}`, AC.hurt, 0.9);
+          if (sound) playSfx("hurt");
           haptic([70]);
           if (!me.out && !me.downed) say(`−${prev.lives - me.lives} HP`, "hurt");
         }
@@ -466,8 +480,9 @@ export function PvpGame({
         }
         if (prev.downed && !me.downed && !me.out) {
           say(`🩹 Qutqarildingiz! ${me.lives} HP`, "power");
-          burst(sparks, pos.x, pos.y, "#4ade80", 30);
-          if (sound) playCorrectSound();
+          burst(sparks, pos.x, pos.y, AC.heal, 30);
+          sparks.confetti(pos.x, pos.y - 40, 16);
+          if (sound) playSfx("power");
           haptic([20, 40, 20]);
         }
         if (prev.out && !me.out) {
@@ -476,16 +491,23 @@ export function PvpGame({
           pos.x = mine?.x ?? me.x;
           pos.y = mine?.y ?? me.y;
           say(`🩹 Tiriltirildingiz! ${me.lives} HP`, "power");
-          burst(sparks, pos.x, pos.y, "#4ade80", 30);
-          if (sound) playCorrectSound();
+          burst(sparks, pos.x, pos.y, AC.heal, 30);
+          sparks.confetti(pos.x, pos.y - 40, 16);
+          if (sound) playSfx("power");
           haptic([20, 40, 20]);
         }
         if (me.kills > prev.kills) {
-          if (sound) playBoom();
+          if (sound) playSfx("boom");
+          sparks.hitStop.trigger(80);
+          sparks.shake.add(4);
+          sparks.confetti(pos.x, pos.y - 50, 22);
+          sparks.text(pos.x, pos.y - 90, me.kills % 3 === 0 ? "Ajoyib!" : me.kills % 2 ? "Zo'r!" : "Barakalla!", theme.palette.accentLight, 1.2);
+          sparks.cheer(meId);
           haptic([20, 40, 20]);
         }
         if (me.out && !prev.out) {
-          if (sound) playBoom();
+          if (sound) playSfx("boom");
+          sparks.shake.add(6);
           burst(sparks, pos.x, pos.y, skinOf(me.skin).body, 40);
         }
       }
@@ -497,7 +519,10 @@ export function PvpGame({
           const victim = world.peers.find((p) => p.name === f.b);
           if (victim) burst(sparks, victim.x, victim.y, skinOf(victim.skin).body, 34);
           if (f.a === me.name) say(`💥 ${f.b} yiqitildi!`, "kill");
-          else if (sound && f.b !== me.name) playBoom();
+          else if (sound && f.b !== me.name) playSfx("boom");
+          // The killer celebrates on everyone's screen
+          const killer = world.peers.find((p) => p.name === f.a && !p.isMe);
+          if (killer) sparks.cheer(killer.id);
         } else if (f.kind === "down" && myTeam >= 0 && !me.out && !me.downed && f.b !== me.name) {
           // Jamoadosh yiqildi: qayerga borib nima bosishni aytamiz
           const mate = world.peers.find((p) => p.name === f.b && !p.isMe);
@@ -519,6 +544,7 @@ export function PvpGame({
       );
       for (const p of world.peers) if (!shown.has(p.id)) shown.set(p.id, { x: p.x, y: p.y, a: p.a, moving: false });
       for (const id of [...shown.keys()]) if (!world.peers.some((p) => p.id === id)) shown.delete(id);
+      sparks.keep(new Set(world.peers.map((p) => p.id)));
     };
 
     // Real vaqt xonasi (WebSocket). 4 s da ulanmasa yoki uzilsa — darhol HTTP so'rovlari bilan davom etiladi,
@@ -601,6 +627,11 @@ export function PvpGame({
     };
     window.addEventListener("online", wake);
     document.addEventListener("visibilitychange", wake);
+    // Back from a hidden tab: continue drawing without a time jump
+    const onVis = () => {
+      if (document.visibilityState === "visible") last = performance.now();
+    };
+    document.addEventListener("visibilitychange", onVis);
     const stale = setInterval(() => {
       if (wsReady && socket && performance.now() - lastMsg > 2500) socket.close();
     }, 1000);
@@ -662,11 +693,12 @@ export function PvpGame({
       const halfH = h / 2 / scale;
       view.cx += ((halfW * 2 >= map.w ? map.w / 2 : Math.max(halfW, Math.min(map.w - halfW, fx))) - view.cx) * (view.cx === 0 ? 1 : 0.2);
       view.cy += ((halfH * 2 >= map.h ? map.h / 2 : Math.max(halfH, Math.min(map.h - halfH, fy))) - view.cy) * (view.cy === 0 ? 1 : 0.2);
-      const sx = shake > 0 ? (Math.random() - 0.5) * shake : 0;
-      const sy = shake > 0 ? (Math.random() - 0.5) * shake : 0;
+      const sx = sparks.shake.x;
+      const sy = sparks.shake.y;
+      sparks.pxScale = scale * dpr;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = "#070b18";
+      ctx.fillStyle = AC.void;
       ctx.fillRect(0, 0, w, h);
       ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (w / 2 - view.cx * scale + sx), dpr * (h / 2 - view.cy * scale + sy));
       drawFloor(ctx, t, layers);
@@ -680,8 +712,9 @@ export function PvpGame({
         if (!p.out && !vis.has(p.id)) continue;
         drawRobot(
           ctx,
-          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y, map) || Boolean(p.downed), ring: teamColor(p.team), fired: now - (peerFired.get(p.id) ?? -1e9) < 110, look: lookOf(p.id) },
-          t
+          { id: p.id, x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, downed: Boolean(p.downed), moving: (s as { moving?: boolean }).moving, ghost: inBush(s.x, s.y, map) || Boolean(p.downed), ring: teamColor(p.team), fired: now - (peerFired.get(p.id) ?? -1e9) < 110, look: lookOf(p.id) },
+          t,
+          sparks
         );
       }
       // O'zi
@@ -690,8 +723,9 @@ export function PvpGame({
         const moving = keys.size > 0 || Boolean(stick);
         drawRobot(
           ctx,
-          { x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, moving, ghost: inBush(pos.x, pos.y, map) || Boolean(me.downed), ring: teamColor(myTeam), fired: now - lastFire < 90, dash: now < dashUntil, look: lookOf(init.playerId) },
-          t
+          { id: meId || "me", x: pos.x, y: pos.y, a: pos.a, skin: me.skin, shield: powers.includes("shield"), powers, flash: now < flashUntil, out: me.out, downed: Boolean(me.downed), moving, ghost: inBush(pos.x, pos.y, map) || Boolean(me.downed), ring: teamColor(myTeam), fired: now - lastFire < 90, dash: now < dashUntil, look: lookOf(init.playerId) },
+          t,
+          sparks
         );
       }
       // Yiqilgan jamoadoshlar: 🩹 belgisi va tiriltirish halqasi
@@ -701,12 +735,12 @@ export function PvpGame({
           const s = p.isMe ? { x: pos.x, y: pos.y } : shown.get(p.id) ?? p;
           ctx.save();
           ctx.lineWidth = 5;
-          ctx.strokeStyle = "rgba(74,222,128,0.25)";
+          ctx.strokeStyle = alpha(AC.revive, 0.25);
           ctx.beginPath();
           ctx.arc(s.x, s.y, PLAYER_R + 16, 0, Math.PI * 2);
           ctx.stroke();
           if ((p.revive ?? 0) > 0) {
-            ctx.strokeStyle = "#4ade80";
+            ctx.strokeStyle = AC.revive;
             ctx.beginPath();
             ctx.arc(s.x, s.y, PLAYER_R + 16, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * (p.revive ?? 0)) / 100);
             ctx.stroke();
@@ -722,8 +756,7 @@ export function PvpGame({
       }
       // O'qlar
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
-      for (const s of myShots) drawShot(ctx, s, "#fde047");
-      drawSparks(ctx, sparks);
+      for (const s of myShots) drawShot(ctx, s, AC.myShot);
       drawTop(ctx, t, layers);
       // Toraluvchi zona: tashqarisi binafsha "bo'ron", chegara yonib turadi, keyingi doira — oq punktir
       const zone = zoneNow(now);
@@ -732,22 +765,22 @@ export function PvpGame({
         ctx.beginPath();
         ctx.rect(-600, -600, map.w + 1200, map.h + 1200);
         ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2, true);
-        ctx.fillStyle = `rgba(147,51,234,${0.2 + Math.sin(t * 2) * 0.04})`;
+        ctx.fillStyle = alpha(AC.storm, 0.2 + Math.sin(t * 2) * 0.04);
         ctx.fill("evenodd");
         ctx.lineWidth = 6;
         // Nur (shadowBlur) ishlatilmaydi — katta doirada har kadrda juda og'ir
-        ctx.strokeStyle = `rgba(216,180,254,${0.75 + Math.sin(t * 6) * 0.2})`;
+        ctx.strokeStyle = alpha(AC.stormEdge, 0.75 + Math.sin(t * 6) * 0.2);
         ctx.beginPath();
         ctx.arc(zone.x, zone.y, zone.r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.lineWidth = 16;
-        ctx.strokeStyle = "rgba(192,132,252,0.18)";
+        ctx.strokeStyle = alpha(AC.stormGlow, 0.18);
         ctx.stroke();
         if (zone.tr < zone.r - 2) {
           ctx.setLineDash([18, 14]);
           ctx.lineDashOffset = -t * 30;
           ctx.lineWidth = 3;
-          ctx.strokeStyle = "rgba(255,255,255,0.7)";
+          ctx.strokeStyle = alpha(theme.palette.white, 0.7);
           ctx.beginPath();
           ctx.arc(zone.tx, zone.ty, zone.tr, 0, Math.PI * 2);
           ctx.stroke();
@@ -758,7 +791,7 @@ export function PvpGame({
           const ang = Math.atan2(zone.y - pos.y, zone.x - pos.x);
           ctx.translate(pos.x + Math.cos(ang) * (PLAYER_R + 34), pos.y + Math.sin(ang) * (PLAYER_R + 34));
           ctx.rotate(ang);
-          ctx.fillStyle = "#f5d0fe";
+          ctx.fillStyle = AC.stormArrow;
           ctx.beginPath();
           ctx.moveTo(16, 0);
           ctx.lineTo(-10, -11);
@@ -775,7 +808,9 @@ export function PvpGame({
         const s = shown.get(p.id) ?? p;
         nameTag(ctx, `${p.out ? "💀 " : ""}🤝 ${p.name}`, s.x, s.y - PLAYER_R - 14, teamColor(p.team) ?? colorFor(p.id), 0, 0);
       }
-      if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, "#fde047", 0, 0);
+      if (me && pos.ready && !me.out) nameTag(ctx, `${myName} (siz)`, pos.x, pos.y - PLAYER_R - 14, AC.me, 0, 0);
+      // Floating texts and particles above everything in the world
+      drawSparks(ctx, sparks);
       // Emoji-reaksiyalar
       for (const p of world?.peers ?? []) {
         if (p.isMe || p.out || p.emote < 0 || !vis.has(p.id)) continue;
@@ -800,12 +835,12 @@ export function PvpGame({
           const ang = Math.atan2(py - h / 2, px - w / 2);
           ctx.save();
           ctx.translate(ex, ey);
-          ctx.fillStyle = `rgba(22,163,74,${0.75 + Math.sin(t * 6) * 0.2})`;
+          ctx.fillStyle = alpha(AC.reviveDark, 0.75 + Math.sin(t * 6) * 0.2);
           ctx.beginPath();
           ctx.arc(0, 0, 18, 0, Math.PI * 2);
           ctx.fill();
           ctx.rotate(ang);
-          ctx.fillStyle = "#fff";
+          ctx.fillStyle = theme.palette.white;
           ctx.beginPath();
           ctx.moveTo(26, 0);
           ctx.lineTo(16, -7);
@@ -826,12 +861,16 @@ export function PvpGame({
       const mx0 = w - mmW - 10;
       const my0 = h - mmH - 10;
       const k = mmW / map.w;
-      ctx.fillStyle = "rgba(2,6,23,0.72)";
+      ctx.fillStyle = alpha(theme.outline, 0.82);
+      ctx.beginPath();
+      ctx.roundRect(mx0 - 3, my0 - 3, mmW + 6, mmH + 6, 8);
+      ctx.fill();
+      ctx.fillStyle = alpha(AC.minimapBg, 0.72);
       ctx.fillRect(mx0, my0, mmW, mmH);
-      ctx.strokeStyle = "rgba(192,132,252,0.7)";
+      ctx.strokeStyle = alpha(AC.minimapEdge, 0.7);
       ctx.lineWidth = 1.5;
       ctx.strokeRect(mx0, my0, mmW, mmH);
-      ctx.fillStyle = "rgba(56,189,248,0.6)";
+      ctx.fillStyle = alpha(AC.minimapWall, 0.6);
       for (const wl of map.walls) ctx.fillRect(mx0 + wl.x * k, my0 + wl.y * k, Math.max(1, wl.w * k), Math.max(1, wl.h * k));
       for (const p of world?.pickups ?? []) {
         if (claimed.has(p.id)) continue;
@@ -847,7 +886,7 @@ export function PvpGame({
         ctx.fill();
       }
       if (pos.ready && me && !me.out) {
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = AC.me;
         ctx.beginPath();
         ctx.arc(mx0 + pos.x * k, my0 + pos.y * k, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -857,14 +896,14 @@ export function PvpGame({
         ctx.beginPath();
         ctx.rect(mx0, my0, mmW, mmH);
         ctx.clip();
-        ctx.strokeStyle = "#d8b4fe";
+        ctx.strokeStyle = AC.stormEdge;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(mx0 + zone.x * k, my0 + zone.y * k, zone.r * k, 0, Math.PI * 2);
         ctx.stroke();
         if (zone.tr < zone.r - 2) {
           ctx.setLineDash([4, 3]);
-          ctx.strokeStyle = "rgba(255,255,255,0.8)";
+          ctx.strokeStyle = alpha(theme.palette.white, 0.8);
           ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.arc(mx0 + zone.tx * k, my0 + zone.ty * k, zone.tr * k, 0, Math.PI * 2);
@@ -873,32 +912,35 @@ export function PvpGame({
         }
         ctx.restore();
       }
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.strokeStyle = alpha(theme.palette.white, 0.5);
       ctx.strokeRect(mx0 + (view.cx - halfW) * k, my0 + (view.cy - halfH) * k, halfW * 2 * k, halfH * 2 * k);
       // Joystik va otish tugmasi
       if (usingTouch && !me?.out) {
         const r = canvas.getBoundingClientRect();
         if (stick) {
-          ctx.strokeStyle = "rgba(255,255,255,0.4)";
+          ctx.strokeStyle = alpha(theme.palette.white, 0.4);
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(stick.ox - r.left, stick.oy - r.top, 56, 0, Math.PI * 2);
           ctx.stroke();
           const dx = Math.max(-56, Math.min(56, stick.x - stick.ox));
           const dy = Math.max(-56, Math.min(56, stick.y - stick.oy));
-          ctx.fillStyle = "rgba(255,255,255,0.55)";
+          ctx.fillStyle = alpha(theme.palette.white, 0.55);
           ctx.beginPath();
           ctx.arc(stick.ox - r.left + dx, stick.oy - r.top + dy, 26, 0, Math.PI * 2);
           ctx.fill();
         }
-        ctx.fillStyle = touchFire ? "rgba(244,63,94,0.55)" : "rgba(244,63,94,0.28)";
+        ctx.fillStyle = alpha(AC.fire, touchFire ? 0.6 : 0.3);
         ctx.beginPath();
-        ctx.arc(w - mmW - 70, h - 70, 44, 0, Math.PI * 2);
+        ctx.arc(w - mmW - 70, h - 70, touchFire ? 41 : 44, 0, Math.PI * 2);
         ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = alpha(theme.outline, 0.8);
+        ctx.stroke();
         ctx.font = "bold 28px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = theme.palette.white;
         ctx.fillText("🎯", w - mmW - 70, h - 70);
       }
       return specName;
@@ -950,7 +992,8 @@ export function PvpGame({
             lastDash = now;
             dashUntil = now + DASH_MS;
             dashDir = len > 0.1 ? { x: mx / Math.max(len, 1e-6), y: my / Math.max(len, 1e-6) } : { x: Math.cos(pos.a), y: Math.sin(pos.a) };
-            burst(sparks, pos.x, pos.y, "#e0f2fe", 10);
+            burst(sparks, pos.x, pos.y, AC.dashDust, 10);
+            if (sound) playSfx("jump");
             haptic([15]);
           }
         }
@@ -965,16 +1008,16 @@ export function PvpGame({
         // Oyoq ostidan chang (tezlik yo'lagida — rangli)
         if ((len > 0.1 || dashing) && now - lastDust > (dashing ? 25 : 90)) {
           lastDust = now;
-          sparks.push({ x: pos.x - Math.cos(pos.a) * 14 + (Math.random() - 0.5) * 10, y: pos.y + 16, vx: (Math.random() - 0.5) * 40, vy: -20, life: 0.35, color: onPad(pos.x, pos.y, map) ? `rgb(${map.theme.pad})` : "rgba(148,163,184,0.7)" });
+          sparks.dust(pos.x - Math.cos(pos.a) * 14 + (Math.random() - 0.5) * 10, pos.y + 16, onPad(pos.x, pos.y, map) ? `rgb(${map.theme.pad})` : AC.dust);
         }
         if ((len > 0.1 || dashing) && now - lastTeleport > 900) {
           const tp = teleportFrom(pos.x, pos.y, dashing ? dashDir.x : mx, dashing ? dashDir.y : my, map);
           if (tp) {
             lastTeleport = now;
-            burst(sparks, pos.x, pos.y, "#e879f9", 16);
+            burst(sparks, pos.x, pos.y, AC.teleportIn, 16);
             pos.x = tp.x;
             pos.y = tp.y;
-            burst(sparks, pos.x, pos.y, "#22d3ee", 16);
+            burst(sparks, pos.x, pos.y, AC.teleportOut, 16);
           }
         }
         // Nishon
@@ -995,7 +1038,7 @@ export function PvpGame({
           for (const s of shots) pendingShots.push({ id: s.id, x: Math.round(s.x), y: Math.round(s.y), a: Number(pos.a.toFixed(3)) });
           if (sound && now - lastShotSound > 60) {
             lastShotSound = now;
-            playShot();
+            playSfx("shot");
           }
         }
         // Sovg'a
@@ -1027,16 +1070,20 @@ export function PvpGame({
       for (const hit of mine.hits) {
         pendingHits.push({ target: hit.target, shot: hit.shot });
         const victim = world?.peers.find((p) => p.id === hit.target);
-        burst(sparks, hit.x, hit.y, victim?.shield ? "#38bdf8" : "#fde047", 10);
+        burst(sparks, hit.x, hit.y, victim?.shield ? AC.shieldSpark : AC.hitSpark, 10);
+        sparks.hit(hit.target);
       }
-      for (const wpt of mine.walls) burst(sparks, wpt.x, wpt.y, "#94a3b8", 4);
+      for (const wpt of mine.walls) burst(sparks, wpt.x, wpt.y, AC.wallSpark, 4);
       const everyone = [...targets, ...(me && !me.out && pos.ready ? [{ id: meId, x: pos.x, y: pos.y }] : [])];
       const theirs = stepShots(foreign, dt, everyone, allyShot, map);
       foreign.length = 0;
       foreign.push(...theirs.shots);
-      for (const hit of theirs.hits) burst(sparks, hit.x, hit.y, colorFor(hit.owner), 6);
+      for (const hit of theirs.hits) {
+        burst(sparks, hit.x, hit.y, colorFor(hit.owner), 6);
+        if (hit.target !== meId) sparks.hit(hit.target);
+      }
+      // Visual time only (capped at 1/30 s, frozen during hit-stop); the simulation above uses the real dt
       stepSparks(sparks, dt);
-      if (shake > 0) shake = Math.max(0, shake - dt * 40);
 
       const specName = draw(t, now);
       if (now - lastHud > 120) {
@@ -1051,6 +1098,7 @@ export function PvpGame({
           alive: world?.alive ?? 0,
           total: world?.total ?? 0,
           left: Math.max(0, Math.ceil((tm.end - now) / 1000)),
+          frac: Math.max(0, Math.min(1, (tm.end - now) / Math.max(1, tm.end - tm.start))),
           powers,
           feed: (world?.feed ?? []).filter((f) => f.ago < 7000).slice(0, 4),
           out: Boolean(me?.out),
@@ -1122,6 +1170,7 @@ export function PvpGame({
       if (retryTimer) clearTimeout(retryTimer);
       window.removeEventListener("online", wake);
       document.removeEventListener("visibilitychange", wake);
+      document.removeEventListener("visibilitychange", onVis);
       if (bannerTimer) clearTimeout(bannerTimer);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);
@@ -1136,8 +1185,11 @@ export function PvpGame({
   }, []);
 
   const skin = skinOf(init.skin);
+  const panel = "inline-flex h-10 items-center gap-1 rounded-xl bg-(--g-outline)/70 px-3 shadow-[0_6px_16px_-10px_var(--g-shadow)] ring-1 ring-white/10 backdrop-blur";
+  // Timer: orange from 30% left, red + pulse from 10%
+  const timerCls = hud.frac <= 0.1 ? "game-pulse bg-(--g-danger) text-white" : hud.frac <= 0.3 ? "bg-(--g-warning) text-white" : "bg-(--g-outline)/70";
   return (
-    <div ref={wrapRef} className="relative h-full min-h-[300px] w-full flex-1 select-none overflow-hidden rounded-2xl touch-none">
+    <div ref={wrapRef} className={cn("game-ui relative h-full min-h-[300px] w-full flex-1 select-none overflow-hidden rounded-2xl touch-none ring-2 ring-(--g-outline)", gameFont.className, gameFont.variable)} style={themeCssVars()}>
       <canvas ref={canvasRef} className="absolute inset-0 block cursor-crosshair" />
       {/* HUD */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-2 text-white sm:p-3">
@@ -1146,28 +1198,32 @@ export function PvpGame({
           {hud.powers.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {hud.powers.map((p) => (
-                <span key={p.kind} className="live-pop rounded-lg bg-black/55 px-2 py-1 text-xs font-black backdrop-blur" style={{ color: POWERS[p.kind].color }}>
+                <span key={p.kind} className="live-pop rounded-lg bg-(--g-outline)/70 px-2 py-1 text-xs font-black ring-1 ring-white/10 backdrop-blur" style={{ color: POWERS[p.kind].color }}>
                   {POWERS[p.kind].icon} {POWERS[p.kind].label} {p.s}s
                 </span>
               ))}
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-sm font-black">
-          <span className="inline-flex items-center gap-1 rounded-xl bg-black/55 px-3 py-1.5 backdrop-blur">
-            <Users className="h-4 w-4 text-emerald-300" /> {hud.alive}/{hud.total}
+        <div className="pointer-events-auto flex items-center gap-1.5 text-sm font-black">
+          <span className={panel} aria-label="Tirik o'yinchilar">
+            <Users className="h-4 w-4 text-(--g-success-light)" /> <span className="tabular-nums">{hud.alive}/{hud.total}</span>
           </span>
-          <span className="inline-flex items-center gap-1 rounded-xl bg-black/55 px-3 py-1.5 backdrop-blur">
-            <Skull className="h-4 w-4 text-fuchsia-300" /> {hud.kills}
+          <span className={panel} aria-label="Yiqitganlar">
+            <Skull className="h-4 w-4 text-(--g-accent-light)" />
+            <span key={hud.kills} className={cn("inline-block tabular-nums", hud.kills > 0 && "game-bump")}>
+              {hud.kills}
+            </span>
           </span>
-          <span className={cn("rounded-xl bg-black/55 px-3 py-1.5 font-mono backdrop-blur", hud.left <= 10 && "text-rose-300 quiz-shake")}>{hud.left}s</span>
+          <span className={cn("inline-flex h-10 min-w-14 items-center justify-center rounded-xl px-3 tabular-nums ring-1 ring-white/10 backdrop-blur transition-colors", timerCls)}>{hud.left}s</span>
+          <SfxToggle className="h-10 w-10 bg-(--g-outline)/70 backdrop-blur" />
         </div>
         {hud.zone && !hud.zone.final && phase === "play" && (
           <div className="flex w-full justify-center sm:w-auto">
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-black backdrop-blur",
-                hud.zone.shrinking ? "bg-fuchsia-600/80 text-white" : "bg-black/55 text-fuchsia-200"
+                hud.zone.shrinking ? "bg-(--g-mud)/85 text-white" : "bg-(--g-outline)/70 text-(--g-primary-light)"
               )}
             >
               🌀 {hud.zone.shrinking ? `Zona torayapti · ${hud.zone.s}s` : `Zona ${hud.zone.s}s dan keyin torayadi`}
@@ -1179,7 +1235,7 @@ export function PvpGame({
             {hud.teams.map((t) => (
               <span
                 key={t.team}
-                className={cn("inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 backdrop-blur", t.team === myTeam && "ring-2 ring-white/70")}
+                className={cn("inline-flex items-center gap-1 rounded-lg bg-(--g-outline)/70 px-2 py-1 backdrop-blur", t.team === myTeam && "ring-2 ring-white/70")}
                 style={{ color: teamColor(t.team) ?? undefined }}
               >
                 {t.team === myTeam ? "🤝 " : ""}
@@ -1203,7 +1259,7 @@ export function PvpGame({
                 }}
                 aria-label={`Reaksiya ${e}`}
                 title={touch ? undefined : `${i + 1} tugmasi`}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-black/45 text-xl backdrop-blur transition-transform active:scale-90"
+                className="game-btn flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-(--g-outline)/60 text-xl ring-1 ring-white/10 backdrop-blur"
               >
                 {e}
               </button>
@@ -1217,7 +1273,7 @@ export function PvpGame({
             }}
             aria-label="Sakrash"
             title={touch ? undefined : "Shift"}
-            className="absolute bottom-[150px] right-4 flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-full bg-sky-500/40 text-2xl font-black text-white ring-2 ring-sky-300/60 backdrop-blur transition-transform active:scale-90"
+            className="game-btn absolute bottom-[150px] right-4 flex h-16 w-16 cursor-pointer flex-col items-center justify-center rounded-full bg-(--g-info)/45 text-2xl font-black text-white ring-2 ring-(--g-outline) backdrop-blur"
           >
             💨<span className="text-[9px] font-black uppercase tracking-wider">sakrash</span>
           </button>
@@ -1234,8 +1290,8 @@ export function PvpGame({
           aria-pressed={boardOpen}
           title={touch ? undefined : "Tab — bosib turing"}
           className={cn(
-            "absolute right-2 top-14 z-20 flex h-10 cursor-pointer items-center gap-1 rounded-xl px-2.5 text-sm font-black text-white backdrop-blur transition active:scale-90 sm:right-3",
-            boardOpen ? "bg-amber-400 text-slate-950" : "bg-black/55"
+            "game-btn absolute right-2 top-14 z-20 flex h-11 cursor-pointer items-center gap-1 rounded-xl px-2.5 text-sm font-black text-white ring-1 ring-white/10 backdrop-blur sm:right-3",
+            boardOpen ? "bg-(--g-accent) text-(--g-ink)" : "bg-(--g-outline)/70"
           )}
         >
           📊 {!touch && <kbd className="rounded bg-white/15 px-1 font-mono text-[10px]">Tab</kbd>}
@@ -1245,7 +1301,7 @@ export function PvpGame({
       {/* Kim kimni yiqitdi */}
       <div className="pointer-events-none absolute left-2 top-24 flex max-w-[60%] flex-col gap-1 sm:left-3">
         {hud.feed.map((f) => (
-          <span key={f.key} className="live-pop truncate rounded-lg bg-black/55 px-2 py-1 text-xs font-bold text-white backdrop-blur">
+          <span key={f.key} className="live-pop truncate rounded-lg bg-(--g-outline)/70 px-2 py-1 text-xs font-bold text-white ring-1 ring-white/10 backdrop-blur">
             {f.kind === "down" ? (
               <>
                 <b className="text-amber-300">{f.a}</b> 🔻 <b className="text-rose-200">{f.b}</b> yiqildi
@@ -1267,17 +1323,17 @@ export function PvpGame({
         ))}
       </div>
       {phase === "intro" && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/55 px-4 text-center text-white backdrop-blur-sm">
-          <p className="text-xs font-black uppercase tracking-[0.4em] text-fuchsia-300">{myTeam >= 0 ? "Kiber jang · jamoaviy" : "Kiber jang · hamma hammaga qarshi"}</p>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-(--g-outline)/65 px-4 text-center text-white backdrop-blur-sm">
+          <p className="text-xs font-black uppercase tracking-[0.4em] text-(--g-primary-light)">{myTeam >= 0 ? "Kiber jang · jamoaviy" : "Kiber jang · hamma hammaga qarshi"}</p>
           <p className="rounded-full bg-white/10 px-4 py-1 text-sm font-black">
             Xarita: {mapOf(init.map).emoji} {mapOf(init.map).name}
           </p>
           {myTeam >= 0 && (
-            <p className="rounded-2xl px-4 py-1.5 text-xl font-black text-slate-950" style={{ background: teamColor(myTeam) ?? undefined }}>
+            <p className="rounded-2xl px-4 py-1.5 text-xl font-black text-(--g-ink) ring-2 ring-(--g-outline)" style={{ background: teamColor(myTeam) ?? undefined }}>
               Jamoangiz: {TEAM_NAMES[myTeam] ?? `${myTeam + 1}-jamoa`} — jamoadoshlarga o&apos;q tegmaydi
             </p>
           )}
-          <span key={intro} className="quiz-count font-mono text-8xl font-black">
+          <span key={intro} className="quiz-count text-8xl font-black tabular-nums">
             {Math.max(1, intro)}
           </span>
           <p className="text-lg font-black">
@@ -1299,8 +1355,8 @@ export function PvpGame({
         <div className="pointer-events-none absolute inset-x-0 top-[30%] flex justify-center">
           <span
             className={cn(
-              "live-banner rounded-2xl px-6 py-3 text-2xl font-black text-white sm:text-3xl",
-              banner.tone === "kill" ? "bg-amber-500" : banner.tone === "hurt" ? "bg-rose-600" : "bg-sky-600"
+              "live-banner rounded-2xl px-6 py-3 text-2xl font-black text-white shadow-2xl ring-4 ring-(--g-outline) sm:text-3xl",
+              banner.tone === "kill" ? "bg-(--g-accent)" : banner.tone === "hurt" ? "bg-(--g-danger)" : "bg-(--g-info)"
             )}
           >
             {banner.text}
@@ -1308,9 +1364,9 @@ export function PvpGame({
         </div>
       )}
       {hud.zone?.outside && phase === "play" && !hud.out && (
-        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_80px_20px_rgba(168,85,247,0.55)]">
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_80px_20px_color-mix(in_srgb,var(--g-mud)_55%,transparent)]">
           <div className="absolute inset-x-0 top-[22%] flex justify-center">
-            <span className="quiz-shake rounded-2xl bg-fuchsia-700/90 px-5 py-2 text-base font-black text-white sm:text-lg">
+            <span className="quiz-shake rounded-2xl bg-(--g-mud)/90 px-5 py-2 text-base font-black text-white ring-2 ring-(--g-outline) sm:text-lg">
               ⚠️ Zonadan tashqaridasiz — doiraga kiring! (har {ZONE_DAMAGE_MS / 1000}s da −1 ❤)
             </span>
           </div>
@@ -1327,7 +1383,7 @@ export function PvpGame({
           onPointerLeave={() => controls.current?.revive(false)}
           onPointerCancel={() => controls.current?.revive(false)}
           aria-label={`${hud.revive.name}ni tiriltirish`}
-          className="absolute bottom-[230px] left-1/2 z-20 flex -translate-x-1/2 cursor-pointer select-none flex-col items-center gap-1 rounded-2xl bg-emerald-600/85 px-5 py-2.5 font-black text-white shadow-xl ring-2 ring-emerald-300/70 backdrop-blur active:scale-95 sm:bottom-24"
+          className="game-btn absolute bottom-[230px] left-1/2 z-20 flex -translate-x-1/2 cursor-pointer select-none flex-col items-center gap-1 rounded-2xl bg-(--g-success-dark)/90 px-5 py-2.5 font-black text-white shadow-xl ring-2 ring-(--g-outline) backdrop-blur sm:bottom-24"
         >
           <span className="text-sm">
             🩹 {hud.revive.name} — {touch ? "5 soniya bosib turing" : "F ni 5 soniya bosib turing"}
@@ -1338,10 +1394,10 @@ export function PvpGame({
         </button>
       )}
       {hud.downed && phase === "play" && (
-        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_24px_rgba(225,29,72,0.55)]">
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_90px_24px_color-mix(in_srgb,var(--g-danger)_55%,transparent)]">
           <div className="absolute inset-x-0 top-[30%] flex flex-col items-center gap-1.5 px-4 text-center">
-            <span className="rounded-2xl bg-rose-700/90 px-5 py-2 text-lg font-black text-white">🩸 Yiqildingiz — {hud.lives} HP</span>
-            <span className="rounded-xl bg-black/65 px-3 py-1.5 text-sm font-bold text-white">
+            <span className="rounded-2xl bg-(--g-danger)/90 px-5 py-2 text-lg font-black text-white ring-2 ring-(--g-outline)">🩸 Yiqildingiz — {hud.lives} HP</span>
+            <span className="rounded-xl bg-(--g-outline)/75 px-3 py-1.5 text-sm font-bold text-white">
               {hud.myRevive > 0
                 ? `🩹 Sizni qutqarishyapti… ${hud.myRevive}%`
                 : `Ota olmaysiz, HP kamaymoqda. Jamoadoshingiz yoningizga kelib qutqarsa — ${REVIVE_HP} HP bilan turasiz`}
@@ -1351,27 +1407,27 @@ export function PvpGame({
       )}
       {hud.out && hud.revivable && phase !== "done" && (
         <div className="pointer-events-none absolute inset-x-0 top-[36%] flex justify-center px-4">
-          <span className="rounded-2xl bg-emerald-700/90 px-4 py-2 text-center text-sm font-black text-white">
+          <span className="rounded-2xl bg-(--g-success-dark)/90 px-4 py-2 text-center text-sm font-black text-white ring-2 ring-(--g-outline)">
             {hud.myRevive > 0 ? `🩹 Sizni tiriltirishyapti… ${hud.myRevive}%` : "🩹 Jamoadoshingiz 30 soniya ichida yoningizga kelib sizni tiriltira oladi"}
           </span>
         </div>
       )}
       {hud.out && phase !== "done" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex flex-col items-center gap-1 text-center text-white">
-          <span className="rounded-2xl bg-rose-600/90 px-5 py-2 text-lg font-black">
+          <span className="rounded-2xl bg-(--g-danger)/90 px-5 py-2 text-lg font-black ring-2 ring-(--g-outline)">
             <Skull className="mr-1 inline h-5 w-5" /> Siz chiqdingiz{hud.killedBy ? ` — ${hud.killedBy} yiqitdi` : ""}
           </span>
           {hud.spectating && (
-            <span className="rounded-xl bg-black/60 px-3 py-1 text-sm font-bold">
+            <span className="rounded-xl bg-(--g-outline)/75 px-3 py-1 text-sm font-bold">
               <Eye className="mr-1 inline h-4 w-4" /> {hud.spectating} ni kuzatyapsiz{touch ? " (bosing — keyingisi)" : ""}
             </span>
           )}
         </div>
       )}
       {phase === "done" && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 text-white">
-          <Crosshair className="h-14 w-14 text-amber-300" />
-          <p className="text-3xl font-black">Jang tugadi!</p>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-(--g-outline)/60 text-white">
+          <Crosshair className="live-pop h-14 w-14 text-(--g-accent-light)" />
+          <p className="live-pop text-3xl font-black">Jang tugadi!</p>
         </div>
       )}
     </div>
@@ -1383,20 +1439,21 @@ export function PvpGame({
 /** Sog'liq polosasi (faqat o'yinchining o'zi ko'radi): yashil → sariq → qizil, zarar izi bilan */
 function HpBar({ hp, max }: { hp: number; max: number }) {
   const pct = Math.max(0, Math.min(100, (hp / Math.max(1, max)) * 100));
-  const color = pct > 60 ? "from-emerald-400 to-lime-300" : pct > 30 ? "from-amber-400 to-yellow-300" : "from-rose-600 to-rose-400";
+  const color = pct > 60 ? "bg-(--g-success)" : pct > 30 ? "bg-(--g-accent)" : "bg-(--g-danger)";
   return (
-    <div className="w-44 rounded-xl bg-black/60 px-2.5 py-1.5 backdrop-blur sm:w-56" role="meter" aria-label="Sog'liq" aria-valuemin={0} aria-valuemax={max} aria-valuenow={hp}>
+    <div className="w-44 rounded-xl bg-(--g-outline)/75 px-2.5 py-1.5 shadow-[0_6px_16px_-10px_var(--g-shadow)] ring-1 ring-white/10 backdrop-blur sm:w-56" role="meter" aria-label="Sog'liq" aria-valuemin={0} aria-valuemax={max} aria-valuenow={hp}>
       <div className="mb-1 flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-white/80">
         <span>❤ HP</span>
-        <span className={cn("font-mono text-sm", pct <= 30 ? "text-rose-300" : "text-white")}>
+        <span className={cn("text-sm tabular-nums", pct <= 30 ? "text-(--g-danger-light)" : "text-white")}>
           {Math.round(hp)}
           <span className="text-white/50">/{max}</span>
         </span>
       </div>
-      <div className="relative h-3 overflow-hidden rounded-full bg-white/15">
+      <div className="relative h-3 overflow-hidden rounded-full bg-white/15 ring-1 ring-(--g-outline)">
         {/* Zarar izi: oq qism sekinroq qisqaradi */}
         <span className="absolute inset-y-0 left-0 rounded-full bg-white/70 transition-[width] delay-200 duration-700" style={{ width: `${pct}%` }} />
-        <span className={cn("absolute inset-y-0 left-0 rounded-full bg-gradient-to-r transition-[width] duration-150", color, pct <= 30 && "animate-pulse")} style={{ width: `${pct}%` }} />
+        <span className={cn("absolute inset-y-0 left-0 rounded-full transition-[width] duration-150", color, pct <= 30 && "animate-pulse")} style={{ width: `${pct}%` }} />
+        <span className="absolute inset-x-0 top-0 h-1/2 rounded-full bg-white/25" />
       </div>
     </div>
   );

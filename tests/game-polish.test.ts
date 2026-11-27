@@ -94,6 +94,15 @@ describe("character rig state machine", () => {
     a.revive();
     expect(a.state).toBe("idle");
   });
+  it("finishes a turn when knocked out (never lies edge-on)", () => {
+    const a = new RigActor({ seed: 7 });
+    a.update(1 / 60, { moving: false, dirX: -1 });
+    a.update(1 / 60, { moving: false, dirX: -1 });
+    a.knockOut();
+    expect(Math.abs(a.pose().facing)).toBe(1);
+    run(a, 1);
+    expect(Math.abs(a.pose().facing)).toBe(1);
+  });
   it("squash keeps volume and blinks within 5 s", () => {
     const a = new RigActor({ seed: 5 });
     a.request("jump");

@@ -2,7 +2,10 @@
 // the synthesized sounds themselves live in lib/sound.ts. Music is never auto-played from here.
 
 import {
+  playBoom,
   playCorrectSound,
+  playHurt,
+  playShot,
   playFanfare,
   playHeartbeat,
   playSeatTaken,
@@ -38,7 +41,11 @@ export type SfxName =
   | "survive"
   | "out"
   | "appear"
-  | "close";
+  | "close"
+  | "shot"
+  | "boom"
+  | "hurt"
+  | "power";
 
 const PLAY: Record<SfxName, (arg?: number) => void> = {
   correct: playCorrectSound,
@@ -60,6 +67,10 @@ const PLAY: Record<SfxName, (arg?: number) => void> = {
   out: playShutdown,
   appear: (n) => playZoneAppear(n ?? 1),
   close: playZoneClose,
+  shot: playShot,
+  boom: playBoom,
+  hurt: playHurt,
+  power: playCorrectSound,
 };
 
 const KEY = "itxiva:sfx-muted";

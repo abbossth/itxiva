@@ -29,6 +29,35 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-polish-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kiber jang: personajingiz endi jangda jonli",
+    slides: [
+      {
+        art: "games",
+        title: "Yuguradi, otadi, quvonadi",
+        text: "Kiber jangda personajingiz yugurganda oyoq-qo'llari harakatlanadi, o'q tekkanda titraydi, yiqilsa yotib qoladi, qutqarilsa sakrab turadi. Raqibni yiqitsangiz — konfetti va «Zo'r!» yozuvi! Sovg'alar, devorlar va butalar ham yangi ko'rinishda. 🔊 tugmasi bilan ovozni o'chirish mumkin.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-polish-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Kiber jang: yangi grafika, qoidalar o'zgarmadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🎨",
+        title: "Proyektor va telefonda jonli personajlar",
+        text: "O'quvchilarning personajlari jangda to'liq animatsiyali: yugurish, zarba olish, yiqilish va qutqarilish, yiqitgandan keyin quvonish. Proyektorda ham shunday ko'rinadi. HP, o'q, tezlik, zona va coin mukofotlari o'zgarmadi.",
+      },
+    ],
+  },
+  {
     id: "student-zone-polish-skins-2026-11-27",
     date: "2026-11-27",
     audience: "student",

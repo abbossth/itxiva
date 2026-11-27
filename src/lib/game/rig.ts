@@ -133,6 +133,9 @@ export class RigActor {
     if (this.down) return;
     this.down = true;
     this.downT = 0;
+    // Finish any turn instantly so the body doesn't freeze edge-on while lying down
+    this.facingTarget = this.facing.value < 0 ? -1 : 1;
+    this.facing.set(this.facingTarget);
     this.request("hit");
     this.queued = "sad";
   }

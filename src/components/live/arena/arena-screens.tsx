@@ -8,7 +8,8 @@ import { BULLET_RANGE, BULLET_SPEED, PLAYER_R, POWERS, inBush, mapOf, sameTeam, 
 import { getGameLooksAction, resolveArenaVoteAction, voteArenaMapAction } from "@/actions/live-game.actions";
 import type { GameLook } from "@/lib/character/catalog";
 import { MapVote } from "./map-vote";
-import { playBoom } from "@/lib/sound";
+import { playSfx } from "@/lib/game/sfx";
+import { theme } from "@/lib/game/theme";
 import { useCountdown } from "../live-ui";
 import { PvpGame, pvpFetch } from "./pvp-game";
 import { Smoother } from "./interp";
@@ -27,7 +28,7 @@ import {
   nameTag,
   spawnForeignShots,
   stepSparks,
-  type Spark,
+  ArenaFx,
   drawZone,
 } from "./pvp-draw";
 import { cn, formatNumberUz } from "@/lib/utils";
@@ -122,7 +123,7 @@ function ArenaFight({
         seen.add(f.key);
         if (!first && f.kind === "kill" && f.ago < 3000) {
           setShout(f);
-          if (soundRef.current) playBoom();
+          if (soundRef.current) playSfx("boom");
         }
       }
       first = false;
@@ -385,8 +386,10 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
     const shown = new Map<string, { x: number; y: number; a: number; moving: boolean }>();
     const shots: Shot[] = [];
     const seenShots = new Map<string, number>();
-    const sparks: Spark[] = [];
+    // Effects + each student's character animation (hit, knocked out, celebrating a kill)
+    const sparks = new ArenaFx();
     const outSeen = new Set<string>();
+    const prevState = new Map<string, { lives: number; kills: number }>();
     let lastWorld: PvpWorld | null = null;
     // Personajlar: robot o'rniga o'quvchilarning o'z personaji chiziladi
     const looks = new Map<string, GameLook>();
@@ -416,8 +419,19 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
             outSeen.add(p.id);
             const s = shown.get(p.id) ?? p;
             burst(sparks, s.x, s.y, skinOf(p.skin).body, 40);
+            sparks.shake.add(2);
           }
+          // Lost health → flinch; new kill → celebrate (visual only)
+          const prev = prevState.get(p.id);
+          if (prev && p.lives < prev.lives) sparks.hit(p.id);
+          if (prev && p.kills > prev.kills) {
+            sparks.cheer(p.id);
+            const s = shown.get(p.id) ?? p;
+            sparks.confetti(s.x, s.y - 50, 14);
+          }
+          prevState.set(p.id, { lives: p.lives, kills: p.kills });
         }
+        sparks.keep(new Set(world.peers.map((p) => p.id)));
       }
       const r = canvas.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -461,10 +475,11 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
       cam.y = cam.y === 0 ? ccy : cam.y + (ccy - cam.y) * Math.min(1, dt * 1.0);
       const ox = r.width / 2 - cam.x * scale;
       const oy = r.height / 2 - cam.y * scale;
+      sparks.pxScale = scale * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = "#070b18";
+      ctx.fillStyle = theme.arena.void;
       ctx.fillRect(0, 0, r.width, r.height);
-      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
+      ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (ox + sparks.shake.x), dpr * (oy + sparks.shake.y));
       // Kichik ekranda ham ismlar va qahramonlar o'qiladigan bo'lsin
       const big = Math.min(2.2, Math.max(1, 0.55 / scale));
       drawFloor(ctx, t, layers);
@@ -477,8 +492,9 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
         shown.set(p.id, s);
         drawRobot(
           ctx,
-          { x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, moving: s.moving, ghost: inBush(s.x, s.y, map), size: big, ring: teamColor(p.team), fired: now - (fired.get(p.id) ?? -1e9) < 110, look: looksReady ? looks.get(p.id) ?? null : undefined },
-          t
+          { id: p.id, x: s.x, y: s.y, a: s.a, skin: p.skin, shield: p.shield, powers: p.powers, out: p.out, downed: Boolean(p.downed), moving: s.moving, ghost: inBush(s.x, s.y, map), size: big, ring: teamColor(p.team), fired: now - (fired.get(p.id) ?? -1e9) < 110, look: looksReady ? looks.get(p.id) ?? null : undefined },
+          t,
+          sparks
         );
       }
       const targets = peers.filter((p) => !p.out).map((p) => ({ id: p.id, ...(shown.get(p.id) ?? p) }));
@@ -489,8 +505,8 @@ function ArenaSpectator({ gameId, worldRef, realtime, mapId }: { gameId: string;
       for (const h of step.hits) burst(sparks, h.x, h.y, colorFor(h.owner), 8);
       for (const s of shots) drawShot(ctx, s, colorFor(s.owner));
       stepSparks(sparks, dt);
-      drawSparks(ctx, sparks);
       drawTop(ctx, t, layers);
+      drawSparks(ctx, sparks);
       if (world?.zone) drawZone(ctx, world.zone, t, map);
       for (const p of peers) {
         const s = shown.get(p.id) ?? p;
