@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import type { GameLook } from "@/lib/character/catalog";
-import { CharacterSvg } from "./character-svg";
+import { CharacterSvgDrawing as CharacterSvg } from "./character-svg";
 
 // Kanvas o'yinlar (Yashil zona, Kiber arena) uchun personaj rasmi: SVG bir marta chizilib, rasmga aylantiriladi va
 // keshlanadi. Kanvas har kadrda tayyor rasmni chizadi — tez ishlaydi. Rasm tayyor bo'lguncha `null` (eski robot chiziladi).

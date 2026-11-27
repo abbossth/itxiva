@@ -59,7 +59,7 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | undefined): CharModel {
+export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | undefined, opts: { holding?: string | null } = {}): CharModel {
   const look = { ...DEFAULT_LOOK, color: 0, level: 1, ...(raw ?? {}) } as GameLook;
   const cos: Costume | undefined = look.costume && look.costume !== "none" ? COSTUMES[look.costume] : undefined;
   const disposables: { dispose: () => void }[] = [];
@@ -892,7 +892,7 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
   // ---- Hand items (right hand) ----
   const hr = handR.R!;
   const inHand = (g: T.BufferGeometry, m: T.Material, x = 0, y = 0, z = 0) => mesh(geo(g), m, hr, x, y, z);
-  const handKind = cos?.hand ?? look.hand;
+  const handKind = opts.holding ?? cos?.hand ?? look.hand;
   switch (handKind) {
     case "pencil": {
       const p = inHand(new THREE.CylinderGeometry(0.025, 0.025, 0.36, 10), gloss("#facc15"), 0, 0, 0.06);
@@ -920,6 +920,14 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
       const gold = metal("#fbbf24", 0.18);
       inHand(new THREE.CylinderGeometry(0.12, 0.06, 0.18, 24), gold, 0, 0.08, 0.12);
       inHand(new THREE.CylinderGeometry(0.07, 0.09, 0.05, 16), gold, 0, -0.04, 0.12);
+      break;
+    }
+    case "pickaxe": {
+      const pk = group(hr, 0, 0.02, 0.07);
+      pk.rotation.z = 0.5;
+      mesh(geo(new THREE.CylinderGeometry(0.02, 0.022, 0.5, 8)), leather("#78350f"), pk, 0, 0.2, 0);
+      const headP = mesh(geo(new THREE.TorusGeometry(0.16, 0.025, 8, 20, Math.PI * 0.8)), metal("#94a3b8", 0.3), pk, 0, 0.38, 0);
+      headP.rotation.z = Math.PI * 0.1;
       break;
     }
     case "dutor": {

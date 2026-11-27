@@ -1226,3 +1226,8 @@ h1,
 .lobby-dots::after { content: "…"; display: inline-block; width: 1.2em; text-align: left; animation: lobby-dots 1.4s steps(4, end) infinite; overflow: hidden; vertical-align: bottom; }
 @keyframes lobby-dots { 0% { width: 0; } 100% { width: 1.2em; } }
 @media (prefers-reduced-motion: reduce) { .lobby-dots::after { animation: none; } }
+
+/* ---- 3D-render personaj (sprite sheet): kayfiyat qatorini 6 kadr bilan aylantiradi ---- */
+.chr3d-play { animation: chr3d-play var(--chr3d-dur, 1s) steps(6) infinite; }
+@keyframes chr3d-play { from { background-position-x: 0px; } to { background-position-x: var(--chr3d-end); } }
+@media (prefers-reduced-motion: reduce) { .chr3d-play { animation: none; } }

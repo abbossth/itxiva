@@ -6,6 +6,7 @@
 import { DEFAULT_MAP, EMOTES, PLAYER_R, POWERS, TELEPORT_R, skinOf, type ArenaMap, type PowerKind, type Shot } from "@/lib/live-game/pvp";
 import type { GameLook } from "@/lib/character/catalog";
 import { characterRig, drawRig } from "@/components/character/character-rig";
+import { charSheet, drawSheetFrame, rowOfState } from "@/components/character/three/char-baker";
 import { FloatTextPool, HitStop, ParticlePool, Shake, groundShadow } from "@/lib/game/fx";
 import { GAME_FONT } from "@/lib/game/font";
 import { motionScale } from "@/lib/game/motion";
@@ -629,8 +630,10 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
 
   const lookReady = r.look !== undefined;
   const H = R * 3.2;
-  const rig = lookReady && fx ? characterRig(r.look ?? null, H * size * fx.pxScale) : null;
-  if (rig && fx && r.id) {
+  // 3D-rendered character (sprite sheet); while it bakes — the 2D rig; before that — the robot
+  const sheet = lookReady && fx ? charSheet(r.look ?? null, (H * size * fx.pxScale * 100) / 124) : null;
+  const rig = !sheet && lookReady && fx ? characterRig(r.look ?? null, H * size * fx.pxScale) : null;
+  if ((sheet || rig) && fx && r.id) {
     const actor = fx.actor(r.id, r.look ?? null, seed * 31 + R);
     fx.drive(r.id, actor, r);
     const pose = actor.pose;
@@ -643,9 +646,19 @@ export function drawRobot(ctx: CanvasRenderingContext2D, r: RobotLook, t: number
     // Recoil: lean back a touch when firing
     if (r.fired && !r.out) pose.lean -= 0.05;
     const aimUp = Math.sin(r.a) < 0;
-    if (aimUp && !(r.out || r.downed)) drawGun(ctx, r, R, H, pose);
-    drawRig(ctx, rig, pose, 0, R * 0.95, H, { alpha: 1, t, fallDir: Math.cos(r.a) < 0 ? 1 : -1 });
-    if (!aimUp && !(r.out || r.downed)) drawGun(ctx, r, R, H, pose);
+    // Hand height: 3D chibi hands sit lower than the 2D rig's
+    const handY = sheet ? R * 0.95 - 0.255 * H : undefined;
+    if (aimUp && !(r.out || r.downed)) drawGun(ctx, r, R, H, pose, handY);
+    if (sheet)
+      drawSheetFrame(ctx, sheet, rowOfState(actor.rig.state, actor.rig.down), actor.rig.state === "run" ? actor.rig.clock : actor.rig.t, 0, R * 0.95, H, {
+        lift: pose.y,
+        down: pose.down,
+        fallDir: Math.cos(r.a) < 0 ? 1 : -1,
+        shake: pose.shakeX,
+        facing: pose.facing,
+      });
+    else if (rig) drawRig(ctx, rig, pose, 0, R * 0.95, H, { alpha: 1, t, fallDir: Math.cos(r.a) < 0 ? 1 : -1 });
+    if (!aimUp && !(r.out || r.downed)) drawGun(ctx, r, R, H, pose, handY);
     if (r.flash) {
       ctx.fillStyle = alpha(P.white, 0.4);
       ctx.beginPath();
@@ -773,9 +786,9 @@ function muzzleFlash(ctx: CanvasRenderingContext2D, x: number, y: number) {
 }
 
 /** Blaster held at hand height, pointing at the aim; kicks back on each shot */
-function drawGun(ctx: CanvasRenderingContext2D, r: RobotLook, R: number, H: number, pose: Pose) {
+function drawGun(ctx: CanvasRenderingContext2D, r: RobotLook, R: number, H: number, pose: Pose, handY?: number) {
   ctx.save();
-  ctx.translate(pose.shakeX * H, -R * 0.55 - pose.y * H);
+  ctx.translate(pose.shakeX * H, (handY ?? -R * 0.55) - pose.y * H);
   ctx.rotate(r.a);
   const kick = r.fired ? -5 : 0;
   const triple = r.powers?.includes("triple");

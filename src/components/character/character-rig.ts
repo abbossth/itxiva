@@ -7,7 +7,7 @@ import { DEFAULT_LOOK, tierOf, type GameLook } from "@/lib/character/catalog";
 import { FACE_KEYS, type FaceKey, type Pose } from "@/lib/game/rig";
 import { skinFx } from "@/lib/game/skins";
 import { theme } from "@/lib/game/theme";
-import { CharacterSvg, type CharMood, type RigLayer } from "./character-svg";
+import { CharacterSvgDrawing as CharacterSvg, type CharMood, type RigLayer } from "./character-svg";
 
 // Canvas character rig. The student's SVG character is baked ONCE into a small atlas of separate parts
 // (legs, torso, arms, back item, pet, aura and one head per face expression), each with a dark-indigo outline.

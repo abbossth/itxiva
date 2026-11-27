@@ -29,6 +29,35 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-3d-everywhere-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangi",
+    title: "3D personajingiz endi hamma joyda",
+    slides: [
+      {
+        art: "character-games",
+        title: "O'yinlarda, reytingda, do'konda — bir xil 3D",
+        text: "Yashil zona, Kiber jang, jonli o'yin maydonlari, podium, kutish zali va do'kondagi personaj endi o'sha 3D personajingiz: yuguradi, quvonadi, xafa bo'ladi, o'ylaydi. Birinchi marta ochilganda bir lahza oddiy rasm ko'rinadi — 3D tayyor bo'lgach almashadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-3d-everywhere-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "O'quvchilar personaji barcha o'yinlarda 3D",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🧸",
+        title: "Bir xil 3D personaj — hamma ekranda",
+        text: "Har o'quvchining 3D personaji bir marta (fon rejimida) kadrlarga tayyorlanadi va proyektor, telefon, reyting va do'konda ishlatiladi. Kuchsiz qurilmada WebGL bo'lmasa — avvalgi rasm ko'rinadi. O'yin qoidalari va mukofotlar o'zgarmadi.",
+      },
+    ],
+  },
+  {
     id: "student-3d-character-v2-2026-11-27",
     date: "2026-11-27",
     audience: "student",

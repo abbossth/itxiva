@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useId } from "react";
+import { memo, useId, useSyncExternalStore } from "react";
 import { DEFAULT_LOOK, OUTFIT_COLORS, tierOf, type GameLook } from "@/lib/character/catalog";
 import { emoteOf } from "@/lib/character/emotes";
 import { SKINS, skinFx, type Skin, type SkinEmblem, type SkinHat } from "@/lib/game/skins";
+import { HEAD_FACES, ROW_SECONDS, SHEET_COLS, SHEET_ROWS, charSheet, rowOfMood, subscribeSheets, type CharSheet } from "./three/char-baker";
 import { cn } from "@/lib/utils";
 
 // O'quvchi personaji (SVG): multfilm uslubida — har qism kontur chiziq, yorug'lik/soya gradienti va yaltirash bilan.
@@ -1336,4 +1337,76 @@ function Pet({ kind }: { kind: string }) {
   );
 }
 
-export const CharacterSvg = memo(CharacterSvgImpl);
+/** The vector drawing itself (used to bake the 2D rig and as the fallback while the 3D sheet bakes) */
+export const CharacterSvgDrawing = memo(CharacterSvgImpl);
+
+const MOOD_FACE: Record<string, (typeof HEAD_FACES)[number]> = { cheer: "happy", happy: "happy", jump: "happy", sad: "sad", hit: "hit", think: "think" };
+
+/**
+ * Student character. Shows the 3D-rendered chibi character (sprite sheet baked from the 3D model, animated
+ * per mood) as soon as it is ready; until then — and on devices without WebGL — the vector drawing.
+ */
+function CharacterView(props: CharacterSvgProps) {
+  const { look, size = 96, mood: baseMood = "idle", pedestal = true, holding = null, className, title, still = false, headOnly = false, emote = null } = props;
+  const px = typeof size === "number" ? size : null;
+  const sheet = useSyncExternalStore(
+    subscribeSheets,
+    () => (px ? charSheet(look, px * 2, holding) : null),
+    () => null
+  );
+  if (!sheet?.url || !px) return <CharacterSvgDrawing {...props} />;
+  const em = emoteOf(emote);
+  const mood = em ? em.mood : baseMood;
+  return headOnly ? <HeadSprite sheet={sheet} size={px} mood={mood} className={className} title={title} /> : <BodySprite sheet={sheet} size={px} mood={mood} still={still} pedestal={pedestal} level={look?.level ?? 1} className={className} title={title} />;
+}
+
+function HeadSprite({ sheet, size, mood, className, title }: { sheet: CharSheet; size: number; mood: string; className?: string; title?: string }) {
+  const col = Math.max(0, HEAD_FACES.indexOf(MOOD_FACE[mood] ?? "idle"));
+  const rowH = (sheet.fh / sheet.fw) * size;
+  return (
+    <span
+      role="img"
+      aria-label={title ?? "Personaj"}
+      className={cn("chr3d inline-block shrink-0 bg-no-repeat", className)}
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: `url(${sheet.url})`,
+        backgroundSize: `${SHEET_COLS * size}px ${SHEET_ROWS.length * rowH}px`,
+        backgroundPosition: `${-col * size}px ${-(SHEET_ROWS.length - 1) * rowH}px`,
+      }}
+    />
+  );
+}
+
+function BodySprite({ sheet, size, mood, still, pedestal, level, className, title }: { sheet: CharSheet; size: number; mood: string; still: boolean; pedestal: boolean; level: number; className?: string; title?: string }) {
+  const row = rowOfMood(mood === "work" ? "idle" : mood);
+  const r = SHEET_ROWS.indexOf(row);
+  const h = size * 1.24;
+  const tier = tierOf(level);
+  return (
+    <span role="img" aria-label={title ?? "Personaj"} className={cn("chr3d relative inline-block shrink-0", className)} style={{ width: size, height: h }}>
+      {level >= 4 && <span aria-hidden className="chr3d-aura pointer-events-none absolute inset-x-[-6%] top-[4%] bottom-[2%] rounded-full" style={{ background: `radial-gradient(closest-side, ${tier.light}66, ${tier.light}22 60%, transparent)` }} />}
+      {pedestal ? (
+        <span aria-hidden className="pointer-events-none absolute left-[19%] right-[19%] rounded-[50%]" style={{ bottom: "4%", height: "7%", background: `linear-gradient(180deg, ${tier.light}, ${tier.base})`, boxShadow: `0 ${size * 0.03}px 0 ${tier.base}` }} />
+      ) : (
+        <span aria-hidden className="pointer-events-none absolute left-[30%] right-[30%] rounded-[50%] bg-black/35 blur-[1px]" style={{ bottom: "8%", height: "4%" }} />
+      )}
+      <span
+        aria-hidden
+        className={cn("chr3d-sprite absolute inset-0 bg-no-repeat", !still && "chr3d-play")}
+        style={{
+          backgroundImage: `url(${sheet.url})`,
+          backgroundSize: `${SHEET_COLS * size}px ${SHEET_ROWS.length * h}px`,
+          backgroundPositionY: `${-r * h}px`,
+          backgroundPositionX: "0px",
+          ["--chr3d-end" as string]: `${-SHEET_COLS * size}px`,
+          ["--chr3d-dur" as string]: `${ROW_SECONDS[row]}s`,
+          bottom: pedestal ? "2%" : undefined,
+        }}
+      />
+    </span>
+  );
+}
+
+export const CharacterSvg = memo(CharacterView);

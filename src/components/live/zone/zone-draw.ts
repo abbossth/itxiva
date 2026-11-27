@@ -7,6 +7,7 @@
 import { FIELD, ROBOT_R, STAR_R, ZAP_PERIOD_MS, zapActive, type ZoneWave } from "@/lib/live-game/zone";
 import type { GameLook } from "@/lib/character/catalog";
 import { characterRig, drawRig } from "@/components/character/character-rig";
+import { charSheet, drawSheetFrame, rowOfState } from "@/components/character/three/char-baker";
 import { ease, clamp01 } from "@/lib/game/easing";
 import { FloatTextPool, HitStop, ParticlePool, RingPool, Shake, groundShadow, starPath, type ParticleKind } from "@/lib/game/fx";
 import { GAME_FONT } from "@/lib/game/font";
@@ -604,13 +605,25 @@ export function drawZoneField(ctx: CanvasRenderingContext2D, width: number, heig
       ctx.stroke();
     }
 
-    const rig = r.look !== undefined ? characterRig(r.look, h) : null;
-    if (rig) {
-      drawRig(ctx, rig, pose, x, feet, h, { alpha: r.out ? 0.55 : 1, t, fallDir: a.fallDir });
+    // 3D-rendered character (sprite sheet); while it bakes — the 2D rig; before that — the robot
+    const sheet = r.look !== undefined ? charSheet(r.look, (h * 100) / 124) : null;
+    const rig = !sheet && r.look !== undefined ? characterRig(r.look, h) : null;
+    if (sheet || rig) {
+      if (sheet)
+        drawSheetFrame(ctx, sheet, rowOfState(a.rig.state, a.rig.down), a.rig.state === "run" ? a.rig.clock : a.rig.t, x, feet, h, {
+          alpha: r.out ? 0.55 : 1,
+          lift: pose.y,
+          down: pose.down,
+          fallDir: a.fallDir,
+          shake: pose.shakeX,
+          facing: pose.facing,
+        });
+      else if (rig) drawRig(ctx, rig, pose, x, feet, h, { alpha: r.out ? 0.55 : 1, t, fallDir: a.fallDir });
       // Skin effects: idle particles (epic/legendary) and golden run trail
+      const skin = skinFx(r.look?.costume);
       if (!r.out && fx.vdt > 0 && !reducedMotion()) {
-        if (rig.fx.particles && Math.random() < fx.vdt * 2.2) fx.particles.emit(r.x + (Math.random() - 0.5) * 3, r.y - 2.5, { kind: "star", color: rig.fx.particles, n: 1, speed: 2, dir: -Math.PI / 2, spread: 1, size: 0.3, life: 0.8, drag: 2 });
-        if (rig.fx.trail && r.moving && a.rig.stepped) fx.particles.emit(r.x, r.y + ROBOT_R, { kind: "star", color: rig.fx.trail, n: 1, speed: 2, size: 0.28, life: 0.5 });
+        if (skin.particles && Math.random() < fx.vdt * 2.2) fx.particles.emit(r.x + (Math.random() - 0.5) * 3, r.y - 2.5, { kind: "star", color: skin.particles, n: 1, speed: 2, dir: -Math.PI / 2, spread: 1, size: 0.3, life: 0.8, drag: 2 });
+        if (skin.trail && r.moving && a.rig.stepped) fx.particles.emit(r.x, r.y + ROBOT_R, { kind: "star", color: skin.trail, n: 1, speed: 2, size: 0.28, life: 0.5 });
       }
     } else {
       drawRobot(ctx, r, pose, x, feet, rad, color, t, ol);
