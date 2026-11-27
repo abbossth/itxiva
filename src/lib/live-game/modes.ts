@@ -6,6 +6,9 @@ import { isTeamAdventure, teamAdventureRanking } from "./team-adventures";
 /** Jamoalarga bo'linadigan rejimlar */
 export const isTeamMode = (mode: string) => mode === "team" || isTeamAdventure(mode);
 
+/** O'yinchilar jamoalarga bo'linadimi: jamoaviy rejimlar yoki jamoaviy qilib yaratilgan "Kiber arena" */
+export const gameHasTeams = (mode: string, options?: { teamArena?: boolean } | null) => isTeamMode(mode) || (mode === "arena" && Boolean(options?.teamArena));
+
 /** Jamoalar tartibi: jamoaviy sarguzashtlarda — o'yin holati bo'yicha (arqon, qal'a, gollar, orol), aks holda o'rtacha ochko */
 export function teamStandingsFor(mode: string, players: { team: number; score: number }[], teams: number, cells: number[] = []) {
   const base = teamStandings(players, teams);

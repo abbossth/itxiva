@@ -681,7 +681,7 @@ function LobbyCrowd({ state }: { state: LiveHostState }) {
       <span className="-mt-1 max-w-full truncate rounded-xl bg-white px-2 py-0.5 text-xs font-black text-slate-900 shadow-lg sm:text-sm">{p.name.split(" ")[0]}</span>
     </div>
   );
-  if (!isTeamMode(state.mode)) {
+  if (!state.teamed) {
     const size = Math.round(Math.min(n > 24 ? 62 : 80, Math.max(44, (vh - 430) / (n > 16 ? 2.6 : 1.6))));
     return <>{state.players.map((p, i) => one(p, i, size))}</>;
   }
@@ -813,7 +813,7 @@ function QuestionView({ state, remaining, busy, onReveal }: { state: LiveHostSta
           <SkipForward className="h-4 w-4" /> Natijani ko&apos;rsatish
         </Button>
       </div>
-      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} teams={isTeamMode(state.mode) ? state.standings : undefined} />
+      <AnswerCrowd players={state.players.filter((p) => !p.eliminated)} teams={state.teamed ? state.standings : undefined} />
     </div>
   );
 }

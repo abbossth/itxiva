@@ -42,6 +42,7 @@ import {
   rollChest,
   scoreAnswer,
   isTeamMode,
+  gameHasTeams,
   stealAmount,
   teamStandingsFor,
 } from "@/lib/live-game/modes";
@@ -273,7 +274,7 @@ export async function createLiveGameAction(input: {
       // "Kiber arena" rejimida qisqa o'yinlar o'rnini janglar egallaydi, final jang doim bor
       options:
         input.mode === "arena"
-          ? { minigames: false, arena: true, teamArena: false }
+          ? { minigames: false, arena: true, teamArena: input.teamArena === true }
           : input.mode === "galaxy" || input.mode === "zone"
           ? { minigames: false, arena: false, teamArena: false }
           : {
@@ -352,7 +353,7 @@ async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Re
     // "Kiber arena" rejimi: har 3 savoldan keyin qisqa jang
     const rounds = game.arenaRounds ?? [];
     if (game.status === "reveal" && arenaRoundDue(game.mode, game.index, game.questions.length, rounds)) {
-      await startArena(game._id, game.index, ROUND_SECONDS);
+      await startArena(game._id, game.index, ROUND_SECONDS, game.mode === "arena" && Boolean(game.options?.teamArena));
       return { success: true, data: { finished: false } };
     }
     // "Galaktika poygasi 3D": har 3 savoldan keyin poyga
@@ -379,7 +380,7 @@ async function advanceGame(gameId: string | mongoose.Types.ObjectId): Promise<Re
       // Oxirgi savoldan keyin — final jang (yoqilgan bo'lsa, bir marta), keyin g'oliblar
       const finalKey = game.questions.length - 1;
       if (game.options?.arena && !rounds.includes(finalKey) && game.status !== "arena") {
-        await startArena(game._id, finalKey, PVP_SECONDS, isTeamMode(game.mode) && Boolean(game.options?.teamArena));
+        await startArena(game._id, finalKey, PVP_SECONDS, gameHasTeams(game.mode, game.options) && Boolean(game.options?.teamArena));
         return { success: true, data: { finished: false } };
       }
       if (game.mode === "zone" && !zoneRounds.includes(finalKey) && game.status !== "zone") {
@@ -1223,6 +1224,8 @@ function arenaView(game: Pick<ILiveGame, "arena" | "status" | "questions">, play
 export interface LiveHostState {
   id: string;
   mode: LiveGameMode;
+  /** O'yinchilar jamoalarga bo'lingan (jamoaviy rejim yoki jamoaviy Kiber arena) */
+  teamed: boolean;
   status: LiveGameStatus;
   index: number;
   total: number;
@@ -1349,6 +1352,7 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
       data: {
         id: game._id.toString(),
         mode: game.mode,
+        teamed: gameHasTeams(game.mode, game.options),
         status: game.status,
         index: game.index,
         total: game.questions.length,
@@ -1363,7 +1367,7 @@ export async function getLiveHostStateAction(gameId: string): Promise<Result<Liv
         answeredCount: answersNow.filter((a) => a!.value !== "" && !(Array.isArray(a!.value) && a!.value.length === 0)).length,
         activeCount: players.filter((p) => !p.eliminated || p.eliminatedAt === game.index).length,
         players: toRows(players, game.mode, game.index),
-        standings: isTeamMode(game.mode) ? teamStandingsFor(game.mode, players, game.teams, game.cells ?? []) : [],
+        standings: gameHasTeams(game.mode, game.options) ? teamStandingsFor(game.mode, players, game.teams, game.cells ?? []) : [],
         events: [...game.events].reverse().slice(0, 8).map((e) => ({ text: e.text, kind: e.kind })),
         minigame: minigameView(game, players),
         bonus: game.bonusIndex === game.index && game.index >= 0,
@@ -1509,7 +1513,7 @@ export async function joinLiveGameAction(gameId: string): Promise<Result<{ joine
     const rawLook = (ch?.look ?? null) as Record<string, unknown> | null;
     const look = gameLook(cleanLook(rawLook, ch?.owned ?? [], lvl, ch?.power ?? 0, rawLook?.color), lvl);
     let team = 0;
-    if (isTeamMode(game.mode)) {
+    if (gameHasTeams(game.mode, game.options)) {
       const sizes = await LiveGamePlayer.aggregate<{ _id: number; n: number }>([
         { $match: { gameId: game._id } },
         { $group: { _id: "$team", n: { $sum: 1 } } },
@@ -1695,6 +1699,8 @@ export interface LivePrizeView {
 export interface LivePlayerState {
   id: string;
   mode: LiveGameMode;
+  /** O'yinchilar jamoalarga bo'lingan (jamoaviy rejim yoki jamoaviy Kiber arena) */
+  teamed: boolean;
   /** O'yin tugaganidan beri o'tgan vaqt (server soati) — telefon avval monitorni ko'rsatadi, keyin o'rinni */
   finishedAgoMs: number | null;
   /** Kutish zali: chap/o'ng qo'shnilar (itarish uchun) va so'nggi itarishlar */
@@ -1942,7 +1948,8 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
       data: {
         id: game._id.toString(),
         mode: game.mode,
-        lobby: game.status === "lobby" && mine ? lobbyView(players, mine, game.mode) : null,
+        teamed: gameHasTeams(game.mode, game.options),
+        lobby: game.status === "lobby" && mine ? lobbyView(players, mine, game.mode, gameHasTeams(game.mode, game.options)) : null,
         finishedAgoMs: game.status === "finished" ? Math.max(0, Date.now() - new Date(game.finishedAt ?? game.createdAt ?? 0).getTime()) : null,
         studentGame: game.studentGame
           ? {
@@ -2056,7 +2063,7 @@ export async function getLivePlayerStateAction(gameId: string): Promise<Result<L
         goal: goalOf(game.mode, game.questions.length),
         cells: (game.mode === "territory" && game.status !== "question") || isTeamAdventure(game.mode) ? game.cells ?? [] : [],
         introMs: introLeft(game),
-        standings: isTeamMode(game.mode) ? teamStandingsFor(game.mode, players, game.teams, game.cells ?? []) : [],
+        standings: gameHasTeams(game.mode, game.options) ? teamStandingsFor(game.mode, players, game.teams, game.cells ?? []) : [],
         top: game.status === "finished" ? rows.slice(0, 5).map((r) => ({ name: r.name, score: r.score, coins: r.coins })) : [],
         minigame: (() => {
           const view = minigameView(game, players);
@@ -3060,13 +3067,13 @@ function busyInPush(players: Pick<ILiveGamePlayer, "push" | "_id">[], now: numbe
 }
 
 /** Telefon uchun kutish zali: qo'shnilar va so'nggi itarishlar */
-function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: LiveGameMode): NonNullable<LivePlayerState["lobby"]> {
+function lobbyView(players: ILiveGamePlayer[], mine: ILiveGamePlayer, mode: LiveGameMode, teamed: boolean): NonNullable<LivePlayerState["lobby"]> {
   const order = rankPlayers(
     mode,
     players.map((p) => ({ p, id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime() }))
   );
   const myId = mine._id.toString();
-  const { left, right } = lobbyNeighbors(order, myId, isTeamMode(mode));
+  const { left, right } = lobbyNeighbors(order, myId, teamed);
   const busy = busyInPush(players, Date.now());
   const view = (x: (typeof order)[number] | null) => (x ? { id: x.id, name: x.p.name, look: (x.p.look as GameLook | null | undefined) ?? null, busy: busy.has(x.id) } : null);
   const byId = new Map(players.map((p) => [p._id.toString(), p]));
@@ -3096,7 +3103,7 @@ export async function playPushAction(gameId: string, dir: PushDir): Promise<Resu
       game.mode,
       players.map((p) => ({ id: p._id.toString(), score: p.score, eliminated: p.eliminated, eliminatedAt: p.eliminatedAt, team: p.team, joinedAt: new Date(p.createdAt ?? 0).getTime(), name: p.name }))
     );
-    const target = lobbyNeighbors(order, mine._id.toString(), isTeamMode(game.mode))[dir];
+    const target = lobbyNeighbors(order, mine._id.toString(), gameHasTeams(game.mode, game.options))[dir];
     if (!target) return fail(dir === "left" ? "Chap tomoningizda hech kim yo'q" : "O'ng tomoningizda hech kim yo'q");
     const now = Date.now();
     // Otish davom etayotganda unda qatnashayotgan ikkalasi (otuvchi ham, otilgan ham) — na otadi, na otiladi

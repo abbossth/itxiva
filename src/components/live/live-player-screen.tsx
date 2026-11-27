@@ -1,6 +1,5 @@
 "use client";
 
-import { isTeamMode } from "@/lib/live-game/modes";
 
 import { AntiCheatGuard } from "@/components/anti-cheat/anti-cheat-guard";
 import { ProtectedText } from "@/components/anti-cheat/protected-text";
@@ -243,7 +242,7 @@ export function LivePlayerScreen({ initial }: { initial: LivePlayerState }) {
                 <Lives lives={me.lives} max={SURVIVAL_LIVES} />
               </span>
             )}
-            {isTeamMode(state.mode) && (
+            {state.teamed && (
               <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 ring-1", TEAM_STYLES[me.team]?.soft)}>
                 <span className={cn("h-2 w-2 rounded-full", TEAM_STYLES[me.team]?.dot)} /> {me.teamName}
               </span>
@@ -361,7 +360,7 @@ export function LobbyView({ state, onRefresh }: { state: LivePlayerState; onRefr
   // Remembered tab (per device); server and first client render use the default
   const tab = useSyncExternalStore(subscribeLobbyTab, readLobbyTab, () => "friends" as LobbyTab);
   const pick = setLobbyTab;
-  const team = me && isTeamMode(state.mode) ? TEAM_STYLES[me.team] : null;
+  const team = me && state.teamed ? TEAM_STYLES[me.team] : null;
   const tabs: { id: LobbyTab; label: string; icon: typeof Users }[] = [
     { id: "friends", label: "Qo'shnilar", icon: Users },
     { id: "boost", label: "Kuchaytirgich", icon: Backpack },
@@ -679,7 +678,7 @@ function RevealView({
         </div>
       )}
 
-      {isTeamMode(state.mode) && state.standings.length > 0 && (
+      {state.teamed && state.standings.length > 0 && (
         <div className="space-y-1.5">
           {state.standings.map((s) => (
             <div key={s.team} className={cn("flex items-center justify-between rounded-xl px-3 py-2 text-sm font-bold ring-1", TEAM_STYLES[s.team]?.soft)}>

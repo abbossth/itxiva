@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-team-cyber-arena-2026-11-27",
+    date: "2026-11-27",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Kiber arena endi jamoaviy ham bo'ladi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤝",
+        title: "Jang turi: hamma alohida yoki jamoaviy",
+        text: "«Kiber arena» rejimini yaratishda «Jamoaviy»ni tanlang va jamoalar sonini (2–4) belgilang. O'quvchilar qo'shilganda jamoalarga teng bo'linadi, har 3 savoldan keyingi janglar va final jang jamoa jamoaga qarshi o'tadi: jamoadoshga o'q tegmaydi, yiqilganni qutqarish mumkin, g'olib jamoaning har a'zosi +400 ochko oladi.",
+      },
+    ],
+  },
+  {
+    id: "student-team-cyber-arena-2026-11-27",
+    date: "2026-11-27",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kiber arena: jamoa bo'lib jang qiling!",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤝",
+        title: "Jamoadoshlar bilan birga",
+        text: "Endi Kiber arena jamoaviy ham bo'ladi: kutish zalida jamoangiz ko'rinadi, jangda jamoadoshga o'q tegmaydi, yiqilgan do'stingiz yoniga borib uni qutqaring. Oxirgi qolgan jamoa g'olib!",
+      },
+    ],
+  },
+  {
     id: "student-lobby-redesign-2026-11-27",
     date: "2026-11-27",
     audience: "student",

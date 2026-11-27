@@ -171,6 +171,8 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const [zoneMini, setZoneMini] = useState(true);
   const [arena, setArena] = useState(true);
   const [teamArena, setTeamArena] = useState(true);
+  /** "Kiber arena" rejimining o'zi: hamma alohida yoki jamoa jamoaga qarshi */
+  const [arenaTeams, setArenaTeams] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Guruhlar va ulardagi savollar soni oyna ochilganda bir marta olinadi
@@ -202,7 +204,7 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, zoneMini, arena, teamArena: isTeamMode(mode) && teamArena });
+      const res = await createLiveGameAction({ groupId, mode, source, count, teams, prizes, minigames, zoneMini, arena, teamArena: mode === "arena" ? arenaTeams : isTeamMode(mode) && teamArena });
       if (!res.success) {
         toast.error(res.error);
         return;
@@ -268,7 +270,33 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
             </ul>
           </Field>
 
-          {(mode === "team" || mode === "siege" || mode === "island") && (
+          {mode === "arena" && (
+            <Field label="Jang turi">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {[
+                  { v: false, icon: "⚔️", title: "Hamma alohida", text: "Har kim o'zi uchun — hamma hammaga qarshi otishma" },
+                  { v: true, icon: "🤝", title: "Jamoaviy", text: "O'quvchilar jamoalarga bo'linadi, jamoadoshga o'q tegmaydi, yiqilganni qutqarish mumkin. Oxirgi qolgan jamoa yutadi (+400 har a'zoga)" },
+                ].map((o) => (
+                  <button
+                    key={o.title}
+                    type="button"
+                    onClick={() => setArenaTeams(o.v)}
+                    aria-pressed={arenaTeams === o.v}
+                    className={cn(
+                      "cursor-pointer rounded-2xl border-2 p-3 text-left transition-colors",
+                      arenaTeams === o.v ? "border-teal-500 bg-teal-500/10" : "border-slate-200 dark:border-slate-700"
+                    )}
+                  >
+                    <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {o.icon} {o.title}
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">{o.text}</span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+          {(mode === "team" || mode === "siege" || mode === "island" || (mode === "arena" && arenaTeams)) && (
             <Field label="Jamoalar soni">
               <Segmented value={teams} options={[2, 3, 4]} onChange={setTeams} />
             </Field>
