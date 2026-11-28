@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-team-awards-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Tuzatildi",
+    title: "Jamoaviy Kiber arena: g'alaba — butun jamoaga",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏆",
+        title: "Jamoa bilan yutasiz",
+        text: "Kiber arena jamoaviy o'ynalganda taqdirlash ham jamoaviy: katta ekranda g'olib jamoalar chiqadi, g'olib jamoaning har bir a'zosi mukofot coinini oladi, telefoningizda esa jamoangizning o'rni ko'rinadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-team-awards-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Tuzatildi",
+    title: "Jamoaviy Kiber arena: taqdirlash tuzatildi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🏆",
+        title: "Shohsupa va coin — jamoaviy",
+        text: "«Jamoaviy» qilib yaratilgan Kiber arenada endi shohsupada g'olib jamoalar chiqadi va mukofot g'olib jamoaning har a'zosiga beriladi (avval 1/2/3-o'rin bo'yicha alohida o'yinchilarga berilardi). Yaratishda mukofot maydoni ham «g'olib jamoaning har a'zosiga» bo'lib ko'rinadi.",
+      },
+    ],
+  },
+  {
     id: "student-homework-ai-grade-2026-11-28",
     date: "2026-11-28",
     audience: "student",

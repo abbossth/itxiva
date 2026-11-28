@@ -399,9 +399,9 @@ function CreateLiveGameDialog({ onClose }: { onClose: () => void }) {
           </>
           )}
 
-          <Field label={isTeamMode(mode) ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
+          <Field label={isTeamMode(mode) || (mode === "arena" && arenaTeams) ? "Mukofot (g'olib jamoaning har a'zosiga)" : "Mukofot: 1 / 2 / 3-o'rin (coin)"}>
             <div className="flex gap-2">
-              {(isTeamMode(mode) ? [0] : [0, 1, 2]).map((i) => (
+              {(isTeamMode(mode) || (mode === "arena" && arenaTeams) ? [0] : [0, 1, 2]).map((i) => (
                 <input
                   key={i}
                   type="number"

@@ -3,7 +3,7 @@ import { LiveGame } from "@/lib/db/models/live-game.model";
 import { LiveGamePlayer } from "@/lib/db/models/live-game-player.model";
 import { awardCoins } from "@/lib/gamification/award";
 import { rewardQuizAnswers } from "@/lib/gamification/quiz-rewards";
-import { isTeamMode, LIVE_MODES, computeAwards } from "./modes";
+import { gameHasTeams, LIVE_MODES, computeAwards } from "./modes";
 
 // Jonli o'yinni yakunlash: 1–3 o'ringa (jamoaviyda g'olib jamoaga) coin, to'g'ri javoblar test savoli sifatida sanaladi.
 // Server action va cron (yopilmay qolgan o'yinlar) shu yerdan foydalanadi. Bu fayl "use server" emas.
@@ -40,7 +40,8 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
     })),
     game.prizes,
     game.teams,
-    game.cells ?? []
+    game.cells ?? [],
+    gameHasTeams(game.mode, game.options)
   );
   const byId = new Map(players.map((p) => [p._id.toString(), p]));
   const modeTitle = LIVE_MODES[game.mode].title;
@@ -48,7 +49,7 @@ export async function finishLiveGame(gameId: Id, now: Date = new Date()): Promis
   for (const a of awards) {
     const p = byId.get(a.id);
     if (!p) continue;
-    const reason = isTeamMode(game.mode) ? `Jonli o'yinda (${modeTitle}) jamoangiz g'olib bo'ldi` : `Jonli o'yinda (${modeTitle}) ${a.place}-o'rin`;
+    const reason = gameHasTeams(game.mode, game.options) ? `Jonli o'yinda (${modeTitle}) jamoangiz g'olib bo'ldi` : `Jonli o'yinda (${modeTitle}) ${a.place}-o'rin`;
     const res = await awardCoins({
       studentId: p.studentId,
       coin: a.coins,

@@ -236,10 +236,12 @@ export function computeAwards<T extends RankablePlayer>(
   players: T[],
   prizes: number[],
   teams: number,
-  cells: number[] = []
+  cells: number[] = [],
+  /** Jamoaviy o'yinmi (jamoaviy qilib yaratilgan Kiber arena ham) — sukut bo'yicha o'yin turidan */
+  teamed: boolean = isTeamMode(mode)
 ): { id: string; place: number; coins: number }[] {
   const played = players.filter((p) => p.score > 0 || (mode === "survival" && !p.eliminated));
-  if (isTeamMode(mode)) {
+  if (teamed) {
     const standings = teamStandingsFor(mode, played, teams, cells);
     const winner = standings.find((s) => s.members > 0 && s.average > 0);
     if (!winner) return [];

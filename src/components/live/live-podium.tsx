@@ -62,8 +62,9 @@ function Spotlights({ focus }: { focus: boolean }) {
 export function LivePodium({ state, sound, music }: { state: LiveHostState; sound: boolean; music: boolean }) {
   // Shohsupa va ro'yxatda faqat ochko to'plaganlar (jamoaviyda — ochkosi bor jamoalar)
   const scored = state.players.filter((p) => p.score > 0);
+  const teamed = state.teamed || isTeamMode(state.mode);
   const places: Place[] =
-    isTeamMode(state.mode)
+    teamed
       ? state.standings.filter((s) => s.average > 0).slice(0, 3).map((s) => ({
           key: `t${s.team}`,
           name: s.name,
@@ -133,13 +134,13 @@ export function LivePodium({ state, sound, music }: { state: LiveHostState; soun
   const charSmall = Math.round(charBig * 0.74);
   // Ustunda medal, ism va ochko sig'ishi kerak — balandlik undan past bo'lmaydi
   const pillarH = { 1: Math.max(96, Math.round(vh * 0.19)), 2: Math.max(84, Math.round(vh * 0.15)), 3: Math.max(76, Math.round(vh * 0.12)) } as const;
-  const rest = shown === -1 && !isTeamMode(state.mode) ? scored.slice(3, vh > 820 ? 12 : 9) : [];
+  const rest = shown === -1 && !teamed ? scored.slice(3, vh > 820 ? 12 : 9) : [];
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col items-center justify-between gap-3 overflow-hidden pb-1 text-center">
       <Spotlights focus={rolling !== null || shown === -1} />
       <div className="relative flex w-full items-center justify-center">
-        <p className="text-sm font-black uppercase tracking-[0.4em] text-amber-200 drop-shadow">{isTeamMode(state.mode) ? "G'olib jamoalar" : "G'oliblar"}</p>
+        <p className="text-sm font-black uppercase tracking-[0.4em] text-amber-200 drop-shadow">{teamed ? "G'olib jamoalar" : "G'oliblar"}</p>
         {shown === -1 && (
           <Link href="/mentor/live" className="live-pop absolute right-0 inline-flex min-h-[40px] items-center rounded-2xl bg-white/15 px-4 text-sm font-bold ring-1 ring-white/20 backdrop-blur hover:bg-white/25">
             Yangi o&apos;yin

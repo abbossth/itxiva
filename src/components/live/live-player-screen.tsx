@@ -733,14 +733,22 @@ function WatchMonitor({ left, look }: { left: number; look: GameLook | null }) {
 
 function FinishedResult({ state }: { state: LivePlayerState }) {
   const me = state.me;
+  // Jamoaviy o'yinda (jamoaviy Kiber arena ham) — natija jamoa bo'yicha
+  const teamPlace = state.teamed && me && state.standings.length > 0 ? state.standings.findIndex((s) => s.team === me.team) + 1 : 0;
+  const myTeam = teamPlace > 0 ? state.standings[teamPlace - 1] : null;
+  const won = teamPlace === 1;
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
       <Crown className="h-14 w-14 text-amber-300" />
-      {me && <CharacterSvg look={me.look} size={140} mood={me.rank > 0 && me.rank <= 3 ? "happy" : "idle"} />}
+      {me && <CharacterSvg look={me.look} size={140} mood={(myTeam ? won : me.rank > 0 && me.rank <= 3) ? "happy" : "idle"} />}
       <p className="text-xs font-black uppercase tracking-[0.3em] text-amber-200">O&apos;yin tugadi</p>
       {me ? (
         <>
-          <p className="text-4xl font-black">{me.rank}-o&apos;rin</p>
+          {myTeam ? (
+            <p className="text-3xl font-black">{won ? `🏆 ${myTeam.name} g'olib!` : `🤝 ${myTeam.name}: ${teamPlace}-o'rin`}</p>
+          ) : (
+            <p className="text-4xl font-black">{me.rank}-o&apos;rin</p>
+          )}
           <p className="font-mono text-lg text-slate-300">{formatNumberUz(me.score)} ochko</p>
           {me.coins > 0 && <p className="rounded-full bg-amber-400/20 px-4 py-1.5 text-lg font-black text-amber-200">+{me.coins} coin</p>}
           <LivePrizes gameId={state.id} prizes={me.prizes} look={me.look} />
@@ -748,7 +756,20 @@ function FinishedResult({ state }: { state: LivePlayerState }) {
       ) : (
         <p className="text-slate-300">Bu o&apos;yinda qatnashmadingiz.</p>
       )}
-      {state.top.length > 0 && (
+      {state.teamed && state.standings.length > 0 ? (
+        <ol className="w-full space-y-1.5 text-left">
+          {state.standings.map((s, i) => (
+            <li key={s.team} className={cn("flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold", s.team === me?.team ? "bg-amber-400/20 ring-1 ring-amber-300/50" : "bg-white/10")}>
+              <span className="w-5 font-mono text-slate-400">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {i === 0 ? "🏆 " : ""}
+                {s.name}
+              </span>
+              <span className="font-mono">{formatNumberUz(s.average)}</span>
+            </li>
+          ))}
+        </ol>
+      ) : state.top.length > 0 && (
         <ol className="w-full space-y-1.5 text-left">
           {state.top.map((t, i) => (
             <li key={i} className="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-sm font-bold">

@@ -2822,7 +2822,7 @@ async function announceStudentGame(game: ILiveGame & { _id: mongoose.Types.Objec
         audience,
         questions: game.questions.length,
         prizes: [...(game.prizes ?? [])],
-        team: isTeamMode(game.mode),
+        team: gameHasTeams(game.mode, game.options),
         minPlayers: game.minPlayers ?? 0,
         needPlayers: game.needPlayers ?? 0,
         price: game.price ?? 0,
