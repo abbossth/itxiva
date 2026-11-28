@@ -8,6 +8,7 @@ import { CHAT_MESSAGE_TTL_DAYS, ChatMediaStat, ChatMessage, ChatRead, ChatRoom, 
 import { Group } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
 import { groupShortName } from "@/lib/group-name";
+import { newsCard, syncNewsToChat, type NewsCard } from "./news-feed";
 
 // Chat qoidalari (server, "use server" emas):
 // - Umumiy chat: hamma o'qiydi va yozadi.
@@ -121,6 +122,8 @@ async function unreadCounts(rooms: IChatRoom[], userId: string, mutedOut?: Set<s
 /** Foydalanuvchining xonalari (mentor uchun `watch` — a'zo bo'lmagan o'quvchilar guruhlari va shaxsiy xabarlar) */
 export async function listRooms(v: ChatViewer, opts: { watch?: boolean } = {}): Promise<ChatRoomItem[]> {
   await connectToDatabase();
+  // Yangi deploydan keyin birinchi so'rovda: chiqmagan yangiliklar umumiy chatga post qilinadi (jarayonda bir marta)
+  await syncNewsToChat().catch(() => {});
   let rooms: IChatRoom[];
   if (opts.watch && v.role === "mentor") {
     rooms = await ChatRoom.find({ kind: { $in: ["custom", "dm"] }, members: { $ne: oid(v.userId) }, lastMessageAt: { $ne: null } })
@@ -212,6 +215,8 @@ export interface ChatMessageItem {
   senderStyle: PremiumStyle | null;
   /** Personajli GIF uchun yuboruvchining personaji */
   senderLook: GameLook | null;
+  /** Platforma yangiligi posti (rasm + matn karta) */
+  news: NewsCard | null;
   /** Javob berilgan xabar (o'chirilgan bo'lsa — deleted, matn bo'sh) */
   replyTo: { id: string; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar */
@@ -232,6 +237,7 @@ export function toItem(m: {
   image?: { width: number; height: number } | null;
   sticker?: string | null;
   gif?: string | null;
+  news?: string | null;
   replyTo?: { id: unknown; senderName: string; text: string; deleted?: boolean } | null;
   reactions?: { emoji: string; userId: unknown }[];
   mentions?: { id: unknown; name: string }[];
@@ -253,6 +259,7 @@ export function toItem(m: {
     gif: m.gif && !gone ? m.gif : null,
     senderStyle: null,
     senderLook: null,
+    news: m.news && !gone ? newsCard(m.news) : null,
     // Iqtibos qilingan xabar o'chirilgan bo'lsa — uning matni ko'rsatilmaydi
     replyTo: m.replyTo && !gone ? { id: String(m.replyTo.id), senderName: m.replyTo.senderName, text: m.replyTo.deleted ? "" : m.replyTo.text, deleted: Boolean(m.replyTo.deleted) } : null,
     reactions: [...reactions].map(([emoji, users]) => ({ emoji, users })),
@@ -439,7 +446,8 @@ export async function loadChanged(roomId: Id, since: Date): Promise<ChatMessageI
 }
 
 /** Xabar tavsifi: ro'yxatda, iqtibosda va bildirishnomada */
-export function previewOf(m: { text?: string; voice?: unknown; image?: unknown; sticker?: string | null; gif?: string | null }): string {
+export function previewOf(m: { text?: string; voice?: unknown; image?: unknown; sticker?: string | null; gif?: string | null; news?: string | null }): string {
+  if (m.news) return `📢 ${newsCard(m.news)?.title ?? "Yangilik"}`;
   if (m.gif) return `🎞️ GIF${gifOf(m.gif) ? ` · ${gifOf(m.gif)!.caption}` : ""}`;
   if (m.sticker) return `${premiumSticker(m.sticker)?.emoji ?? m.sticker} Stiker`;
   if (m.voice) return "🎤 Ovozli xabar";

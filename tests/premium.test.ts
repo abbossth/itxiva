@@ -64,7 +64,7 @@ describe("IT Xiva Premium", () => {
     const mine = await chat.sendChatMessageAction(general.id, "va alaykum");
     expect(mine.success && mine.data.senderStyle).toBeNull();
     const list = await core.loadMessages(general.id, {});
-    expect(list.map((m) => Boolean(m.senderStyle))).toEqual([true, false]);
+    expect(list.filter((m) => !m.news).map((m) => Boolean(m.senderStyle))).toEqual([true, false]);
   });
 });
 

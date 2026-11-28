@@ -64,6 +64,7 @@ import { GIFS, PREMIUM_STICKERS, isGif, isPremiumSticker, searchEmoji } from "@/
 import { bubbleOf } from "@/lib/premium";
 import { AnimatedEmoji, AnimatedSticker } from "./animated-sticker";
 import { ChatGif } from "./chat-gif";
+import { NewsPost } from "./news-post";
 import { PremiumName } from "@/components/premium/premium-name";
 import { Initials, PeoplePicker } from "./people-picker";
 
@@ -1201,6 +1202,34 @@ const Bubble = memo(function Bubble({
         (read ? <CheckCheck className={cn("h-3.5 w-3.5", bare ? "text-sky-500" : "text-sky-200")} aria-label="O'qildi" /> : <Check className="h-3.5 w-3.5" aria-label="Yuborildi" />)}
     </span>
   );
+
+  // Platforma yangiligi: markazda rasm + matnli karta (IT Xiva nomidan)
+  if (m.news && !m.deleted)
+    return (
+      <div id={`msg-${m.id}`} className="my-3 flex flex-col items-center gap-1">
+        <div {...handlers} className="w-full max-w-[22rem]">
+          <NewsPost card={m.news} stamp={<span className="text-[10px] text-slate-400">{timeOf(m.at)}</span>} />
+        </div>
+        {m.reactions.length > 0 && (
+          <div className="-mt-2 flex flex-wrap justify-center gap-1">
+            {m.reactions.map((r) => (
+              <button
+                key={r.emoji}
+                type="button"
+                onClick={() => onAction({ t: "react", m, emoji: r.emoji })}
+                className={cn(
+                  "relative z-[1] flex cursor-pointer items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs shadow-sm",
+                  r.users.includes(me) ? "border-teal-300 bg-teal-50 dark:border-teal-600 dark:bg-teal-500/20" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                )}
+              >
+                {r.emoji}
+                {r.users.length > 1 && <span className="font-semibold text-slate-600 dark:text-slate-300">{r.users.length}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
 
   return (
     <div id={`msg-${m.id}`} className={cn("group flex min-w-0 items-end gap-1 rounded-2xl transition-shadow", mine ? "justify-end" : "justify-start", gapTop ? "mt-2.5" : "mt-0.5")}>

@@ -62,6 +62,8 @@ export interface IChatMessage {
   sticker?: string | null;
   /** GIF (o'z to'plamimizdagi "g:…" kodi) */
   gif?: string | null;
+  /** Platforma yangiligi (lib/whats-new.ts id) — "IT Xiva" nomidan e'lon posti */
+  news?: string | null;
   /** Javob berilgan xabar (iqtibos) */
   replyTo?: { id: mongoose.Types.ObjectId; senderName: string; text: string; deleted?: boolean } | null;
   /** @belgilanganlar (id va ism — matnda "@Ism Familiya" ko'rinishida) */
@@ -87,6 +89,7 @@ const ChatMessageSchema = new Schema<IChatMessage>(
     image: { type: new Schema({ key: String, mime: String, width: Number, height: Number, size: Number }, { _id: false }), default: null },
     sticker: { type: String, default: null },
     gif: { type: String, default: null },
+    news: { type: String, default: null },
     replyTo: { type: new Schema({ id: Schema.Types.ObjectId, senderName: String, text: String, deleted: { type: Boolean, default: false } }, { _id: false }), default: null },
     mentions: { type: [new Schema({ id: Schema.Types.ObjectId, name: String }, { _id: false })], default: [] },
     reactions: { type: [new Schema({ emoji: String, userId: Schema.Types.ObjectId }, { _id: false })], default: [] },
@@ -163,3 +166,17 @@ ChatTypingSchema.index({ at: 1 }, { expireAfterSeconds: 120 });
 export const ChatTyping: Model<IChatTyping> = mongoose.models.ChatTyping || mongoose.model<IChatTyping>("ChatTyping", ChatTypingSchema);
 
 export const ChatMediaStat: Model<IChatMediaStat> = mongoose.models.ChatMediaStat || mongoose.model<IChatMediaStat>("ChatMediaStat", ChatMediaStatSchema);
+
+/**
+ * Qaysi yangilik e'loni chatga post qilingan (xabarlar 7 kunda o'chadi, bu belgi esa qoladi —
+ * e'lon qayta post qilinmaydi). Doimiy, kichik kolleksiya.
+ */
+export interface IChatNewsPost {
+  newsId: string;
+  at: Date;
+}
+const ChatNewsPostSchema = new Schema<IChatNewsPost>({
+  newsId: { type: String, required: true, unique: true },
+  at: { type: Date, required: true },
+});
+export const ChatNewsPost: Model<IChatNewsPost> = mongoose.models.ChatNewsPost || mongoose.model<IChatNewsPost>("ChatNewsPost", ChatNewsPostSchema);

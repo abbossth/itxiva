@@ -29,6 +29,58 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-news-in-chat-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangi",
+    title: "Yangiliklar endi chatda ham",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📢",
+        title: "Hech narsani o'tkazib yubormaysiz",
+        text: "Platformaga har yangi imkoniyat qo'shilganda, e'lon «Umumiy chat»ga ham rasm va matn bilan tushadi. Unga reaksiya bosishingiz va do'stlaringiz bilan muhokama qilishingiz mumkin.",
+      },
+    ],
+    cta: { label: "Chatni ochish", href: "/chat" },
+  },
+  {
+    id: "student-arena-ally-markers-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kiber arena: yiqilgan sheriklar ko'rinib turadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "Sherigingizni tez toping",
+        text: "Jamoaviy jangda yiqilgan (🩹) yoki tiriltirsa bo'ladigan (💀) sherigingiz ekran chetida ismi va masofasi bilan ko'rsatiladi. Eng yaqinigacha yashil yo'l chiziladi, kichik xaritada esa miltillovchi xoch bilan belgilanadi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-news-and-arena-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "E'lonlar chatda, arenada sherik ko'rsatkichi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "📢",
+        title: "Yangiliklar «Umumiy chat»ga ham tushadi",
+        text: "O'quvchilar uchun har bir «Yangilik» e'loni deploydan keyin avtomatik ravishda «Umumiy chat»ga IT Xiva nomidan rasm va matnli karta bo'lib tushadi (har biri bir marta). Chat xabarlari kabi 7 kundan keyin o'chadi.",
+      },
+      {
+        art: "emoji",
+        emoji: "🩹",
+        title: "Kiber arena: yiqilgan sheriklar",
+        text: "Jamoaviy jangda yiqilgan yoki tiriltirsa bo'ladigan sheriklar ekran chetida ismi va masofasi bilan ko'rsatiladi, eng yaqinigacha yo'l chiziladi, xaritada belgilanadi.",
+      },
+    ],
+  },
+  {
     id: "student-arena-regen-2026-11-28",
     date: "2026-11-28",
     audience: "student",

@@ -754,6 +754,31 @@ export function PvpGame({
           ctx.restore();
         }
       }
+      // Eng yaqin yordam kerak bo'lgan jamoadoshgacha yo'l: punktir chiziq (oson topib borish uchun)
+      if (myTeam >= 0 && me && !me.out && !me.downed && pos.ready) {
+        let best: { x: number; y: number; d: number } | null = null;
+        for (const p of world?.peers ?? []) {
+          if (p.isMe || !((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
+          const s = shown.get(p.id) ?? p;
+          const d = Math.hypot(s.x - pos.x, s.y - pos.y);
+          if (d > PLAYER_R * 3 && (!best || d < best.d)) best = { x: s.x, y: s.y, d };
+        }
+        if (best) {
+          ctx.save();
+          ctx.strokeStyle = alpha(AC.revive, 0.55);
+          ctx.lineWidth = 4;
+          ctx.lineCap = "round";
+          ctx.setLineDash([2, 16]);
+          ctx.lineDashOffset = -t * 40;
+          const ux = (best.x - pos.x) / best.d;
+          const uy = (best.y - pos.y) / best.d;
+          ctx.beginPath();
+          ctx.moveTo(pos.x + ux * (PLAYER_R + 14), pos.y + uy * (PLAYER_R + 14));
+          ctx.lineTo(best.x - ux * (PLAYER_R + 20), best.y - uy * (PLAYER_R + 20));
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
       // O'qlar
       for (const s of foreign) drawShot(ctx, s, colorFor(s.owner));
       for (const s of myShots) drawShot(ctx, s, AC.myShot);
@@ -821,7 +846,7 @@ export function PvpGame({
 
       // ---- Ekran qatlami ----
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Ekrandan tashqaridagi yiqilgan jamoadosh: chetda yashil ko'rsatkich
+      // Ekrandan tashqaridagi yiqilgan / tiriltirsa bo'ladigan jamoadosh: chetda ko'rsatkich — ism, masofa, yo'nalish
       if (myTeam >= 0 && me && !me.out && !me.downed) {
         for (const p of world?.peers ?? []) {
           if (p.isMe || !((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
@@ -829,29 +854,51 @@ export function PvpGame({
           const px = (s.x - view.cx) * scale + w / 2;
           const py = (s.y - view.cy) * scale + h / 2;
           if (px > 24 && px < w - 24 && py > 24 && py < h - 24) continue;
-          const m = 30;
+          const m = 44;
           const ex = Math.max(m, Math.min(w - m, px));
-          const ey = Math.max(m + 40, Math.min(h - m, py));
-          const ang = Math.atan2(py - h / 2, px - w / 2);
+          const ey = Math.max(m + 44, Math.min(h - m - 30, py));
+          const ang = Math.atan2(py - ey, px - ex);
+          const dist = Math.round(Math.hypot(s.x - pos.x, s.y - pos.y) / (PLAYER_R * 2));
+          const pulse = 0.5 + Math.sin(t * 6) * 0.5;
           ctx.save();
           ctx.translate(ex, ey);
-          ctx.fillStyle = alpha(AC.reviveDark, 0.75 + Math.sin(t * 6) * 0.2);
+          // glow + disc
+          ctx.fillStyle = alpha(AC.revive, 0.18 + pulse * 0.17);
           ctx.beginPath();
-          ctx.arc(0, 0, 18, 0, Math.PI * 2);
+          ctx.arc(0, 0, 26 + pulse * 6, 0, Math.PI * 2);
           ctx.fill();
+          ctx.fillStyle = alpha(AC.reviveDark, 0.92);
+          ctx.beginPath();
+          ctx.arc(0, 0, 21, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = AC.revive;
+          ctx.stroke();
+          // arrow toward the teammate
           ctx.rotate(ang);
           ctx.fillStyle = theme.palette.white;
           ctx.beginPath();
-          ctx.moveTo(26, 0);
-          ctx.lineTo(16, -7);
-          ctx.lineTo(16, 7);
+          ctx.moveTo(34, 0);
+          ctx.lineTo(22, -9);
+          ctx.lineTo(22, 9);
           ctx.closePath();
           ctx.fill();
           ctx.rotate(-ang);
-          ctx.font = "16px system-ui";
+          ctx.font = "18px system-ui";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("🩹", 0, 1);
+          ctx.fillText(p.out ? "💀" : "🩹", 0, 1);
+          // name + distance label under the disc
+          const label = `${p.name.split(" ")[0]} · ${dist} m`;
+          ctx.font = "800 12px system-ui";
+          const lw = ctx.measureText(label).width + 14;
+          const ly = 34;
+          ctx.fillStyle = alpha(theme.outline, 0.85);
+          ctx.beginPath();
+          ctx.roundRect(-lw / 2, ly - 10, lw, 20, 10);
+          ctx.fill();
+          ctx.fillStyle = AC.revive;
+          ctx.fillText(label, 0, ly + 1);
           ctx.restore();
         }
       }
@@ -885,6 +932,22 @@ export function PvpGame({
         ctx.arc(mx0 + s.x * k, my0 + s.y * k, 3, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Yordam kerak bo'lgan jamoadoshlar xaritada doim ko'rinadi (butada bo'lsa ham): miltillovchi yashil xoch
+      if (myTeam >= 0)
+        for (const p of world?.peers ?? []) {
+          if (p.isMe || !((p.downed && !p.out) || p.revivable) || !sameTeam(myTeam, p.team)) continue;
+          const s = shown.get(p.id) ?? p;
+          const cx = mx0 + s.x * k;
+          const cy = my0 + s.y * k;
+          const r = 5 + Math.sin(t * 6) * 1.5;
+          ctx.fillStyle = alpha(AC.revive, 0.3);
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = AC.revive;
+          ctx.fillRect(cx - r, cy - 1.6, r * 2, 3.2);
+          ctx.fillRect(cx - 1.6, cy - r, 3.2, r * 2);
+        }
       if (pos.ready && me && !me.out) {
         ctx.fillStyle = AC.me;
         ctx.beginPath();

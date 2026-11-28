@@ -182,8 +182,8 @@ export function WhatsNewModal({ waitForLevelUp }: { waitForLevelUp: boolean }) {
   );
 }
 
-/** Slayd rasmi: o'quvchining o'z personaji bilan */
-function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: string }) {
+/** Slayd rasmi: o'quvchining o'z personaji bilan (chatdagi yangilik postida ham ishlatiladi) */
+export function Art({ art, look, emoji }: { art: NewsArt; look: GameLook; emoji?: string }) {
   switch (art) {
     case "character-hello":
       return (
