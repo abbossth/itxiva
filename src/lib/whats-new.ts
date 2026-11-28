@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-lobby-guide-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangi",
+    title: "Kutish zalida qo'llanma",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💡",
+        title: "Qaysi tugma nima qiladi?",
+        text: "«Siz o'yindasiz!» sahifasida endi kichik qo'llanma bor: harakat g'ildiragi, qo'shnilar, kuchaytirgichlar va harakatlar do'koni birma-bir tushuntiriladi, «Ko'rsat» tugmasi kerakli bo'limni ochadi. Yopsangiz, «💡 Yordam» tugmasi orqali qayta ochasiz.",
+      },
+    ],
+  },
+  {
     id: "student-arena-team-awards-2026-11-28",
     date: "2026-11-28",
     audience: "student",

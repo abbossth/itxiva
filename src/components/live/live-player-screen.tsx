@@ -27,6 +27,7 @@ import { GalaxyPlayer } from "./galaxy/galaxy-race";
 import { ZonePlayer } from "./zone/zone-player";
 import { ArenaPlayer } from "./arena/arena-screens";
 import { AdventureMine } from "./adventure-boards";
+import { LobbyGuide, TAB_HINTS } from "./lobby-guide";
 import { EmotePad, EmoteShop, EmoteStrip } from "./emote-pad";
 import { VoiceChat } from "./voice/voice-chat";
 import { BoosterBar, BoosterShop } from "./boosters";
@@ -392,9 +393,13 @@ export function LobbyView({ state, onRefresh }: { state: LivePlayerState; onRefr
         </div>
       )}
 
+      {/* Qo'llanma: qaysi tugma nima qiladi — birma-bir */}
+      <LobbyGuide onTab={pick} />
+
       {/* Sahna: personaj va harakatlar g'ildiragi */}
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-1">
         <EmotePad gameId={state.id} look={me?.look ?? null} shop={false} />
+        <p className="text-center text-xs text-white/55">👆 Doiradagi tugmani bosing: personajingiz harakat qiladi, katta ekranda ham ko&apos;rinadi</p>
       </div>
 
       {/* Qo'shimchalar — tablar */}
@@ -420,7 +425,8 @@ export function LobbyView({ state, onRefresh }: { state: LivePlayerState; onRefr
             );
           })}
         </div>
-        <div role="tabpanel" className="mt-3">
+        <p className="mt-2 text-center text-xs text-white/55">{TAB_HINTS[tab]}</p>
+        <div role="tabpanel" className="mt-2">
           {tab === "friends" &&
             (state.lobby && hasNeighbors ? (
               <LobbyPush gameId={state.id} lobby={state.lobby} look={me?.look ?? null} onDone={onRefresh} />
