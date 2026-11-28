@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-homework-ai-grade-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangi",
+    title: "Uyga vazifa tezroq baholanadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤖",
+        title: "AI darhol tekshiradi",
+        text: "Vazifani yuborganingizdan keyin AI uni o'zi tekshirib, ball, coin va har bir xato bo'yicha izoh qo'yadi. Ustoz bahoni ko'rib chiqadi va kerak bo'lsa o'zgartiradi. Shubhali ishlarni esa ustozning o'zi tekshiradi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-homework-ai-grade-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "Uyga vazifani AI o'zi baholaydi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🤖",
+        title: "Avtomatik baho, nazorat sizda",
+        text: "O'quvchi vazifa yuborgach, AI fonda tekshiradi va ishonchi yetarli bo'lsa o'zi baholaydi. Coin sizning formulangiz bilan hisoblanadi (ball × mukofot / 100, kechiksa 0), vazifada «🤖 AI baholadi» belgisi chiqadi. Bahoni istalgan payt o'zgartirishingiz mumkin, coin farqi to'g'ri hisoblanadi. AI ishonchi past bo'lsa, AI yozgan yoki ko'chirilgan bo'lishi mumkin bo'lsa, ish sizga qoldiriladi va sababi ko'rsatiladi. AI ishlamasa, 30 daqiqadan keyin o'zi qayta urinadi. «AI bilan tekshirish» tugmasi endi 45 soniyadan ortiq kutmaydi va xato sababini aniq aytadi.",
+      },
+    ],
+  },
+  {
     id: "student-costumes-3d-2026-11-28",
     date: "2026-11-28",
     audience: "student",

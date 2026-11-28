@@ -54,6 +54,11 @@ export interface IHomeworkSubmissionData {
   gradedAt?: Date | string | null;
   gradedBy?: string | mongoose.Types.ObjectId | null;
   integrity?: IHomeworkIntegrity | null;
+  /** Bahoni AI avtomatik qo'ygan (mentor o'zgartirsa — false bo'ladi) */
+  autoGraded?: boolean;
+  /** Avtomatik AI baholash holati: pending — ishlayapti; done — tugadi (baholadi yoki mentorga qoldirdi);
+   *  failed — AI ishlamadi (keyin qayta uriniladi); skipped — AI o'qiy olmaydi */
+  aiGrade?: { status: "pending" | "done" | "failed" | "skipped"; at: Date | string; note: string } | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -119,6 +124,14 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
     gradedAt: { type: Date, default: null },
     gradedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     integrity: { type: IntegritySchema, default: null },
+    autoGraded: { type: Boolean, default: false },
+    aiGrade: {
+      type: new Schema(
+        { status: { type: String, enum: ["pending", "done", "failed", "skipped"] }, at: Date, note: { type: String, default: "" } },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   { timestamps: true }
 );

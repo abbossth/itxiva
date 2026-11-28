@@ -27,6 +27,10 @@ export class AiError extends Error {}
 // vaqt yo'qotmaslik uchun shu vaqtgacha u o'tkazib yuboriladi
 const CLAUDE_COOLDOWN_MS = 10 * 60 * 1000;
 let claudeUnavailableUntil = 0;
+// Gemini hududi/kaliti tufayli ishlamasa — shu vaqt davomida qayta sinalmaydi
+const GEMINI_STICKY_MS = 30 * 60 * 1000;
+let geminiUnavailableUntil = 0;
+let geminiStickyError: AiError | null = null;
 
 /** Claude xatosi: `sticky` — sabab o'z-o'zidan tuzalmaydi (balans, kalit) */
 class ClaudeFailure extends AiError {
@@ -59,6 +63,8 @@ interface GenerateParams<Schema extends z.ZodType> {
   attachments?: AiAttachment[];
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Butun so'rov uchun chegara (ms): mentor oldida — qisqa, fondagi ishlarda — uzunroq */
+  deadlineMs?: number;
 }
 
 /**
@@ -72,8 +78,9 @@ export async function generateStructured<Schema extends z.ZodType>(
   }
 
   // Asosiy provayder — Gemini. Claude faqat Gemini sozlanmagan yoki javob bera olmagan holatda ishlatiladi.
-  let geminiError: AiError | null = null;
-  if (isGeminiConfigured()) {
+  // Gemini tuzalmaydigan sabab bilan ishlamasa (hudud, kalit), u bir muddat umuman chaqirilmaydi — darhol Claude'ga
+  let geminiError: AiError | null = Date.now() < geminiUnavailableUntil ? geminiStickyError : null;
+  if (isGeminiConfigured() && !geminiError) {
     try {
       return await generateStructuredWithGemini({
         schema: params.schema,
@@ -81,10 +88,15 @@ export async function generateStructured<Schema extends z.ZodType>(
         prompt: params.prompt,
         attachments: params.attachments,
         maxTokens: params.maxTokens ?? 16000,
+        deadlineMs: params.deadlineMs,
       });
     } catch (error) {
       if (error instanceof GeminiError) {
         geminiError = new AiError(error.message);
+        if (error.sticky) {
+          geminiUnavailableUntil = Date.now() + GEMINI_STICKY_MS;
+          geminiStickyError = geminiError;
+        }
       } else {
         console.error("Gemini request failed:", error);
         geminiError = new AiError("AI xizmatiga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring");
@@ -114,6 +126,7 @@ async function generateWithClaude<Schema extends z.ZodType>({
   attachments = [],
   effort = "medium",
   maxTokens = 16000,
+  deadlineMs = 120_000,
 }: GenerateParams<Schema>): Promise<z.infer<Schema>> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [
     ...attachments.map((a): Anthropic.Beta.BetaContentBlockParam =>
@@ -136,7 +149,7 @@ async function generateWithClaude<Schema extends z.ZodType>({
       system: SYSTEM_PROMPT,
       output_config: { effort, format: zodOutputFormat(schema) },
       messages: [{ role: "user", content }],
-    });
+    }, { timeout: deadlineMs, maxRetries: 1 });
 
     if (response.stop_reason === "refusal") {
       throw new AiError("AI bu so'rovni bajara olmadi. Mavzuni boshqacha ifodalab ko'ring");

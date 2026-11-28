@@ -8,6 +8,7 @@ import { aiGradeExamSubmission, aiGradeQuizSubmission, pendingAiAnswers } from "
 import { Quiz } from "@/lib/db/models/quiz.model";
 import { Exam } from "@/lib/db/models/exam.model";
 import { isAiConfigured } from "./claude";
+import { autoGradeHomework } from "@/lib/homework-auto-grade";
 
 // AI band yoki kunlik limiti tugagani uchun bajarilmay qolgan ishlarni keyinroq qayta bajaradi:
 // vazifaning "AI yozganmi" tekshiruvi va test/imtihondagi ochiq javoblarning avtomatik bahosi.
@@ -16,12 +17,16 @@ import { isAiConfigured } from "./claude";
 /** Doim ishlamaydigan ish limitni cheksiz yemasligi uchun: faqat oxirgi 3 kun va urinishlar orasida 6 soat */
 const LOOKBACK_MS = 3 * 86_400_000;
 const INTEGRITY_SPACING_MS = 6 * 3_600_000;
+/** Avtomatik baholash qayta urinishlari orasida (yoki "pending"da osilib qolganda) — 30 daqiqa */
+const AUTO_GRADE_SPACING_MS = 30 * 60 * 1000;
 const LOCK_KEY = "lock:ai-retry";
 /** Bir necha mentor bir vaqtda sahifa ochsa ham, qayta urinish soatiga bir marta */
 const LOCK_MS = 60 * 60 * 1000;
 
 export interface AiRetryResult {
   integrity: number;
+  /** AI avtomatik baholagan uyga vazifalar */
+  homework: number;
   quizzes: number;
   exams: number;
   skipped?: "locked" | "not_configured";
@@ -48,7 +53,7 @@ async function acquireLock(): Promise<boolean> {
  * Limit hali tugagan bo'lsa, har bir urinish tez qaytadi (model kutish vaqti bazada saqlanadi).
  */
 export async function retryFailedAiWork({ budgetMs = 40_000, maxItems = 10, useLock = true } = {}): Promise<AiRetryResult> {
-  const result: AiRetryResult = { integrity: 0, quizzes: 0, exams: 0 };
+  const result: AiRetryResult = { integrity: 0, homework: 0, quizzes: 0, exams: 0 };
   if (!isAiConfigured()) return { ...result, skipped: "not_configured" };
   await connectToDatabase();
   if (useLock && !(await acquireLock())) return { ...result, skipped: "locked" };
@@ -73,6 +78,23 @@ export async function retryFailedAiWork({ budgetMs = 40_000, maxItems = 10, useL
     await runIntegrityCheck(String(s._id));
     const after = await HomeworkSubmission.findById(s._id).select("integrity.status").lean();
     if (after?.integrity?.status === "done") result.integrity++;
+  }
+
+  // AI ishlamagani uchun avtomatik baholanmay qolgan uyga vazifalar (mentor hali baholamagan)
+  const failedGrades = await HomeworkSubmission.find({
+    status: "submitted",
+    "aiGrade.status": { $in: ["failed", "pending"] },
+    "aiGrade.at": { $lte: new Date(Date.now() - AUTO_GRADE_SPACING_MS) },
+    submittedAt: { $gte: since },
+  })
+    .select("_id")
+    .sort({ submittedAt: 1 })
+    .limit(maxItems)
+    .lean();
+  for (const s of failedGrades) {
+    if (!hasTime()) break;
+    left--;
+    if ((await autoGradeHomework(String(s._id)).catch(() => "failed")) === "graded") result.homework++;
   }
 
   // Ochiq javoblari hali baholanmagan ("submitted") topshiriqlar. Faqat AI kutayotgan javobi borlari olinadi:

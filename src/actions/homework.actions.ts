@@ -12,10 +12,10 @@ import {
   IHomeworkIntegrity,
 } from "@/lib/db/models/homework-submission.model";
 import { PENDING_INTEGRITY, runIntegrityCheck } from "@/lib/homework-integrity";
-import { syncLevel } from "@/lib/gamification/award";
+import { applyHomeworkGrade } from "@/lib/homework-grade";
+import { autoGradeHomework } from "@/lib/homework-auto-grade";
 import { Group } from "@/lib/db/models/group.model";
 import { User } from "@/lib/db/models/user.model";
-import { CoinLedger } from "@/lib/db/models/coin-ledger.model";
 import { AuditLog } from "@/lib/db/models/audit-log.model";
 import { getCurrentUser, requireAuth, requireMentor, requireStudent } from "@/lib/auth/guards";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -74,6 +74,10 @@ export interface HomeworkSubmissionView {
   gradedAt: string | null;
   /** null — hali tekshirilmagan (tekshiruv qo'shilishidan oldingi javob) */
   integrity: IntegrityView | null;
+  /** Bahoni AI avtomatik qo'ygan */
+  autoGraded: boolean;
+  /** Faqat mentorga: AI avtomatik bahosining holati va izohi */
+  aiGrade: { status: "pending" | "done" | "failed" | "skipped"; note: string } | null;
 }
 
 interface SubmissionLean {
@@ -90,6 +94,8 @@ interface SubmissionLean {
   coinsAwarded?: number;
   gradedAt?: Date | null;
   integrity?: IHomeworkIntegrity | null;
+  autoGraded?: boolean;
+  aiGrade?: { status: "pending" | "done" | "failed" | "skipped"; note?: string } | null;
 }
 
 function toIntegrityView(i: IHomeworkIntegrity | null | undefined, forMentor: boolean): IntegrityView | null {
@@ -129,6 +135,8 @@ function toSubmissionView(s: SubmissionLean, forMentor: boolean): HomeworkSubmis
     coinsAwarded: s.coinsAwarded ?? 0,
     gradedAt: s.gradedAt ? new Date(s.gradedAt).toISOString() : null,
     integrity: toIntegrityView(s.integrity, forMentor),
+    autoGraded: Boolean(s.autoGraded),
+    aiGrade: forMentor && s.aiGrade?.status ? { status: s.aiGrade.status, note: s.aiGrade.note ?? "" } : null,
   };
 }
 
@@ -228,6 +236,8 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     existing.isLate = isLate;
     existing.attempt = (existing.attempt ?? 1) + 1;
     existing.integrity = { ...PENDING_INTEGRITY };
+    existing.autoGraded = false;
+    existing.aiGrade = null;
     await existing.save();
     submissionId = existing._id.toString();
   } else {
@@ -264,13 +274,18 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     resubmitted: Boolean(existing),
   });
 
-  // Plagiat va AI tekshiruvi javobdan keyin fonda ishlaydi — o'quvchi kutib qolmaydi
+  // Plagiat va AI tekshiruvi, keyin AI avtomatik bahosi — javobdan keyin fonda ishlaydi, o'quvchi kutib qolmaydi
   after(async () => {
     try {
       await runIntegrityCheck(submissionId);
       revalidateHomework(lessonId);
     } catch (error) {
       console.error("Homework integrity check error:", error);
+    }
+    try {
+      if ((await autoGradeHomework(submissionId)) === "graded") revalidateHomework(lessonId);
+    } catch (error) {
+      console.error("Homework auto-grade error:", error);
     }
   });
 
@@ -762,77 +777,9 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
   if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
   const { submissionId, score, feedback, coins } = parsed.data;
   if (!isObjectId(submissionId)) return { success: false, message: "Javob topilmadi" };
-
-  await connectToDatabase();
-  const submission = await HomeworkSubmission.findById(submissionId);
-  if (!submission) return { success: false, message: "Javob topilmadi" };
-
-  const lesson = await Lesson.findById(submission.lessonId).select("title homework").lean();
-  const maxCoins = lesson?.homework?.coinsReward ?? DEFAULT_HOMEWORK_COINS;
-  if (coins > maxCoins) {
-    return { success: false, message: `Coin ${maxCoins} dan oshmasligi kerak` };
-  }
-
-  // Qayta baholashda faqat farq yoziladi — coin ikki marta berilmaydi.
-  // Shart bilan yangilash: bir vaqtda ikki marta bosilganda farq bir marta hisoblanadi.
-  const previousCoins = submission.coinsAwarded ?? 0;
-  const updated = await HomeworkSubmission.findOneAndUpdate(
-    { _id: submission._id, coinsAwarded: previousCoins },
-    {
-      $set: {
-        status: "graded",
-        score,
-        feedback,
-        coinsAwarded: coins,
-        gradedAt: new Date(),
-        gradedBy: mentor.userId,
-      },
-    },
-    { returnDocument: "after" }
-  );
-  if (!updated) {
-    return { success: false, message: "Javob hozirgina o'zgartirildi. Sahifani yangilab, qayta urinib ko'ring" };
-  }
-
-  const delta = coins - previousCoins;
-  if (delta !== 0) {
-    const student = await User.findByIdAndUpdate(
-      submission.studentId,
-      // XP ham coin bilan birga o'zgaradi: qayta baholashda kamaygan mukofot XP dan ham qaytariladi
-      { $inc: { totalCoins: delta, spendableBalance: delta, xp: delta } },
-      { returnDocument: "after" }
-    );
-    await CoinLedger.create({
-      studentId: submission.studentId,
-      amount: delta,
-      type: "homework",
-      xp: delta,
-      referenceId: submission._id,
-      description:
-        delta > 0
-          ? `Uyga vazifa uchun: ${lesson?.title ?? "dars"} (${score} ball)`
-          : `Uyga vazifa bahosi o'zgartirildi: ${lesson?.title ?? "dars"} (${score} ball)`,
-      balanceAfter: student?.totalCoins ?? 0,
-    });
-    if (delta > 0) await syncLevel(submission.studentId);
-  }
-
-  await AuditLog.create({
-    actorId: mentor.userId,
-    targetUserId: submission.studentId,
-    action: "GRADE_HOMEWORK",
-    details: { submissionId: submission._id, lessonId: submission.lessonId, score, coins, coinsDelta: delta },
-  });
-
-  notify(submission.studentId, "homework_graded", {
-    lessonId: submission.lessonId.toString(),
-    lessonTitle: lesson?.title ?? "Dars",
-    score,
-    coins,
-    feedback,
-  });
-
-  revalidateHomework(submission.lessonId.toString());
+  const r = await applyHomeworkGrade({ submissionId, score, feedback, coins, gradedBy: mentor.userId });
+  if (!r.ok) return { success: false, message: r.message };
+  revalidateHomework(r.lessonId);
   return { success: true, message: "Baho saqlandi" };
 }
 

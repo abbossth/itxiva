@@ -29,7 +29,15 @@ const busyUntil = new Map<string, number>();
 const quotaUntil = new Map<string, number>();
 const MAX_QUOTA_COOLDOWN_MS = 24 * 3_600_000;
 
-export class GeminiError extends Error {}
+export class GeminiError extends Error {
+  /** true — sabab o'z-o'zidan tuzalmaydi (hudud, kalit): keyingi so'rovlarda Gemini bir muddat chetlab o'tiladi */
+  constructor(message: string, readonly sticky = false) {
+    super(message);
+  }
+}
+
+/** Google so'rovni hudud sababli rad etdi: bepul tarif Yevropada (server Frankfurtda) ishlamaydi */
+const isLocationError = (data: GeminiResponse) => /location is not supported/i.test(data.error?.message ?? "");
 
 export function isGeminiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -84,6 +92,7 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   prompt,
   attachments = [],
   maxTokens,
+  deadlineMs = 60_000,
 }: {
   schema: Schema;
   system: string;
@@ -91,6 +100,8 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   /** Rasm yoki PDF (base64) — matndan oldin yuboriladi */
   attachments?: { mimeType: string; data: string }[];
   maxTokens: number;
+  /** Butun chaqiruv uchun umumiy chegara: shundan keyin hamma so'rovlar bekor qilinadi (mentor kutib qolmasin) */
+  deadlineMs?: number;
 }): Promise<z.infer<Schema>> {
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
   delete jsonSchema.$schema;
@@ -122,6 +133,8 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   const done = new AbortController();
 
   const tryModel = async (model: string): Promise<z.infer<Schema> | null> => {
+    // Vaqt tugagan yoki javob allaqachon olingan — yangi so'rov boshlanmaydi
+    if (done.signal.aborted) return null;
     let result: { status: number; data: GeminiResponse };
     try {
       result = await callModel(model, buildBody(true), done.signal);
@@ -140,8 +153,14 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
     }
 
     const { status, data } = result;
+    if (status === 400 && isLocationError(data)) {
+      throw new GeminiError(
+        "Gemini bepul tarifi serverimiz joylashgan hududda (Yevropa) ishlamaydi. Google AI Studio'da billing yoqilishi yoki Claude kaliti qo'shilishi kerak",
+        true
+      );
+    }
     if (status === 401 || status === 403) {
-      throw new GeminiError("Gemini kaliti (GEMINI_API_KEY) noto'g'ri yoki ruxsati yo'q");
+      throw new GeminiError("Gemini kaliti (GEMINI_API_KEY) noto'g'ri yoki ruxsati yo'q", true);
     }
     if (status === 503 || status === 429) {
       busyUntil.set(model, Date.now() + BUSY_COOLDOWN_MS);
@@ -195,6 +214,12 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
   // kuchlisi ajratilgan vaqt ichida javob bermasa, eng yengil zaxira model ham ishga tushiriladi va qaysi biri
   // birinchi javob bersa, o'sha olinadi. Zaxira oldindan ishga tushirilmaydi — har so'rovda limit ikki marta sarflanmasin.
   const backupModel = rest.pop();
+  // Umumiy chegara: vaqt tugasa, kutilayotgan barcha so'rovlar bekor qilinadi
+  let timedOut = false;
+  const deadline = setTimeout(() => {
+    timedOut = true;
+    done.abort();
+  }, deadlineMs);
   try {
     const primaryRun = tryModel(primary);
     if (!backupModel) {
@@ -226,12 +251,15 @@ export async function generateStructuredWithGemini<Schema extends z.ZodType>({
     }
 
     for (const model of rest) {
+      if (done.signal.aborted) break;
       const answer = await tryModel(model);
       if (answer) return answer;
     }
   } finally {
+    clearTimeout(deadline);
     done.abort();
   }
 
+  if (timedOut) throw new GeminiError("AI belgilangan vaqtda javob bermadi. Keyinroq avtomatik qayta uriniladi");
   throw new GeminiError("AI xizmati hozir band. Bir daqiqadan keyin qayta urinib ko'ring");
 }

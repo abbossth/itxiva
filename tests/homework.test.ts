@@ -13,6 +13,8 @@ const flushAfter = async () => {
 const estimateAiWriting = vi.fn<(params: unknown) => Promise<{ score: number | null; signals: string[] }>>(async () => ({ score: 75, signals: ["Markdown: **Xulosa**"] }));
 vi.mock("@/lib/ai/detect-ai", () => ({ estimateAiWriting: (p: unknown) => estimateAiWriting(p) }));
 vi.stubEnv("GEMINI_API_KEY", "test");
+// AI avtomatik bahosi alohida testda (homework-auto-grade.test.ts); bu yerda tarmoqqa chiqmasin
+vi.mock("@/lib/homework-auto-grade", () => ({ autoGradeHomework: vi.fn(async () => "skipped") }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: () => ({ allowed: true, remaining: 99, resetInSeconds: 1 }), resetRateLimit: vi.fn() }));
 const sendNotifications = vi.fn(async (recipients: { ids: unknown[] }) => recipients.ids.length);
 vi.mock("@/lib/notifications/notify", () => ({

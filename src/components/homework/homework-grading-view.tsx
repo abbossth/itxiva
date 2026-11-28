@@ -427,7 +427,23 @@ function GradeForm({
         {submission.attempt > 1 && <Badge variant="secondary">{submission.attempt}-urinish</Badge>}
         {submission.isLate && <Badge variant="danger">Kechikkan</Badge>}
         <Badge variant={HOMEWORK_STATE_BADGE[row.state]}>{HOMEWORK_STATE_LABELS[row.state]}</Badge>
+        {submission.autoGraded && <Badge variant="secondary">🤖 AI baholadi — o&apos;zgartirishingiz mumkin</Badge>}
       </div>
+      {submission.aiGrade && !submission.autoGraded && (
+        <p
+          className={cn(
+            "rounded-xl px-3 py-2 text-xs",
+            submission.aiGrade.status === "failed" ? "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300" : "bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
+          )}
+        >
+          🤖{" "}
+          {submission.aiGrade.status === "pending"
+            ? "AI javobni tekshirmoqda…"
+            : submission.aiGrade.status === "failed"
+              ? `AI hozir baholay olmadi: ${submission.aiGrade.note} Keyinroq avtomatik qayta uriniladi.`
+              : submission.aiGrade.note}
+        </p>
+      )}
 
       <SubmissionContent
         submissionId={submission._id}

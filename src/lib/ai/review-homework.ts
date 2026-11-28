@@ -189,15 +189,18 @@ const cleanList = (items: string[], max: number) =>
  * `fresh` — mentor "Qaytadan tekshirish" bosganda: oldingi natija o'rniga AI qayta so'raladi.
  * Aks holda xuddi shu javob (matn, fayllar, vazifa) uchun saqlangan natija qaytariladi — limit tejaladi.
  */
-export async function reviewHomeworkWithAi(input: HomeworkReviewInput, { fresh = false }: { fresh?: boolean } = {}): Promise<HomeworkReview> {
+export async function reviewHomeworkWithAi(
+  input: HomeworkReviewInput,
+  { fresh = false, deadlineMs }: { fresh?: boolean; deadlineMs?: number } = {}
+): Promise<HomeworkReview> {
   const prompt = buildHomeworkReviewPrompt(input);
   const attachments = input.files.map(({ mimeType, data }) => ({ mimeType, data }));
   const key = aiCacheKey("hw-review:v1", [prompt, attachments]);
-  return cachedAi(key, () => runReview(prompt, attachments), { fresh });
+  return cachedAi(key, () => runReview(prompt, attachments, deadlineMs), { fresh });
 }
 
-async function runReview(prompt: string, attachments: { mimeType: string; data: string }[]): Promise<HomeworkReview> {
-  const data = await generateStructured({ schema: reviewSchema, prompt, attachments, effort: "medium", maxTokens: 8000 });
+async function runReview(prompt: string, attachments: { mimeType: string; data: string }[], deadlineMs?: number): Promise<HomeworkReview> {
+  const data = await generateStructured({ schema: reviewSchema, prompt, attachments, effort: "medium", maxTokens: 8000, deadlineMs });
   const checks: HomeworkCheck[] = data.checks.slice(0, 40).map((c) => ({
       task: c.task.trim().slice(0, 60),
       student: c.student.trim().slice(0, 300),
