@@ -14,6 +14,7 @@ import { RigActor, newPose, type CharState, type FaceKey } from "@/lib/game/rig"
 import { skinFx } from "@/lib/game/skins";
 import { theme } from "@/lib/game/theme";
 import { buildCharModel } from "./char-model";
+import { setupStudio } from "./studio";
 
 export type SheetRow = "idle" | "run" | "celebrate" | "jump" | "hit" | "sad" | "think" | "head";
 export const SHEET_ROWS: SheetRow[] = ["idle", "run", "celebrate", "jump", "hit", "sad", "think", "head"];
@@ -76,8 +77,15 @@ export const sheetsUnavailable = () => webglOk === false;
 const idle = () =>
   new Promise<void>((resolve) => {
     const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-    if (w.requestIdleCallback) w.requestIdleCallback(() => resolve(), { timeout: 200 });
-    else setTimeout(resolve, 24);
+    if (w.requestIdleCallback) w.requestIdleCallback(() => resolve(), { timeout: 60 });
+    else setTimeout(resolve, 16);
+  });
+/** Give the main thread back for a moment (input, animation frames) without waiting for full idleness */
+const yieldTask = () =>
+  new Promise<void>((resolve) => {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => resolve();
+    ch.port2.postMessage(0);
   });
 
 interface Studio {
@@ -94,27 +102,10 @@ function getStudio(): Promise<Studio | null> {
     studio = (async () => {
       try {
         const THREE = await import("three");
-        const { RoomEnvironment } = await import("three/examples/jsm/environments/RoomEnvironment.js");
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-        renderer.outputColorSpace = THREE.SRGBColorSpace;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.08;
         renderer.setClearColor(0x000000, 0);
         const scene = new THREE.Scene();
-        const pmrem = new THREE.PMREMGenerator(renderer);
-        scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-        scene.environmentIntensity = 0.6;
-        pmrem.dispose();
-        scene.add(new THREE.HemisphereLight(0xfff4e6, 0x3b3f6b, 0.95));
-        const key = new THREE.DirectionalLight(0xfff1e0, 2.3);
-        key.position.set(-3, 6, 5);
-        scene.add(key);
-        const fill = new THREE.DirectionalLight(0xc7d2fe, 0.7);
-        fill.position.set(4, 2.5, 3);
-        scene.add(fill);
-        const rim = new THREE.DirectionalLight(0x99f6e4, 1.5);
-        rim.position.set(2.5, 3.5, -4);
-        scene.add(rim);
+        await setupStudio(THREE, renderer, scene, { shadows: true, mapSize: 1024 });
         // Body frame: 100:124 — feet (y = 0) at 111/124 of the height, top at y ≈ 2.64 (room for tall hats)
         const H = 2.95;
         const W = (H * 100) / 124;
@@ -151,8 +142,18 @@ async function pump() {
         continue;
       }
       try {
-        cache.set(job.key, { state: "ready", sheet: await bake(st, job.look, job.fw, job.holding) });
-      } catch {
+        const { sheet, url } = await bake(st, job.look, job.fw, job.holding);
+        // canvas users (games) get the frames right away; DOM users when the PNG is encoded — in parallel
+        // with the next bake
+        cache.set(job.key, { state: "ready", sheet });
+        const key = job.key;
+        void url.then((u) => {
+          if (!u) return;
+          cache.set(key, { state: "ready", sheet: { ...sheet, url: u } });
+          for (const l of listeners) l();
+        });
+      } catch (e) {
+        if (process.env.NODE_ENV !== "production") console.error("[char-baker]", e);
         cache.set(job.key, { state: "failed" });
       }
       for (const l of listeners) l();
@@ -165,14 +166,15 @@ async function pump() {
 
 const ROW_STATE: Record<Exclude<SheetRow, "head">, CharState> = { idle: "idle", run: "run", celebrate: "celebrate", jump: "jump", hit: "hit", sad: "sad", think: "think" };
 
-async function bake(st: Studio, look: Partial<GameLook>, fw: number, holding: string | null): Promise<CharSheet> {
+async function bake(st: Studio, look: Partial<GameLook>, fw: number, holding: string | null): Promise<{ sheet: CharSheet; url: Promise<string | null> }> {
   const { renderer, scene, body: bodyCam, head: headCam } = st;
   const fh = Math.round((fw * 124) / 100);
-  const dpr = 1;
-  renderer.setPixelRatio(dpr);
+  const W = fw * SHEET_COLS;
+  const H = fh * SHEET_ROWS.length;
+  renderer.setPixelRatio(1);
   const sheet = document.createElement("canvas");
-  sheet.width = fw * SHEET_COLS;
-  sheet.height = fh * SHEET_ROWS.length;
+  sheet.width = W;
+  sheet.height = H;
   const ctx = sheet.getContext("2d")!;
   const model = buildCharModel(st.THREE, look, { holding });
   // 3/4 view, facing screen-right; feet at y = 0
@@ -180,18 +182,24 @@ async function bake(st: Studio, look: Partial<GameLook>, fw: number, holding: st
   const holder = new st.THREE.Group();
   holder.add(model.root);
   scene.add(holder);
-  // Thin indigo rim around each frame keeps the character readable on any background
-  const outline = `drop-shadow(0 0 ${Math.max(0.6, fw / 110).toFixed(2)}px ${theme.outline}) drop-shadow(0 0 ${Math.max(0.4, fw / 160).toFixed(2)}px ${theme.outline})`;
-  const blit = (x: number, y: number, w: number, h: number) => {
-    ctx.save();
-    ctx.filter = outline;
-    ctx.drawImage(renderer.domElement, x, y, w, h);
-    ctx.restore();
+  // The whole sheet is rendered tile by tile into ONE WebGL canvas and copied to 2D once at the end:
+  // copying after every frame would make the CPU wait for the GPU 54 times.
+  const sz = renderer.getSize(new st.THREE.Vector2());
+  if (sz.x !== W || sz.y !== H) renderer.setSize(W, H, false);
+  renderer.autoClear = false;
+  renderer.setScissorTest(true);
+  const tile = (x: number, y: number, w: number, h: number) => {
+    const yy = H - y - h;
+    renderer.setViewport(x, yy, w, h);
+    renderer.setScissor(x, yy, w, h);
+    renderer.clear();
   };
+  renderer.setViewport(0, 0, W, H);
+  renderer.setScissor(0, 0, W, H);
+  renderer.clear();
   const pose = newPose();
   const fx = skinFx(look.costume);
   try {
-    renderer.setSize(fw, fh, false);
     for (let r = 0; r < SHEET_ROWS.length - 1; r++) {
       const row = SHEET_ROWS[r] as Exclude<SheetRow, "head">;
       const actor = new RigActor({ seed: 2, celebrate: fx.celebrate });
@@ -213,34 +221,38 @@ async function bake(st: Studio, look: Partial<GameLook>, fw: number, holding: st
         pose.down = 0;
         if (pose.face === "blink") pose.face = "idle";
         model.pose(pose, c * step);
+        tile(c * fw, r * fh, fw, fh);
         renderer.render(scene, bodyCam);
-        blit(c * fw, r * fh, fw, fh);
       }
-      await idle();
+      await yieldTask();
     }
     // Head portraits — one per face, square at the top of each cell
-    renderer.setSize(fw, fw, false);
     const still = newPose();
     for (let c = 0; c < SHEET_COLS; c++) {
       still.face = HEAD_FACES[c];
-      model.pose(still, 0);
       // settle the eyelid easing
-      for (let i = 0; i < 12; i++) model.pose(still, 0);
+      for (let i = 0; i < 13; i++) model.pose(still, 0);
+      tile(c * fw, (SHEET_ROWS.length - 1) * fh, fw, fw);
       renderer.render(scene, headCam);
-      blit(c * fw, (SHEET_ROWS.length - 1) * fh, fw, fw);
     }
+    // Thin indigo rim around the character keeps it readable on any background
+    ctx.filter = `drop-shadow(0 0 ${Math.max(0.6, fw / 110).toFixed(2)}px ${theme.outline}) drop-shadow(0 0 ${Math.max(0.4, fw / 160).toFixed(2)}px ${theme.outline})`;
+    ctx.drawImage(renderer.domElement, 0, 0);
+    ctx.filter = "none";
   } finally {
+    renderer.setScissorTest(false);
+    renderer.autoClear = true;
     scene.remove(holder);
     model.dispose();
   }
-  const url = await new Promise<string | null>((resolve) => {
+  const url = new Promise<string | null>((resolve) => {
     try {
       sheet.toBlob((b) => resolve(b ? URL.createObjectURL(b) : null), "image/png");
     } catch {
       resolve(null);
     }
   });
-  return { canvas: sheet, url, fw, fh };
+  return { sheet: { canvas: sheet, url: null, fw, fh }, url };
 }
 
 /** Row for a 2D mood name (SVG moods + rig states) */

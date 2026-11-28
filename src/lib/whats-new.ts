@@ -29,6 +29,40 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-character-pro-3d-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Personajlar professional 3D sifatda",
+    slides: [
+      {
+        art: "character-hello",
+        title: "Jonliroq yuz va soch",
+        text: "Ko'zlar endi katta va yaltiroq: kiprik, qorachiq, yorug' aksi bor, qovoqlar yumshoq ochilib-yopiladi, qosh va og'iz kayfiyatga qarab o'zgaradi. Soch qatlam-qatlam tutamlardan iborat. Teri, mato, jinsi va charm haqiqiy materialdek ko'rinadi, kiyimda burmalar bor.",
+      },
+      {
+        art: "character-shop",
+        title: "Do'kon buyumlari qayta ishlandi",
+        text: "Chust naqshli do'ppi, chokli kepka, ritsar dubulg'asi, oltin toj, qilich, kubok, dutor, noutbuk, farishta va ajdar qanotlari, ryukzak, reaktiv ranets va hamrohlar yangidan modellashtirildi. Personajlar ham avvalgidan 2 baravar tez yuklanadi.",
+      },
+    ],
+    cta: { label: "Personajimni ko'rish", href: "/profile" },
+  },
+  {
+    id: "mentor-character-pro-3d-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Personajlar: professional 3D sifat",
+    slides: [
+      {
+        art: "character-shop",
+        title: "Model va buyumlar qayta ishlandi",
+        text: "Yuz (bosh yuzasiga yopishgan ko'zlar, qovoq, kiprik, qosh), qatlamli soch, burmali kiyim, mato, jinsi va charm materiallari, yangi yorug'lik va soyalar. Do'kon buyumlari qayta modellashtirildi: do'ppi, kepka, dubulg'a, toj, qilich, kubok, qanotlar, hamrohlar. Sprite tayyorlash 2 baravar tezlashdi. Narxlar va qoidalar o'zgarmagan.",
+      },
+    ],
+  },
+  {
     id: "student-news-in-chat-2026-11-28",
     date: "2026-11-28",
     audience: "student",

@@ -1,15 +1,15 @@
 // Profile 3D character (three.js): the chibi model from three/char-model.ts in a soft "studio" —
-// image-based lighting (RoomEnvironment), key/fill/rim lights, real soft shadows, ACES tone mapping,
+// image-based lighting (RoomEnvironment), key/fill/rim lights, real soft shadows, neutral tone mapping,
 // a level pedestal with glowing rings. Animated by the shared rig state machine (breathing, blinking,
 // weight shift, looking around); click — celebrates; the head and eyes follow the cursor; drag — rotate.
 // Rendering stops when the view is off-screen. Loaded only on the profile page, when needed.
 
 import type * as T from "three";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { DEFAULT_LOOK, tierOf, type GameLook } from "@/lib/character/catalog";
 import { RigActor, newPose } from "@/lib/game/rig";
 import { skinFx } from "@/lib/game/skins";
 import { buildCharModel, type CharModel } from "./three/char-model";
+import { setupStudio } from "./three/studio";
 
 type Three = typeof import("three");
 
@@ -25,7 +25,8 @@ export class Character3DScene {
   private spin: T.Object3D[] = [];
   private sparks: T.Object3D[] = [];
   private stageDisposables: { dispose: () => void }[] = [];
-  private envTex: T.Texture;
+  private envTex: T.Texture | null = null;
+  private disposed = false;
   private raf = 0;
   private running = true;
   private t0 = performance.now();
@@ -45,45 +46,21 @@ export class Character3DScene {
     look: Partial<GameLook>,
     private onPoke?: () => void
   ) {
-    const { WebGLRenderer, Scene, PerspectiveCamera, HemisphereLight, DirectionalLight, Group, PMREMGenerator } = THREE;
+    const { WebGLRenderer, Scene, PerspectiveCamera, Group } = THREE;
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.touchAction = "none";
     this.renderer.domElement.style.cursor = "grab";
     this.scene = new Scene();
-    // Soft studio reflections for every PBR material
-    const pmrem = new PMREMGenerator(this.renderer);
-    this.envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
-    this.scene.environment = this.envTex;
-    this.scene.environmentIntensity = 0.55;
+    // Soft studio light shared with the sprite baker (three/studio.ts)
+    void setupStudio(THREE, this.renderer, this.scene, { shadows: true }).then((r) => {
+      if (this.disposed) r.env.dispose();
+      else this.envTex = r.env;
+    });
     this.camera = new PerspectiveCamera(30, 1, 0.1, 50);
     this.camera.position.set(0, 1.75, 7.6);
     this.camera.lookAt(0, 1.2, 0);
-    this.scene.add(new HemisphereLight(0xfff4e6, 0x3b3f6b, 0.9));
-    const key = new DirectionalLight(0xfff1e0, 2.4);
-    key.position.set(-3, 6, 5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    key.shadow.camera.left = -2;
-    key.shadow.camera.right = 2;
-    key.shadow.camera.top = 3;
-    key.shadow.camera.bottom = -1;
-    key.shadow.bias = -0.0004;
-    key.shadow.radius = 6;
-    this.scene.add(key);
-    const fill = new DirectionalLight(0xc7d2fe, 0.7);
-    fill.position.set(4, 2.5, 3);
-    this.scene.add(fill);
-    const rim = new DirectionalLight(0x99f6e4, 1.6);
-    rim.position.set(2.5, 3.5, -4);
-    this.scene.add(rim);
     this.root = new Group();
     this.scene.add(this.root);
     this.setLook(look);
@@ -253,6 +230,7 @@ export class Character3DScene {
   };
 
   dispose() {
+    this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.io.disconnect();
@@ -262,7 +240,7 @@ export class Character3DScene {
     window.removeEventListener("pointerup", this.onUp);
     this.model?.dispose();
     for (const d of this.stageDisposables) d.dispose();
-    this.envTex.dispose();
+    this.envTex?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
