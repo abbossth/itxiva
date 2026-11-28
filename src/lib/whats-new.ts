@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-costumes-3d-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kostyumlar yangilandi",
+    slides: [
+      {
+        art: "skins",
+        title: "Xudilar, dubulg'alar va chug'irma",
+        text: "Mushuk, asalari, pingvin, dinozavr va ajdar xudilari endi boshni o'rab turadi: yuz uchun oval teshik, quloqlar, asalarida mo'ylov va chiziqlar, pingvinda tumshuq bor. Kiber zirh va Temir robotda nurli vizor, Ritsarda tirqishli dubulg'a va pat bor. Xorazm palvoni haqiqiy jingalak chug'irma kiyadi.",
+      },
+    ],
+    cta: { label: "Kostyumlarni ko'rish", href: "/profile" },
+  },
+  {
     id: "student-character-pro-3d-2026-11-28",
     date: "2026-11-28",
     audience: "student",

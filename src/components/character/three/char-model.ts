@@ -366,21 +366,26 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
     return o;
   };
   /** Patch hugging the torso (emblems, pockets, plates): w × h around (θc, yc) */
-  const torsoPatch = (thetaC: number, yc: number, w: number, h: number, lift: number, bulge = 0) => {
+  const torsoPatch = (thetaC: number, yc: number, w: number, h: number, lift: number, bulge = 0, oval = false) => {
     const r0 = torsoFrame(thetaC, yc).p;
     const rr = Math.hypot(r0.x, r0.z - 0.004);
-    return gridSurface(
-      THREE,
-      16,
-      16,
-      (u, v, out) => {
-        const a = u * 2 - 1;
-        const b = v * 2 - 1;
-        const f = torsoFrame(thetaC - (a * w) / 2 / rr, yc + (b * h) / 2, lift + bulge * Math.max(0, 1 - a * a) * Math.max(0, 1 - b * b));
-        out.copy(f.p);
-      },
-      { center: (_u, _v, out) => out.set(0, yc, 0) }
-    );
+    const at = (a: number, b: number, out: T.Vector3) => {
+      const f = torsoFrame(thetaC - (a * w) / 2 / rr, yc + (b * h) / 2, lift + bulge * Math.max(0, 1 - a * a) * Math.max(0, 1 - b * b));
+      out.copy(f.p);
+    };
+    if (oval)
+      return gridSurface(
+        THREE,
+        40,
+        10,
+        (u, v, out) => {
+          const t = u * Math.PI * 2;
+          const r = Math.max(1e-3, v);
+          at(Math.cos(t) * r, Math.sin(t) * r, out);
+        },
+        { wrapU: true, center: (_u, _v, out) => out.set(0, yc, 0) }
+      );
+    return gridSurface(THREE, 16, 16, (u, v, out) => at(u * 2 - 1, v * 2 - 1, out), { center: (_u, _v, out) => out.set(0, yc, 0) });
   };
   // Pelvis (trousers / shorts top) — slightly wider than the waist, rounding under into the crotch
   mesh(
@@ -558,8 +563,11 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
     collar(fabric(cos.trim));
     hem();
     const em = cos.emblem;
-    if (em === "belly") {
-      decal(torsoPatch(Math.PI / 2, 0.15, 0.34, 0.36, 0.01, 0.03), fabric(cos.trim), chest).castShadow = true;
+    if (em === "belly" && look.costume === "bee") {
+      // bee stripes around the body
+      for (const y of [0.02, 0.2, 0.36]) ringMesh(band(THREE, ringAt(torsoRings, torsoV(y)).rx + 0.004, ringAt(torsoRings, torsoV(y)).rz + 0.004, 0.07, 0.006, { n: 2.4 }), fabric(cos.trim), chest, y, ringAt(torsoRings, torsoV(y)).z);
+    } else if (em === "belly") {
+      decal(torsoPatch(Math.PI / 2, 0.15, 0.36, 0.4, 0.008, 0.03, true), fabric(cos.trim), chest).castShadow = true;
     } else if (em === "star") chestDecal((c) => star(c, 128, 128, 96, "#fde047"));
     else if (em === "moon")
       chestDecal((c) => {
@@ -1518,33 +1526,170 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
   const it = (g: T.BufferGeometry, m: T.Material, x = 0, y = 0, z = 0) => mesh(geo(g), m, items, x, y, z);
   if (cos) {
     if (cos.hood) {
+      // Soft hood hugging the head with an oval face opening and a rolled edge
       const m = fabric(cos.hood, { roughness: 0.92 }, "knit", [10, 6], 0.2);
-      const hood = it(new THREE.SphereGeometry(0.66, 56, 40, 0, Math.PI * 2, 0, Math.PI * 0.6), m, 0, 0.02, -0.04);
-      hood.rotation.x = -0.85;
-      const rim = it(new THREE.TorusGeometry(0.5, 0.06, 14, 56), m, 0, -0.06, 0.32);
-      rim.rotation.x = -0.4;
-      rim.scale.set(1.05, 1.15, 1);
-      if (cos.ears === "cat")
-        for (const s of [-1, 1]) {
-          it(new THREE.ConeGeometry(0.17, 0.36, 24), m, s * 0.36, 0.62, -0.02).rotation.z = -s * 0.35;
-          const inner = it(new THREE.ConeGeometry(0.1, 0.24, 20), fabric(cos.trim), s * 0.35, 0.6, 0.06);
-          inner.rotation.z = -s * 0.35;
-          inner.scale.z = 0.4;
+      const HL = 0.075;
+      const inFace = (az: number, pol: number) => (az / 0.98) ** 2 + ((pol - 1.78) / 0.6) ** 2 < 1;
+      const hoodG = gridSurface(
+        THREE,
+        128,
+        64,
+        (u, v, out) => {
+          const az = u * Math.PI * 2 - Math.PI;
+          const pol = Math.max(1e-4, v * 2.5);
+          out.copy(hs.frame(az, pol, HL + 0.025 * Math.max(0, -Math.cos(az)) * Math.sin(pol)).p);
+        },
+        { wrapU: true, center: (_u, _v, out) => out.set(0, 0, 0) }
+      );
+      {
+        const uvA = hoodG.getAttribute("uv") as T.BufferAttribute;
+        const idx = hoodG.index!.array;
+        const keep: number[] = [];
+        for (let t = 0; t < idx.length; t += 3) {
+          let su = 0;
+          let sv = 0;
+          for (let k = 0; k < 3; k++) {
+            su += uvA.getX(idx[t + k]);
+            sv += uvA.getY(idx[t + k]);
+          }
+          if (!inFace((su / 3) * Math.PI * 2 - Math.PI, (sv / 3) * 2.5)) keep.push(idx[t], idx[t + 1], idx[t + 2]);
         }
-      if (cos.ears === "horns") for (const s of [-1, 1]) it(new THREE.ConeGeometry(0.07, 0.34, 20), gloss("#fef3c7"), s * 0.28, 0.72, -0.05).rotation.z = -s * 0.4;
-      if (cos.ears === "spikes") for (let i = 0; i < 4; i++) it(new THREE.ConeGeometry(0.08, 0.24, 16), fabric(cos.trim), 0, 0.66 - i * 0.12, -0.12 - i * 0.16).rotation.x = -0.4 - i * 0.35;
+        hoodG.setIndex(keep);
+      }
+      mesh(geo(hoodG), m, head);
+      const rim: T.Vector3[] = [];
+      for (let i = 0; i <= 48; i++) {
+        const a = (i / 48) * Math.PI * 2;
+        rim.push(hs.frame(Math.cos(a) * 0.98, 1.78 + Math.sin(a) * 0.6, HL).p);
+      }
+      rim.pop();
+      const rimCurve = new THREE.CatmullRomCurve3(rim, true, "centripetal");
+      mesh(geo(new THREE.TubeGeometry(rimCurve, 96, 0.04, 12, true)), m, head);
+      const onHood = (o: T.Object3D, az: number, pol: number, lift = HL) => {
+        const f = hs.frame(az, pol, lift);
+        o.position.copy(f.p);
+        o.quaternion.setFromUnitVectors(V(0, 1, 0), f.n.clone().add(V(0, 0.6, 0)).normalize());
+        head.add(o);
+        return o;
+      };
+      if (look.costume === "penguin") {
+        const f = hs.frame(0, 1.12, HL + 0.01);
+        const beak = mesh(geo(new THREE.ConeGeometry(0.06, 0.12, 16)), gloss("#f97316"), head, f.p.x, f.p.y, f.p.z);
+        beak.quaternion.setFromUnitVectors(V(0, 1, 0), f.n.clone().add(V(0, -0.35, 0)).normalize());
+        beak.scale.set(1.2, 1, 0.7);
+      }
+      if (cos.ears === "cat")
+        for (const sg of [-1, 1]) {
+          const ear = new THREE.Group();
+          mesh(geo(new THREE.ConeGeometry(0.13, 0.26, 4, 1)), m, ear, 0, 0.1, 0).rotation.y = Math.PI / 4;
+          const inner = mesh(geo(new THREE.ConeGeometry(0.08, 0.18, 4, 1)), fabric("#fbcfe8", { roughness: 0.9 }, "fur", [2, 2], 0.6), ear, 0, 0.08, 0.035);
+          inner.rotation.y = Math.PI / 4;
+          inner.scale.z = 0.5;
+          onHood(ear, sg * 0.62, 0.58).rotateY(-sg * 0.2);
+        }
+      if (cos.ears === "horns")
+        for (const sg of [-1, 1]) {
+          const base = hs.frame(sg * 0.55, 0.5, HL - 0.01).p;
+          const pts = [base, base.clone().add(V(sg * 0.05, 0.12, -0.02)), base.clone().add(V(sg * 0.02, 0.24, -0.1))];
+          mesh(geo(sweep(THREE, pts, (t) => [0.05 * (1 - t * 0.9), 0.05 * (1 - t * 0.9)], () => undefined as unknown as void, { rows: 16, seg: 12 })), gloss("#fef3c7"), head);
+        }
+      if (cos.ears === "spikes") {
+        if (look.costume === "bee") {
+          // antennae with little pompoms
+          for (const sg of [-1, 1]) {
+            const base = hs.frame(sg * 0.35, 0.35, HL).p;
+            const pts = [base, base.clone().add(V(sg * 0.04, 0.16, 0.03)), base.clone().add(V(sg * 0.12, 0.26, 0.06))];
+            mesh(geo(sweep(THREE, pts, () => [0.012, 0.012], () => undefined as unknown as void, { rows: 12, seg: 8 })), gloss("#111827"), head);
+            const tip = pts[2];
+            mesh(geo(new THREE.SphereGeometry(0.04, 16, 12)), gloss("#111827"), head, tip.x, tip.y, tip.z);
+          }
+        } else
+          for (let i = 0; i < 5; i++) {
+            const sp = new THREE.Mesh(geo(new THREE.ConeGeometry(0.07, 0.17, 4)), fabric(cos.trim));
+            onHood(sp, 0.0001, 0.35 + i * 0.36, HL - 0.01).rotateX(-0.25);
+          }
+      }
     }
     if (cos.helmet && cos.helmetStyle === "astro") {
       it(new THREE.SphereGeometry(0.86, 64, 48), track(new THREE.MeshPhysicalMaterial({ color: C("#e0f2fe"), transmission: 0.95, roughness: 0.02, thickness: 0.02, transparent: true, opacity: 0.3, clearcoat: 1, depthWrite: false })), 0, 0, 0);
       it(new THREE.TorusGeometry(0.66, 0.08, 16, 64), gloss(cos.trim), 0, -0.6, 0).rotation.x = Math.PI / 2;
     } else if (cos.helmet) {
-      it(new THREE.SphereGeometry(0.7, 64, 48), metal(cos.body, 0.25), 0, 0.02, 0);
-      if (cos.helmetStyle === "knight") {
-        it(new THREE.BoxGeometry(0.86, 0.09, 0.12), basic("#0f172a"), 0, 0.1, 0.62);
-        it(new THREE.ConeGeometry(0.1, 0.42, 20), gloss("#dc2626"), 0, 0.86, 0);
+      // Closed helmet that follows the head's shape (sculpted surface lifted outward)
+      const knight = cos.helmetStyle === "knight";
+      const shellM = metal(knight ? "#c4ccd8" : cos.body, knight ? 0.2 : 0.26);
+      const lift = 0.1;
+      mesh(
+        geo(
+          gridSurface(
+            THREE,
+            96,
+            48,
+            (u, v, out) => {
+              const az = u * Math.PI * 2 - Math.PI;
+              const pol = Math.max(1e-4, v * 2.45);
+              out.copy(hs.frame(az, pol, lift + (knight ? 0.02 * Math.max(0, Math.cos(pol)) : 0)).p);
+              if (knight) out.y = Math.min(out.y, 0.53);
+            },
+            { wrapU: true, center: (_u, _v, out) => out.set(0, 0, 0) }
+          )
+        ),
+        shellM,
+        head
+      );
+      // rim at the neck
+      headBand(2.42, 0, 0.05, 0.02, lift, metal(knight ? "#9aa5b4" : "#475569", 0.3));
+      if (knight) {
+        // eye slit, breathing holes, gold cross, rivets, red plume
+        const dark = basic("#0b1020");
+        mesh(geo(headPatch(THREE, hs, 0, 1.64, 0.95, 0.05, { lift: lift + 0.003, rect: true, rings: 2, seg: 32 })), dark, head).castShadow = false;
+        for (let i = 0; i < 6; i++)
+          for (let k = 0; k < 2; k++) {
+            const f = hs.frame(0.32 + k * 0.1, 1.95 + i * 0.06, lift + 0.002);
+            const hole = mesh(geo(new THREE.CircleGeometry(0.011, 10)), dark, head, f.p.x, f.p.y, f.p.z);
+            hole.lookAt(f.p.clone().add(f.n));
+            hole.castShadow = false;
+          }
+        const gold = metal("#d4a017", 0.22);
+        mesh(geo(headPatch(THREE, hs, 0, 1.55, 0.06, 1.2, { lift: lift + 0.004, rect: true, rings: 16, seg: 4, bulge: 0.006 })), gold, head);
+        mesh(geo(headPatch(THREE, hs, 0, 1.55, 0.82, 0.05, { lift: lift + 0.004, rect: true, rings: 3, seg: 32, bulge: 0.004 })), gold, head);
+        for (let i = 0; i < 12; i++) {
+          const f = hs.frame(-Math.PI + (i / 12) * Math.PI * 2, 2.3, lift + 0.006);
+          mesh(geo(new THREE.SphereGeometry(0.014, 10, 8)), gold, head, f.p.x, f.p.y, f.p.z);
+        }
+        const plumeM = fabric(cos.trim, { roughness: 0.8 }, "fur", [2, 4], 0.8);
+        for (let i = 0; i < 6; i++) {
+          const b0 = V((i - 2.5) * 0.012, 0.6, 0.06 - i * 0.03);
+          const pts = [b0, b0.clone().add(V((i - 2.5) * 0.03, 0.26, -0.06)), b0.clone().add(V((i - 2.5) * 0.06, 0.32, -0.32)), b0.clone().add(V((i - 2.5) * 0.07, 0.16, -0.55))];
+          mesh(geo(sweep(THREE, pts, (t) => [0.075 * (1 - t * 0.6), 0.05 * (1 - t * 0.8)], () => undefined as unknown as void, { rows: 20, seg: 10 })), plumeM, head);
+        }
+        mesh(geo(new THREE.CylinderGeometry(0.035, 0.05, 0.08, 16)), gold, head, 0, 0.58, 0.05);
       } else {
-        const visor = it(new THREE.SphereGeometry(0.705, 48, 16, -0.9, 1.8, Math.PI * 0.42, Math.PI * 0.16), glow("#22d3ee", 0.9), 0, 0.02, 0);
-        visor.castShadow = false;
+        // cyber: wrap-around glowing visor, face plate, ear pods with lights, antenna
+        const visorM = track(new THREE.MeshPhysicalMaterial({ color: C("#083344"), emissive: C(cos.trim), emissiveIntensity: 0.7, roughness: 0.06, metalness: 0.4, clearcoat: 1, clearcoatRoughness: 0.03 }));
+        mesh(geo(headPatch(THREE, hs, 0, 1.66, 1.3, 0.24, { lift: lift + 0.006, rect: true, rings: 8, seg: 48, bulge: 0.012 })), visorM, head);
+        mesh(geo(headPatch(THREE, hs, 0, 1.66, 1.38, 0.3, { lift: lift + 0.002, rect: true, rings: 6, seg: 48 })), metal("#1f2937", 0.3), head);
+        const scan = mesh(geo(headPatch(THREE, hs, 0, 1.64, 1.2, 0.022, { lift: lift + 0.02, rect: true, rings: 2, seg: 48 })), glow("#e0f2fe", 1.8), head);
+        scan.castShadow = false;
+        mesh(geo(headPatch(THREE, hs, 0, 2.08, 0.5, 0.16, { lift: lift + 0.003, rect: true, rings: 4, seg: 16, bulge: 0.01 })), metal("#334155", 0.3), head);
+        for (let i = 0; i < 3; i++) {
+          const g = mesh(geo(headPatch(THREE, hs, 0, 2.03 + i * 0.05, 0.3, 0.012, { lift: lift + 0.016, rect: true, rings: 1, seg: 8 })), basic("#0f172a"), head);
+          g.castShadow = false;
+        }
+        for (const sgn of [-1, 1]) {
+          const pod = group(head, sgn * 0.6, -0.04, 0);
+          pod.rotation.z = (-sgn * Math.PI) / 2;
+          mesh(lathe([[0, -0.04], [0.11, -0.04], [0.12, -0.02], [0.12, 0.02], [0.09, 0.045], [0, 0.05]], 32), metal("#475569", 0.3), pod);
+          const ring = mesh(geo(new THREE.TorusGeometry(0.075, 0.012, 8, 32)), glow(cos.trim, 1.6), pod, 0, 0.048, 0);
+          ring.rotation.x = Math.PI / 2;
+          ring.castShadow = false;
+        }
+        const ant = hs.frame(0.6, 0.35, lift).p;
+        mesh(geo(new THREE.CylinderGeometry(0.008, 0.012, 0.2, 8)), metal("#94a3b8", 0.25), head, ant.x, ant.y + 0.09, ant.z);
+        mesh(geo(new THREE.SphereGeometry(0.025, 14, 10)), glow(cos.trim, 2), head, ant.x, ant.y + 0.2, ant.z);
+        // panel seam over the top
+        const seam = [0.1, 0.5, 0.9, 1.25].map((pol) => hs.frame(0, pol, lift + 0.002).p);
+        const seamBack = [0.1, 0.6, 1.2, 1.9].map((pol) => hs.frame(Math.PI, pol, lift + 0.002).p);
+        for (const pts of [seam, seamBack]) mesh(geo(sweep(THREE, pts, () => [0.008, 0.004], (p, o) => o.copy(p).normalize(), { rows: 14, seg: 6 })), basic("#0f172a"), head);
       }
     }
     if (cos.mask) it(new THREE.TorusGeometry(0.585, 0.08, 14, 64), fabric(cos.mask), 0, 0.04, 0).rotation.x = Math.PI / 2;
@@ -1589,11 +1734,30 @@ export function buildCharModel(THREE: Three, raw: Partial<GameLook> | null | und
       }
     }
     if (cos.hat === "chugirma") {
-      const fur = fabric(hatHex ?? "#f5f5f4", { roughness: 1, sheen: 1, sheenRoughness: 0.9 }, "fur", [8, 6], 1);
-      it(new THREE.SphereGeometry(0.76, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.55), fur, 0, 0.22, 0).scale.set(1.05, 1.15, 1.05);
-      for (let i = 0; i < 18; i++) {
-        const a = (i / 18) * Math.PI * 2;
-        it(new THREE.IcosahedronGeometry(0.15, 2), fur, Math.sin(a) * 0.64, 0.42 + (i % 3) * 0.1, Math.cos(a) * 0.64);
+      // Khorezm "chugirma": a tall sheepskin hat of tight woolly curls, down to just above the brows
+      const fur = fabric(hatHex ?? "#f5f5f4", { roughness: 1, sheen: 1, sheenRoughness: 0.9, sheenColor: C("#ffffff") }, "fur", [8, 6], 1);
+      const line = (az: number) => 1.12 + 0.35 * Math.max(0, -Math.cos(az)) + 0.12 * Math.abs(Math.sin(az));
+      headDome(line, (_az, pol) => 0.05 + 0.18 * Math.max(0, Math.cos(pol * 0.9)), fur, 36);
+      const curl = (() => {
+        const g = new THREE.IcosahedronGeometry(0.06, 2);
+        const p = g.attributes.position as T.BufferAttribute;
+        const q = V();
+        for (let i = 0; i < p.count; i++) {
+          q.fromBufferAttribute(p, i);
+          const k = 1 + 0.15 * Math.sin(q.x * 80) * Math.sin(q.y * 70) * Math.sin(q.z * 75);
+          p.setXYZ(i, q.x * k, q.y * k, q.z * k);
+        }
+        g.computeVertexNormals();
+        return geo(g);
+      })();
+      for (let i = 0; i < 120; i++) {
+        const az = -Math.PI + (((i * 0.618034) % 1) * Math.PI * 2);
+        const f = ((i * 7) % 13) / 12;
+        const pol = 0.05 + f * (line(az) - 0.08);
+        const fr = hs.frame(az, pol, 0.05 + 0.18 * Math.max(0, Math.cos(pol * 0.9)) + 0.01);
+        const c = mesh(curl, fur, head, fr.p.x, fr.p.y, fr.p.z);
+        c.scale.setScalar(0.85 + rnd(i, 2) * 0.5);
+        c.rotation.set(rnd(i, 3) * 6, rnd(i, 4) * 6, 0);
       }
     }
     if (cos.hat === "guard") {
