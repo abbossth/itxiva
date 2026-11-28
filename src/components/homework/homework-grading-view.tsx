@@ -21,6 +21,7 @@ import { IntegrityChips, IntegrityReport } from "@/components/homework/integrity
 import {
   gradeHomeworkAction,
   returnHomeworkAction,
+  rejectHomeworkAppealAction,
   checkHomeworkIntegrityAction,
   remindMissingHomeworkAction,
   HomeworkRoster,
@@ -331,6 +332,56 @@ export function HomeworkGradingView({
   );
 }
 
+/** Mentor: o'quvchining e'tirozi — sababi; baho o'zgartirilsa (pastdagi forma) e'tiroz o'zi yopiladi, yoki rad etiladi */
+function AppealReview({ submissionId, reason, score, onDone }: { submissionId: string; reason: string; score: number | null; onDone: () => void }) {
+  const { toast } = useToast();
+  const [rejecting, setRejecting] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const reject = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await rejectHomeworkAppealAction({ submissionId, answer });
+      if (!r.success) setError(r.message || "Saqlab bo'lmadi");
+      else {
+        toast.success(r.message || "Yuborildi");
+        onDone();
+      }
+    } catch {
+      setError("Saqlab bo'lmadi");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div role="alert" className="space-y-2 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+      <p className="font-black">⚖️ O&apos;quvchi bahoga e&apos;tiroz bildirdi{score !== null ? ` (hozirgi baho: ${score})` : ""}</p>
+      <p className="whitespace-pre-line">💬 {reason}</p>
+      <p className="text-xs opacity-80">Bahoni o&apos;zgartirsangiz (pastdagi forma), e&apos;tiroz o&apos;zi yopiladi. Baho to&apos;g&apos;ri bo&apos;lsa — sababini yozib rad eting.</p>
+      {rejecting ? (
+        <div className="space-y-2">
+          <Textarea value={answer} onChange={(e) => setAnswer(e.target.value)} rows={2} maxLength={2000} placeholder="Nima uchun baho o'zgarmaydi…" />
+          {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setRejecting(false)} disabled={busy}>
+              Bekor qilish
+            </Button>
+            <Button type="button" size="sm" onClick={() => void reject()} disabled={busy || answer.trim().length < 3}>
+              Rad etish va javob yuborish
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" variant="secondary" size="sm" onClick={() => setRejecting(true)}>
+          Baho to&apos;g&apos;ri — rad etish
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function GradeForm({
   row,
   coinsReward,
@@ -444,6 +495,8 @@ function GradeForm({
               : submission.aiGrade.note}
         </p>
       )}
+
+      {submission.appeal?.status === "open" && <AppealReview submissionId={submission._id} reason={submission.appeal.reason} score={submission.score} onDone={() => { router.refresh(); onDone(); }} />}
 
       <SubmissionContent
         submissionId={submission._id}

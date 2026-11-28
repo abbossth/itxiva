@@ -22,6 +22,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { getDownloadPresignedUrl } from "@/lib/storage/r2";
 import {
   homeworkGradeSchema,
+  homeworkAppealSchema,
+  homeworkAppealRejectSchema,
   homeworkReturnSchema,
   homeworkSubmitSchema,
 } from "@/lib/validations/homework.schema";
@@ -78,6 +80,10 @@ export interface HomeworkSubmissionView {
   autoGraded: boolean;
   /** Faqat mentorga: AI avtomatik bahosining holati va izohi */
   aiGrade: { status: "pending" | "done" | "failed" | "skipped"; note: string } | null;
+  /** O'quvchining bahoga e'tirozi */
+  appeal: { status: "open" | "accepted" | "rejected"; reason: string; answer: string; at: string } | null;
+  /** Yana nechta e'tiroz yuborish mumkin */
+  appealsLeft: number;
 }
 
 interface SubmissionLean {
@@ -96,6 +102,8 @@ interface SubmissionLean {
   integrity?: IHomeworkIntegrity | null;
   autoGraded?: boolean;
   aiGrade?: { status: "pending" | "done" | "failed" | "skipped"; note?: string } | null;
+  appeal?: { status: "open" | "accepted" | "rejected"; reason?: string; answer?: string; at: Date } | null;
+  appealCount?: number;
 }
 
 function toIntegrityView(i: IHomeworkIntegrity | null | undefined, forMentor: boolean): IntegrityView | null {
@@ -137,8 +145,13 @@ function toSubmissionView(s: SubmissionLean, forMentor: boolean): HomeworkSubmis
     integrity: toIntegrityView(s.integrity, forMentor),
     autoGraded: Boolean(s.autoGraded),
     aiGrade: forMentor && s.aiGrade?.status ? { status: s.aiGrade.status, note: s.aiGrade.note ?? "" } : null,
+    appeal: s.appeal?.status ? { status: s.appeal.status, reason: s.appeal.reason ?? "", answer: s.appeal.answer ?? "", at: new Date(s.appeal.at).toISOString() } : null,
+    appealsLeft: Math.max(0, MAX_APPEALS - (s.appealCount ?? 0)),
   };
 }
+
+/** Bitta javob bo'yicha e'tirozlar chegarasi */
+const MAX_APPEALS = 2;
 
 function toTask(hw: IHomework): HomeworkTask {
   return {
@@ -461,6 +474,8 @@ export interface HomeworkInboxItem {
   files: number;
   /** Plagiat/AI tekshiruvi; null — tekshirilmagan */
   integrity: IntegrityView | null;
+  /** O'quvchi bahoga e'tiroz bildirgan (ko'rib chiqilmagan) */
+  appealOpen: boolean;
 }
 
 /**
@@ -471,7 +486,7 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
   await requireMentor();
   await connectToDatabase();
 
-  type Row = Pick<SubmissionLean, "_id" | "status" | "submittedAt" | "isLate" | "attempt" | "score" | "integrity"> & {
+  type Row = Pick<SubmissionLean, "_id" | "status" | "submittedAt" | "isLate" | "attempt" | "score" | "integrity" | "appeal"> & {
     lessonId: mongoose.Types.ObjectId;
     studentId: mongoose.Types.ObjectId;
     hasText: boolean;
@@ -488,12 +503,14 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
     attempt: 1,
     score: 1,
     integrity: 1,
+    appeal: 1,
     hasText: { $gt: [{ $strLenCP: { $trim: { input: { $ifNull: ["$text", ""] } } } }, 0] },
     nLinks: { $size: { $ifNull: ["$links", []] } },
     nFiles: { $size: { $ifNull: ["$files", []] } },
   };
   const [pendingDocs, recentDocs] = await Promise.all([
-    HomeworkSubmission.find({ status: "submitted" }).select(fields).sort({ submittedAt: 1 }).limit(500).lean<Row[]>(),
+    // Navbatda: tekshirilmaganlar va bahosiga e'tiroz bildirilganlar
+    HomeworkSubmission.find({ $or: [{ status: "submitted" }, { "appeal.status": "open" }] }).select(fields).sort({ submittedAt: 1 }).limit(500).lean<Row[]>(),
     HomeworkSubmission.find({ status: { $in: ["graded", "returned"] } }).select(fields).sort({ gradedAt: -1, submittedAt: -1 }).limit(50).lean<Row[]>(),
   ]);
   const all = [...pendingDocs, ...recentDocs];
@@ -535,6 +552,7 @@ export async function getHomeworkInbox(): Promise<{ pending: HomeworkInboxItem[]
         links: s.nLinks ?? 0,
         files: s.nFiles ?? 0,
         integrity: toIntegrityView(s.integrity, true),
+        appealOpen: s.appeal?.status === "open",
       },
     ];
   };
@@ -779,8 +797,88 @@ export async function gradeHomeworkAction(input: unknown): Promise<ActionResult>
   if (!isObjectId(submissionId)) return { success: false, message: "Javob topilmadi" };
   const r = await applyHomeworkGrade({ submissionId, score, feedback, coins, gradedBy: mentor.userId });
   if (!r.ok) return { success: false, message: r.message };
+  // Ochiq e'tiroz bo'lsa — ustoz qayta baholadi: e'tiroz yopiladi (yangi izoh — javob)
+  await HomeworkSubmission.updateOne(
+    { _id: submissionId, "appeal.status": "open" },
+    { $set: { "appeal.status": "accepted", "appeal.answer": feedback, "appeal.resolvedAt": new Date(), "appeal.resolvedBy": mentor.userId } }
+  );
   revalidateHomework(r.lessonId);
   return { success: true, message: "Baho saqlandi" };
+}
+
+/** O'quvchi o'z bahosiga e'tiroz bildiradi: ustozlarga xabar boradi, vazifa navbatga qaytadi */
+export async function appealHomeworkAction(input: unknown): Promise<ActionResult> {
+  const session = await requireStudent();
+  const parsed = homeworkAppealSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
+  const { submissionId, reason } = parsed.data;
+  if (!isObjectId(submissionId)) return { success: false, message: "Javob topilmadi" };
+  const rate = checkRateLimit(`hw_appeal_${session.userId}`, 5, 60 * 60 * 1000);
+  if (!rate.allowed) return { success: false, message: "Juda ko'p urinish. Keyinroq qayta yuboring" };
+
+  await connectToDatabase();
+  // Shart bilan: o'zining, baholangan, ochiq e'tirozi yo'q, chegaradan oshmagan
+  const updated = await HomeworkSubmission.findOneAndUpdate(
+    {
+      _id: submissionId,
+      studentId: session.userId,
+      status: "graded",
+      "appeal.status": { $ne: "open" },
+      $or: [{ appealCount: { $lt: MAX_APPEALS } }, { appealCount: { $exists: false } }],
+    },
+    { $set: { appeal: { status: "open", reason, at: new Date(), answer: "", resolvedAt: null, resolvedBy: null } }, $inc: { appealCount: 1 } },
+    { returnDocument: "after" }
+  );
+  if (!updated) {
+    const s = await HomeworkSubmission.findOne({ _id: submissionId, studentId: session.userId }).select("status appeal appealCount").lean();
+    if (!s) return { success: false, message: "Javob topilmadi" };
+    if (s.status !== "graded") return { success: false, message: "E'tirozni faqat baholangan vazifaga bildirish mumkin" };
+    if (s.appeal?.status === "open") return { success: false, message: "E'tirozingiz allaqachon ustozda" };
+    return { success: false, message: `Bu vazifa bo'yicha ${MAX_APPEALS} marta e'tiroz bildirgansiz` };
+  }
+  const lesson = await Lesson.findById(updated.lessonId).select("title groupId").lean();
+  const group = lesson ? await Group.findById(lesson.groupId).select("name").lean() : null;
+  notifyMentors("homework_submitted", {
+    lessonId: updated.lessonId.toString(),
+    lessonTitle: lesson?.title ?? "Dars",
+    studentName: session.fullName,
+    groupName: group?.name,
+    appeal: { score: updated.score ?? 0, reason },
+  });
+  revalidateHomework(updated.lessonId.toString());
+  return { success: true, message: "E'tirozingiz ustozga yuborildi" };
+}
+
+/** Ustoz e'tirozni ko'rib chiqdi, baho o'zgarmaydi: o'quvchiga sababi yoziladi */
+export async function rejectHomeworkAppealAction(input: unknown): Promise<ActionResult> {
+  const mentor = await requireMentor();
+  const parsed = homeworkAppealRejectSchema.safeParse(input);
+  if (!parsed.success) return { success: false, message: parsed.error.issues[0].message };
+  const { submissionId, answer } = parsed.data;
+  if (!isObjectId(submissionId)) return { success: false, message: "Javob topilmadi" };
+  await connectToDatabase();
+  const updated = await HomeworkSubmission.findOneAndUpdate(
+    { _id: submissionId, "appeal.status": "open" },
+    { $set: { "appeal.status": "rejected", "appeal.answer": answer, "appeal.resolvedAt": new Date(), "appeal.resolvedBy": mentor.userId } },
+    { returnDocument: "after" }
+  );
+  if (!updated) return { success: false, message: "Ochiq e'tiroz topilmadi" };
+  const lesson = await Lesson.findById(updated.lessonId).select("title").lean();
+  await AuditLog.create({
+    actorId: mentor.userId,
+    targetUserId: updated.studentId,
+    action: "REJECT_HOMEWORK_APPEAL",
+    details: { submissionId: updated._id, lessonId: updated.lessonId, score: updated.score },
+  });
+  notify(updated.studentId, "homework_graded", {
+    lessonId: updated.lessonId.toString(),
+    lessonTitle: lesson?.title ?? "Dars",
+    score: updated.score ?? 0,
+    feedback: answer,
+    appealRejected: true,
+  });
+  revalidateHomework(updated.lessonId.toString());
+  return { success: true, message: "Javob o'quvchiga yuborildi" };
 }
 
 export async function returnHomeworkAction(input: unknown): Promise<ActionResult> {
@@ -852,7 +950,7 @@ export async function getHomeworkBadgeCount(): Promise<number> {
   try {
     await connectToDatabase();
     if (session.role === "mentor") {
-      return await HomeworkSubmission.countDocuments({ status: "submitted" });
+      return await HomeworkSubmission.countDocuments({ $or: [{ status: "submitted" }, { "appeal.status": "open" }] });
     }
     if (!session.groupId) return 0;
     const lessons = await Lesson.find({

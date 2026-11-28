@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/toast";
 import { SubmissionContent } from "@/components/homework/submission-content";
 import { TaskAttachments } from "@/components/homework/task-attachments";
 import { IntegrityReport } from "@/components/homework/integrity-report";
+import { AppealBox } from "@/components/homework/appeal-box";
 import {
   submitHomeworkAction,
   HomeworkSubmissionView,
@@ -235,6 +236,7 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
               <span>{submission.feedback}</span>
             </p>
           )}
+          <AppealBox submission={submission} readOnly={readOnly} />
         </div>
       )}
       {submission && state === "returned" && submission.feedback && (

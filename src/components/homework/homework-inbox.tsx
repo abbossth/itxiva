@@ -150,6 +150,7 @@ export function HomeworkInbox({
                     <Badge variant="teal" title={r.groupName}>
                       {r.groupShortName}
                     </Badge>
+                    {r.appealOpen && <Badge variant="warning">⚖️ E&apos;tiroz</Badge>}
                     {r.isLate && <Badge variant="danger">Kechikkan</Badge>}
                     {r.attempt > 1 && <Badge variant="secondary">{r.attempt}-urinish</Badge>}
                     <IntegrityChips integrity={r.integrity} />

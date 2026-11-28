@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-homework-appeal-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangi",
+    title: "Bahoga e'tiroz bildirish",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⚖️",
+        title: "Baho noto'g'ri deb o'ylaysizmi?",
+        text: "Baholangan vazifa ostidagi «Bahoga e'tiroz bildirish» tugmasini bosing va qaysi joy to'g'ri bajarilganini yozing. Ustoz qayta ko'rib chiqadi: bahoni o'zgartiradi yoki sababini tushuntiradi. Bitta vazifa uchun 2 marta yozish mumkin.",
+      },
+    ],
+  },
+  {
+    id: "mentor-homework-appeal-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangi",
+    title: "O'quvchilar bahoga e'tiroz bildira oladi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "⚖️",
+        title: "E'tirozlar navbatda",
+        text: "O'quvchi baholangan vazifaga sabab bilan e'tiroz yuborsa, sizga xabar keladi va vazifa «⚖️ E'tiroz» belgisi bilan tekshirish navbatiga tushadi. Bahoni o'zgartirsangiz, e'tiroz o'zi yopiladi va coin farqi hisoblanadi. Baho to'g'ri bo'lsa, «Rad etish» orqali sababini yozasiz. Bitta vazifa uchun ko'pi bilan 2 ta e'tiroz.",
+      },
+    ],
+  },
+  {
     id: "student-lobby-guide-2026-11-28",
     date: "2026-11-28",
     audience: "student",

@@ -12,7 +12,7 @@ import { penaltyAmount } from "@/lib/penalty-ladder";
 // Yangi tur qo'shish: types.ts ga tur va sozlama yorlig'i, shu yerga payload va matn shabloni.
 
 export interface NotificationPayloads {
-  homework_graded: { lessonId: string; lessonTitle: string; returned?: boolean; score?: number; coins?: number; feedback?: string };
+  homework_graded: { lessonId: string; lessonTitle: string; returned?: boolean; score?: number; coins?: number; feedback?: string; appealRejected?: boolean };
   lesson_new: { lessonId: string; lessonTitle: string; hasHomework?: boolean; /** Darsdagi vazifa endi ochildi */ homeworkOpened?: boolean; dueLabel?: string };
   material_new: { lessonId: string; lessonTitle: string; materialTitle: string };
   exam_new: { kind: "quiz" | "exam"; title: string; href: string; startsAt?: string | null };
@@ -57,7 +57,7 @@ export interface NotificationPayloads {
   student_game_new: { gameId: string; creatorName: string; groupName?: string; modeTitle: string; audience: string; questions: number; price: number; paid: number; recipients: number; /** Botni ulamaganlar (ularga xabar bormaydi) */ noTelegram?: number };
   chat_message: { roomId: string; roomTitle: string; senderName: string; text: string; voice?: boolean; reason?: "dm" | "mention" | "reply" };
   quest_submitted: { questTitle: string; studentName: string; groupName?: string; pending: number };
-  homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean };
+  homework_submitted: { lessonId: string; lessonTitle: string; studentName: string; groupName?: string; isLate?: boolean; resubmitted?: boolean; appeal?: { score: number; reason: string } };
   order_new: { productTitle: string; price: number; studentName: string };
   exam_finished: { examId: string; title: string; submitted: number; total: number; avgPercent: number | null; ungraded: number };
   lesson_reminder: {
@@ -192,7 +192,14 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     button: link("Tekshirish", "/mentor/quests/review"),
   }),
   homework_graded: (p) =>
-    p.returned
+    p.appealRejected
+      ? {
+          text: [`⚖️ ${b("E'tirozingiz ko'rib chiqildi")}`, escapeHtml(p.lessonTitle), `\nBaho o'zgarmadi: ${b(`${p.score ?? 0} / 100`)}`, p.feedback ? `💬 ${escapeHtml(clip(p.feedback, 1500))}` : ""]
+            .filter(Boolean)
+            .join("\n"),
+          button: link("Vazifani ochish", `/lessons/${p.lessonId}?tab=homework`),
+        }
+      : p.returned
       ? {
           text: [`🔁 ${b("Vazifa qayta ishlashga qaytarildi")}`, escapeHtml(p.lessonTitle), p.feedback ? `\n💬 ${escapeHtml(clip(p.feedback, 1500))}` : ""]
             .filter(Boolean)
@@ -285,7 +292,15 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     button: link("Do'konni ochish", "/shop"),
   }),
   homework_submitted: (p) => ({
-    text: [
+    text: p.appeal
+      ? [
+          `⚖️ ${b("Bahoga e'tiroz")}`,
+          `${escapeHtml(p.studentName)}${p.groupName ? ` · ${escapeHtml(p.groupName)}` : ""}`,
+          escapeHtml(p.lessonTitle),
+          `\nBaho: ${b(`${p.appeal.score} / 100`)}`,
+          `💬 ${escapeHtml(clip(p.appeal.reason, 1000))}`,
+        ].join("\n")
+      : [
       `📥 ${b(p.resubmitted ? "Vazifa qayta topshirildi" : "Yangi vazifa topshirildi")}`,
       `${escapeHtml(p.studentName)}${p.groupName ? ` · ${escapeHtml(p.groupName)}` : ""}`,
       escapeHtml(p.lessonTitle),
@@ -293,7 +308,7 @@ const templates: { [T in NotificationType]: (p: NotificationPayloads[T]) => Mess
     ]
       .filter(Boolean)
       .join("\n"),
-    button: link("Tekshirish", `/mentor/homework/${p.lessonId}`),
+    button: link(p.appeal ? "Ko'rib chiqish" : "Tekshirish", `/mentor/homework/${p.lessonId}`),
   }),
   order_new: (p) => ({
     text: `🛒 ${b("Do'konda yangi buyurtma")}\n${escapeHtml(p.studentName)}\n${escapeHtml(p.productTitle)} — ${b(`${p.price} coin`)}`,

@@ -36,6 +36,16 @@ export interface IHomeworkIntegrity {
   checkedAt: Date | string | null;
 }
 
+export interface IHomeworkAppeal {
+  status: "open" | "accepted" | "rejected";
+  reason: string;
+  at: Date | string;
+  /** Ustoz javobi (rad etilganda — sababi; qayta baholaganda — yangi izoh) */
+  answer: string;
+  resolvedAt: Date | string | null;
+  resolvedBy: string | mongoose.Types.ObjectId | null;
+}
+
 export interface IHomeworkSubmissionData {
   _id: string | mongoose.Types.ObjectId;
   lessonId: string | mongoose.Types.ObjectId;
@@ -59,6 +69,10 @@ export interface IHomeworkSubmissionData {
   /** Avtomatik AI baholash holati: pending — ishlayapti; done — tugadi (baholadi yoki mentorga qoldirdi);
    *  failed — AI ishlamadi (keyin qayta uriniladi); skipped — AI o'qiy olmaydi */
   aiGrade?: { status: "pending" | "done" | "failed" | "skipped"; at: Date | string; note: string } | null;
+  /** O'quvchining bahoga e'tirozi: open — ustozda; accepted — ustoz qayta baholadi; rejected — baho o'zgarmadi */
+  appeal?: IHomeworkAppeal | null;
+  /** Shu javob bo'yicha nechta e'tiroz yuborilgan (chegara bor) */
+  appealCount?: number;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -125,6 +139,21 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
     gradedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     integrity: { type: IntegritySchema, default: null },
     autoGraded: { type: Boolean, default: false },
+    appeal: {
+      type: new Schema<IHomeworkAppeal>(
+        {
+          status: { type: String, enum: ["open", "accepted", "rejected"], required: true },
+          reason: { type: String, default: "" },
+          at: { type: Date, required: true },
+          answer: { type: String, default: "" },
+          resolvedAt: { type: Date, default: null },
+          resolvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+    appealCount: { type: Number, default: 0 },
     aiGrade: {
       type: new Schema(
         { status: { type: String, enum: ["pending", "done", "failed", "skipped"] }, at: Date, note: { type: String, default: "" } },
@@ -140,6 +169,7 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
 HomeworkSubmissionSchema.index({ lessonId: 1, studentId: 1 }, { unique: true });
 HomeworkSubmissionSchema.index({ groupId: 1, status: 1 });
 HomeworkSubmissionSchema.index({ studentId: 1, submittedAt: -1 });
+HomeworkSubmissionSchema.index({ "appeal.status": 1 }, { partialFilterExpression: { "appeal.status": "open" } });
 
 export const HomeworkSubmission: Model<IHomeworkSubmission> =
   mongoose.models.HomeworkSubmission ||

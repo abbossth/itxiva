@@ -48,5 +48,15 @@ export const homeworkReturnSchema = z.object({
   feedback: z.string().trim().min(3, "Nimani tuzatish kerakligini yozing").max(3000, "Izoh juda uzun"),
 });
 
+export const homeworkAppealSchema = z.object({
+  submissionId: z.string().min(1),
+  reason: z.string().trim().min(10, "Nima uchun baho noto'g'ri deb o'ylashingizni batafsilroq yozing (kamida 10 belgi)").max(1000, "Juda uzun (1000 belgigacha)"),
+});
+
+export const homeworkAppealRejectSchema = z.object({
+  submissionId: z.string().min(1),
+  answer: z.string().trim().min(3, "O'quvchiga nima uchun baho o'zgarmaganini yozing").max(2000, "Juda uzun"),
+});
+
 export type HomeworkSubmitInput = z.input<typeof homeworkSubmitSchema>;
 export type HomeworkGradeInput = z.input<typeof homeworkGradeSchema>;
