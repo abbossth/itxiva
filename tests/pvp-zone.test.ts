@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REGEN_DELAY_MS, REGEN_EVERY_MS, regenStep, ARENA_MAPS as MAPS_BY_ID, ZONE_DAMAGE_MS, ZONE_FINAL_R, ZONE_KILLER, outsideZone, zoneAt, zoneStep } from "@/lib/live-game/pvp";
+import { REGEN_CAP, REGEN_DELAY_MS, REGEN_EVERY_MS, REGEN_HP, regenStep, ARENA_MAPS as MAPS_BY_ID, ZONE_DAMAGE_MS, ZONE_FINAL_R, ZONE_KILLER, outsideZone, zoneAt, zoneStep } from "@/lib/live-game/pvp";
 import { PvpRoom } from "@/lib/live-game/pvp-room";
 
 const ARENA_MAPS = Object.values(MAPS_BY_ID);
@@ -52,6 +52,7 @@ describe("toraluvchi zona", () => {
     room.join({ p: "a", n: "Ali", skin: "bolt", weapon: "Lazer-1", cooldown: 0.36, lives: 2, maxLives: 2, x: far[0], y: far[1], shieldUntil: 0 });
     room.join({ p: "b", n: "Vali", skin: "rex", weapon: "Lazer-1", cooldown: 0.36, lives: 2, maxLives: 2, x: zEnd.x, y: zEnd.y, shieldUntil: 0 });
     // Boshida — hamma ichkarida
+    room.players.get("a")!.lastHurt = START;
     room.step(START + 1000);
     expect(room.players.get("a")!.lives).toBe(2);
     // Bu testda HP tiklanishi xalaqit bermasin (yaqinda zarar olgan)
@@ -66,15 +67,17 @@ describe("toraluvchi zona", () => {
 });
 
 describe("HP sekin tiklanishi", () => {
-  it("zarardan 5 s o'tgach har 3 s da +1, 100 dan oshmaydi", () => {
+  it("zarardan 3 s o'tgach har soniyada +5, 80 dan oshmaydi", () => {
     const p = { lives: 50, lastHurt: START, regenAt: 0 };
     expect(regenStep(p, START + REGEN_DELAY_MS, START).add).toBe(0);
     const r = regenStep(p, START + REGEN_DELAY_MS + REGEN_EVERY_MS * 4 + 10, START);
-    expect(r.add).toBe(4);
+    expect(r.add).toBe(4 * REGEN_HP);
     // Keyingi hisob qolgan joydan davom etadi (ikki marta qo'shilmaydi)
-    expect(regenStep({ ...p, lives: 54, regenAt: r.regenAt }, START + REGEN_DELAY_MS + REGEN_EVERY_MS * 4 + 20, START).add).toBe(0);
-    expect(regenStep({ lives: 99, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(1);
-    expect(regenStep({ lives: 100, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(0);
+    expect(regenStep({ ...p, lives: 70, regenAt: r.regenAt }, START + REGEN_DELAY_MS + REGEN_EVERY_MS * 4 + 20, START).add).toBe(0);
+    expect(regenStep({ lives: 78, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(2);
+    expect(regenStep({ lives: REGEN_CAP, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(0);
+    expect(regenStep({ lives: 95, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(0);
+    expect(regenStep({ lives: 0, lastHurt: 0, regenAt: 0 }, START + 600_000, START).add).toBe(0);
   });
 
   it("xonada: tik turgan o'yinchi tiklanadi, yiqilgan — yo'q", () => {

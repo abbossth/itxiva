@@ -19,6 +19,7 @@ import {
   BLEED_MS,
   DOWN_HP,
   regenStep,
+  REGEN_CAP,
   REVIVE_GRACE_MS,
   REVIVE_HP,
   REVIVE_MS,
@@ -427,7 +428,8 @@ export async function pvpTick(game: CachedGame, studentId: Id, input: PvpTickInp
       if (r.add > 0) {
         const up = await LiveGamePlayer.updateOne(
           { _id: meDoc._id, "arena.out": false, "arena.downed": { $ne: true }, "arena.regenAt": b.regenAt ?? 0, "arena.lastHurt": b.lastHurt ?? 0 },
-          [{ $set: { "arena.lives": { $min: [MAX_HP, { $add: ["$arena.lives", r.add] }] }, "arena.regenAt": r.regenAt } }],
+          // 80% dan oshirmaydi, lekin oraliqda ❤ bilan ko'tarilgan HP ni ham kamaytirmaydi
+          [{ $set: { "arena.lives": { $max: ["$arena.lives", { $min: [REGEN_CAP, { $add: ["$arena.lives", r.add] }] }] }, "arena.regenAt": r.regenAt } }],
           { updatePipeline: true }
         );
         if (up.modifiedCount > 0) zoneHurt = true; // o'z holati qayta o'qilsin

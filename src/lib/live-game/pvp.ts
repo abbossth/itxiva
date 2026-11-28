@@ -110,16 +110,21 @@ export const MAX_PICKUPS = 6;
 export const MAX_HP = 100;
 /** Eski nom (yurak bilan to'ldirish chegarasi) */
 export const MAX_LIVES = MAX_HP;
-/** HP sekin tiklanadi: oxirgi zarardan REGEN_DELAY_MS o'tgach har REGEN_EVERY_MS da +1 (yiqilganda — yo'q) */
-export const REGEN_DELAY_MS = 5000;
-export const REGEN_EVERY_MS = 3000;
+/**
+ * HP o'zi tiklanadi: oxirgi zarardan REGEN_DELAY_MS o'tgach har soniyada +REGEN_HP, lekin faqat REGEN_CAP gacha
+ * (80%; undan yuqorisi — faqat ❤ sovg'asi bilan). Yiqilgan va chiqib ketgan o'yinchi tiklanmaydi (chaqiruvchida).
+ */
+export const REGEN_DELAY_MS = 3000;
+export const REGEN_EVERY_MS = 1000;
+export const REGEN_HP = 5;
+export const REGEN_CAP = Math.round(MAX_HP * 0.8);
 /** Tiklanish: qancha HP qo'shiladi va keyingi hisob qayerdan davom etadi */
 export function regenStep(p: { lives: number; lastHurt: number; regenAt: number }, now: number, startedAt: number): { add: number; regenAt: number } {
-  if (p.lives <= 0 || p.lives >= MAX_HP) return { add: 0, regenAt: now };
+  if (p.lives <= 0 || p.lives >= REGEN_CAP) return { add: 0, regenAt: now };
   const from = Math.max(p.regenAt, p.lastHurt + REGEN_DELAY_MS, startedAt);
   if (now < from + REGEN_EVERY_MS) return { add: 0, regenAt: from };
   const steps = Math.floor((now - from) / REGEN_EVERY_MS);
-  return { add: Math.min(steps, MAX_HP - p.lives), regenAt: from + steps * REGEN_EVERY_MS };
+  return { add: Math.min(steps * REGEN_HP, REGEN_CAP - p.lives), regenAt: from + steps * REGEN_EVERY_MS };
 }
 /** ❤ sovg'asi qancha HP qaytaradi */
 export const HEART_HP = 30;

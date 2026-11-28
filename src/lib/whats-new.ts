@@ -29,6 +29,36 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "student-arena-regen-2026-11-28",
+    date: "2026-11-28",
+    audience: "student",
+    badge: "Yangilandi",
+    title: "Kiber arena: jon tezroq tiklanadi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💚",
+        title: "Har soniyada +5 HP",
+        text: "O'q tegmay 3 soniya o'tsa, joningiz har soniyada 5 HP dan o'zi tiklanadi — 80 HP gacha. Undan yuqorisi faqat ❤ sovg'asi bilan. Yiqilganda va o'yindan chiqqanda tiklanmaydi.",
+      },
+    ],
+  },
+  {
+    id: "mentor-arena-regen-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Kiber arena: HP tiklanishi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "💚",
+        title: "+5 HP / soniya, 80% gacha",
+        text: "Oxirgi zarardan 3 soniya o'tgach HP har soniyada 5 tadan o'zi tiklanadi, 80 gacha (avval: har 3 soniyada +1, 100 gacha). Yiqilgan va chiqib ketgan o'yinchiga ta'sir qilmaydi.",
+      },
+    ],
+  },
+  {
     id: "student-premium-chat-2026-11-27",
     date: "2026-11-27",
     audience: "student",

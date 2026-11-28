@@ -3,7 +3,7 @@
 // Qoidalar `pvp-server.ts` (HTTP yo'li) bilan bir xil: o'q tekkanini otgan aniqlaydi, jonni xona ayiradi.
 // Xabarlar ixcham (massivlar): 25 kishilik sinfda ham Wi-Fi'ni og'irlashtirmaydi.
 
-import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, regenStep, REVIVE_DEAD_HP, REVIVE_DEAD_MS, revivableDead, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
+import { BULLET_RANGE, EMOTES, EMOTE_MS, BLEED_MS, DOWN_HP, regenStep, REGEN_CAP, REVIVE_DEAD_HP, REVIVE_DEAD_MS, revivableDead, HEART_HP, HIT_GRACE_MS, MAX_HP, MAX_REVIVES, REVIVE_GRACE_MS, REVIVE_HP, REVIVE_MS, REVIVE_R, ZONE_DAMAGE, hitDamage, MAX_PICKUPS, PICKUP_EVERY_MS, PICKUP_R, PLAYER_R, POWERS, ZONE_KILLER, freeSpot, mapOf, outsideZone, rollPower, sameTeam, zoneAt, zoneStep, type ArenaMap, type MapId, type PowerKind, type ZoneState } from "./pvp";
 import type { PvpFeedView, PvpMe, PvpPeer, PvpPickup, PvpTickInput, PvpWorld } from "./pvp-types";
 
 const POWER_LIST: PowerKind[] = ["heart", "shield", "speed", "rapid", "triple"];
@@ -332,12 +332,12 @@ export class PvpRoom {
         this.damage(p, ZONE_DAMAGE, now, null, ZONE_KILLER);
       }
     }
-    // HP sekin tiklanadi (tik turganlarda)
+    // HP o'zi tiklanadi (faqat tik turganlarda): har soniyada +5, 80 gacha
     for (const p of this.players.values()) {
       if (p.out || p.downed) continue;
       const r = regenStep(p, now, this.startedAt);
       p.regenAt = r.regenAt;
-      if (r.add > 0) p.lives += r.add;
+      if (r.add > 0) p.lives = Math.max(p.lives, Math.min(REGEN_CAP, p.lives + r.add));
     }
     // Yiqilganlar: HP har soniyada 1 kamayadi; jamoasida tik turgan qolmasa — darhol chiqadi
     for (const p of this.players.values()) {
