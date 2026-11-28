@@ -31,6 +31,15 @@ export const homeworkSubmitSchema = z
     text: z.string().max(HOMEWORK_MAX_TEXT, `Matn ${HOMEWORK_MAX_TEXT} belgidan oshmasligi kerak`).default(""),
     links: z.array(httpUrl).max(HOMEWORK_MAX_LINKS, `Ko'pi bilan ${HOMEWORK_MAX_LINKS} ta havola`).default([]),
     files: z.array(homeworkFileSchema).max(HOMEWORK_MAX_FILES, `Ko'pi bilan ${HOMEWORK_MAX_FILES} ta fayl`).default([]),
+    /** Yozish jarayoni (brauzer o'lchaydi; faqat plagiat/AI tekshiruvi uchun) */
+    authoring: z
+      .object({
+        typed: z.number().int().min(0).max(1_000_000),
+        pasted: z.number().int().min(0).max(1_000_000),
+        pastes: z.number().int().min(0).max(10_000),
+        ms: z.number().int().min(0).max(86_400_000),
+      })
+      .nullish(),
   })
   .refine((v) => v.text.trim().length > 0 || v.links.length > 0 || v.files.length > 0, {
     message: "Javob bo'sh: matn yozing, havola qo'shing yoki fayl yuklang",

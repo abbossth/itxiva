@@ -68,6 +68,8 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
   // Hali yuborilmagan yoki qaytarilgan bo'lsa forma darhol ochiq; yuborilgan bo'lsa "Tahrirlash" bilan ochiladi
   const [editing, setEditing] = useState(state === "missing" || state === "returned");
   const [text, setText] = useState(submission?.text ?? "");
+  // Yozish jarayoni (plagiat/AI tekshiruvi uchun faqat sonlar): qo'lda yozilgan va joylashtirilgan belgilar, faol vaqt
+  const authoring = useRef({ typed: 0, pasted: 0, pastes: 0, ms: 0, last: 0, pasting: false });
   const [links, setLinks] = useState<string[]>(submission?.links ?? []);
   const [files, setFiles] = useState<IHomeworkFile[]>(submission?.files ?? []);
   const [linkDraft, setLinkDraft] = useState("");
@@ -164,7 +166,14 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
     try {
       setIsSending(true);
       setErrorMsg(null);
-      const res = await submitHomeworkAction({ lessonId, text, links: linksToSend, files });
+      const a = authoring.current;
+      const res = await submitHomeworkAction({
+        lessonId,
+        text,
+        links: linksToSend,
+        files,
+        authoring: { typed: a.typed, pasted: a.pasted, pastes: a.pastes, ms: Math.round(a.ms) },
+      });
       if (res.success) {
         toast.success(res.message || "Javob yuborildi");
         setEditing(false);
@@ -283,7 +292,22 @@ export function HomeworkPanel({ lessonId, task, submission, readOnly = false }: 
           <Textarea
             id="hw-text"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const a = authoring.current;
+              const now = Date.now();
+              if (a.last) a.ms += Math.min(now - a.last, 30_000);
+              a.last = now;
+              const delta = e.target.value.length - text.length;
+              if (a.pasting) a.pasting = false;
+              else if (delta > 0) a.typed += delta;
+              setText(e.target.value);
+            }}
+            onPaste={(e) => {
+              const a = authoring.current;
+              a.pasted += e.clipboardData.getData("text").length;
+              a.pastes += 1;
+              a.pasting = true;
+            }}
             maxLength={HOMEWORK_MAX_TEXT}
             rows={7}
             spellCheck={false}

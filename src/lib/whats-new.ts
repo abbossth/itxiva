@@ -29,6 +29,21 @@ export interface NewsItem {
 
 export const NEWS: NewsItem[] = [
   {
+    id: "mentor-integrity-stronger-2026-11-28",
+    date: "2026-11-28",
+    audience: "mentor",
+    badge: "Yangilandi",
+    title: "Plagiat va AI nazorati kuchaytirildi",
+    slides: [
+      {
+        art: "emoji",
+        emoji: "🔍",
+        title: "Endi nimalar tekshiriladi",
+        text: "1) Yozish jarayoni: javobning qancha qismi tayyor holda joylashtirilgani (paste) va qancha vaqt yozilgani. 2) AI'siz belgilar: markdown, chatbot iboralari («Albatta!», «Xulosa qilib aytganda»), terilmaydigan belgilar (× → —), avvalgi ishlardan keskin farq. Bular AI ishlamaganda ham ishlaydi. 3) Kod: o'zgaruvchi nomlari va izohlar o'zgartirilsa ham ko'chirma topiladi, hamma yozadigan umumiy tuzilma esa hisobga olinmaydi. 4) Fayllar mazmuni bo'yicha solishtiriladi, boshqa vazifa yoki guruhga yuborilgan aynan shu fayl ham topiladi. Har bir belgi hisobotda iqtibos bilan ko'rsatiladi. Bu taxmin: shubha bo'lsa, o'quvchidan yechimini tushuntirib berishni so'rang.",
+      },
+    ],
+  },
+  {
     id: "student-homework-appeal-2026-11-28",
     date: "2026-11-28",
     audience: "student",

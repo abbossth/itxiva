@@ -9,6 +9,16 @@ export interface IHomeworkFile {
   name: string;
   mimeType?: string;
   size?: number;
+  /** Fayl mazmunining SHA-256 xeshi (plagiat: nomi boshqa bo'lsa ham bir xil fayl topiladi) */
+  sha256?: string;
+}
+
+/** Javob maydonida yozish jarayoni (brauzer o'lchaydi): qo'lda yozilgan va joylashtirilgan belgilar, vaqt */
+export interface IHomeworkAuthoring {
+  typed: number;
+  pasted: number;
+  pastes: number;
+  ms: number;
 }
 
 export interface IIntegrityMatch {
@@ -73,6 +83,7 @@ export interface IHomeworkSubmissionData {
   appeal?: IHomeworkAppeal | null;
   /** Shu javob bo'yicha nechta e'tiroz yuborilgan (chegara bor) */
   appealCount?: number;
+  authoring?: IHomeworkAuthoring | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -87,6 +98,7 @@ const HomeworkFileSchema = new Schema<IHomeworkFile>(
     name: { type: String, required: true, trim: true },
     mimeType: { type: String, trim: true },
     size: { type: Number },
+    sha256: { type: String },
   },
   { _id: false }
 );
@@ -154,6 +166,10 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
       default: null,
     },
     appealCount: { type: Number, default: 0 },
+    authoring: {
+      type: new Schema<IHomeworkAuthoring>({ typed: Number, pasted: Number, pastes: Number, ms: Number }, { _id: false }),
+      default: null,
+    },
     aiGrade: {
       type: new Schema(
         { status: { type: String, enum: ["pending", "done", "failed", "skipped"] }, at: Date, note: { type: String, default: "" } },
@@ -169,6 +185,7 @@ const HomeworkSubmissionSchema = new Schema<IHomeworkSubmission>(
 HomeworkSubmissionSchema.index({ lessonId: 1, studentId: 1 }, { unique: true });
 HomeworkSubmissionSchema.index({ groupId: 1, status: 1 });
 HomeworkSubmissionSchema.index({ studentId: 1, submittedAt: -1 });
+HomeworkSubmissionSchema.index({ "files.sha256": 1 }, { partialFilterExpression: { "files.sha256": { $type: "string" } } });
 HomeworkSubmissionSchema.index({ "appeal.status": 1 }, { partialFilterExpression: { "appeal.status": "open" } });
 
 export const HomeworkSubmission: Model<IHomeworkSubmission> =

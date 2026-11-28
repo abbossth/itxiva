@@ -205,6 +205,7 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     return { success: false, message: parsed.error.issues[0].message };
   }
   const { lessonId, text, links, files } = parsed.data;
+  const authoring = parsed.data.authoring ?? null;
   if (!isObjectId(lessonId)) return { success: false, message: "Dars topilmadi" };
 
   const rate = checkRateLimit(`hw_submit_${session.userId}`, 20, 10 * 60 * 1000);
@@ -249,6 +250,7 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
     existing.isLate = isLate;
     existing.attempt = (existing.attempt ?? 1) + 1;
     existing.integrity = { ...PENDING_INTEGRITY };
+    existing.authoring = authoring;
     existing.autoGraded = false;
     existing.aiGrade = null;
     await existing.save();
@@ -266,6 +268,7 @@ export async function submitHomeworkAction(input: unknown): Promise<ActionResult
         submittedAt: now,
         isLate,
         integrity: { ...PENDING_INTEGRITY },
+        authoring,
       });
       submissionId = created._id.toString();
     } catch (err) {
